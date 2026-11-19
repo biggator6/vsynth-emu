@@ -15,7 +15,6 @@
 
 namespace {
 using V = Vc2PartVoices;
-constexpr int kSteps = 400;
 constexpr uint32_t kNoteAt = 0x8998a51c, kNoteBytes = 0x744;   // [FW] the notes W
 constexpr uint32_t kRoutinesAt[4] = { 0x893965e0, 0x89396630, 0x89396910, 0x893951b0 };   // [FW] what's logged
 constexpr VoicesKind kRoutineKinds[4] = { kVoicesNoteOn, kVoicesStartNote, kVoicesTruncateOnce, kVoicesWait };
@@ -32,7 +31,8 @@ VoicesCall called(VoicesKind kind, uint32_t routine, uint32_t object, std::array
 } // namespace
 
 // rom.4's side: the voice's two virtuals of both classes, the note's three routines and the queue's wait
-void assignInstallRom(VoicesSides& s) {
+void assignInstallRom(AssignSides& a) {
+    VoicesSides& s = a.s;
     for (const uint32_t vtable : { V::kVoiceVtable, kVoicesNoteClass }) {
         const VoicesCall prepare = voicesSlotCall(s.fw, kVoicesPrepare, 0, vtable, kAssignPrepareEntry);
         s.fw.cpu.hook(prepare.routine, [&s, prepare](Sh4& c) {
@@ -121,18 +121,12 @@ std::string assignStart(AssignSides& a, std::mt19937& rng) {
 }
 
 namespace {
-std::string assignCase(AssignSides& a, std::mt19937& rng) {
-    std::string what = assignStart(a, rng);
-    const std::span<const AssignEvent> events = assignEvents();
-    for (int k = 0; k < kSteps && what.empty(); ++k, ++a.n.events) {
-        assignSteer(a, rng, k == 0);
-        voicesPrepare(a.s, (uint32_t)rng());
-        what = events[rng() % events.size()](a, rng);
-        a.n.prepared += vc2CountCalls(a.s.mine, kVoicesPrepare);
-        a.n.stolen += vc2CountCalls(a.s.mine, kVoicesDestroy);
-        for (const VoicesCall& call : a.s.mine) a.n.partners += call.kind == kVoicesPrepare && (call.more[3] & 0xff);
-    }
-    return what;
+// An event's calls counted
+void assignCount(AssignSides& a) {
+    ++a.n.events;
+    a.n.prepared += vc2CountCalls(a.s.mine, kVoicesPrepare);
+    a.n.stolen += vc2CountCalls(a.s.mine, kVoicesDestroy);
+    for (const VoicesCall& call : a.s.mine) a.n.partners += call.kind == kVoicesPrepare && (call.more[3] & 0xff);
 }
 
 void sayAssignCounts(const AssignCounts& n) {
@@ -202,13 +196,7 @@ int32_t AssignPortParts::clock() {
 }
 
 long vc2AssignPart(VoicesSides& s, const Vc2Run& run) {
-    AssignSides a { s, {}, AssignPortParts(s) };
-    assignInstallRom(s);
-    Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
-    Vc2Run own = run;
-    own.seed = run.seed + 1;
-    vc2RunCases(own, tally, "", a.n.events, [&](std::mt19937& rng, bool) { return assignCase(a, rng); });
-    sayAssignCounts(a.n);
-    return tally.different;
+    return voicesPart<AssignSides, assignInstallRom, assignStart, assignSteer, assignEvents, assignCount,
+                      sayAssignCounts>(s, run, 1);
 }
 #endif

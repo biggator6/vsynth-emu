@@ -17,6 +17,7 @@ struct ReleaseCounts {
 
 // The third part's sides: the assigner's, the port's keys, the counts
 struct ReleaseSides {
+    explicit ReleaseSides(VoicesSides& s) : a(s) {}
     AssignSides a;
     Vc2Keys keys {};
     ReleaseCounts n {};
@@ -33,3 +34,9 @@ uint32_t releaseNode(std::mt19937& rng);
 
 using ReleaseEvent = std::string (*)(ReleaseSides&, std::mt19937&);
 std::span<const ReleaseEvent> releaseEvents();
+// A case's start (the assigner's, then the keys noise; what differs) and the draws before an event (all at a case's
+// first)
+std::string releaseStart(ReleaseSides& r, std::mt19937& rng);
+// The port's keys against rom.4's span; empty when they don't differ
+std::string releaseKeysDiffer(ReleaseSides& r);
+void steerRelease(ReleaseSides& r, std::mt19937& rng, bool all);

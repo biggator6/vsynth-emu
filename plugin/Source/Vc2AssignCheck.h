@@ -4,6 +4,7 @@
 // XT_VC2VOICES_MAIN only.
 #include "Vc2Assigner.h"
 #include "Vc2PartVoicesCheck.h"
+#include <memory>
 
 inline constexpr uint32_t kAssignMessagesAt = 0x89987420, kAssignMessageBytes = 0x24;   // [FW] the portamento keys
 inline constexpr uint32_t kAssignTablesAt = 0x89982720, kAssignTableBytes = 0x134;      // [FW] the key tables
@@ -54,6 +55,7 @@ struct AssignCounts {
 // The assigner's sides: the voices', the port's assigner and its parts, the note a few sounding voices are made to be
 // (a call takes it half the time), the counts
 struct AssignSides {
+    explicit AssignSides(VoicesSides& v) : s(v), parts(v) {}
     VoicesSides& s;
     Vc2Assigner assigner {};
     AssignPortParts parts;
@@ -66,10 +68,44 @@ uint32_t assignNoteOf(const VoicesAnswer& a);
 // A call drawn: the target half the time, else one of the messages, a part, a byte, a word passed on and a kind
 Vc2AssignCall assignDrawCall(AssignSides& a, std::mt19937& rng);
 
+// The arguments past r7, on the stack as a caller leaves them (Sh4::call sets r4…r7 alone)
+void assignStack(AssignSides& a, std::initializer_list<uint32_t> words);
+
 using AssignEvent = std::string (*)(AssignSides&, std::mt19937&);
 std::span<const AssignEvent> assignEvents();
+// A part's case: `Start`, then up to 400 of `Events()`, each after `Draw` (all at the first) and the voices' prepare,
+// its calls counted by `Count` after it; what differs, or nothing
+template <auto Start, auto Draw, auto Events, auto Count, class Sides>
+std::string voicesPartCase(Sides& x, VoicesSides& s, std::mt19937& rng) {
+    std::string what = Start(x, rng);
+    const auto events = Events();
+    for (int k = 0; k < 400 && what.empty(); ++k) {
+        Draw(x, rng, k == 0);
+        voicesPrepare(s, (uint32_t)rng());
+        what = events[rng() % events.size()](x, rng);
+        Count(x);
+    }
+    return what;
+}
+
+// A part of xt_vc2voices on the seed `offset` after the run's: its sides made on the voices', rom.4's hooks put in by
+// `Install`, its cases by voicesPartCase, its counts said by `Say`; how many cases differ
+template <class Sides, auto Install, auto Start, auto Draw, auto Events, auto Count, auto Say>
+long voicesPart(VoicesSides& s, const Vc2Run& run, uint32_t offset) {
+    const auto x = std::make_unique<Sides>(s);
+    Install(*x);
+    Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
+    Vc2Run own = run;
+    own.seed = run.seed + offset;
+    vc2RunCases(own, tally, "", x->n.events, [&](std::mt19937& rng, bool) {
+        return voicesPartCase<Start, Draw, Events, Count>(*x, s, rng);
+    });
+    Say(x->n);
+    return tally.different;
+}
+
 // A case's start (the voices noise, the notes drawn, rom.4's three inits; what differs), the second part's draws
 // before an event (all at a case's first), and rom.4's side's hooks
 std::string assignStart(AssignSides& a, std::mt19937& rng);
 void assignSteer(AssignSides& a, std::mt19937& rng, bool all);
-void assignInstallRom(VoicesSides& s);
+void assignInstallRom(AssignSides& a);

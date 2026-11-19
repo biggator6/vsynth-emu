@@ -33,7 +33,8 @@ VoicesAnswer drawAnswer(std::mt19937& rng) {
 const char* kindName(int32_t kind) {
     constexpr const char* kNames[kVoicesKinds] = { "destroy", "end test", "cost", "prepare", "retune", "note-on",
                                                    "note's start", "truncation once", "queue's wait", "key-off",
-                                                   "parameters' message", "clock" };
+                                                   "parameters' message", "clock", "note's routine",
+                                                   "conversion set's routine", "OS's routine" };
     return kNames[kind];
 }
 } // namespace

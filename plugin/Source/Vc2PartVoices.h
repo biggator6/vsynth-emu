@@ -46,7 +46,9 @@ static_assert(sizeof(Vc2VoiceNode) == 0x50, "rom.4's layout, a list's head and a
 struct Vc2Voice {
     Vc2VoiceNode node {};
     uint8_t byte50 = 0, byte51 = 0, byte52 = 0, byte53 = 0;   // +0x50…+0x53: the note's class's (0, −1 at +0x52)
-    uint32_t word54 = 0, word58 = 0;                         // +0x54, +0x58
+    uint8_t byte54 = 0, byte55 = 0;                          // +0x54, +0x55: the prepare's copies of +0x52, +0x50
+    uint16_t half56 = 0;                                     // +0x56
+    uint32_t word58 = 0;                                     // +0x58: 1 when C's refresh found a change
     uint32_t set = 0;                                        // +0x5c: its conversion set C, 0 none
 };
 static_assert(sizeof(Vc2Voice) == 0x60, "rom.4's layout, a voice's 0x60 bytes");

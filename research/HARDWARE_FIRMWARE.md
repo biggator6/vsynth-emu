@@ -1546,6 +1546,106 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's voices' virtuals and update queue (2026-11-19, v279) {#vc2-voice-class}
+
+Step 4.3's seventh version (VC2_MODE_PLAN.md, step 4.3, item 6): the note voice's class (vtable `0x898cd3dc`, which
+v277's class builder `0x893969e0` puts on a voice taken) and the update queue at `0x89989cc4`. `Vc2VoiceClass` and
+`Vc2UpdateQueue` are bit for bit against rom.4's own routines in `xt_vc2voices`' fourth part.
+
+**The class's words.** Beyond the base's 0x50 bytes (v272): +0x50…+0x55 bytes, +0x58 a word set when C's refresh
+found a change, and +0x5c the voice's conversion set C, 0 for none. C itself is step 4.3's next item; here its routines
+are called and logged.
+
+**The words a portamento key sets** (P, v276, and its key table K, P's +0):
+- **The prepare's `0x89391ae0(V, P, part, key; a word on the stack)`.**
+  - +0x34 takes K, +0x38 P, +0x3c the part, +0x41 the key, +0x42 P's key and +0x43 the word.
+  - The voices' age counter (`0x8998270c`) goes up by one. +0x20 takes its low 28 bits with 0x70000000, and +0x24
+    takes 0x5fffffff.
+  - +0x2f takes K's note-on velocity (K+8), and +0x2e K's note-on count for P's key (K+0x1c + the key, as a byte).
+  - +0x48 takes 7: the key and both pedals held.
+- **The retune's `0x89391b40(V, P, part, key)`.** It writes the same, but leaves +0x34…+0x3c. +0x43 takes K's
+  note-on velocity, and +0x48 has 7 or-ed in. The part, in r6, isn't read.
+
+**The six virtuals.** C's routines are given a struct of three words: V+0x34, V+0x53 and a word.
+- **+0x0c, the update `0x893970b0(V)`.** It needs a set and a note.
+  - Under the OS's lock (`0x893018e0` and `0x893018f0` on `0x8994fec8`): C's refresh `0x893a7f10` (a nonzero answer
+    sets +0x58), then C's update `0x893a7cc0`, both with the word 0.
+  - Then C's copy into the note `0x893a7df0(C, W)` and the note's update pass (v275, `0x893967a0`).
+- **+0x18, the retune `0x893971f0(V, P, part, key)`.** It waits on the voice's queue (`0x893951b0`), sets the retune's
+  words and +0x55 to 1. With a set and a note: C's conversion `0x893a7b20(C, struct, W)`, the struct's word read from
+  `0x8953fb2c` (0 in rom.4), then the note's settings pass (`0x89396650`).
+- **+0x24, the destroy `0x893973a0(V)`.** It takes the voice off its queue (`0x89395120`). It ends its note
+  (`0x89396590(W, 3)`) and its set (`0x893a7a20(C, 3)`), each cleared after, and clears +0x30.
+- **+0x30, the key-off `0x89397280(V)`.** It waits on its queue. With a set and a note: C's release
+  `0x893a7c50(C, +0x2f)`, then the note's release (`0x893968b0`).
+- **+0x3c, the prepare `0x89397130(V, P, part, key; the legato's struct, a word and the kind on the stack)`.**
+  - It sets the prepare's words and +0x2d to 1.
+  - +0x55, +0x53 and +0x54 take +0x50, +0x51 and +0x52; +0x30 and +0x58 are cleared.
+  - Its note is the note W of its own number (`0x8998a51c` + 0x744 × +0x40), constructed with the part's first byte
+    and the kind (`0x89396520`).
+  - Its set is placed by `0x893a76a0(108, number)`. When there is one, it is made (`0x893a76d0(C, struct, W)`, the
+    struct's word the legato's struct's address). +0x5c takes it, or 0.
+- **+0x48, the change test `0x893972d0(V)`.** It answers 0 when +0x30's bit 0 is set. Otherwise the voice is put on the
+  queue (`0x89394fa0`). With a set, C's refresh (word 0) runs: when it answers nonzero or +0x58 is set, +0x58 is cleared
+  and the test answers 1; else 0.
+
+**The update queue.** There is one queue, 36 bytes at `0x89989cc4`. A voice's +0x0c byte names its queue
+(`0x89989cc4` + 36 × the byte), and every caller gives queue 0.
+- **Its words.** The head node is at +4: its links at +4 and +8, its class `0x898cd358` at +0x14. The node being run
+  is at +0x18. +0x1c is an OS object posted when that node moves on. +0x20 is one waited on and signalled around it.
+- **The nodes.** They are the voices' first words: +0 the next node, +4 the previous, +8 a flag. A node out of the
+  queue is linked to itself.
+- **The constructor `0x89394f60(Q)`** links the head to itself, writes its class and clears +0x18. The static
+  initializer `0x89395280` runs it on the queue.
+- **The link `0x89394f10(node, after)` and unlink `0x89394f20(node)`** are the list's plain two; the unlink links the
+  node to itself.
+- **The enqueue `0x89394fa0(Q, node)`.**
+  - When the node is being run, it waits for it (the OS's wait then signal on +0x20) and unlinks it.
+  - Otherwise a node already on a queue (its next not itself) is left.
+  - Then the node goes at the front, after the head; its flag takes 1 and its queue byte 0.
+- **The node being run moves to its next** in four routines when it is the node given:
+  - the move on `0x89395040(Q, node)`, which posts +0x1c and unlinks the node;
+  - the pass on `0x893950b0(Q, node)`, which posts +0x1c alone;
+  - the take off `0x89395120(Q, node)`, which waits and unlinks the node;
+  - the move `0x89395210(node, queue)`, which needs no queue given, with the interrupts masked. It unlinks the node,
+    links it at the front of the queue named and writes the byte.
+- **The waits.** `0x893951b0(Q, node)` waits when the node is being run, and `0x893951d0(Q)` always.
+
+**The check.** `xt_vc2voices` gains a fourth part, on the seed after the release path's, so the other three parts'
+lines stay as they were. It runs rom.4's virtuals and queue routines, which the earlier parts hook, as its own again.
+It hooks and logs, with their arguments:
+- the note's five routines;
+- C's eight, a struct read through its pointer, with the placement and the refresh answering as drawn (a set for each
+  note's number, or none);
+- the OS's lock, unlock, wait, signal and post.
+
+The port's queue routines run on the port's queue. A call on another queue's address is logged as one rom.4 never
+makes. The queue's 36 bytes are written into rom.4's memory before each event and compared after it, beside the
+voices' and keys' spans.
+
+The draws, beyond the release path's:
+- every voice on queue 0;
+- the queue's links one list, a few voices on it in a drawn order and the rest linked to themselves, and one time in
+  four a voice's link aimed elsewhere (where the enqueue's test of the next link alone shows);
+- the queue's node being run (none, the head, one on the queue or any voice), its class and OS words;
+- a node's queue byte, half the time, before the queue's own routines (which don't read it);
+- the voices' sets, +0x58 and bytes +0x50…+0x55, and their held bits (+0x48) any byte one time in four, where the
+  prepare's write and the retune's or differ;
+- the age counter now and then, its top bits set;
+- the four messages' keys below 128;
+- the retune's word, 0 or any.
+
+Not drawn: a glide's key past 127, as the port reads K's note-on counts by the key. Not planted: a queue's stride, as
+there is one queue and a virtual reads queue 0; the unlink's two writes in the other order, which never meet.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2VoiceClass.cpp` and `Vc2VoiceQueue.cpp` is reached.
+- `mutate_vc2.py --voices`: the class's 57 plants and the queue's 38 with the 191 before them, none missed.
+
+The parts' runners are now one template, `voicesPart` (Vc2AssignCheck.h), on their sides, hooks, starts, draws, events
+and counts.
+
 ### The VC-2 part's assigner, its second part (2026-11-19, v278) {#vc2-part-assigner-release}
 
 Step 4.3's sixth version (VC2_MODE_PLAN.md, step 4.3, item 5's second half): the release path and the part node's note

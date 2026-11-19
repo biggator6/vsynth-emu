@@ -98,4 +98,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Assigner.cpp
     Source/Vc2AssignRelease.cpp
     Source/Vc2AssignNotes.cpp
+    Source/Vc2VoiceQueue.cpp
+    Source/Vc2VoiceClass.cpp
 )

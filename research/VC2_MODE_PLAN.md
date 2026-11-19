@@ -684,6 +684,11 @@ version against rom.4's routines with what it calls hooked:
         (HARDWARE_FIRMWARE.md, "The VC-2 part's assigner, its second part"). Item 5 done.
    6. The voice's virtuals (`0x89397130`, `0x893970b0`, `0x893971f0`, `0x89397280`, `0x893972d0`, `0x893973a0`) and the
       update queue at `0x89989cc4` (`0x89394f30…0x893951b0`).
+      - done (v279): `Vc2VoiceClass`, the six virtuals and the words they set from a portamento key (`0x89391ae0`,
+        `0x89391b40`), C's routines and the note's through `Vc2VoiceClassParts`; `Vc2UpdateQueue`, the one queue word
+        for word with its constructor, initializer, link, unlink, enqueue, move on, pass on, take off, waits and move
+        (a node's constructor `0x89394f30` is v272's `vc2ConstructNode`'s); xt_vc2voices' fourth part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's voices' virtuals and update queue").
    7. C's frame: `0x893a76d0`, `0x893a7a20`, `0x893a7b20`, `0x893a7c50`, `0x893a7cc0`, `0x893a7df0`, `0x893a7f10`, and
       the note's M (`0x893a5db0`, `0x893a5fe0`, `0x893a6010`, `0x893a61f0`), its children behind an interface.
    8. C's children with no port, a version each: the common's (`0x893a1940…`), the envelopes' (`0x8939a620…`), the LFOs'

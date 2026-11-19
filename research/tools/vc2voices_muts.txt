@@ -202,3 +202,103 @@ noteoff-second|if (parts.partSetting(part, kCarrierHeld) == 0) glideOff(first + 
 noteoff-mono|    if (parts.partSetting(part, kMono) == 0) return;\n    parts.readParameters(part);\n    retune|    parts.readParameters(part);\n    retune|vc2nodenotes
 noteoff-parameters|    parts.readParameters(part);\n    retune(|    retune(|vc2nodenotes
 noteoff-key|(uint32_t)movedKey(part, found, parts), false, v, parts);|(uint32_t)movedKey(part, 0, parts), false, v, parts);|vc2nodenotes
+
+# The voice's virtuals (vc2class, v279) and the update queue (vc2queue), through xt_vc2voices' fourth part.  Not
+# planted: a queue's stride (36 bytes) in the virtuals and the move, as rom.4 has the one queue and every voice is on
+# queue 0 when a virtual reads it; the unlink's two writes in the other order (one is a node's +4, the other a node's
+# +0: they never meet).
+class-channel-at|kChannelAt = 0x34|kChannelAt = 0x38|vc2class
+class-byte-at|kByteAt = 0x53|kByteAt = 0x52|vc2class
+class-age-mask|kAgeMask = 0x0fffffff|kAgeMask = 0x07ffffff|vc2class
+class-age-marks|kAgeMarks = 0x70000000|kAgeMarks = 0x60000000|vc2class
+class-second-age|kSecondAge = 0x5fffffff|kSecondAge = 0x6fffffff|vc2class
+class-all-held|kAllHeld = 7;|kAllHeld = 3;|vc2class
+class-update-asked|kUpdateAsked = 1;|kUpdateAsked = 2;|vc2class
+class-ages-step|    v.ages += 1;|    v.ages += 2;|vc2class
+class-velocity|n.byte2f = keys.table(glide.table).onVelocity;|n.byte2f = keys.table(glide.table).offVelocity;|vc2class
+class-ons|.ons[(uint8_t)glide.key];|.offs[(uint8_t)glide.key];|vc2class
+prepare-channel|n.channel = keys.glide(c.message).table;|n.channel = c.message;|vc2class
+prepare-source|n.source = c.message;|n.source = c.part;|vc2class
+prepare-key|    n.key = (uint8_t)c.onByte;|    n.key = (uint8_t)c.passed;|vc2class
+prepare-byte42|n.byte42 = (uint8_t)keys.glide(c.message).key;|n.byte42 = (uint8_t)c.onByte;|vc2class
+prepare-byte43|n.byte43 = (uint8_t)c.passed;|n.byte43 = (uint8_t)c.kind;|vc2class
+prepare-held|    n.held = kAllHeld;|    n.held \|= kAllHeld;|vc2class
+retune-key|n.key = (uint8_t)onByte;|n.key = (uint8_t)glide.key;|vc2class
+retune-byte42|    n.byte42 = (uint8_t)glide.key;|    n.byte42 = (uint8_t)onByte;|vc2class
+retune-byte43|n.byte43 = keys.table(glide.table).onVelocity;|n.byte43 = (uint8_t)onByte;|vc2class
+retune-held|    n.held \|= kAllHeld;|    n.held = kAllHeld;|vc2class
+update-word58|if (parts.refreshSet(w.set, call) != 0) w.word58 = 1;|if (parts.refreshSet(w.set, call) == 0) w.word58 = 1;|vc2class
+update-order|    parts.unlock();\n    parts.copySet(w.set, w.node.note);|    parts.copySet(w.set, w.node.note);\n    parts.unlock();|vc2class
+update-note-test|    if (w.set == 0 \|\| w.node.note == 0) return;\n    parts.lock();|    if (w.set == 0) return;\n    parts.lock();|vc2class
+update-call-word|    const Vc2SetCall call = setCall(voice, 0);|    const Vc2SetCall call = setCall(voice, 1);|vc2class
+update-note|    parts.noteUpdate(w.node.note);|    parts.noteBlocks(w.node.note);|vc2class
+retune-byte55|    w.byte55 = 1;|    w.byte55 = 0;|vc2class
+retune-word|setCall(voice, parts.retuneWord())|setCall(voice, 0)|vc2class
+retune-blocks|    parts.noteBlocks(w.node.note);|    parts.noteUpdate(w.node.note);|vc2class
+retune-no-wait|    parts.waitQueue(kQueueAt + kQueueBytes * w.node.queue, voice);\n    retuneWords|    retuneWords|vc2class
+retune-set-test|    w.byte55 = 1;\n    if (w.set == 0 \|\| w.node.note == 0) return;|    w.byte55 = 1;\n    if (w.node.note == 0) return;|vc2class
+destroy-queue|parts.takeOff(kQueueAt + kQueueBytes * w.node.queue, voice);|parts.takeOff(kQueueAt + 4, voice);|vc2class
+destroy-note-clear|        parts.endNote(w.node.note);\n        w.node.note = 0;|        parts.endNote(w.node.note);|vc2class
+destroy-set-clear|        parts.endSet(w.set);\n        w.set = 0;|        parts.endSet(w.set);|vc2class
+destroy-updated|    w.node.updated = 0;\n}\n\nvoid Vc2VoiceClass::keyOff|}\n\nvoid Vc2VoiceClass::keyOff|vc2class
+destroy-order|        parts.endSet(w.set);\n        w.set = 0;\n    }\n    w.node.updated = 0;|        w.set = 0;\n    }\n    w.node.updated = 0;\n    if (w.set != 0) parts.endSet(w.set);|vc2class
+keyoff-velocity|parts.releaseSet(w.set, w.node.byte2f);|parts.releaseSet(w.set, w.node.byte2e);|vc2class
+keyoff-no-wait|    parts.waitQueue(kQueueAt + kQueueBytes * w.node.queue, voice);\n    if (w.set == 0 \|\| w.node.note == 0) return;\n    parts.releaseSet|    if (w.set == 0 \|\| w.node.note == 0) return;\n    parts.releaseSet|vc2class
+keyoff-release|    parts.noteRelease(w.node.note);|    parts.noteUpdate(w.node.note);|vc2class
+prepare-released|w.node.released = 1;|w.node.released = 0;|vc2class
+prepare-byte55|w.byte55 = w.byte50;|w.byte55 = w.byte51;|vc2class
+prepare-byte53|w.byte53 = w.byte51;|w.byte53 = w.byte52;|vc2class
+prepare-byte54|w.byte54 = w.byte52;|w.byte54 = w.byte50;|vc2class
+prepare-updated|    w.node.updated = 0;\n    w.word58 = 0;|    w.word58 = 0;|vc2class
+prepare-word58|    w.word58 = 0;\n    const uint32_t note|    const uint32_t note|vc2class
+prepare-note|(uint32_t)sizeof(Vc2NoteWords) * w.node.number;|(uint32_t)sizeof(Vc2NoteWords) * (w.node.number + 1u);|vc2class
+prepare-kind|parts.firstByte(w.node.part), c.kind);|parts.firstByte(w.node.part), c.passed);|vc2class
+prepare-part|parts.constructNote(note, parts.firstByte(w.node.part), c.kind);|parts.constructNote(note, w.node.part, c.kind);|vc2class
+prepare-legato|setCall(voice, c.legatoAt)|setCall(voice, c.passed)|vc2class
+prepare-set-number|parts.placeSet(w.node.number)|parts.placeSet(w.node.key)|vc2class
+prepare-set-kept|    w.set = set;\n}|    w.set = set == 0 ? w.set : set;\n}|vc2class
+prepare-words-first|    prepareWords(voice, c, v, keys);\n    w.node.released = 1;|    w.node.released = 1;\n    prepareWords(voice, c, v, keys);\n    w.node.released = 0;|vc2class
+changed-asked|if ((w.node.updated & kUpdateAsked) != 0) return 0;|if ((w.node.updated & kUpdateAsked) != 0) return 1;|vc2class
+changed-enqueue|parts.enqueue(kQueueAt, voice);|parts.enqueue(kQueueAt + 4, voice);|vc2class
+changed-and|== 0 && w.word58 == 0) return 0;|== 0 \|\| w.word58 == 0) return 0;|vc2class
+changed-clear|    w.word58 = 0;\n    return 1;|    return 1;|vc2class
+changed-no-set|    if (w.set == 0) return 0;\n    if (parts.refreshSet|    if (w.set == 0) return 1;\n    if (parts.refreshSet|vc2class
+changed-call-word|if (parts.refreshSet(w.set, setCall(voice, 0)) == 0|if (parts.refreshSet(w.set, setCall(voice, 2)) == 0|vc2class
+queue-next-head|return node == kHeadAt ? q.next : v.at(node).queueNext;|return node == kAt ? q.next : v.at(node).queueNext;|vc2queue
+queue-prev-of|return node == kHeadAt ? q.prev : v.at(node).queuePrev;|return node == kHeadAt ? q.next : v.at(node).queuePrev;|vc2queue
+construct-next|    q.next = kHeadAt;\n    q.prev = kHeadAt;|    q.next = kAt;\n    q.prev = kHeadAt;|vc2queue
+construct-prev|    q.prev = kHeadAt;\n    q.vtable|    q.prev = 0;\n    q.vtable|vc2queue
+construct-vtable|q.vtable = kHeadVtable;|q.vtable = kHeadVtable + 4;|vc2queue
+construct-current|    q.current = 0;\n}|}|vc2queue
+static-none|void Vc2UpdateQueue::staticInit() { construct(); }|void Vc2UpdateQueue::staticInit() {}|vc2queue
+link-node-next|    nextOf(node, v) = next;\n    prevOf(node, v) = after;|    nextOf(node, v) = after;\n    prevOf(node, v) = after;|vc2queue
+link-node-prev|    prevOf(node, v) = after;|    prevOf(node, v) = next;|vc2queue
+link-after-next|    nextOf(after, v) = node;|    nextOf(after, v) = next;|vc2queue
+link-next-prev|    prevOf(next, v) = node;\n}|    prevOf(next, v) = after;\n}|vc2queue
+link-order|    const uint32_t next = nextOf(after, v);\n    nextOf(node, v) = next;|    nextOf(after, v) = node;\n    const uint32_t next = nextOf(after, v);\n    nextOf(node, v) = next;|vc2queue
+unlink-next-prev|    prevOf(next, v) = prev;|    prevOf(next, v) = node;|vc2queue
+unlink-prev-next|    nextOf(prev, v) = next;|    nextOf(prev, v) = node;|vc2queue
+unlink-self-prev|    prevOf(node, v) = node;\n    nextOf(node, v) = node;|    nextOf(node, v) = node;|vc2queue
+unlink-self-next|    nextOf(node, v) = node;\n}|}|vc2queue
+wait-lock|    parts.wait(q.lock);|    parts.wait(q.post);|vc2queue
+wait-signal|    parts.signal(q.lock);|    parts.signal(q.post);|vc2queue
+advance-test|    if (q.current != node) return false;|    if (q.current == 0) return false;|vc2queue
+advance-next|    q.current = nextOf(node, v);|    q.current = prevOf(node, v);|vc2queue
+enqueue-current|    if (q.current == node) {|    if (q.current == kHeadAt) {|vc2queue
+enqueue-no-wait|        waitCurrent(parts);\n        unlink(node, v);\n    } else|        unlink(node, v);\n    } else|vc2queue
+enqueue-no-unlink|        waitCurrent(parts);\n        unlink(node, v);\n    } else|        waitCurrent(parts);\n    } else|vc2queue
+enqueue-linked|} else if (nextOf(node, v) != node) {|} else if (prevOf(node, v) != node) {|vc2queue
+enqueue-head|    link(node, kHeadAt, v);\n    v.at(node).queued = 1;|    link(node, q.prev, v);\n    v.at(node).queued = 1;|vc2queue
+enqueue-queued|    v.at(node).queued = 1;|    v.at(node).queued = 0;|vc2queue
+enqueue-queue|    v.at(node).queue = 0;\n}|}|vc2queue
+moveon-post|    if (advance(node, v)) parts.post(q.post);\n    unlink(node, v);|    advance(node, v);\n    unlink(node, v);|vc2queue
+moveon-unlink|    if (advance(node, v)) parts.post(q.post);\n    unlink(node, v);|    if (advance(node, v)) parts.post(q.post);|vc2queue
+passon-post|    if (advance(node, v)) parts.post(q.post);\n}|    if (advance(node, v)) parts.post(q.lock);\n}|vc2queue
+passon-unlink|    if (advance(node, v)) parts.post(q.post);\n}|    if (advance(node, v)) parts.post(q.post);\n    unlink(node, v);\n}|vc2queue
+takeoff-wait|    if (advance(node, v)) waitCurrent(parts);|    if (advance(node, v)) parts.post(q.post);|vc2queue
+takeoff-unlink|    if (advance(node, v)) waitCurrent(parts);\n    unlink(node, v);|    if (advance(node, v)) waitCurrent(parts);|vc2queue
+wait-test|    if (q.current == node) waitCurrent(parts);|    if (q.current != 0) waitCurrent(parts);|vc2queue
+waitall-signal|void Vc2UpdateQueue::waitAll(Vc2QueueParts& parts) { waitCurrent(parts); }|void Vc2UpdateQueue::waitAll(Vc2QueueParts& parts) { parts.wait(q.lock); }|vc2queue
+moveto-advance|    advance(node, v);\n    unlink(node, v);\n    link(|    unlink(node, v);\n    link(|vc2queue
+moveto-unlink|    unlink(node, v);\n    link(node, kHeadAt|    link(node, kHeadAt|vc2queue
+moveto-queue|    v.at(node).queue = (uint8_t)queue;\n}|}|vc2queue

@@ -23,7 +23,8 @@ inline constexpr int kVoicesNotes = 24, kVoicesTones = 24;
 // note start's (Vc2AssignReleaseCheck.cpp)
 enum VoicesKind : int32_t {
     kVoicesDestroy, kVoicesEnded, kVoicesCost, kVoicesPrepare, kVoicesRetune, kVoicesNoteOn, kVoicesStartNote,
-    kVoicesTruncateOnce, kVoicesWait, kVoicesKeyOff, kVoicesParameters, kVoicesClock, kVoicesKinds
+    kVoicesTruncateOnce, kVoicesWait, kVoicesKeyOff, kVoicesParameters, kVoicesClock, kVoicesNote, kVoicesSet,
+    kVoicesOs, kVoicesKinds
 };
 
 // A call as either side made it: what, the routine it reached and the object it was given, and from v277 the arguments
@@ -127,3 +128,6 @@ long vc2AssignPart(VoicesSides& s, const Vc2Run& run);
 // The release path's and note start's part (v278, Vc2AssignReleaseCheck.cpp), after the assigner's on the seed after
 // its: its cases' count that differ, its counts said
 long vc2AssignReleasePart(VoicesSides& s, const Vc2Run& run);
+// The voice class's and update queue's part (v279, Vc2VoiceClassCheck.cpp), after the release path's on the seed
+// after its
+long vc2VoiceClassPart(VoicesSides& s, const Vc2Run& run);

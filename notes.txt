@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's voices' virtuals and update queue v279 (2026-11-19, on claude/vc2-part-4-3 after v278;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's voices' virtuals and update queue"): step 4.3's seventh version, item 6 done.
+  Vc2VoiceClass, the note voice's six virtuals (the update, retune, destroy, key-off, prepare and change test) and the
+  words they set from a portamento key; Vc2UpdateQueue, rom.4's one update queue word for word (the constructor,
+  initializer, link, unlink, enqueue, move on, pass on, take off, waits and move); the note's, C's and the OS's routines
+  through their parts. xt_vc2voices gains a fourth part on the seed after the release path's, the queue's words compared
+  too: 0 different at seeds 2024, 7 and 31337; mutate_vc2.py --voices 286 planted (95 new), 0 missed. The parts' runners
+  are one template, voicesPart. Found: the retune's routines take the part in r6 and leave it unread; the retune's C
+  struct word is rom.4's 0x8953fb2c, 0. Not in the sound yet.
+
 The VC-2 part's assigner, its second part v278 (2026-11-19, on claude/vc2-part-4-3 after v277 and vc2-mode's merge;
   HARDWARE_FIRMWARE.md, "The VC-2 part's assigner, its second part"): step 4.3's sixth version, item 5 done. On
   Vc2Assigner, the release path (a key's release on a voice, the pedals' lifts, and over a key table's voices the

@@ -23,8 +23,8 @@ auto assignOnCall(AssignSides& a, OnCall member, const Vc2AssignCall& c) {
 }
 
 uint32_t assignVoice(AssignSides& a, std::mt19937& rng) { return a.s.port.addressOf((int)(rng() % V::kVoices)); }
+} // namespace
 
-// The arguments past r7, on the stack as a caller leaves them (Sh4::call sets r4…r7 alone)
 void assignStack(AssignSides& a, std::initializer_list<uint32_t> words) {
     uint32_t at = kVc2Sp;
     for (const uint32_t w : words) {
@@ -32,6 +32,8 @@ void assignStack(AssignSides& a, std::initializer_list<uint32_t> words) {
         at += 4;
     }
 }
+
+namespace {
 
 std::string assignStartEvent(AssignSides& a, std::mt19937& rng) {
     const Vc2AssignCall c = assignDrawCall(a, rng);

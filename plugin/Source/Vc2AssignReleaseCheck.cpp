@@ -14,7 +14,6 @@
 
 namespace {
 using V = Vc2PartVoices;
-constexpr int kSteps = 400;
 constexpr int32_t kClockMost = 1 << 30;
 constexpr uint32_t kSettingOffsets[5] = { 0, 1, 2, 0x16, 0x18 };   // [FW] the bytes the routines read
 
@@ -39,8 +38,9 @@ void releaseInstallRom(ReleaseSides& r) {
         c.ret((uint32_t)r.a.parts.ms);
     });
 }
+} // namespace
 
-std::string keysDiffer(ReleaseSides& r) {
+std::string releaseKeysDiffer(ReleaseSides& r) {
     std::vector<uint8_t> theirs(sizeof r.keys);
     r.a.s.fw.cpu.read(Vc2Keys::kTablesAt, theirs.data(), theirs.size());
     const auto* ours = reinterpret_cast<const uint8_t*>(&r.keys);
@@ -51,6 +51,8 @@ std::string keysDiffer(ReleaseSides& r) {
     std::snprintf(t, sizeof t, "the keys' byte 0x%08x: %02x, against %02x", at, *b, *a);
     return t;
 }
+
+namespace {
 
 // A glide as the routines meet it: aimed at one of the three tables, its flags 0 or 1, its clock below 2^30
 void releaseGlide(Vc2KeyGlide& g, std::mt19937& rng) {
@@ -87,6 +89,7 @@ void releaseVoiceWords(ReleaseSides& r, uint32_t voice, std::mt19937& rng) {
     v.part = releaseMessage(rng);
     if (rng() % 2) v.byte42 = (uint8_t)r.keys.table(table).offKey;
 }
+} // namespace
 
 void steerRelease(ReleaseSides& r, std::mt19937& rng, bool all) {
     assignSteer(r.a, rng, all);
@@ -108,21 +111,21 @@ void steerRelease(ReleaseSides& r, std::mt19937& rng, bool all) {
     r.a.parts.ms = (int32_t)(rng() % kClockMost);
 }
 
-std::string releaseCase(ReleaseSides& r, std::mt19937& rng) {
-    std::string what = assignStart(r.a, rng);
+std::string releaseStart(ReleaseSides& r, std::mt19937& rng) {
+    const std::string what = assignStart(r.a, rng);
     std::vector<uint32_t> noise(sizeof r.keys / 4);
     for (uint32_t& w : noise) w = (uint32_t)rng();
     std::memcpy(&r.keys, noise.data(), sizeof r.keys);
-    const std::span<const ReleaseEvent> events = releaseEvents();
-    for (int k = 0; k < kSteps && what.empty(); ++k, ++r.n.events) {
-        steerRelease(r, rng, k == 0);
-        voicesPrepare(r.a.s, (uint32_t)rng());
-        what = events[rng() % events.size()](r, rng);
-        r.n.keyOffs += vc2CountCalls(r.a.s.mine, kVoicesKeyOff);
-        r.n.builds += vc2CountCalls(r.a.s.mine, kVoicesPrepare);
-        r.n.retunes += vc2CountCalls(r.a.s.mine, kVoicesRetune);
-    }
     return what;
+}
+
+namespace {
+// An event's calls counted
+void releaseCount(ReleaseSides& r) {
+    ++r.n.events;
+    r.n.keyOffs += vc2CountCalls(r.a.s.mine, kVoicesKeyOff);
+    r.n.builds += vc2CountCalls(r.a.s.mine, kVoicesPrepare);
+    r.n.retunes += vc2CountCalls(r.a.s.mine, kVoicesRetune);
 }
 
 void sayReleaseCounts(const ReleaseCounts& n) {
@@ -143,7 +146,7 @@ std::string releaseOnBoth(ReleaseSides& r, const Vc2CheckRoutine& routine, std::
     };
     const std::string what = vc2BothAnswer(r.a.s.fw, routine, args, ours, [&] {
         const std::string voices = voicesDifference(r.a.s);
-        return voices.empty() ? keysDiffer(r) : voices;
+        return voices.empty() ? releaseKeysDiffer(r) : voices;
     });
     return what.empty() ? what : std::string(routine.name) + ": " + what;
 }
@@ -157,13 +160,7 @@ uint32_t releaseMessage(std::mt19937& rng) {
 uint32_t releaseNode(std::mt19937& rng) { return kReleaseNodesAt + kReleaseObjectBytes * (rng() % kReleaseObjects); }
 
 long vc2AssignReleasePart(VoicesSides& s, const Vc2Run& run) {
-    const auto r = std::make_unique<ReleaseSides>(ReleaseSides { { s, {}, AssignPortParts(s) } });
-    releaseInstallRom(*r);
-    Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
-    Vc2Run own = run;
-    own.seed = run.seed + 2;
-    vc2RunCases(own, tally, "", r->n.events, [&](std::mt19937& rng, bool) { return releaseCase(*r, rng); });
-    sayReleaseCounts(r->n);
-    return tally.different;
+    return voicesPart<ReleaseSides, releaseInstallRom, releaseStart, steerRelease, releaseEvents, releaseCount,
+                      sayReleaseCounts>(s, run, 2);
 }
 #endif
