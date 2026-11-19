@@ -1546,6 +1546,39 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the part's bytes and the COSM inputs (2026-11-19, v287) {#vc2-part-settings-cosm}
+
+Step 4.3's fifteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's second part): two more of the part's readers, on
+`Vc2PartSettings` and checked by `xt_vc2settings`' second part.
+
+**The part's bytes by kind** (`0x89998a14`, 16 a part, the byte the sets read by kind): `0x893a8250` reads each kind's
+by `0x893a81d0`, ID 0x2d3 from the kind's first block (flag 1).
+
+**The COSM inputs** (`0x89e2003c`, 0x540 a part, 84 a kind, 42 a COSM input), by `0x89399ed0`: for each kind, each of
+its two COSM inputs, two rows:
+- `0x89399c90` (flag 4): a COSM's own read object, `0x89320c10(obj, part, kind, cosm)`, read by the typed getter
+  `0x89324370` (its third argument a halfword at `0x8950d98a`). +0 takes ID 0x462 and +1 0x463, the COSM's type. The
+  type picks a run of IDs from rom.4's table `0x8953fb40` (a first and a last ID by type: 17 types, 1…14 IDs each),
+  read into halfwords from +10. Past type 16 the table runs into other data, some of whose runs would write far past
+  the row; the parameter's range never gives such a type, and the port reads nothing there.
+- `0x89399d60` (flag 2): from the kind's second block, two envelopes' velocity curve and depth by v286's laws, into
+  +2 and +4, +6 and +8. COSM input 0 takes envelopes 9 and 10's (IDs 0x389 + 13 × the envelope, and the next); input
+  1 takes 11 and 12's. A COSM index past 1 answers 0.
+- The runs are read by `Vc2PartSettingsTables` (loadVc2), which refuses an image where a run is out of order or
+  longer than a row's 16 halfwords.
+
+**The check.** It is `xt_vc2settings`' second part, on the seed after the first's, so the first part's draws and line
+are as they were. It adds the COSM set-up and the typed getter to the hooks; the read's log carries the COSM input.
+The store answers the type's ID within the table's 17. Each case is noise in every table, then 400 events: the
+bytes' reader and row, the COSM inputs' reader and its two rows (the second given a COSM index up to 2).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first part's line as it was.
+- Every line and branch of `Vc2PartSettings.cpp` is reached but the type's guard past 16, never drawn.
+- `mutate_vc2.py --settings`: 139 plants, none missed; v287's 34 new. The first run missed one, a flag set right
+  after a COSM row's reads: the check's flips set only flags 0…3, so the second part's now set any of the five (the
+  first part's stay at four, keeping its draws).
+
 ### The VC-2 part's settings by ID (2026-11-19, v286) {#vc2-part-settings}
 
 Step 4.3's fourteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's first part): the readers that fill the tables C's

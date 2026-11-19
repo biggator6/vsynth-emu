@@ -723,6 +723,9 @@ version against rom.4's routines with what it calls hooked:
         TVA's readers and their systems', on `Vc2PartParams`; xt_vc2settings (HARDWARE_FIRMWARE.md, "The VC-2 part's
         settings by ID"). Left: the mode row, the part's bytes, the OSC rows, the COSM inputs, `0x893a72f0`, the
         dispatchers, the Category and budget and the nodes.
+      - the part's bytes and the COSM inputs done (v287): `0x893a8250` and `0x89399ed0` with their rows, the types'
+        runs by `Vc2PartSettingsTables`; xt_vc2settings' second part. Left: the mode row (it sends messages to the
+        part's channels), the OSC rows, `0x893a72f0`, the dispatchers, the Category and budget and the nodes.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

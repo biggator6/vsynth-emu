@@ -5,10 +5,11 @@
 #include "Vc2CheckCalls.h"
 #include "Vc2CheckMain.h"
 #include "Vc2PartSettings.h"
+#include "Vc2PartSettingsTables.h"
 #include <vector>
 
 struct SettingsCall {
-    int32_t block, part, kind, id;
+    int32_t block, part, kind, sub, id;   // sub: a COSM's read object's COSM input (v287), else 0
     bool operator==(const SettingsCall&) const = default;
 };
 
@@ -33,7 +34,10 @@ class SettingsPortParams final : public Vc2PartParams {
 public:
     explicit SettingsPortParams(SettingsReads& reads) : reads_(reads) {}
     int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) override {
-        return reads_.read({ (int32_t)block, part, kind, id });
+        return reads_.read({ (int32_t)block, part, kind, 0, id });
+    }
+    int32_t cosmValue(int part, int kind, int cosm, int16_t id) override {
+        return reads_.read({ (int32_t)Vc2ParamBlock::kCosm, part, kind, cosm, id });
     }
     bool held(int flag) override { return reads_.flags[flag] != 0; }
 
@@ -43,7 +47,8 @@ private:
 
 struct SettingsCounts {
     long events = 0, calls = 0, gaveUp = 0, flipped = 0;
-    std::array<long, 16> byEvent {};
+    long moreEvents = 0, moreCalls = 0;   // the second part's (v287)
+    std::array<long, 21> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups and the getter hooked, the tables, each side's

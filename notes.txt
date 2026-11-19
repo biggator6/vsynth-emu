@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's settings by ID, the part's bytes and the COSM inputs v287 (2026-11-19, on claude/vc2-part-4-3 after
+  v286; HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the part's bytes and the COSM inputs"): step 4.3's
+  fifteenth version, item 9's second part. On Vc2PartSettings: the part's bytes by kind and the COSM inputs' two rows
+  (a COSM's read object and the typed getter, its type's run of IDs from rom.4's table by Vc2PartSettingsTables,
+  loadVc2; two envelopes' velocity by v286's laws). xt_vc2settings gains a second part: 0 different at seeds 2024,
+  7 and 31337, the first part's line unchanged; mutate_vc2.py --settings 139 planted, 0 missed. Not in the sound
+  yet.
+
 The VC-2 part's settings by ID v286 (2026-11-19, on claude/vc2-part-4-3 after v285; HARDWARE_FIRMWARE.md, "The VC-2
   part's settings by ID"): step 4.3's fourteenth version, item 9's first part. Vc2PartSettings, rom.4's readers that
   fill the tables C's children read, word for word: the common's, the envelopes', the LFOs', the mix's and the TVA's

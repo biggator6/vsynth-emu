@@ -108,3 +108,37 @@ trailer-gain-wide|put8(&t.tvas[kTvaGainAt]|put16(&t.tvas[kTvaGainAt]|vc2settings
 trailer-block|Block::kSystemC, 0, 0, kTvaTrailerRate|Block::kSystemB, 0, 0, kTvaTrailerRate|vc2settings
 route-block|Block::kSystemB, 0, 0, kTvaRouteId|Block::kSystem, 0, 0, kTvaRouteId|vc2settings
 controls-block|Block::kSystem, 0, 0, kControlsId|Block::kSystemB, 0, 0, kControlsId|vc2settings
+held-cosm|kHeldCosm = 4,|kHeldCosm = 3,|vc2settings
+cosm-count|return everyRow(kCosms, [&](int kind, int cosm) {|return everyRow(1, [&](int kind, int cosm) {|vc2settings
+bytes-part|kBytesPart = 16,|kBytesPart = 15,|vc2settings
+cosm-part|kCosmPart = 0x540,|kCosmPart = 0x530,|vc2settings
+cosm-kind|kCosmKind = 84,|kCosmKind = 82,|vc2settings
+cosm-bytes|kCosmBytes = 42,|kCosmBytes = 40,|vc2settings
+cosm-ids-at|kCosmIdsAt = 10;|kCosmIdsAt = 12;|vc2settings
+id-bytes|kBytesId = 0x2d3,|kBytesId = 0x2d2,|vc2settings
+id-cosm-first|kCosmFirst = 0x462,|kCosmFirst = 0x461,|vc2settings
+id-cosm-type|kCosmTypeId = 0x463,|kCosmTypeId = 0x464,|vc2settings
+id-velocity|kVelocityIds = 0x389;|kVelocityIds = 0x38a;|vc2settings
+cosm-envelopes|{ { 9, 10 }, { 11, 12 } }|{ { 9, 10 }, { 12, 11 } }|vc2settings
+cosm-envelope-first|{ { 9, 10 }, { 11, 12 } }|{ { 8, 10 }, { 11, 12 } }|vc2settings
+byte-before|    if (p_.held(kHeldKind)) return false;\n    put8(&t.bytes|    put8(&t.bytes|vc2settings
+byte-block|p_.value(Block::kKindA, part, kind, kBytesId)|p_.value(Block::kKindB, part, kind, kBytesId)|vc2settings
+byte-at|&t.bytes[kBytesPart * part + kind]|&t.bytes[kBytesPart * kind + part]|vc2settings
+byte-after|kBytesId));\n    return !p_.held(kHeldKind);|kBytesId));\n    return true;|vc2settings
+cosm-before|    if (p_.held(kHeldCosm)) return false;\n|\n|vc2settings
+cosm-after|    return !p_.held(kHeldCosm);|    return true;|vc2settings
+cosm-first|put8(row, p_.cosmValue(part, kind, cosm, kCosmFirst));|put8(row, p_.cosmValue(part, kind, cosm, kCosmTypeId));|vc2settings
+cosm-type-store|    row[1] = type;\n|\n|vc2settings
+cosm-run-first|for (int id = runs[2 * type], k = 0;|for (int id = runs[2 * type] + 1, k = 0;|vc2settings
+cosm-run-last|id <= runs[2 * type + 1];|id < runs[2 * type + 1];|vc2settings
+cosm-run-at|put16(row + kCosmIdsAt + 2 * k,|put8(row + kCosmIdsAt + 2 * k,|vc2settings
+cosm-run-sub|p_.cosmValue(part, kind, cosm, static_cast<int16_t>(id))|p_.cosmValue(part, kind, 0, static_cast<int16_t>(id))|vc2settings
+velocity-cosm-test|static_cast<uint32_t>(cosm) >= kCosms|static_cast<uint32_t>(cosm) > kCosms|vc2settings
+velocity-cosm-held|if (p_.held(kHeldEnvelope) \|\| static_cast<uint32_t>(cosm) >= kCosms) return false;|if (static_cast<uint32_t>(cosm) >= kCosms) return false;|vc2settings
+velocity-cosm-curve-at|put8(row + 2 + 4 * k, vc2CurveOf(|put8(row + 1 + 4 * k, vc2CurveOf(|vc2settings
+velocity-cosm-depth|static_cast<int16_t>(b + 1))));|static_cast<int16_t>(b + 2))));|vc2settings
+velocity-cosm-block|p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b))|p_.value(Block::kKindA, part, kind, static_cast<int16_t>(b))|vc2settings
+velocity-cosm-after|    }\n    return !p_.held(kHeldEnvelope);\n}\n\nbool Vc2PartSettings::cosms|    }\n    return true;\n}\n\nbool Vc2PartSettings::cosms|vc2settings
+cosms-and|cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm)|cosmRow(t, part, kind, cosm) \|\| cosmVelocityRow(t, part, kind, cosm)|vc2settings
+cosms-order|cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm)|cosmVelocityRow(t, part, kind, cosm) && cosmRow(t, part, kind, cosm)|vc2settings
+tables-cosm-runs|image.read(0x8953fb40,|image.read(0x8953fb44,|vc2settingstables

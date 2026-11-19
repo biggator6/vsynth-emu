@@ -4,21 +4,25 @@
 // its reads: the common's 0x893a1be0, the envelopes' 0x8939ada0 by rows 0x8939ab90, the LFOs' 0x8939b9a0 by rows
 // 0x8939b860 and their system's 0x8939b970, the mix's 0x8939bff0 by rows 0x8939bf30, the TVA's 0x893a71f0 by rows
 // 0x893a6f80 and 0x893a70c0 (the curve's law 0x893a8120 and the depth's 0x893a8070) and its systems' 0x893a7160,
-// 0x893a71a0 and 0x893a71d0.  The parameters by read object and ID, and the flags, through Vc2PartParams.  Not in the
+// 0x893a71a0 and 0x893a71d0; and (v287) the part's bytes by kind 0x893a8250 and the COSM inputs' 0x89399ed0, a COSM's
+// type's run of IDs from Vc2PartSettingsTables.  The parameters by read object and ID, and the flags, through
+// Vc2PartParams.  Not in the
 // sound yet.  Bit for bit: xt_vc2settings.  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID".  The notes' task.
 #include <array>
 #include <cstdint>
 
 // The read objects a reader sets up, each a block of parameters the getter 0x89324350 reads by ID: the part's
 // (0x893207b0), the system's three (0x89320790, 0x89320760, 0x89320f60) and a note kind's three (0x89320a50,
-// 0x89320ad0, 0x89320b70)
-enum class Vc2ParamBlock : uint8_t { kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC };
+// 0x89320ad0, 0x89320b70); and a COSM's (0x89320c10, v287), which the typed getter 0x89324370 reads
+enum class Vc2ParamBlock : uint8_t { kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC, kCosm };
 
 class Vc2PartParams {
 public:
     virtual ~Vc2PartParams() = default;
     // The getter on a block set up for `part` and `kind` (the system's take neither)
     virtual int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) = 0;
+    // The typed getter on a COSM's block, by the part, kind and COSM (v287)
+    virtual int32_t cosmValue(int part, int kind, int cosm, int16_t id) = 0;
     // rom.4's flag byte 0x8993d0c0 + `flag`, a task's hold on the tables
     virtual bool held(int flag) = 0;
 };
@@ -31,6 +35,8 @@ struct Vc2PartRows {
     std::array<uint8_t, 0x1600> mixes {};       // 0x89e32a60: 352 a part, 22 a kind
     std::array<uint8_t, 0x1806> tvas {};        // 0x89e4987c: 384 a part, 24 a kind; the systems' trailer
     uint8_t controls = 0;                       // 0x89997fcc: the part's CC 7 and 11 on the TVA's level
+    std::array<uint8_t, 256> bytes {};          // 0x89998a14: the part's byte by kind, 16 a part (v287)
+    std::array<uint8_t, 0x5400> cosms {};       // 0x89e2003c: 0x540 a part, 84 a kind, 42 a COSM input (v287)
 };
 
 class Vc2PartSettings {
@@ -50,6 +56,11 @@ public:
     void tvaTrailer(Vc2PartRows& t);                                // 0x893a7160
     void tvaRoute(Vc2PartRows& t);                                  // 0x893a71a0
     void tvaControls(Vc2PartRows& t);                               // 0x893a71d0
+    bool bytes(Vc2PartRows& t, int part);                           // 0x893a8250 (v287)
+    bool byteRow(Vc2PartRows& t, int part, int kind);               // 0x893a81d0
+    bool cosms(Vc2PartRows& t, int part);                           // 0x89399ed0
+    bool cosmRow(Vc2PartRows& t, int part, int kind, int cosm);     // 0x89399c90: its type and the type's IDs
+    bool cosmVelocityRow(Vc2PartRows& t, int part, int kind, int cosm);   // 0x89399d60: two envelopes' velocity
 
 private:
     Vc2PartParams& p_;

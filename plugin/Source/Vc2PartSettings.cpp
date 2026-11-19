@@ -1,6 +1,7 @@
 // The VC-2 part's settings by ID: see Vc2PartSettings.h (v286).  Each reader's flag tests, reads and stores in rom.4's
 // order.
 #include "Vc2PartSettings.h"
+#include "Vc2PartSettingsTables.h"
 #include "Vc2SetChildHead.h"
 #include <cstring>
 
@@ -27,6 +28,12 @@ constexpr int kSixtyThirdShift = 5;
 constexpr int32_t kThirtyFirst = static_cast<int32_t>(0x84210843u);  // [FW] n / 31 by its shift
 constexpr int kThirtyFirstShift = 4, kThirtySecondShift = 5;
 constexpr int32_t kHundred = 100, kTen = 10, kDepthEdge = 32;
+// [FW] v287's: the COSM inputs' flag, count, strides and IDs (a type's run after the type), the bytes' ID; each COSM
+// input's two envelopes whose velocity curve and depth it takes (envelope i's at 0x389 + 13 i and the next)
+constexpr int kHeldCosm = 4, kCosms = 2;
+constexpr uint32_t kBytesPart = 16, kCosmPart = 0x540, kCosmKind = 84, kCosmBytes = 42, kCosmIdsAt = 10;
+constexpr int16_t kBytesId = 0x2d3, kCosmFirst = 0x462, kCosmTypeId = 0x463, kVelocityIds = 0x389;
+constexpr int kCosmEnvelopes[kCosms][2] = { { 9, 10 }, { 11, 12 } };
 
 void put8(uint8_t* at, int32_t v) { *at = static_cast<uint8_t>(v); }
 
@@ -172,3 +179,47 @@ void Vc2PartSettings::tvaRoute(Vc2PartRows& t) {
 }
 
 void Vc2PartSettings::tvaControls(Vc2PartRows& t) { put8(&t.controls, p_.value(Block::kSystem, 0, 0, kControlsId)); }
+
+bool Vc2PartSettings::byteRow(Vc2PartRows& t, int part, int kind) {
+    if (p_.held(kHeldKind)) return false;
+    put8(&t.bytes[kBytesPart * part + kind], p_.value(Block::kKindA, part, kind, kBytesId));
+    return !p_.held(kHeldKind);
+}
+
+bool Vc2PartSettings::bytes(Vc2PartRows& t, int part) {
+    return everyRow(1, [&](int kind, int) { return byteRow(t, part, kind); });
+}
+
+// The COSM's first byte and type, then the type's run of IDs as halfwords from +10.  A type past the table's (the
+// parameter's range never gives one) reads nothing: rom.4 reads past its table there, into other data
+bool Vc2PartSettings::cosmRow(Vc2PartRows& t, int part, int kind, int cosm) {
+    if (p_.held(kHeldCosm)) return false;
+    uint8_t* row = t.cosms.data() + kCosmPart * part + kCosmKind * kind + kCosmBytes * cosm;
+    put8(row, p_.cosmValue(part, kind, cosm, kCosmFirst));
+    const auto type = static_cast<uint8_t>(p_.cosmValue(part, kind, cosm, kCosmTypeId));
+    row[1] = type;
+    if (type < Vc2PartSettingsTables::kCosmTypes) {
+        const auto& runs = vc2PartSettingsTables().cosmRuns;
+        for (int id = runs[2 * type], k = 0; id <= runs[2 * type + 1]; ++id, ++k)
+            put16(row + kCosmIdsAt + 2 * k, p_.cosmValue(part, kind, cosm, static_cast<int16_t>(id)));
+    }
+    return !p_.held(kHeldCosm);
+}
+
+// Two envelopes' velocity curve and depth, by the laws, into +2…+9; a COSM past the two answers false
+bool Vc2PartSettings::cosmVelocityRow(Vc2PartRows& t, int part, int kind, int cosm) {
+    if (p_.held(kHeldEnvelope) || static_cast<uint32_t>(cosm) >= kCosms) return false;
+    uint8_t* row = t.cosms.data() + kCosmPart * part + kCosmKind * kind + kCosmBytes * cosm;
+    for (int k = 0; k < 2; ++k) {
+        const int b = kVelocityIds + kEnvelopeStride * kCosmEnvelopes[cosm][k];
+        put8(row + 2 + 4 * k, vc2CurveOf(p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b))));
+        put16(row + 4 + 4 * k, vc2DepthOf(p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b + 1))));
+    }
+    return !p_.held(kHeldEnvelope);
+}
+
+bool Vc2PartSettings::cosms(Vc2PartRows& t, int part) {
+    return everyRow(kCosms, [&](int kind, int cosm) {
+        return cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm);
+    });
+}
