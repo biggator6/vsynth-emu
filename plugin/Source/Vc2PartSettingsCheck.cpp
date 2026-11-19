@@ -46,7 +46,10 @@ std::string settingsTails(SettingsSides& s) {
                                                    { kLfosAt + kLfoWords + 1, t.lfos[kLfoWords + 1] },
                                                    { kTvasAt + kTvaWords, t.tvas[kTvaWords] },
                                                    { kTvasAt + kTvaWords + 1, t.tvas[kTvaWords + 1] },
-                                                   { kControlsAt, t.controls } };
+                                                   { kControlsAt, t.controls },
+                                                   { kTripAssignsAt, (uint8_t)t.tripAssigns[0] },
+                                                   { kTripAssignsAt + 1, (uint8_t)t.tripAssigns[1] },
+                                                   { kPatchRemainAt, t.patchRemain } };
     for (const auto& [at, mine] : bytes) {
         if (s.fw.cpu.rd8(at) == mine) continue;
         char text[96];
@@ -67,7 +70,8 @@ std::string settingsDifference(SettingsSides& s) {
         { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" },
         { kModesAt, &t.modes, sizeof t.modes, "mode rows" },
         { kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes, "nodes" }, { kMatrixAt, &s.g, sizeof s.g, "G" },
-        { kHeldNoteAt, &t.heldNote, sizeof t.heldNote, "the held note" } });
+        { kHeldNoteAt, &t.heldNote, sizeof t.heldNote, "the held note" },
+        { kVoiceCountsAt, t.voiceCounts.data(), sizeof t.voiceCounts, "the voices' counts" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -127,9 +131,10 @@ const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCount
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
-    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow })
+    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
+                                      &kStaticPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kStaticPartRow);
+    return different + settingsRunPart(s, run, kSystemPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

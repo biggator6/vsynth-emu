@@ -27,6 +27,8 @@ inline constexpr int32_t kOutBudget = 20, kOutController = 21, kOutTruncate = 22
 // The static M's (v295): the channel state's set-up (its argument as the COSM, the state as the ID), the enqueue (the
 // queue as the kind, the node as the ID)
 inline constexpr int32_t kOutChannelState = 24, kOutEnqueue = 25;
+// The voices' counts' (v296): the reserve (its count and offset as the kind and ID), the power offset's setter
+inline constexpr int32_t kOutReserve = 26, kOutPowerOffset = 27;
 inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
@@ -67,6 +69,8 @@ public:
     void enqueue(uint32_t queue, uint32_t node) override {
         log_.push_back({ kOutEnqueue, 0, (int32_t)queue, 0, (int32_t)node });
     }
+    void reserve(int32_t count, int32_t offset) override { log_.push_back({ kOutReserve, 0, count, 0, offset }); }
+    void setPowerOffset(int32_t power) override { logOut(log_, kOutPowerOffset, (uint32_t)power); }
 
 private:
     std::vector<SettingsCall>& log_;

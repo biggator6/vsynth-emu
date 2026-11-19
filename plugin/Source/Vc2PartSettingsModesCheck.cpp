@@ -69,12 +69,6 @@ std::string autoNoteEvent(SettingsSides& s, std::mt19937&) {
 
 const SettingsEvent kModeEvents[] = { modeEvent<kModeWrapper, 27>, modeEvent<kModeRow, 28>, autoNoteEvent };
 
-// A case: the nodes noise, then the tables' and the events
-std::string modeCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
-    return settingsCaseOf<kModeEvents, kV293Rows, 5>(s, rng, events, calls);
-}
-
 void sayModePart(const SettingsCounts& n) {
     const auto& e = n.byEvent;
     std::printf("modes: %ld events: %ld wrappers, %ld rows, %ld Auto Note switches; %ld All Sound Offs, %ld reads "
@@ -83,6 +77,6 @@ void sayModePart(const SettingsCounts& n) {
 }
 } // namespace
 
-const SettingsPartRow kModePartRow { 5, &SettingsCounts::modeEvents, &SettingsCounts::modeCalls, modeCase, sayModePart,
-                                     hookMessages };
+const SettingsPartRow kModePartRow { 5, &SettingsCounts::modeEvents, &SettingsCounts::modeCalls,
+                                     settingsNodesCaseOf<kModeEvents, kV293Rows>, sayModePart, hookMessages };
 #endif

@@ -1546,6 +1546,43 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's system readers and budget (2026-11-19, v296) {#vc2-part-system-readers}
+
+Step 4.3's twenty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's first part): the readers the parameters'
+messages (`0x89392890`, by the message's kind) run besides item 9's dispatchers, on `Vc2PartSettings`
+(`Vc2PartSettingsSystem.cpp`, and the budget in `Vc2PartSettingsCategory.cpp`), checked by `xt_vc2settings`' tenth
+part. None tests a held flag; each but the budget answers 1.
+
+- **Time Trip's assigns** `0x893943f0` (kind 5's; also called near `0x893927e0`): Time Trip Assign X and Y (IDs 0x93, 0x94,
+  the system's read object) into the bytes at `0x89989404` and `0x89989405`, 0 and 32 (OFF and CC32) as −1, the
+  first stored before the second is read. `0x89394440`, next to it, is the controllers' use of them: item 10's.
+- **Patch Remain** `0x89391520(0x899826fc)` (kind 4's): ID 0x41 on the system's second read object into the given
+  object's +1, `0x899826fd`.
+- **The voices' counts** `0x89391550` (kind 3's): on the system's third read object, Number of Voices (0x52d) held to
+  24, Offset of Voice Number (0x52e) held to 23, CPU Power Max for TG (0x530) and CPU Power Offset for Voice (0x531);
+  with count + offset past 24 the count is 24 − offset. Each is held against its last read, four halfwords at
+  `0x8993d02c` (a signed halfword against the word): a new count or offset is stored and given to the reserve
+  (`0x893911b0(count, offset)`, v272's); a new power stored and the budget run; a new power offset stored and given
+  to its setter (`0x89391260`, v272's `setOffset`).
+- **The budget** `0x893937b0`: Patch Category on part 0's block, CPU Power Max, the Category's law and the held note's
+  word, the budget's setter; the argument it is given is not read. It is the Category routine's second half, the
+  same code: `category` (v294) now calls `budget` after its first read, its line unchanged.
+
+The reserve, the power offset's setter and the budget's setter go out through `Vc2SettingsParts`; v272 has all three.
+
+**The check.** `xt_vc2settings`' tenth part, on the seed nine after the run's, every table and these words noise; the
+reserve and the power offset's setter hooked to log, the budget's setter by v294's hook. The store draws Time Trip
+Assign X and Y 0…39 half the time, Number of Voices and Offset 0…11 (inside the holds, so a last read can be set to
+equal what the reader will make of it), Patch Category 0…13; before the voices' counts each last read is set half the
+time to the store's answer. The bytes are compared one by one with the tables' trailers (a word compare of a one- or
+two-byte region read nothing: the first run crashed there).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first nine parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsSystem.cpp` and `Vc2PartSettingsCategory.cpp` is reached.
+- `mutate_vc2.py --settings`: 465 plants, none missed; v296's 25 new. The sum's test at 24 by one, missed in a first
+  run, is equivalent (at a sum of 24, 24 − offset is the count itself) and is listed as not planted.
+
 ### The VC-2 part's static M (2026-11-19, v295) {#vc2-part-static-m}
 
 Step 4.3's twenty-third version (VC2_MODE_PLAN.md, step 4.3, item 9's tenth part): the part's own Matrix object, the

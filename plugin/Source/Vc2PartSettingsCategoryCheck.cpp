@@ -46,11 +46,6 @@ std::string categoryEvent(SettingsSides& s, std::mt19937& rng) {
 
 const SettingsEvent kCategoryEvents[] = { categoryEvent };
 
-std::string categoryCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
-    return settingsCaseOf<kCategoryEvents, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
-}
-
 void sayCategoryPart(const SettingsCounts& n) {
     std::printf("Category: %ld events, %ld holding a note, %ld all notes off (%ld calls)\n", n.categoryEvents,
                 n.heldNotes, n.notesOff, n.categoryCalls);
@@ -58,5 +53,6 @@ void sayCategoryPart(const SettingsCounts& n) {
 } // namespace
 
 const SettingsPartRow kCategoryPartRow { 7, &SettingsCounts::categoryEvents, &SettingsCounts::categoryCalls,
-                                         categoryCase, sayCategoryPart, hookCategory };
+                                         settingsNodesCaseOf<kCategoryEvents, kV295Rows>, sayCategoryPart,
+                                         hookCategory };
 #endif

@@ -23,6 +23,8 @@ inline constexpr uint32_t kRobotAt = 0x89997fdc, kUnvoiceLevelAt = 0x899d9968;  
 inline constexpr uint32_t kModesAt = 0x89995390, kNodesAt = 0x899888d0;           // v291's: the mode rows, the nodes
 inline constexpr uint32_t kMatrixAt = 0x89997398;                                 // v292's: G, the Matrix's settings
 inline constexpr uint32_t kHeldNoteAt = 0x899891d0;                               // v294's: the held note's word
+// v296's: Time Trip Assign X and Y's bytes, Patch Remain's, the voices' counts' last reads
+inline constexpr uint32_t kTripAssignsAt = 0x89989404, kPatchRemainAt = 0x899826fd, kVoiceCountsAt = 0x8993d02c;
 // A read object's handle the set-ups' hooks leave: this, the block << 16, part << 8, kind << 2, COSM; and (v291) the
 // one rom.4's stack is given where Auto Note's switch reads through a read object never set up, a block past the
 // OSC block's call
@@ -101,7 +103,8 @@ struct SettingsCounts {
     long dispatchEvents = 0, dispatchCalls = 0, wholeParts = 0, received = 0;   // the seventh's (v292)
     long categoryEvents = 0, categoryCalls = 0, heldNotes = 0, notesOff = 0;    // the eighth's (v294)
     long staticEvents = 0, staticCalls = 0;                                     // the ninth's (v295)
-    std::array<long, 39> byEvent {};
+    long systemEvents = 0, systemCalls = 0;                                     // the tenth's (v296)
+    std::array<long, 43> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -162,8 +165,12 @@ extern const SettingsPartRow kDispatchPartRow;
 extern const SettingsPartRow kCategoryPartRow;
 // The ninth (v295): the static M's initializers (Vc2StaticMatrixCheck.cpp)
 extern const SettingsPartRow kStaticPartRow;
+// The tenth (v296): the system's readers and the budget (Vc2PartSettingsSystemCheck.cpp)
+extern const SettingsPartRow kSystemPartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
+// v294's and v295's parts' noise stops before v296's words
+inline constexpr size_t kV295Rows = offsetof(Vc2PartRows, tripAssigns);
 // Noise in `bytes` bytes at `at` (a part's case's own objects, v291's nodes and v292's G)
 inline void settingsNoise(void* at, size_t bytes, std::mt19937& rng) {
     auto* b = static_cast<uint8_t*>(at);
@@ -237,6 +244,9 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes);
     s.fw.cpu.write(kMatrixAt, &s.g, sizeof s.g);
     s.fw.cpu.wr32(kHeldNoteAt, t.heldNote);
+    s.fw.cpu.write(kTripAssignsAt, t.tripAssigns.data(), sizeof t.tripAssigns);
+    s.fw.cpu.wr8(kPatchRemainAt, t.patchRemain);
+    s.fw.cpu.write(kVoiceCountsAt, t.voiceCounts.data(), sizeof t.voiceCounts);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);
@@ -244,4 +254,11 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
         calls += (long)s.mine.log.size();
     }
     return what;
+}
+
+// A case with the nodes noise first (v291's and v294's parts), then the tables' and the events
+template <const auto& Events, size_t Noised>
+std::string settingsNodesCaseOf(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
+    settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
+    return settingsCaseOf<Events, Noised, 5>(s, rng, events, calls);
 }

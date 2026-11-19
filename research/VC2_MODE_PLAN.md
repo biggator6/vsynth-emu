@@ -772,6 +772,12 @@ version against rom.4's routines with what it calls hooked:
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.
+       - the system readers the parameters' messages run done (v296): Time Trip's assigns `0x893943f0`, Patch Remain
+         `0x89391520`, the voices' counts `0x89391550` (each against its last read at `0x8993d02c`, to v272's reserve
+         and setters), and the budget `0x893937b0`, the Category routine's second half; xt_vc2settings' tenth part
+         (HARDWARE_FIRMWARE.md, "The VC-2 part's system readers and budget"). Next: the parameters' messages
+         themselves (`0x89392890` by kind, the part's `0x89392830`, `0x89392b10`, `0x89392720`, `0x89392750`,
+         `0x8939b0c0`, `0x89394370`), the receive channel's nodes `0x89393fd0`, then the controllers.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

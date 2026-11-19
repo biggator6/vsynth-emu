@@ -1,5 +1,6 @@
-// The VC-2 part's settings by ID, the Category and budget 0x89392c60 (v294): see Vc2PartSettings.h.  Its reads, the
-// held note's word and its calls out in rom.4's order; no held flag is tested.
+// The VC-2 part's settings by ID, the Category and budget 0x89392c60 (v294) and (v296) the budget 0x893937b0, which
+// is its second part's code: see Vc2PartSettings.h.  Their reads, the held note's word and their calls out in rom.4's
+// order; no held flag is tested.
 #include "Vc2PartSettings.h"
 #include <algorithm>
 
@@ -17,16 +18,20 @@ constexpr int kControlSource = 3, kNodeSource = 4, kGivenSource = 1, kPartZero =
 constexpr int32_t kAllNotesOff = 123, kNoValue = -1;
 } // namespace
 
-void Vc2PartSettings::category(Vc2PartRows& t, const Vc2PartNodes& nodes, int part, Vc2SettingsParts& out) {
-    const auto get = [&](int16_t id) { return p_.value(Block::kPart, kPartZero, 0, id); };
-    get(kCategory);   // read, and stored in 0x899891d0 as Category ≥ 10, which the switch writes again
-    const int32_t category = get(kCategory);
+void Vc2PartSettings::budget(Vc2PartRows& t, Vc2SettingsParts& out) {
+    const int32_t category = p_.value(Block::kPart, kPartZero, 0, kCategory);
     uint32_t power = static_cast<uint32_t>(p_.value(Block::kSystemC, 0, 0, kPower));
     const bool known = static_cast<uint32_t>(category) < kCategories;
     const bool held = known && std::ranges::find(kHeldCategories, category) != std::end(kHeldCategories);
     t.heldNote = held ? 1 : 0;
     if (known && category != kFreeCategory) power -= kLess;
     out.setBudget(static_cast<int32_t>(power));
+}
+
+void Vc2PartSettings::category(Vc2PartRows& t, const Vc2PartNodes& nodes, int part, Vc2SettingsParts& out) {
+    // read, and stored in 0x899891d0 as Category ≥ 10, which the budget's switch writes again
+    p_.value(Block::kPart, kPartZero, 0, kCategory);
+    budget(t, out);
     out.controller(kControlSource, nodes.of(kNodeSource, kPartZero).channel, kAllNotesOff, kNoValue);
     out.truncateVoices(nodes.of(kGivenSource, part).word8);
     autoNoteSwitch(out);

@@ -7,8 +7,10 @@
 # vc2settingsmatrix (Vc2MatrixSetup.cpp's flag tests, v292, which xt_vc2settings' flips reach and xt_vc2cosm's
 # don't; the dispatcher's part given to the Matrix's set-up is not planted: the check gives part 0 alone, as rom.4's
 # handler does), vc2settingscategory (Vc2PartSettingsCategory.cpp, v294; the held Categories' test of `known` is
-# not planted: 10 and 11 are known either way) and vc2staticmatrix (Vc2StaticMatrix.cpp, v295; the order of its
-# stores isn't planted, as no store reads another).  Not planted: the depth
+# not planted: 10 and 11 are known either way), vc2staticmatrix (Vc2StaticMatrix.cpp, v295; the order of its
+# stores isn't planted, as no store reads another) and vc2settingssystem (Vc2PartSettingsSystem.cpp, v296; the sum's
+# 32-bit wrap isn't planted: the holds keep both below 25; nor its test at 24 by one: at a sum of 24, 24 − offset is the
+# count itself).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -422,7 +424,7 @@ category-given-source|kGivenSource = 1,|kGivenSource = 2,|vc2settingscategory
 category-part-zero|kPartZero = 0;|kPartZero = 1;|vc2settingscategory
 category-notes-off-number|kAllNotesOff = 123,|kAllNotesOff = 120,|vc2settingscategory
 category-no-value|kNoValue = -1;|kNoValue = 0;|vc2settingscategory
-category-first-read|    get(kCategory);   // read, and stored in 0x899891d0 as Category ≥ 10, which the switch writes again\n||vc2settingscategory
+category-first-read|    p_.value(Block::kPart, kPartZero, 0, kCategory);\n    budget(t, out);|    budget(t, out);|vc2settingscategory
 category-power-block|p_.value(Block::kSystemC, 0, 0, kPower)|p_.value(Block::kSystemB, 0, 0, kPower)|vc2settingscategory
 category-less-past|    if (known && category != kFreeCategory) power -= kLess;|    if (category != kFreeCategory) power -= kLess;|vc2settingscategory
 category-less-free|    if (known && category != kFreeCategory) power -= kLess;|    if (known) power -= kLess;|vc2settingscategory
@@ -434,7 +436,32 @@ category-truncate-part|nodes.of(kGivenSource, part).word8|nodes.of(kGivenSource,
 category-no-autonote|    autoNoteSwitch(out);\n    if (t.heldNote|    if (t.heldNote|vc2settingscategory
 category-notes-off-test|    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote != 0) out.allNotesOff();|vc2settingscategory
 category-notes-off-first|    autoNoteSwitch(out);\n    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote == 0) out.allNotesOff();\n    autoNoteSwitch(out);|vc2settingscategory
-category-control-first|    out.setBudget(static_cast<int32_t>(power));\n    out.controller(|    out.controller(|vc2settingscategory
+category-control-first|    budget(t, out);\n    out.controller(|    out.controller(|vc2settingscategory
+category-budget-unset|    out.setBudget(static_cast<int32_t>(power));\n}|}|vc2settingscategory
+system-trip-order|kTripIds[] = { 0x93, 0x94 };|kTripIds[] = { 0x94, 0x93 };|vc2settingssystem
+system-trip-none|kNoAssign = 0,|kNoAssign = 1,|vc2settingssystem
+system-trip-none-too|kNoAssignToo = 32,|kNoAssignToo = 31,|vc2settingssystem
+system-trip-none-stored|kNone = -1;|kNone = 0;|vc2settingssystem
+system-trip-block|p_.value(Block::kSystem, 0, 0, kTripIds[k])|p_.value(Block::kSystemB, 0, 0, kTripIds[k])|vc2settingssystem
+system-remain-id|kPatchRemain = 0x41;|kPatchRemain = 0x42;|vc2settingssystem
+system-remain-block|p_.value(Block::kSystemB, 0, 0, kPatchRemain)|p_.value(Block::kSystemC, 0, 0, kPatchRemain)|vc2settingssystem
+system-voices-id|kVoices = 0x52d,|kVoices = 0x52c,|vc2settingssystem
+system-offset-id|kVoiceOffset = 0x52e,|kVoiceOffset = 0x52f,|vc2settingssystem
+system-power-id|kPowerMax = 0x530,|kPowerMax = 0x52f,|vc2settingssystem
+system-power-offset-id|kPowerOffset = 0x531;|kPowerOffset = 0x532;|vc2settingssystem
+system-most-voices|kMostVoices = 24,|kMostVoices = 23,|vc2settingssystem
+system-most-offset|kMostOffset = 23;|kMostOffset = 24;|vc2settingssystem
+system-voices-sum|    if (both > kMostVoices) count = kMostVoices - offset;\n||vc2settingssystem
+system-voices-order|    int32_t count = std::min(get(kVoices), kMostVoices);\n    const int32_t offset = std::min(get(kVoiceOffset), kMostOffset);|    const int32_t offset = std::min(get(kVoiceOffset), kMostOffset);\n    int32_t count = std::min(get(kVoices), kMostVoices);|vc2settingssystem
+system-count-only|if (last[0] != count \|\| last[1] != offset)|if (last[0] != count)|vc2settingssystem
+system-offset-only|if (last[0] != count \|\| last[1] != offset)|if (last[1] != offset)|vc2settingssystem
+system-count-stored|        last[0] = static_cast<int16_t>(count);|        last[0] = static_cast<int16_t>(offset);|vc2settingssystem
+system-reserve-args|out.reserve(count, offset);|out.reserve(offset, count);|vc2settingssystem
+system-power-test|    if (last[2] != power) {|    if (last[2] == power) {|vc2settingssystem
+system-power-unstored|        last[2] = static_cast<int16_t>(power);\n||vc2settingssystem
+system-no-budget|        budget(t, out);\n    }\n    if (last[3]|    }\n    if (last[3]|vc2settingssystem
+system-offset-test|    if (last[3] != powerOffset) {|    if (last[3] == powerOffset) {|vc2settingssystem
+system-offset-value|out.setPowerOffset(powerOffset);|out.setPowerOffset(power);|vc2settingssystem
 static-float-first|    floats[0] = f[0];|    floats[0] = f[1];|vc2staticmatrix
 static-float-second|    floats[1] = f[1];|    floats[1] = f[0];|vc2staticmatrix
 static-scale|    scale = f[2];|    scale = f[1];|vc2staticmatrix

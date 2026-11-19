@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's system readers and budget v296 (2026-11-19, on claude/vc2-part-4-3 after v295; HARDWARE_FIRMWARE.md,
+  "The VC-2 part's system readers and budget"): step 4.3's twenty-fourth version, item 10's first part. On
+  Vc2PartSettings (Vc2PartSettingsSystem.cpp): rom.4's Time Trip's assigns 0x893943f0 (into 0x89989404, OFF and CC32
+  as −1), Patch Remain 0x89391520 (0x899826fd) and the voices' counts 0x89391550 (Number of Voices held to 24, Offset
+  to 23, the CPU Powers; each against its last read at 0x8993d02c, a change to the reserve, the budget or the power
+  offset's setter); and the budget 0x893937b0, the Category routine's second half, which category now calls; the
+  reserve and power offset's setter through Vc2SettingsParts. xt_vc2settings gains a tenth part
+  (Vc2PartSettingsSystemCheck.cpp); the modes and Category parts' cases one template, settingsNodesCaseOf: 0
+  different at seeds 2024, 7 and 31337, the first nine parts' lines unchanged; mutate_vc2.py --settings 465
+  planted, 0 missed.
+  Not in the sound yet.
+
 The VC-2 part's static M v295 (2026-11-19, on claude/vc2-part-4-3 after v294; HARDWARE_FIRMWARE.md, "The VC-2 part's
   static M"): step 4.3's twenty-third version, item 9's tenth part. Vc2StaticMatrix: the part's own Matrix object at
   0x89997108, 0x290 bytes word for word (M's words and links, its update queue node at +0x170 and the two vtables, the

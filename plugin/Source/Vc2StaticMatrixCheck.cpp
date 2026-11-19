@@ -40,6 +40,6 @@ void sayStaticPart(const SettingsCounts& n) {
 } // namespace
 
 const SettingsPartRow kStaticPartRow { 8, &SettingsCounts::staticEvents, &SettingsCounts::staticCalls,
-                                       settingsCaseOf<kStaticEvents, sizeof(Vc2PartRows), 5>, sayStaticPart,
+                                       settingsCaseOf<kStaticEvents, kV295Rows, 5>, sayStaticPart,
                                        hookStatic };
 #endif

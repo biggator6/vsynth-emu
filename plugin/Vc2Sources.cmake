@@ -120,4 +120,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartNodes.cpp
     Source/Vc2PartSettingsCategory.cpp
     Source/Vc2StaticMatrix.cpp
+    Source/Vc2PartSettingsSystem.cpp
 )

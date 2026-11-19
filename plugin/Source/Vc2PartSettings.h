@@ -52,6 +52,11 @@ struct Vc2PartRows {
     // upper keys, Vocoder Sw, Split Point, Modulator Key Mode (v291)
     std::array<uint8_t, 512> modes {};
     uint32_t heldNote = 0;   // 0x899891d0: 1 with a patch of Category 10 or 11, a note held for the carrier (v294)
+    // v296: Time Trip Assign X and Y (0x89989404), OFF and CC32 as −1; Patch Remain (0x899826fd); Number of Voices,
+    // Offset of Voice Number and the two CPU Powers as last read (0x8993d02c)
+    std::array<int8_t, 2> tripAssigns {};
+    uint8_t patchRemain = 0;
+    std::array<int16_t, 4> voiceCounts {};
 };
 
 // What the vocoder reader hands on (v290): kind 6's Unvoice Level, the part mixer's setters and targets, Auto Note's
@@ -77,6 +82,9 @@ public:
     virtual void controller(int source, int32_t channel, int32_t number, int32_t value) = 0;   // 0x89392f90
     virtual void truncateVoices(uint32_t word) = 0;                                            // 0x89390fd0
     virtual void allNotesOff() = 0;                                                            // 0x89391e30
+    // v296, the voices' counts': the reserve of `count` voices from `offset`, CPU Power Offset for Voice's setter
+    virtual void reserve(int32_t count, int32_t offset) = 0;                                   // 0x893911b0
+    virtual void setPowerOffset(int32_t power) = 0;                                            // 0x89391260
 };
 
 // G's channel word's two sources (v292): the word at 0x8999738c, with Part 1 Receive Switch off; and with it on, the
@@ -136,6 +144,11 @@ public:
     void matrixChannel(Vc2MatrixSettings& g, Vc2ChannelStates& states);               // 0x893a5050
     // v294, Vc2PartSettingsCategory.cpp: the Category and budget, given the node of source 1 and `part`
     void category(Vc2PartRows& t, const Vc2PartNodes& nodes, int part, Vc2SettingsParts& out);   // 0x89392c60
+    // v296: the budget by the Category (Vc2PartSettingsCategory.cpp); the system's readers (Vc2PartSettingsSystem.cpp)
+    void budget(Vc2PartRows& t, Vc2SettingsParts& out);           // 0x893937b0
+    void tripAssigns(Vc2PartRows& t);                             // 0x893943f0
+    void patchRemain(Vc2PartRows& t);                             // 0x89391520
+    void voiceCounts(Vc2PartRows& t, Vc2SettingsParts& out);      // 0x89391550
 
 private:
     void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)
