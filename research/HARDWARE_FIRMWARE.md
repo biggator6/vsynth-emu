@@ -1546,6 +1546,59 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID (2026-11-19, v286) {#vc2-part-settings}
+
+Step 4.3's fourteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's first part): the readers that fill the tables C's
+children read (v281…v285). `Vc2PartSettings` is bit for bit against rom.4's own in `xt_vc2settings`.
+
+**How a reader reads.** It sets up a read object on a block of parameters and reads by ID through the getter
+`0x89324350`. The blocks: the part's (`0x893207b0`, its store `0x8950d8e0[part]`'s), the system's three
+(`0x89320790`, `0x89320760`, `0x89320f60`), and a note kind's three in the part's store (`0x89320a50` at +0xfe +
+128 × the kind, `0x89320ad0`, `0x89320b70`). A reader gives up (answers 0) when its task's held flag is set before
+its reads or after them: the bytes `0x8993d0c0`…`c4`, set together around a reload (`0x8939ae50`). The port takes
+both through `Vc2PartParams` (`value(block, part, kind, id)`, `held(flag)`).
+
+**The tables** (`Vc2PartRows`, as rom.4 lays them):
+- **the commons** (`0x89997090`, 6 bytes a part), by `0x893a1be0` → `0x893a1b40`: IDs 0x132, 0x134, 0x135 and the
+  halfword 0x136, from the part's block; flag 0.
+- **the envelopes** (`0x89e2765c`, 2080 a part, 130 a kind, 10 an envelope), by `0x8939ada0`: every kind's 13 rows
+  by `0x8939ab90`. Envelope 12's on byte is ID 0x2d9 from the kind's first block (flag 1), the others' 1. Then from
+  the second block (flag 2), at 0x390 + 13 × the envelope: +1, +2, +3, +4 from +0, +2, +3, +5; +5…+7 from +8…+0xa,
+  each × 100 / 63 by rom.4's division; the halfword +8 from +0xb × 10.
+- **the LFOs** (`0x89e2f85c`, 800 a part, 50 a kind, 10 an LFO), by `0x8939b9a0`: every kind's five rows (the row
+  `0x8939b860` inlined), from the third block (flag 3) at 0x439 + 8 × the LFO: +0, the halfword +2, then +4…+8. The
+  system's byte after them (+0x3200) is ID 67 from the second system block (`0x8939b970`).
+- **the mix** (`0x89e32a60`, 352 a part, 22 a kind), by `0x8939bff0`: each kind's +0…+4 from IDs 0x2d4…0x2d8 of the
+  kind's first block (flag 1, `0x8939bf30`). The rest of the row is not written.
+- **the TVAs** (`0x89e4987c`, 384 a part, 24 a kind), by `0x893a71f0`, each kind two rows:
+  - `0x893a6f80` (flag 1, then 0): the first block's IDs 0x2d9…0x2e3 into +4…+0x15, the two key follows × 10 as
+    halfwords; then +0x16 from the part's block, ID 0x195. ID 0x2d9 is the 13th envelope's on byte too.
+  - `0x893a70c0` (flag 2): the second block's 0x432 by the curve's law `0x893a8120` (1…7 less 1, else 7) into +0, and
+    0x433 by the depth's law `0x893a8070` into the halfword +2. That law takes ±32 to ±100 by 32nds and past it on by
+    31sts, each side's byte as a byte.
+  - Its systems: `0x893a7160` the trailer's gain (+0x1800, ID 0x533) and rate (+0x1802, 0x52c) from the third
+    system block; `0x893a71a0` the route flag (+0x1804, ID 66) from the second; `0x893a71d0` the part's controllers'
+    flag (`0x89997fcc`, ID 0xbb) from the first.
+- The tables are static arrays; their static initializers' tests of the pointer for 0 are dead.
+
+**The dispatchers** (the later parts): `0x8939b170`, a part's, runs eleven readers in turn, these and the mode row
+`0x89396f70`, the part's bytes by kind `0x893a8250`, the OSC rows `0x893a1410`, the COSM inputs `0x89399ed0`, G's
+record `0x893a51c0` (v247) and `0x893a72f0`'s floats; `0x8939b0d0`, `0x8939b110` and `0x8939b140` run the system's.
+
+**The check.** `xt_vc2settings` runs rom.4's own readers on its own tables. The seven set-ups are hooked to leave a
+handle (the block, part and kind) in the read object, and the getter to answer from a store both sides draw alike,
+by a hash of the event's seed and the read, logging each read. The held flags are drawn, and now and then one is set
+after a drawn read on both sides, so every give-up is reached. Each case is noise in the tables, then 400 events: each
+reader, its rows, the systems' and the two laws alone; after each the tables word for word, the bytes past their
+words, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases), 2.1 million reads at 40 cases.
+- Every line and branch of `Vc2PartSettings.cpp` is reached.
+- `mutate_vc2.py --settings`: 105 plants, none missed. The first run missed five: four were equivalent (the depth
+  law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
+  read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
+
 ### The VC-2 part's sets' TVA (2026-11-19, v285) {#vc2-set-tva}
 
 Step 4.3's thirteenth version (VC2_MODE_PLAN.md, step 4.3, item 8's fifth child, its last): C's TVA, one a voice.

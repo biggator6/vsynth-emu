@@ -1,0 +1,110 @@
+# Planted errors in the VC-2 part's settings by ID, for mutate_vc2.py --settings: each must make xt_vc2settings, on
+# rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286).  Not
+# planted: the depth law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within
+# ±32 (the same there), the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what
+# Vc2PartSettings.h holds.
+kinds|kKinds = 16, kEnvelopes = 13, kLfos = 5;|kKinds = 15, kEnvelopes = 13, kLfos = 5;|vc2settings
+envelope-rows|kKinds = 16, kEnvelopes = 13, kLfos = 5;|kKinds = 16, kEnvelopes = 12, kLfos = 5;|vc2settings
+lfo-rows|kKinds = 16, kEnvelopes = 13, kLfos = 5;|kKinds = 16, kEnvelopes = 13, kLfos = 4;|vc2settings
+held-common|kHeldCommon = 0, kHeldKind = 1,|kHeldCommon = 1, kHeldKind = 1,|vc2settings
+held-kind|kHeldCommon = 0, kHeldKind = 1,|kHeldCommon = 0, kHeldKind = 2,|vc2settings
+held-envelope|kHeldEnvelope = 2,|kHeldEnvelope = 3,|vc2settings
+held-lfo|kHeldLfo = 3;|kHeldLfo = 2;|vc2settings
+tva-envelope|kTvaEnvelope = 12;|kTvaEnvelope = 11;|vc2settings
+common-bytes|kCommonBytes = 6;|kCommonBytes = 4;|vc2settings
+envelope-part|kEnvelopePart = 2080,|kEnvelopePart = 2070,|vc2settings
+envelope-kind|kEnvelopeKind = 130,|kEnvelopeKind = 120,|vc2settings
+envelope-bytes|kEnvelopeBytes = 10;|kEnvelopeBytes = 8;|vc2settings
+lfo-part|kLfoPart = 800,|kLfoPart = 790,|vc2settings
+lfo-kind|kLfoKind = 50,|kLfoKind = 40,|vc2settings
+lfo-bytes|kLfoBytes = 10,|kLfoBytes = 8,|vc2settings
+lfo-system-at|kLfoSystemAt = 0x3200;|kLfoSystemAt = 0x3201;|vc2settings
+mix-part|kMixPart = 352,|kMixPart = 342,|vc2settings
+mix-kind|kMixKind = 22;|kMixKind = 20;|vc2settings
+tva-part|kTvaPart = 384,|kTvaPart = 374,|vc2settings
+tva-kind|kTvaKind = 24,|kTvaKind = 22,|vc2settings
+tva-gain-at|kTvaGainAt = 0x1800,|kTvaGainAt = 0x1801,|vc2settings
+tva-rate-at|kTvaRateAt = 0x1802,|kTvaRateAt = 0x1800,|vc2settings
+tva-route-at|kTvaRouteAt = 0x1804;|kTvaRouteAt = 0x1805;|vc2settings
+id-common|kCommonIds[] = { 0x132, 0x134, 0x135 }|kCommonIds[] = { 0x133, 0x134, 0x135 }|vc2settings
+id-common-sens|kCommonSens = 0x136;|kCommonSens = 0x137;|vc2settings
+id-envelope-on|kEnvelopeOn = 0x2d9,|kEnvelopeOn = 0x2da,|vc2settings
+id-envelope|kEnvelopeIds = 0x390,|kEnvelopeIds = 0x391,|vc2settings
+id-envelope-stride|kEnvelopeStride = 13;|kEnvelopeStride = 12;|vc2settings
+id-lfo|kLfoIds = 0x439,|kLfoIds = 0x438,|vc2settings
+id-lfo-stride|kLfoStride = 8,|kLfoStride = 7,|vc2settings
+id-mix|kMixIds = 0x2d4,|kMixIds = 0x2d3,|vc2settings
+id-tva|kTvaIds = 0x2d9,|kTvaIds = 0x2d8,|vc2settings
+id-tva-gain|kTvaGainId = 0x195;|kTvaGainId = 0x196;|vc2settings
+id-curve|kCurveId = 0x432,|kCurveId = 0x431,|vc2settings
+id-depth|kDepthId = 0x433;|kDepthId = 0x434;|vc2settings
+id-lfo-system|kLfoSystemId = 67,|kLfoSystemId = 68,|vc2settings
+id-tva-route|kTvaRouteId = 66,|kTvaRouteId = 65,|vc2settings
+id-trailer-gain|kTvaTrailerGain = 0x533,|kTvaTrailerGain = 0x532,|vc2settings
+id-trailer-rate|kTvaTrailerRate = 0x52c;|kTvaTrailerRate = 0x52d;|vc2settings
+id-controls|kControlsId = 0xbb;|kControlsId = 0xba;|vc2settings
+magic-63|0x82082083u|0x81082083u|vc2settings
+magic-63-shift|kSixtyThirdShift = 5;|kSixtyThirdShift = 4;|vc2settings
+magic-31|0x84210843u|0x83210843u|vc2settings
+magic-31-shift|kThirtyFirstShift = 4,|kThirtyFirstShift = 3,|vc2settings
+shift-32|kThirtySecondShift = 5;|kThirtySecondShift = 4;|vc2settings
+hundred|kHundred = 100,|kHundred = 99,|vc2settings
+ten|kTen = 10,|kTen = 9,|vc2settings
+depth-edge|kDepthEdge = 32;|kDepthEdge = 31;|vc2settings
+put16-short|std::memcpy(at, &h, sizeof h);|std::memcpy(at, &h, 1);|vc2settings
+percent-times|vc2ByMagic(times(v, kHundred), kSixtyThird|vc2ByMagic(v, kSixtyThird|vc2settings
+every-stop|            if (!row(kind, i)) return false;|            row(kind, i);|vc2settings
+curve-top|code > 6 ? 7 : code|code > 5 ? 7 : code|vc2settings
+curve-less|static_cast<uint32_t>(x) - 1u;|static_cast<uint32_t>(x) - 0u;|vc2settings
+depth-low-sign|return -(kHundred + vc2ByMagic(|return -(kHundred - vc2ByMagic(|vc2settings
+depth-low-byte|static_cast<uint8_t>(-kDepthEdge - x)|static_cast<uint16_t>(-kDepthEdge - x)|vc2settings
+depth-neg-sign|if (x < 0) return -(times(|if (x < 0) return (times(|vc2settings
+depth-high-byte|static_cast<uint8_t>(x - kDepthEdge)|static_cast<uint16_t>(x - kDepthEdge)|vc2settings
+depth-high-base|return kHundred + vc2ByMagic(|return vc2ByMagic(|vc2settings
+common-before|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.commons|    uint8_t* row = t.commons|vc2settings
+common-after|    return !p_.held(kHeldCommon);\n}\n\nbool Vc2PartSettings::envelopeRow|    return true;\n}\n\nbool Vc2PartSettings::envelopeRow|vc2settings
+common-count|for (int k = 0; k < 3; ++k) put8(row + k,|for (int k = 0; k < 2; ++k) put8(row + k,|vc2settings
+common-sens-wide|put16(row + 4, p_.value(Block::kPart, part, 0, kCommonSens));|put8(row + 4, p_.value(Block::kPart, part, 0, kCommonSens));|vc2settings
+common-block|p_.value(Block::kPart, part, 0, kCommonIds[k])|p_.value(Block::kKindA, part, 0, kCommonIds[k])|vc2settings
+envelope-on|        row[0] = 1;|        row[0] = 0;|vc2settings
+envelope-which|if (i != kTvaEnvelope)|if (i == kTvaEnvelope)|vc2settings
+envelope-on-block|p_.value(Block::kKindA, part, kind, kEnvelopeOn)|p_.value(Block::kKindB, part, kind, kEnvelopeOn)|vc2settings
+envelope-on-before|    } else {\n        if (p_.held(kHeldKind)) return false;\n|    } else {\n|vc2settings
+envelope-on-after|kEnvelopeOn));\n        if (p_.held(kHeldKind)) return false;\n|kEnvelopeOn));\n|vc2settings
+envelope-before|    if (p_.held(kHeldEnvelope)) return false;\n    const auto get|    const auto get|vc2settings
+envelope-block|Block::kKindB, part, kind, (int16_t)(kEnvelopeIds + at)|Block::kKindC, part, kind, (int16_t)(kEnvelopeIds + at)|vc2settings
+envelope-four|put8(row + 4, get(b + 5));|put8(row + 4, get(b + 4));|vc2settings
+envelope-percent|put8(row + 5, percentOf63(get(b + 8)));|put8(row + 5, get(b + 8));|vc2settings
+envelope-seven|put8(row + 7, percentOf63(get(b + 0xa)));|put8(row + 7, percentOf63(get(b + 0xb)));|vc2settings
+envelope-eight-ten|put16(row + 8, times(get(b + 0xb), kTen));|put16(row + 8, get(b + 0xb));|vc2settings
+envelope-after|    return !p_.held(kHeldEnvelope);\n}\n\nbool Vc2PartSettings::envelopes|    return true;\n}\n\nbool Vc2PartSettings::envelopes|vc2settings
+lfo-before|    if (p_.held(kHeldLfo)) return false;\n    uint8_t* row = t.lfos|    uint8_t* row = t.lfos|vc2settings
+lfo-after|    return !p_.held(kHeldLfo);|    return true;|vc2settings
+lfo-block|Block::kKindC, part, kind, (int16_t)(kLfoIds + at)|Block::kKindA, part, kind, (int16_t)(kLfoIds + at)|vc2settings
+lfo-rate-wide|put16(row + 2, get(b + 2));|put8(row + 2, get(b + 2));|vc2settings
+lfo-count|for (int k = 3; k <= 7; ++k)|for (int k = 3; k < 7; ++k)|vc2settings
+lfo-system-block|Block::kSystemB, 0, 0, kLfoSystemId|Block::kSystemC, 0, 0, kLfoSystemId|vc2settings
+mix-count|for (int k = 0; k < 5; ++k) put8(row + k, p_.value(Block::kKindA|for (int k = 0; k < 4; ++k) put8(row + k, p_.value(Block::kKindA|vc2settings
+mix-before|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.mixes|    uint8_t* row = t.mixes|vc2settings
+mix-after|    return !p_.held(kHeldKind);\n}\n\nbool Vc2PartSettings::mixes|    return true;\n}\n\nbool Vc2PartSettings::mixes|vc2settings
+mix-stop|return mixRow(t, part, kind); });|mixRow(t, part, kind);\n        return true;\n    });|vc2settings
+tva-first|put8(row + 4, get(0));|put8(row + 4, get(1));|vc2settings
+tva-level-ten|put16(row + 8, times(get(2), kTen));|put16(row + 8, get(2));|vc2settings
+tva-pan-wide|put16(row + 0xe, times(get(5), kTen));|put8(row + 0xe, times(get(5), kTen));|vc2settings
+tva-depth-b|put8(row + 0x10, get(6));|put8(row + 0x10, get(7));|vc2settings
+tva-count|for (int k = 0; k < 4; ++k) put8(row + 0x12 + k, get(7 + k));|for (int k = 0; k < 3; ++k) put8(row + 0x12 + k, get(7 + k));|vc2settings
+tva-before|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.tvas|    uint8_t* row = t.tvas|vc2settings
+tva-mid-kind|if (p_.held(kHeldKind) \|\| p_.held(kHeldCommon)) return false;|if (p_.held(kHeldCommon)) return false;|vc2settings
+tva-mid-common|if (p_.held(kHeldKind) \|\| p_.held(kHeldCommon)) return false;|if (p_.held(kHeldKind)) return false;|vc2settings
+tva-gain-block|p_.value(Block::kPart, part, 0, kTvaGainId)|p_.value(Block::kKindA, part, kind, kTvaGainId)|vc2settings
+tva-after|    return !p_.held(kHeldCommon);\n}\n\nbool Vc2PartSettings::tvaVelocityRow|    return true;\n}\n\nbool Vc2PartSettings::tvaVelocityRow|vc2settings
+velocity-before|    if (p_.held(kHeldEnvelope)) return false;\n    uint8_t* row = t.tvas|    uint8_t* row = t.tvas|vc2settings
+velocity-curve-at|put8(row, vc2CurveOf(|put8(row + 1, vc2CurveOf(|vc2settings
+velocity-depth-law|put16(row + 2, vc2DepthOf(|put16(row + 2, (|vc2settings
+velocity-after|    return !p_.held(kHeldEnvelope);\n}\n\nbool Vc2PartSettings::tvas|    return true;\n}\n\nbool Vc2PartSettings::tvas|vc2settings
+tvas-order|tvaRow(t, part, kind) && tvaVelocityRow(t, part, kind)|tvaVelocityRow(t, part, kind) && tvaRow(t, part, kind)|vc2settings
+tvas-and|tvaRow(t, part, kind) && tvaVelocityRow(t, part, kind)|tvaRow(t, part, kind) \|\| tvaVelocityRow(t, part, kind)|vc2settings
+trailer-gain-wide|put8(&t.tvas[kTvaGainAt]|put16(&t.tvas[kTvaGainAt]|vc2settings
+trailer-block|Block::kSystemC, 0, 0, kTvaTrailerRate|Block::kSystemB, 0, 0, kTvaTrailerRate|vc2settings
+route-block|Block::kSystemB, 0, 0, kTvaRouteId|Block::kSystem, 0, 0, kTvaRouteId|vc2settings
+controls-block|Block::kSystem, 0, 0, kControlsId|Block::kSystemB, 0, 0, kControlsId|vc2settings

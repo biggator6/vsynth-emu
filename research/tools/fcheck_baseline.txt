@@ -835,6 +835,9 @@ TVA: 16000 events: 1755 placements, 3587 constructors, 1768 ends, 3542 conversio
 sets: 40 cases, 16000 events: 1176 placements, 2516 makes (1290 with no common), 1213 ends, 1244 conversions, 1257 releases, 1326 updates, 1236 copies, 1175 refreshes; M: 1215 placements, 2379 constructors, 1263 updates
 children: 61610 allocations, 54034 constructors, 19721 ends, 30796 conversions, 32775 updates, 30568 copies, 12351 releases, 1520 refreshes
 xt_vc2sets: 0 different
+== xt_vc2settings
+settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
+xt_vc2settings: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

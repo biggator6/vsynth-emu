@@ -719,6 +719,10 @@ version against rom.4's routines with what it calls hooked:
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.
+      - the readers of item 8's tables done (v286): `Vc2PartSettings`, the common's, envelopes', LFOs', mix's and
+        TVA's readers and their systems', on `Vc2PartParams`; xt_vc2settings (HARDWARE_FIRMWARE.md, "The VC-2 part's
+        settings by ID"). Left: the mode row, the part's bytes, the OSC rows, the COSM inputs, `0x893a72f0`, the
+        dispatchers, the Category and budget and the nodes.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

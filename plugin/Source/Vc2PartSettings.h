@@ -1,0 +1,61 @@
+#pragma once
+// The VC-2 part's settings by ID (v286, step 4.3's fourteenth version, item 9's first part): rom.4's readers that fill
+// the tables C's children read, word for word, each giving up (false) when its task's held flag is set before or after
+// its reads: the common's 0x893a1be0, the envelopes' 0x8939ada0 by rows 0x8939ab90, the LFOs' 0x8939b9a0 by rows
+// 0x8939b860 and their system's 0x8939b970, the mix's 0x8939bff0 by rows 0x8939bf30, the TVA's 0x893a71f0 by rows
+// 0x893a6f80 and 0x893a70c0 (the curve's law 0x893a8120 and the depth's 0x893a8070) and its systems' 0x893a7160,
+// 0x893a71a0 and 0x893a71d0.  The parameters by read object and ID, and the flags, through Vc2PartParams.  Not in the
+// sound yet.  Bit for bit: xt_vc2settings.  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID".  The notes' task.
+#include <array>
+#include <cstdint>
+
+// The read objects a reader sets up, each a block of parameters the getter 0x89324350 reads by ID: the part's
+// (0x893207b0), the system's three (0x89320790, 0x89320760, 0x89320f60) and a note kind's three (0x89320a50,
+// 0x89320ad0, 0x89320b70)
+enum class Vc2ParamBlock : uint8_t { kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC };
+
+class Vc2PartParams {
+public:
+    virtual ~Vc2PartParams() = default;
+    // The getter on a block set up for `part` and `kind` (the system's take neither)
+    virtual int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) = 0;
+    // rom.4's flag byte 0x8993d0c0 + `flag`, a task's hold on the tables
+    virtual bool held(int flag) = 0;
+};
+
+// [FW] the tables, as rom.4 lays them
+struct Vc2PartRows {
+    std::array<uint8_t, 96> commons {};         // 0x89997090: 6 bytes a part
+    std::array<uint8_t, 0x8200> envelopes {};   // 0x89e2765c: 2080 a part, 130 a kind, 10 an envelope
+    std::array<uint8_t, 0x3202> lfos {};        // 0x89e2f85c: 800 a part, 50 a kind, 10 an LFO; the system's byte
+    std::array<uint8_t, 0x1600> mixes {};       // 0x89e32a60: 352 a part, 22 a kind
+    std::array<uint8_t, 0x1806> tvas {};        // 0x89e4987c: 384 a part, 24 a kind; the systems' trailer
+    uint8_t controls = 0;                       // 0x89997fcc: the part's CC 7 and 11 on the TVA's level
+};
+
+class Vc2PartSettings {
+public:
+    explicit Vc2PartSettings(Vc2PartParams& params) : p_(params) {}
+    bool common(Vc2PartRows& t, int part);                          // 0x893a1be0 (0x893a1b40)
+    bool envelopes(Vc2PartRows& t, int part);                       // 0x8939ada0
+    bool envelopeRow(Vc2PartRows& t, int part, int kind, int i);    // 0x8939ab90
+    bool lfos(Vc2PartRows& t, int part);                            // 0x8939b9a0
+    bool lfoRow(Vc2PartRows& t, int part, int kind, int i);         // 0x8939b860
+    void lfoSystem(Vc2PartRows& t);                                 // 0x8939b970
+    bool mixes(Vc2PartRows& t, int part);                           // 0x8939bff0
+    bool mixRow(Vc2PartRows& t, int part, int kind);                // 0x8939bf30
+    bool tvas(Vc2PartRows& t, int part);                            // 0x893a71f0
+    bool tvaRow(Vc2PartRows& t, int part, int kind);                // 0x893a6f80
+    bool tvaVelocityRow(Vc2PartRows& t, int part, int kind);        // 0x893a70c0
+    void tvaTrailer(Vc2PartRows& t);                                // 0x893a7160
+    void tvaRoute(Vc2PartRows& t);                                  // 0x893a71a0
+    void tvaControls(Vc2PartRows& t);                               // 0x893a71d0
+
+private:
+    Vc2PartParams& p_;
+};
+
+// 0x893a8120: the velocity curve's code from its parameter, 1…7 less 1, else 7
+uint8_t vc2CurveOf(int32_t x);
+// 0x893a8070: the velocity depth from its parameter, ±32 to ±100, past them on by 31sts
+int32_t vc2DepthOf(int32_t x);

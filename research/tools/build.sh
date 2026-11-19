@@ -34,7 +34,7 @@ V4=($(vc2Tables . .cpp))
 BUILT=(xt_osc xt_cosm xt_lfo xt_env xt_fw xt_enc xt_analog xt_synth xt_tone xt_fx xt_files xt_arp xt_msm xt_vc2params
        xt_vc2in xt_vc2legacy xt_vc2hireso xt_vc2vocoder xt_vc2carrier xt_vc2tracker xt_vc2kind6 xt_vc2autonote
        xt_vc2mixer xt_vc2tone xt_vc2osc classifier_test rd xt_vc2tva xt_vc2cosm xt_vc2libm xt_vc2voices xt_vc2notes
-       xt_vc2keys xt_vc2sets)
+       xt_vc2keys xt_vc2sets xt_vc2settings)
 for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
@@ -61,6 +61,9 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2SetMixCheck.cpp ] && echo Vc2SetMix.cpp Vc2SetMixCheck.cpp ) \
    $( [ -f Vc2SetTvaCheck.cpp ] && echo Vc2SetTva.cpp Vc2SetTvaCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2sets" &
+# The part's settings by ID (v286) against rom.4's own readers, the read objects and the getter hooked
+[ -f Vc2PartSettingsCheck.cpp ] && cc -DXT_VC2SETTINGS_MAIN Vc2PartSettingsCheck.cpp Vc2PartSettings.cpp \
+   Vc2SetChildHead.cpp "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
    "${SH4[@]}" -o "$O/xt_vc2libm" &

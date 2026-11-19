@@ -1,0 +1,224 @@
+// xt_vc2settings (v286): Vc2PartSettings against rom.4's own readers on its own tables (0x89997090, 0x89e2765c,
+// 0x89e2f85c, 0x89e32a60, 0x89e4987c, the byte 0x89997fcc), the seven read objects' set-ups hooked to leave a handle
+// (the block, part and kind) and the getter 0x89324350 hooked to answer from a store both sides draw alike and log;
+// the held flags (0x8993d0c0…c4) drawn, and now and then one set after a drawn read, on both sides.  Each case noise in
+// the tables, then 400 events: each reader, its rows, the systems' and the two laws alone; after each the tables word
+// for word, the calls and the answer.  XT_VC2SETTINGS_MAIN only.
+#ifdef XT_VC2SETTINGS_MAIN
+#include "Vc2PartSettingsCheck.h"
+
+namespace {
+using Settings = Vc2PartSettings;
+using Block = Vc2ParamBlock;
+constexpr uint32_t kCommonsAt = 0x89997090, kEnvelopesAt = 0x89e2765c, kLfosAt = 0x89e2f85c;   // [FW] the tables
+constexpr uint32_t kMixesAt = 0x89e32a60, kTvasAt = 0x89e4987c, kControlsAt = 0x89997fcc;
+constexpr uint32_t kHeldAt = 0x8993d0c0, kGetter = 0x89324350;                                 // [FW]
+constexpr uint32_t kLfoWords = 0x3200, kTvaWords = 0x1804;   // the tables' words; the bytes past them by hand
+constexpr uint32_t kHandle = 0x01000000;                     // a handle: block << 16, part << 8, kind
+constexpr int kParts = 16, kKinds = 16, kEvents = 400;
+
+// [FW] the read objects' set-ups, by block
+struct SetUp {
+    uint32_t routine;
+    Block block;
+};
+constexpr SetUp kSetUps[] = { { 0x893207b0, Block::kPart }, { 0x89320790, Block::kSystem },
+                              { 0x89320760, Block::kSystemB }, { 0x89320f60, Block::kSystemC },
+                              { 0x89320a50, Block::kKindA }, { 0x89320ad0, Block::kKindB },
+                              { 0x89320b70, Block::kKindC } };
+
+// Values at the laws' edges and the stores' widths
+constexpr int32_t kEdges[] = { 0, 1, -1, 2, 7, 8, 31, 32, 33, -32, -33, 63, 64, -63, -64, 127, 128, 255, 256, 287,
+                               -287, 32767, -32768 };
+
+std::string saidRead(const SettingsCall& c) {
+    char t[64];
+    std::snprintf(t, sizeof t, "block %d, part %d, kind %d, ID 0x%x", c.block, c.part, c.kind, c.id & 0xffff);
+    return t;
+}
+
+// The bytes past the tables' words, and the controls' flag
+std::string settingsTails(SettingsSides& s) {
+    const Vc2PartRows& t = s.rows;
+    const std::pair<uint32_t, uint8_t> bytes[] = { { kLfosAt + kLfoWords, t.lfos[kLfoWords] },
+                                                   { kLfosAt + kLfoWords + 1, t.lfos[kLfoWords + 1] },
+                                                   { kTvasAt + kTvaWords, t.tvas[kTvaWords] },
+                                                   { kTvasAt + kTvaWords + 1, t.tvas[kTvaWords + 1] },
+                                                   { kControlsAt, t.controls } };
+    for (const auto& [at, mine] : bytes) {
+        if (s.fw.cpu.rd8(at) == mine) continue;
+        char text[96];
+        std::snprintf(text, sizeof text, "byte 0x%08x: %02x, against %02x", at, mine, s.fw.cpu.rd8(at));
+        return text;
+    }
+    return "";
+}
+
+std::string settingsDifference(SettingsSides& s) {
+    const Vc2PartRows& t = s.rows;
+    const std::string words = vc2RegionsDifference(s.fw, { { kCommonsAt, &t.commons, sizeof t.commons, "commons" },
+        { kEnvelopesAt, &t.envelopes, sizeof t.envelopes, "envelopes" }, { kLfosAt, &t.lfos, kLfoWords, "LFOs" },
+        { kMixesAt, &t.mixes, sizeof t.mixes, "mix" }, { kTvasAt, &t.tvas, kTvaWords, "TVAs" } });
+    if (!words.empty()) return words;
+    const std::string tails = settingsTails(s);
+    return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
+}
+
+// The draws before an event: the store's seed, now and then a held flag, now and then a flag set after a read
+void settingsDraw(SettingsSides& s, std::mt19937& rng) {
+    s.rom.store.seed = (uint32_t)rng();
+    s.rom.flags = {};
+    if (rng() % 4 == 0) s.rom.flags[rng() % s.rom.flags.size()] = rng() % 2 ? 1 : (uint8_t)(1 + rng() % 255);
+    const auto spans = std::to_array<uint32_t>({ 16, 48, 2400 });
+    s.rom.flipAt = rng() % 4 == 0 ? (int)(1 + rng() % spans[rng() % spans.size()]) : 0;
+    s.rom.flipFlag = (int)(rng() % 4);
+}
+
+template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
+std::string partEvent(SettingsSides& s, std::mt19937& rng) {
+    const int part = (int)(rng() % kParts);
+    ++s.n.byEvent[Counted];
+    return settingsOnBoth(s, { Routine, "a part's reader", vc2R0 }, { TableAt, (uint32_t)part },
+                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part); });
+}
+
+template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
+std::string kindEvent(SettingsSides& s, std::mt19937& rng) {
+    const int part = (int)(rng() % kParts), kind = (int)(rng() % kKinds);
+    ++s.n.byEvent[Counted];
+    return settingsOnBoth(s, { Routine, "a kind's row", vc2R0 }, { TableAt, (uint32_t)part, (uint32_t)kind },
+                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part, kind); });
+}
+
+template <auto Member, uint32_t Routine, uint32_t TableAt, int Rows, size_t Counted>
+std::string rowEvent(SettingsSides& s, std::mt19937& rng) {
+    const int part = (int)(rng() % kParts), kind = (int)(rng() % kKinds), i = (int)(rng() % Rows);
+    ++s.n.byEvent[Counted];
+    const Vc2CheckRoutine r { Routine, "a row", vc2R0 };
+    return settingsOnBoth(s, r, { TableAt, (uint32_t)part, (uint32_t)kind, (uint32_t)i },
+                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part, kind, i); });
+}
+
+// A system's reader: rom.4's answers 1 (0x893a71d0 reads no table: the word it's given unread)
+template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
+std::string systemEvent(SettingsSides& s, std::mt19937&) {
+    ++s.n.byEvent[Counted];
+    return settingsOnBoth(s, { Routine, "a system's reader", vc2R0 }, { TableAt }, [&] {
+        (s.settings.*Member)(s.rows);
+        return 1u;
+    });
+}
+
+template <auto Law, uint32_t Routine, size_t Counted>
+std::string lawEvent(SettingsSides& s, std::mt19937& rng) {
+    const int32_t x = rng() % 2 ? kEdges[rng() % std::size(kEdges)] : (int32_t)(rng() % 2 ? rng() % 80 - 40 : rng());
+    ++s.n.byEvent[Counted];
+    return settingsOnBoth(s, { Routine, "a law", vc2R0 }, { (uint32_t)x }, [&] { return (uint32_t)Law(x); });
+}
+
+using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
+// [FW] the events by routine
+const SettingsEvent kSettingsEvents[] = {
+    partEvent<&Settings::common, 0x893a1be0, kCommonsAt, 0>,
+    partEvent<&Settings::envelopes, 0x8939ada0, kEnvelopesAt, 1>,
+    rowEvent<&Settings::envelopeRow, 0x8939ab90, kEnvelopesAt, 13, 2>,
+    partEvent<&Settings::lfos, 0x8939b9a0, kLfosAt, 3>,
+    rowEvent<&Settings::lfoRow, 0x8939b860, kLfosAt, 5, 4>,
+    systemEvent<&Settings::lfoSystem, 0x8939b970, kLfosAt, 5>,
+    partEvent<&Settings::mixes, 0x8939bff0, kMixesAt, 6>,
+    kindEvent<&Settings::mixRow, 0x8939bf30, kMixesAt, 7>,
+    partEvent<&Settings::tvas, 0x893a71f0, kTvasAt, 8>,
+    kindEvent<&Settings::tvaRow, 0x893a6f80, kTvasAt, 9>,
+    kindEvent<&Settings::tvaVelocityRow, 0x893a70c0, kTvasAt, 10>,
+    systemEvent<&Settings::tvaTrailer, 0x893a7160, kTvasAt, 11>,
+    systemEvent<&Settings::tvaRoute, 0x893a71a0, kTvasAt, 12>,
+    systemEvent<&Settings::tvaControls, 0x893a71d0, 0, 13>,
+    lawEvent<vc2CurveOf, 0x893a8120, 14>,
+    lawEvent<vc2DepthOf, 0x893a8070, 15>,
+};
+
+std::string settingsCase(SettingsSides& s, std::mt19937& rng) {
+    for (uint8_t* b = reinterpret_cast<uint8_t*>(&s.rows); b != reinterpret_cast<uint8_t*>(&s.rows + 1); ++b)
+        *b = (uint8_t)rng();
+    const Vc2PartRows& t = s.rows;
+    s.fw.cpu.write(kCommonsAt, &t.commons, sizeof t.commons);
+    s.fw.cpu.write(kEnvelopesAt, &t.envelopes, sizeof t.envelopes);
+    s.fw.cpu.write(kLfosAt, &t.lfos, sizeof t.lfos);
+    s.fw.cpu.write(kMixesAt, &t.mixes, sizeof t.mixes);
+    s.fw.cpu.write(kTvasAt, &t.tvas, sizeof t.tvas);
+    s.fw.cpu.wr8(kControlsAt, t.controls);
+    std::string what;
+    for (int k = 0; k < kEvents && what.empty(); ++k, ++s.n.events) {
+        settingsDraw(s, rng);
+        what = kSettingsEvents[rng() % std::size(kSettingsEvents)](s, rng);
+        s.n.calls += (long)s.mine.log.size();
+    }
+    return what;
+}
+
+void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
+    const auto& e = n.byEvent;
+    std::printf("settings: %d cases, %ld events: %ld commons; envelopes %ld, %ld rows; LFOs %ld, %ld rows, %ld "
+                "systems; mix %ld, %ld rows; TVAs %ld, %ld rows, %ld velocity rows, %ld trailers, %ld routes, %ld "
+                "controls; laws %ld curves, %ld depths (%ld reads)\n", run.cases, n.events, e[0], e[1], e[2], e[3],
+                e[4], e[5], e[6], e[7], e[8], e[9], e[10], e[11], e[12], e[13], e[14], e[15], n.calls);
+    std::printf("xt_vc2settings: %ld different\n", different);
+}
+
+bool noTables(const char*) { return true; }
+} // namespace
+
+int32_t SettingsStore::value(const SettingsCall& c) const {
+    uint32_t h = seed ^ (uint32_t)c.block * 0x9e3779b9u ^ (uint32_t)c.part * 0x85ebca6bu;
+    h ^= (uint32_t)c.kind * 0xc2b2ae35u ^ (uint32_t)(uint16_t)c.id * 0x27d4eb2fu;
+    h ^= h >> 15;
+    h *= 0x2c1b3c6du;
+    h ^= h >> 12;
+    h *= 0x297a2d39u;
+    h ^= h >> 15;
+    const uint32_t pick = h & 7, v = h >> 3;
+    if (pick < 4) return (int32_t)(v % 128);
+    if (pick < 6) return (int32_t)(v % 129) - 64;
+    return pick == 6 ? kEdges[v % std::size(kEdges)] : (int32_t)(h * 2654435761u);
+}
+
+int32_t SettingsReads::read(const SettingsCall& c) {
+    log.push_back(c);
+    if (++reads == flipAt) flags[flipFlag] = 1;
+    return store.value(c);
+}
+
+SettingsSides::SettingsSides(Vc2Fw& rig) : fw(rig) {
+    for (const SetUp& u : kSetUps)
+        fw.cpu.hook(u.routine, [u](Sh4& c) {
+            const bool byPart = u.block == Block::kPart || u.block >= Block::kKindA;
+            const uint32_t part = byPart ? (c.r[5] & 0xff) << 8 : 0;
+            const uint32_t kind = u.block >= Block::kKindA ? c.r[6] & 0xff : 0;
+            c.wr32(c.r[4] + 4, kHandle | (uint32_t)u.block << 16 | part | kind);
+            c.ret(0);
+        });
+    fw.cpu.hook(kGetter, [this](Sh4& c) {
+        const uint32_t h = c.r[4];
+        const SettingsCall call { (int32_t)(h >> 16 & 0xff), (int32_t)(h >> 8 & 0xff), (int32_t)(h & 0xff),
+                                  (int16_t)c.r[5] };
+        const int32_t v = rom.read(call);
+        if (rom.reads == rom.flipAt) c.wr8(kHeldAt + rom.flipFlag, 1);
+        c.ret((uint32_t)v);
+    });
+}
+
+std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std::initializer_list<uint32_t> args,
+                           const std::function<uint32_t()>& mine) {
+    s.rom.log.clear();
+    s.rom.reads = 0;
+    s.mine = s.rom;
+    s.fw.cpu.write(kHeldAt, s.rom.flags.data(), s.rom.flags.size());
+    if (s.rom.flags != std::array<uint8_t, 5> {} || s.rom.flipAt != 0) ++s.n.gaveUp;
+    return vc2BothAnswer(s.fw, routine, args, mine, [&] { return settingsDifference(s); });
+}
+
+int main(int argc, char** argv) {
+    const Vc2CheckStart start { "xt_vc2settings", noTables, { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" } };
+    return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts);
+}
+#endif

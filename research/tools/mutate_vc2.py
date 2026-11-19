@@ -87,6 +87,8 @@ HARNESSES = {
                '40'),
     '--sets': (mutlist.Harness('mutate_vc2', 'xt_vc2sets', 'vc2sets_muts.txt', ('vc2sets', '2024'), 'XT_VC2SETS_STOP'),
                '40'),
+    '--settings': (mutlist.Harness('mutate_vc2', 'xt_vc2settings', 'vc2settings_muts.txt', ('vc2settings', '2024'),
+                                   'XT_VC2SETTINGS_STOP'), '40'),
     '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
                '40'),
     '--libm': (mutlist.Harness('mutate_vc2', 'xt_vc2libm', 'vc2libm_muts.txt', ('vc2libm', '2024'), 'XT_VC2LIBM_STOP'),
