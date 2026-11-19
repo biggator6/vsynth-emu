@@ -48,7 +48,7 @@ VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTable
 VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes)
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents Vc2ToneModulators
          Vc2ToneEnvelope Vc2ToneLfo Vc2ToneModCheck XtEnvelope XtLfo Vc2ToneMix Vc2ToneMixRender Vc2ToneMixTables
-         Vc2ToneMixCheck Vc2FreeLfos Vc2FreeLfoCheck)
+         Vc2ToneMixCheck Vc2FreeLfos Vc2FreeLfoCheck Vc2ToneLists Vc2ToneMethods Vc2ToneMethodCheck)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
         Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub
@@ -110,6 +110,8 @@ VC2PORTS=(
     "vc2tonemixrender|Vc2ToneMixRender.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
     "vc2tonemixtables|Vc2ToneMixTables.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
     "vc2freelfos|Vc2FreeLfos.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
+    "vc2tonelists|Vc2ToneLists.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
+    "vc2tonemethods|Vc2ToneMethods.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
     "vc2osc|Vc2OscVoice.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscget|Vc2OscVoiceGet.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osckinds|Vc2OscVoiceKinds.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"

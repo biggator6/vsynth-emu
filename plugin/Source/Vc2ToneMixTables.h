@@ -13,6 +13,7 @@ struct Vc2ToneMixTables {
     float half = 0;                  // 0x893adc6c: 0.5
     float fullScale = 0;             // 0x893add74: 2^31, the OSCs' full scale
     float delaySpan = 0;             // 0x893e4988: 248, half the delay lines' samples
+    float settingsScale = 0;         // 0x893adea8: 2^31, the settings update's own word (v273)
 };
 
 [[nodiscard]] bool vc2LoadToneMix(const char* path);

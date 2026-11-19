@@ -31,10 +31,12 @@ constexpr TonePartAt kParts[] = {
 const TonePartAt& tonePartOf(Piece piece) { return *std::ranges::find(kParts, piece, &TonePartAt::piece); }
 
 // [FW] the part words' offsets: an OSC voice's +0x54, +0xa40, +0x1cc, +0xa80, byte +0x58, +0x104, its bindings from
-// +0xa4c; the TVA's +0x40, bindings from +0xa4, serial +0xc0; a COSM's DSP routine (+0x148) and vtable (+0x160); the
-// player a legato takes (+0x15c); a COSM's DSP arguments (+0x58, +0x10)
+// +0xa4c, its cost +0xa88; the TVA's +0x40, bindings from +0xa4, serial +0xc0, fade +0x64; a COSM's DSP routine (+0x148),
+// vtable (+0x160) and cost (+0x14c); the player a legato takes (+0x15c); a COSM's DSP arguments (+0x58, +0x10)
 constexpr uint32_t kOscKind = 0x54, kOscFlag = 0xa40, kOscValue = 0x1cc, kOscOther = 0xa80, kOscByte = 0x58;
 constexpr uint32_t kOscWave = 0x104, kOscBinds = 0xa4c, kTvaLevel = 0x40, kTvaBinds = 0xa4, kTvaSerial = 0xc0;
+constexpr uint32_t kOscCost = 0xa88, kTvaFade = 0x64, kCosmCost = 0x14c;
+constexpr uint32_t kWaitAt = 0x893017f0;   // [FW] the OS's wait for an event, the truncation's
 constexpr uint32_t kCosmDsp = 0x148, kCosmVtable = 0x160, kPlayer = 0x15c, kStateWord = 0xc;
 constexpr uint32_t kCosmD = 0x58, kCosmState = 0x10, kSetUpOther = 4, kSetUpByte = 0xc;
 
@@ -71,7 +73,6 @@ uint32_t word(Sh4& cpu, uint32_t at, uint32_t bytes = sizeof(uint32_t)) {
 
 // How a hooked routine's arguments read into its call, one shape each
 void none(Sh4&, ToneCall&) {}
-void one(Sh4&, ToneCall& t) { t.a = 1; }
 void r5(Sh4& c, ToneCall& t) { t.a = c.r[5]; }
 void fr4(Sh4& c, ToneCall& t) { t.a = c.fb[0][4]; }
 void block5(Sh4& c, ToneCall& t) { t.a = blk(c.r[5]); }
@@ -110,6 +111,8 @@ uint32_t stopped(const Sh4&, const ToneDraws& d, int32_t) { return d.tvaStopped 
 uint32_t held(const Sh4&, const ToneDraws& d, int32_t) { return d.tvaHeld ? 1 : 0; }
 uint32_t installedOsc(const Sh4&, const ToneDraws& d, int32_t p) { return d.installOsc[which(p)]; }
 uint32_t installedCosm(const Sh4&, const ToneDraws& d, int32_t p) { return d.installCosm[which(p)]; }
+uint32_t word168(const Sh4&, const ToneDraws& d, int32_t p) { return d.word168[which(p)]; }
+uint32_t position(const Sh4&, const ToneDraws& d, int32_t p) { return d.position[which(p)]; }
 
 // A hooked routine: where, what it logs as, which register holds its part (0 none), how its arguments read, its answer
 struct ToneHook {
@@ -119,12 +122,11 @@ struct ToneHook {
     void (*decode)(Sh4&, ToneCall&);
     Answer answer;
 };
-// [FW] every routine the tone's frame and note-on call but the envelopes', the LFOs' (v268), the mix's (v269) and the free
-// LFOs' (v271), which run
+// [FW] every routine the tone's frame, note-on and remaining methods call but the envelopes', the LFOs' (v268), the mix's
+// (v269), the free LFOs' (v271) and the part's lists (v273), which run
 const ToneHook kHooks[] = {
     { 0x893ae070, kBuild, 4, none, zero }, { 0x893aa030, kBuild, 4, none, zero }, { 0x893b20b0, kBuild, 4, none, zero },
-    { 0x893aa060, kDestroy, 4, none, zero }, { 0x893ada30, kUnlist, 4, one, zero },
-    { 0x893ad9a0, kUnlist, 4, none, zero }, { 0x893ae1c0, kUpdateOsc, 4, r5, zero },
+    { 0x893aa060, kDestroy, 4, none, zero }, { 0x893ae1c0, kUpdateOsc, 4, r5, zero },
     { kCosmUpdateAt, kUpdateCosm, 4, fr4, zero }, { 0x893b2560, kTvaOver, 4, none, over },
     { 0x893b2610, kTvaStopped, 4, none, stopped }, { 0x893b23d0, kUpdateTva, 4, none, zero },
     { kToneEndedAt, kEnded, 4, state, zero }, { 0x893ae9f0, kRenderOsc, 4, buf5, zero },
@@ -136,7 +138,14 @@ const ToneHook kHooks[] = {
     { 0x893ae370, kNoteOnOsc, 4, blockR6, zero }, { 0x893aee20, kTakePlayer, 4, player, zero },
     { 0x893ae610, kSetOsc, 4, block5, zero },
     { 0x893aa590, kSetUpCosm, 4, setUp, zero }, { 0x893aa0e0, kStartCosm, 4, blockR6, zero },
-    { 0x893b2100, kNoteOnTva, 4, blockR6, zero }, { 0x893ada10, kEnlist, 4, none, zero },
+    { 0x893b2100, kNoteOnTva, 4, blockR6, zero },
+    { 0x893ae780, kSettingsOsc, 4, block5, zero }, { 0x893acff0, kSettingsLfo, 4, block5, zero },
+    { 0x893ac110, kSettingsEnvelope, 4, block5, zero }, { 0x893aa5d0, kNewBlockCosm, 4, block5, zero },
+    { 0x893b23b0, kNewBlockTva, 4, block5, zero }, { 0x893ae9b0, kLegatoOsc, 4, block5, zero },
+    { 0x893ac8c0, kReleaseLfo, 4, none, zero }, { 0x893ac470, kReleaseEnvelope, 4, none, zero },
+    { 0x893b2b60, kKeyOffOsc, 4, none, zero }, { 0x893b25a0, kTruncateTold, 4, none, zero },
+    { 0x893b25b0, kTruncate, 4, none, zero }, { kToneTruncatedAt, kTruncated, 4, none, zero },
+    { 0x893aed40, kOscWord168, 4, none, word168 }, { 0x893aed60, kOscPosition, 4, none, position },
 };
 constexpr uint32_t kLocks[] = { 0x893018b0, 0x893018c0 };   // [FW] the OS's lock and unlock: nothing here
 
@@ -147,7 +156,7 @@ void eachWord(Words& w, Fn fn) {
         const uint32_t at = tonePartOf(o == 0 ? Piece::osc1 : Piece::osc2).offset;
         auto& v = w.osc[o];
         for (auto [off, x] : { std::pair { kOscKind, &v.kind }, { kOscFlag, &v.flag }, { kOscValue, &v.value },
-                               { kOscOther, &v.other }, { kOscWave, &v.wave } }) {
+                               { kOscOther, &v.other }, { kOscWave, &v.wave }, { kOscCost, &v.cost } }) {
             fn(at + off, *x, 4u);
         }
         fn(at + kOscByte, v.byte, 1u);
@@ -157,6 +166,8 @@ void eachWord(Words& w, Fn fn) {
     fn(tva + kTvaLevel, w.tvaLevel, 4u);
     for (size_t k = 0; k < 3; ++k) fn(tva + kTvaBinds + 4 * (uint32_t)k, w.tvaBinds[k], 4u);
     fn(tva + kTvaSerial, w.tvaBinds[3], 4u);
+    fn(tva + kTvaFade, w.tvaFade, 4u);
+    fn(tonePartOf(Piece::cosm1).offset + kCosmCost, w.cosmCost, 4u);
 }
 } // namespace
 
@@ -168,7 +179,20 @@ uint32_t toneEnvelopeAt(uint32_t tone, int e) {
 
 uint32_t toneLfoAt(uint32_t tone, int l) { return tone + tonePartOf(Piece::lfos).offset + 0x98 * (uint32_t)l; }
 
-void toneInstallRom(Vc2Fw& fw, const ToneDraws& draws, std::vector<ToneCall>& log) {
+// The wait a truncation makes: logged by its event, the tone's fade at 0 once the draws' count of waits has passed
+void toneHookWait(Vc2Fw& fw, std::vector<ToneCall>& log, ToneFadeWait& fade) {
+    fw.cpu.hook(kWaitAt, [&log, &fade](Sh4& cpu) {
+        log.push_back({ kWaitFade, kToneNone, kToneNone, cpu.r[4], 0, 0, 0 });
+        if (--fade.romLeft <= 0) {
+            const float done = 0.0f;
+            cpu.write(fade.tone + tonePartOf(Piece::tva).offset + kTvaFade, &done, sizeof done);
+        }
+        cpu.ret(0);
+    });
+}
+
+void toneInstallRom(Vc2Fw& fw, const ToneDraws& draws, std::vector<ToneCall>& log, ToneFadeWait& fade) {
+    toneHookWait(fw, log, fade);
     for (const ToneHook& h : kHooks) {
         fw.cpu.hook(h.at, [&draws, &log, h](Sh4& cpu) {
             const auto [tone, part] = h.partIn == 0 ? std::pair { kToneNone, kToneNone } : partAt(cpu.r[h.partIn]);

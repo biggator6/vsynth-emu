@@ -13,7 +13,7 @@ auto toneMixPoolWords(Vc2ToneMixTables& t) {
         { kGainsAt + 24, &t.gains[6] }, { kGainsAt + 28, &t.gains[7] },
         { 0x893e4670, &t.settle }, { 0x893e46f0, &t.ramp }, { 0x893bf180, &t.follower },
         { 0x893e4318, &t.rateSpan }, { 0x893e431c, &t.rateFloor }, { 0x893adc6c, &t.half },
-        { 0x893add74, &t.fullScale }, { 0x893e4988, &t.delaySpan },
+        { 0x893add74, &t.fullScale }, { 0x893e4988, &t.delaySpan }, { 0x893adea8, &t.settingsScale },
     });
 }
 
