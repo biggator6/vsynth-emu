@@ -108,4 +108,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SetChildHead.cpp
     Source/Vc2SetLfo.cpp
     Source/Vc2SetMix.cpp
+    Source/Vc2SetTva.cpp
 )

@@ -225,7 +225,8 @@ int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offse
 }
 
 long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
-    return vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run) + vc2SetMixPart(s, run);
+    const long children = vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run);
+    return children + vc2SetMixPart(s, run) + vc2SetTvaPart(s, run);
 }
 
 uint32_t* setsPortWords(SetSides& s, uint32_t at) {
@@ -239,15 +240,17 @@ Vc2SetCall setsCallAt(SetSides& s, uint32_t at) {
     return call;
 }
 
-std::string setsChildOnBoth(SetSides& s, const Vc2Region& pool, const Vc2CheckRoutine& routine,
+std::string setsChildOnBoth(SetSides& s, std::span<const Vc2Region> pools, const Vc2CheckRoutine& routine,
                             std::initializer_list<uint32_t> args, const std::function<uint32_t()>& mine) {
-    s.fw.cpu.write(pool.at, pool.mine, pool.bytes);
+    for (const Vc2Region& pool : pools)
+        if (pool.bytes != 0) s.fw.cpu.write(pool.at, pool.mine, pool.bytes);
     s.fw.cpu.write(Vc2Notes::kNotesAt, &s.notes.notes, sizeof s.notes.notes);
     s.rom.clear();
     s.mine.clear();
     const std::string what = vc2BothAnswer(s.fw, routine, args, mine, [&] {
         const Vc2Region notes { Vc2Notes::kNotesAt, &s.notes.notes, sizeof s.notes.notes, "W" };
-        const std::string words = vc2RegionsDifference(s.fw, { pool, notes });
+        std::string words = vc2RegionsDifference(s.fw, { pools[0], notes });
+        if (words.empty() && pools[1].bytes != 0) words = vc2RegionsDifference(s.fw, { pools[1] });
         return words.empty() ? vc2CallsDifference(s.rom, s.mine, saidCall) : words;
     });
     return what.empty() ? what : std::string(routine.name) + ": " + what;

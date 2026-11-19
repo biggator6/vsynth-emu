@@ -1546,6 +1546,81 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's sets' TVA (2026-11-19, v285) {#vc2-set-tva}
+
+Step 4.3's thirteenth version (VC2_MODE_PLAN.md, step 4.3, item 8's fifth child, its last): C's TVA, one a voice.
+`Vc2SetTvas` is bit for bit against rom.4's own in `xt_vc2sets`' sixth part.
+
+**Its words.** There are 24 TVAs of 40 bytes from `0x89997c04`, one a voice (`0x893a67d0(40, number)`).
+- +0 holds the note's kind; +1 the voice's key and +2 its +0x43.
+- +6…+0x1d hold the part's twelve words, from `0x89e4987c` + 384 × the part + 24 × the kind: the velocity's curve and
+  depth, whether it takes its sums, the level and its key follow, a depth, the pan and its key follow, a second
+  depth, the outputs' level, two sends, the outputs' route, and the sends' common level.
+- +0x20 holds the velocity curve's level squared, +0x24 the note's M.
+
+**The constructor and conversion.** `0x893a67f0(tva, call, block, M; the kind on the stack)` writes the kind and M,
+the voice's two bytes and the part's words, as the mix's. The conversion `0x893a68c0` writes the voice's bytes again.
+Then both take the shared velocity curve (`0x893a7fb0`) on the velocity, the depth (+8) and the curve (+6), as a
+halfword over 32768, squared, into +0x20, and call the writer. **The update `0x893a6940`** writes the part's words
+again; **the copy `0x893a69a0`** is the writer's code again, its literal pools apart; **the end `0x893a68b0`** is a
+bare return.
+
+**The block.** Each TVA converts the TVA block of the note's input, W + 0x6e8, by the writer `0x893a6260`. It takes
+seven of the group reader `0x893a2bf0`'s sums. +0 takes 13, and +4, +0x10, +0x14 take 0.
+- **When it takes its sums** (+0xa not 0):
+  - the level: the byte plus its sum, held to 0…127, plus the key follow, (key − 60) × the follow × 127 / 6000 by
+    rom.4's magic division, as a halfword, held again; then the level table by it over 32768. With the part's flag
+    (`0x89997fcc`) the product of it with CC 7's and CC 11's, read from M + 0x178; times the curve's level.
+  - two depths (+0x10, +0x16, signed): the byte plus its sum held to ±63, then sign · (d / 63)², at +8 and +0x1c;
+    +0x18 takes 0.0.
+  - the pan: the byte plus its sum as a halfword, plus its key follow, as a halfword held to 0…127; then CC 10 (M +
+    0x17a) moves it toward 127 by n / 63 above 64 and toward 0 by n / 64 below; the crossfade's pair by 127 less it
+    and by it.
+- **Otherwise** +0xc takes 1.0 (a product of CC 7 and 11 computed first with the flag is stored over), the depths
+  0.0, and the pan the crossfade's middle pair, 63 and 64.
+- Then the outputs' level by its sum, held, from the level table. +0x48 and +0x4c take the pan's pair, and +0x40 and
+  +0x44 1.0 and 0.0 for a note of kind 0, else 0.0 and 1.0.
+- **The route** (+0x1b, a table of three): 0 puts the outputs' level at +0x28 and +0x2c, 1 (and past 2) at +0x20 and
+  +0x24, 2 there unless the part table's flag (`0x89e4b080`) is set; the other pair 0.0.
+- The sends: +0x30 the level by its byte and sum × 16; +0x34 CC 93's level times the other's.
+- **The part's gain** 2^(g / 6) by rom.4's powf, g the signed byte at `0x89e4b07c`, multiplies +0x20…+0x2c, +0x30
+  (as the common level by the table, times the gain, times +0x30), +0x34; +0x38 takes the common level × the gain × 4,
+  +0x3c the gain × the outputs' level.
+- **A global**: `0x8993eb08` takes 1 / (r / 100 × 44.1), r the signed halfword at `0x89e4b07e`. The port keeps it
+  as the pool's word, `step`.
+- The scales are pool words, read by `Vc2SetEnvelopeTables` with the mix's: the curve's, the on and off paths'
+  (both 32768), 63, 16, 6, 4, 100 and 44.1.
+
+**What the port shares.** rom.4's magic division is one routine now, `vc2ByMagic`, the common's by 127², the
+envelopes' by 6400 and the TVA's by 6000 and 63. The kind-only children's head (M, the kind, the voice's bytes, the
+part's words) is the pool's `madeByKind`, the mix's and the TVA's; the part's words by the kind a template on their
+count; the level table's gain `vc2LevelRun`.
+
+**The check.** It is xt_vc2sets' sixth part, on the seed after the mix's. It hooks the reader as the envelopes'
+part does. The velocity curve is rom.4's own on both sides (the port's through `RomShared`, its registers kept, as
+rom.4's answer is read from r0 after the port has run); powf is rom.4's on its side and the port's on the other.
+
+The draws, beyond the sets' part's:
+- the parts' TVA words and the TVAs' own;
+- the curve 0…8 or any; its depth either side of ±200 (the routine's edges) or any; the bytes at their edges; the
+  depths either side of ±63; the follows 0, ±100, ±1200, the ends or any; the route 0…3 or any;
+- the part's flag; the trailer's gain at 0, ±6, ±12 or the ends, its rate (never 0), its route flag;
+- four Ms in the interpreter's RAM that the TVAs point at, their controllers 0…127.
+
+Not drawn: a controller past 127 (MIDI's), where CC 10 sends the pan past the tables either side; a rate of 0.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the earlier parts' lines as they were.
+- Every line and branch of `Vc2SetTva.cpp` is reached.
+- `mutate_vc2.py --sets`: 374 plants, none missed; the TVA's 82 and its tables' 9 new, and the head's division and
+  kind-only head. Four were equivalent and left out: the off pair 63 and 64 (both 32768 in the crossfade's table,
+  planted at 62 and 65 instead), the pan sum's halfword (one with the follow's, mod 2^16), and the curve's answer as a
+  halfword (it answers 0…0x8000).
+
+The first run differed in all its cases: the port's curve ran rom.4's routine in the interpreter and left its answer
+in r0, where the check then read rom.4's constructor's. The next differed on CC 10 past 127, which the draws then left
+out.
+
 ### The VC-2 part's sets' mix (2026-11-19, v284) {#vc2-set-mix}
 
 Step 4.3's twelfth version (VC2_MODE_PLAN.md, step 4.3, item 8's fourth child): C's mix, one a voice. `Vc2SetMixes`

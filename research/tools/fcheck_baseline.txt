@@ -831,6 +831,7 @@ common: 16000 events: 1738 placements, 3557 constructors, 1758 ends, 3486 conver
 envelopes: 16000 events: 1502 placements, 2821 constructors, 1497 ends, 3026 conversions, 1458 updates, 1431 copies, 2855 releases, 1410 block writes (18537 Matrix sums)
 LFOs: 16000 events: 1748 placements, 3479 constructors, 1783 ends, 3668 conversions, 1770 updates, 1762 copies, 1790 block writes (5197 Matrix sums)
 mix: 16000 events: 1859 placements, 3636 constructors, 1725 ends, 3477 conversions, 1736 updates, 1804 copies, 1763 block writes
+TVA: 16000 events: 1755 placements, 3587 constructors, 1768 ends, 3542 conversions, 1750 updates, 1801 copies, 1797 block writes (67617 Matrix sums)
 sets: 40 cases, 16000 events: 1176 placements, 2516 makes (1290 with no common), 1213 ends, 1244 conversions, 1257 releases, 1326 updates, 1236 copies, 1175 refreshes; M: 1215 placements, 2379 constructors, 1263 updates
 children: 61610 allocations, 54034 constructors, 19721 ends, 30796 conversions, 32775 updates, 30568 copies, 12351 releases, 1520 refreshes
 xt_vc2sets: 0 different

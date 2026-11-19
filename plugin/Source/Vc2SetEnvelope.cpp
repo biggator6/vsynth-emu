@@ -51,11 +51,6 @@ uint32_t matrixTime(uint32_t value, uint32_t matrix, uint32_t index, uint32_t st
     return static_cast<uint32_t>(std::clamp(static_cast<int32_t>(value & 0xff) + sum, 0, kTop));
 }
 
-// rom.4's signed division of a depth by 6400: the product's high word, shifted, rounded toward 0
-int32_t byDepth(int32_t n) {
-    const int32_t q = static_cast<int32_t>((static_cast<int64_t>(n) * kMagic) >> 32) >> kMagicShift;
-    return q + static_cast<int32_t>(static_cast<uint32_t>(q) >> 31);
-}
 
 // 0x8939aa40: the time of a value less the velocity's part by its depth (none at or below 0), then by the key's factor
 // (none at 1; held to 12000 past it; at least 1)
@@ -64,7 +59,7 @@ uint32_t curveTime(uint32_t value, uint32_t velocity, int8_t sens, uint32_t fact
     if (time == 0) return 0;
     uint32_t held = static_cast<uint32_t>(time);
     if (sens != 0) {
-        const int32_t depth = byDepth(sens * kDepthScale);
+        const int32_t depth = vc2ByMagic(sens * kDepthScale, kMagic, kMagicShift);
         const int32_t towards = static_cast<int32_t>(velocity & 0xff) - kCentreVelocity;
         const int32_t less = static_cast<int32_t>(static_cast<uint16_t>(time)) - ((depth * towards) >> kVelocityShift);
         if (less <= 0) return 0;

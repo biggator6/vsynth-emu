@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's sets' TVA v285 (2026-11-19, on claude/vc2-part-4-3 after v284; HARDWARE_FIRMWARE.md, "The VC-2
+  part's sets' TVA"): step 4.3's thirteenth version, item 8's last child. Vc2SetTvas, rom.4's 24 TVAs word for word,
+  the constructor and conversion with the velocity curve's level, the update, copy and the block writer: the level by
+  its sum, key follow and the part's CC 7 and 11, two depths, the pan by its sum, key follow and CC 10, the outputs by
+  a route, two sends with CC 93, the part's gain by powf, and rom.4's global step, the pool's own word. rom.4's magic
+  division one routine (vc2ByMagic) for the common, envelopes and TVA. xt_vc2sets gains a sixth part: 0 different at
+  seeds 2024, 7 and 31337; mutate_vc2.py --sets 374 planted, 0 missed. Not in the sound yet.
+
 The VC-2 part's sets' mix v284 (2026-11-19, on claude/vc2-part-4-3 after v283; HARDWARE_FIRMWARE.md, "The VC-2
   part's sets' mix"): step 4.3's twelfth version, item 8's fourth child. Vc2SetMixes, rom.4's 24 mixes word for word,
   the constructor, conversion, update, copy and the block writer: off, 0.7 at the four gains; on, by type, the level

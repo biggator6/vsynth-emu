@@ -47,6 +47,16 @@ struct Vc2SetClock {
     uint16_t period = 0;
 };
 
+// What C's TVA reads past the part's words (v285): the flag of the part's CC 7 and 11 on the level (rom.4's byte
+// 0x89997fcc), and the part table's trailer at 0x89e4b07c: a gain in sixths of an octave, a rate in hundredths of
+// 44.1 kHz's samples and a route's flag
+struct Vc2SetTvaGlobals {
+    uint8_t controls = 0;   // 0x89997fcc
+    int8_t gain = 0;        // 0x89e4b07c
+    int16_t rate = 0;       // 0x89e4b07e
+    uint8_t route = 0;      // 0x89e4b080
+};
+
 // What C, M and C's children read past their own words: the voice by a call, an object's first byte, K's channel state,
 // the channel's bend and controllers (its +0x84 + number), the part's byte by kind (rom.4's 0x89998a14 + 16 × part +
 // kind), the part's three words the common takes (0x89997090 + 6 × part, v281); the part's five words an envelope
@@ -67,6 +77,12 @@ public:
     virtual std::array<uint16_t, 5> lfoOf(uint32_t part, uint32_t kind, uint32_t index) = 0;
     // the part's eleven words the mix takes (0x89e32a60 + 352 × part + 22 × kind, v284)
     virtual std::array<uint16_t, 11> mixOf(uint32_t part, uint32_t kind) = 0;
+    // the TVA's (v285): the part's twelve words (0x89e4987c + 384 × part + 24 × kind), the shared velocity curve
+    // (0x893a7fb0), the note's M's controller `n` (M + 0x178 + n: CC 7, 11, 10, 93), the globals
+    virtual std::array<uint16_t, 12> tvaOf(uint32_t part, uint32_t kind) = 0;
+    virtual int velocityCurve(int velocity, int sens, int curve) = 0;
+    virtual uint8_t matrixControl(uint32_t matrix, uint32_t n) = 0;
+    virtual Vc2SetTvaGlobals tvaGlobals() = 0;
     virtual Vc2SetClock clock() = 0;
     virtual int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) = 0;
 };

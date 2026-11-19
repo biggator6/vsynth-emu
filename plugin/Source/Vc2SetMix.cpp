@@ -11,8 +11,7 @@ constexpr float kOne = 1.0f;            // fldi1
 
 const Vc2SetEnvelopeTables& mixTables() { return vc2SetEnvelopeTables(); }
 
-// The level run's halfword at `at` over `scale`
-float runGain(int32_t at, float scale) { return xtf::div(xtf::flt(mixTables().levels[at]), scale); }
+float runGain(int32_t at, float scale) { return vc2LevelRun(at, scale); }
 
 // Off, or a type past the four: 0 at +0, `gain` at the four gains
 void evenGains(uint32_t* block, float gain) {
@@ -65,10 +64,5 @@ void Vc2SetMixes::blockOf(const Vc2MixWords& w, uint32_t* block, Vc2SetReads&) {
 }
 
 void Vc2SetMixes::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads) {
-    Vc2MixWords& w = at(c.object);
-    w.kind = static_cast<uint8_t>(c.kind);
-    w.matrix = c.matrix;
-    vc2ChildVoice(&w.key, c.call, reads);
-    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::mixOf, c.call, reads);
-    blockOf(w, block, reads);
+    blockOf(madeByKind(c, reads), block, reads);
 }

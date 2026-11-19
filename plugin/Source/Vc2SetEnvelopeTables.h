@@ -1,8 +1,8 @@
 #pragma once
-// C's envelopes', LFOs' and mix's constants from rom.4 (v282, v283, v284): the note values' ticks, the sustain levels,
+// C's envelopes', LFOs', mix's and TVA's constants from rom.4 (v282…v285): the note values' ticks, the sustain levels,
 // the times by value, the LFOs' rates by value, the pool words of the envelope's block writer, release and key factor,
-// of the LFO's depths and of the mix's gains, read once by loadVc2 at the start (Vc2RomTables), never after.
-// HARDWARE_FIRMWARE.md, "The VC-2 part's sets' envelopes", "… LFOs", "… mix".
+// of the LFO's depths, of the mix's gains and of the TVA's, read once by loadVc2 at the start (Vc2RomTables), never
+// after.  HARDWARE_FIRMWARE.md, "The VC-2 part's sets' envelopes", "… LFOs", "… mix", "… TVA".
 #include <array>
 #include <cstdint>
 
@@ -24,7 +24,19 @@ struct Vc2SetEnvelopeTables {
     float mixOther = 0;                    // 0x8939bf08: when its type is none of the four
     float mixScale = 0;                    // 0x8939bd00: the level's and the crossfade's divisor
     float mixScaleTwo = 0;                 // 0x8939bf04: type 2's
+    float tvaVelocity = 0;                 // 0x893a6938: the TVA's velocity curve's divisor (v285)
+    float tvaScale = 0;                    // 0x893a64f0: its level run's divisor when on
+    float tvaScaleOff = 0;                 // 0x893a6600: when off
+    float tvaDepthTop = 0;                 // 0x893a64f4: its two depths' divisor
+    float tvaSend = 0;                     // 0x893a6914: block[12]'s scale
+    float tvaSixths = 0;                   // 0x893a6918: the gain's divisor, an octave
+    float tvaSendTwo = 0;                  // 0x893a6920: block[14]'s scale
+    float tvaRateScale = 0;                // 0x893a6928: the rate's divisor
+    float tvaSampleRate = 0;               // 0x893a692c: its unit, kHz
 };
+
+// The level run's halfword at `at` over `scale`, as the SH-4 divides (the mix's and TVA's gains, v284, v285)
+float vc2LevelRun(int32_t at, float scale);
 
 [[nodiscard]] bool vc2LoadSetEnvelopes(const char* path);
 bool vc2SetEnvelopesLoaded();

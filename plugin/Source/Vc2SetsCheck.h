@@ -5,6 +5,7 @@
 // voices, key tables, channels, parts and the part's bytes by kind where the draws wrote them in rom.4's memory; and the
 // two sides.  The children's parts' shared steps in Vc2SetsChildCheck.h (v283).  XT_VC2SETS_MAIN only.
 #include "Vc2CheckMain.h"
+#include "Vc2RomShared.h"
 #include "Vc2Sets.h"
 #include <span>
 #include <vector>
@@ -32,6 +33,11 @@ struct SetPartTable {
 inline constexpr SetPartTable kSetsEnvelopeTable { 0x89e2765c, 2080, 130, 13 };
 inline constexpr SetPartTable kSetsLfoTable { 0x89e2f85c, 800, 50, 5 };
 inline constexpr SetPartTable kSetsMixTable { 0x89e32a60, 352, 22, 1 };
+inline constexpr SetPartTable kSetsTvaTable { 0x89e4987c, 384, 24, 1 };
+// [FW] the TVA's globals (v285): the part's controllers' flag, the part table's trailer; in Vc2Fw's RAM, the Ms its
+// draws aim at (their controllers at +0x178)
+inline constexpr uint32_t kSetsTvaFlagAt = 0x89997fcc, kSetsTrailerAt = 0x89e4b07c, kSetsControlsAt = 0x178;
+inline constexpr uint32_t kSetsTvaMatricesAt = 0x8C036000, kSetsTvaMatrixBytes = 0x200;
 
 // The calls logged: C's children's methods, and a Matrix group's reader (v282, the envelopes' part)
 enum SetMethod : int32_t { kSetAllocate, kSetConstruct, kSetEnd, kSetConvert, kSetUpdate, kSetCopy, kSetRelease,
@@ -49,7 +55,8 @@ struct SetCall {
 // The port's parts: rom.4's memory read where the draws wrote it, the children's calls logged and answered
 class SetPortParts final : public Vc2SetParts {
 public:
-    SetPortParts(Vc2Fw& fw, std::mt19937& answers, std::vector<SetCall>& log) : fw_(fw), answers_(answers), log_(log) {}
+    SetPortParts(Vc2Fw& fw, std::mt19937& answers, std::vector<SetCall>& log)
+        : fw_(fw), answers_(answers), log_(log), shared_(fw) {}
     uint32_t allocate(const Vc2SetChild& c, uint32_t number, uint32_t index) override;
     void construct(const Vc2SetChild& c, const Vc2SetChildCall& call) override;
     void end(const Vc2SetChild& c, uint32_t object) override;
@@ -68,6 +75,11 @@ public:
     std::array<uint16_t, 5> envelopeOf(uint32_t part, uint32_t kind, uint32_t index) override;
     std::array<uint16_t, 5> lfoOf(uint32_t part, uint32_t kind, uint32_t index) override;
     std::array<uint16_t, 11> mixOf(uint32_t part, uint32_t kind) override;
+    // The TVA's (v285, Vc2SetTvaCheck.cpp): the velocity curve rom.4's own in the interpreter
+    std::array<uint16_t, 12> tvaOf(uint32_t part, uint32_t kind) override;
+    int velocityCurve(int velocity, int sens, int curve) override;
+    uint8_t matrixControl(uint32_t matrix, uint32_t n) override;
+    Vc2SetTvaGlobals tvaGlobals() override;
     Vc2SetClock clock() override;
     int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) override;
 
@@ -83,6 +95,7 @@ private:
     Vc2Fw& fw_;
     std::mt19937& answers_;
     std::vector<SetCall>& log_;
+    RomShared shared_;
 };
 
 // Every byte of `t` drawn
@@ -148,5 +161,7 @@ long vc2SetEnvelopePart(SetSides& s, const Vc2Run& run);
 long vc2SetLfoPart(SetSides& s, const Vc2Run& run);
 // The mix's (v284, Vc2SetMixCheck.cpp)
 long vc2SetMixPart(SetSides& s, const Vc2Run& run);
+// The TVA's (v285, Vc2SetTvaCheck.cpp)
+long vc2SetTvaPart(SetSides& s, const Vc2Run& run);
 // The further parts in turn
 long vc2SetsFurther(SetSides& s, const Vc2Run& run);

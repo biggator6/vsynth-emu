@@ -41,9 +41,7 @@ int8_t envelopeSens(std::mt19937& rng) {
     return setsOneOf(std::to_array<int8_t>({ 0, 1, -1, 63, -63, 127, -127, (int8_t)rng() }), rng);
 }
 
-int16_t envelopeFollow(std::mt19937& rng) {
-    return setsOneOf(std::to_array<int16_t>({ 0, 100, -100, 1200, -1200, 32767, -32768, (int16_t)rng() }), rng);
-}
+constexpr auto envelopeFollow = setsFollowDrawn;
 
 uint16_t pairOf(uint8_t low, uint8_t high) { return (uint16_t)(low | high << 8); }
 

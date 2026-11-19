@@ -13,7 +13,7 @@
 // then rom.4's routine and the port's `mine()`; what differs in the pool, W, the calls or the answer)
 uint32_t* setsPortWords(SetSides& s, uint32_t at);
 Vc2SetCall setsCallAt(SetSides& s, uint32_t at);
-std::string setsChildOnBoth(SetSides& s, const Vc2Region& pool, const Vc2CheckRoutine& routine,
+std::string setsChildOnBoth(SetSides& s, std::span<const Vc2Region> pools, const Vc2CheckRoutine& routine,
                             std::initializer_list<uint32_t> args, const std::function<uint32_t()>& mine);
 
 // The parts' N words for a child drawn in rom.4's memory by `draw`: every kind's of the 16 parts' first 4 (all), or now
@@ -33,10 +33,22 @@ void setsPartWordsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all, const SetPartTab
             }
         }
 }
-// A byte at one of `Edges`, or any (v284)
+// A value at one of `Edges`, or any; a byte so (v284), a key follow in cents a key so (the envelopes', the TVA's, v285)
+template <class T, T... Edges>
+T setsEdgeDrawn(std::mt19937& rng) {
+    return setsOneOf(std::to_array<T>({ Edges..., (T)rng() }), rng);
+}
+
 template <uint8_t... Edges>
 uint8_t setsByteDrawn(std::mt19937& rng) {
-    return setsOneOf(std::to_array<uint8_t>({ Edges..., (uint8_t)rng() }), rng);
+    return setsEdgeDrawn<uint8_t, Edges...>(rng);
+}
+
+inline constexpr auto setsFollowDrawn = setsEdgeDrawn<int16_t, 0, 100, -100, 1200, -1200, 32767, -32768>;
+
+// Any word, the constructor's M where nothing reads through it (v285)
+inline uint32_t setsAnyWord(std::mt19937& rng) {
+    return (uint32_t)rng();
 }
 
 // The part's N words for a child as its object holds them from +6, drawn by `Of` on a whole object (v284)
@@ -84,8 +96,14 @@ struct SetChildSides {
     Counts n {};
     // One of the pool's objects
     uint32_t any(std::mt19937& rng) const { return Pool::kAt + Pool::kBytes * (uint32_t)(rng() % Pool::kCount); }
-    // The pool as rom.4 holds it, said as `what`
-    Vc2Region region(const char* what) const { return { Pool::kAt, &port.items, sizeof port.items, what }; }
+    // The pool as rom.4 holds it, said as `what`, and a word of rom.4's the pool keeps (the TVA's step, v285) or none
+    std::array<Vc2Region, 2> region(const char* what) const {
+        const Vc2Region pool { Pool::kAt, &port.items, sizeof port.items, what };
+        if constexpr (requires { Pool::kStepAt; })
+            return { pool, Vc2Region { Pool::kStepAt, &port.step, sizeof port.step, "the step" } };
+        else
+            return { pool, Vc2Region { 0, nullptr, 0, "" } };
+    }
 };
 
 // A child's routine on an object and C's call (an update): rom.4's on (object, the call struct), the port's
@@ -144,10 +162,10 @@ std::string setsPlaceEvent(Sides& x, std::mt19937& rng) {
                            [&] { return x.port.placeOf(n, i); });
 }
 
-template <class Sides, auto Block, uint32_t Routine, size_t Counted, uint32_t Indices>
+template <class Sides, auto Block, uint32_t Routine, size_t Counted, uint32_t Indices, auto Matrix = setsAnyWord>
 std::string setsMakeEvent(Sides& x, std::mt19937& rng) {
     const uint32_t at = setsCall(x.s, rng);
-    const Vc2SetChildCall c { x.any(rng), setsCallAt(x.s, at), Block(rng), (uint32_t)rng(),
+    const Vc2SetChildCall c { x.any(rng), setsCallAt(x.s, at), Block(rng), Matrix(rng),
                               rng() % 8 ? rng() % 4 : (uint32_t)rng(), rng() % 8 ? rng() % Indices : rng() % 16 };
     x.s.fw.cpu.wr32(kVc2Sp, c.kind);
     x.s.fw.cpu.wr32(kVc2Sp + 4, c.index);

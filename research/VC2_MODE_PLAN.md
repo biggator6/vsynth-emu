@@ -712,6 +712,10 @@ version against rom.4's routines with what it calls hooked:
       - the mix's done (v284): `Vc2SetMixes`, the 24 words, constructor, conversion, update, copy and the block writer
         `0x8939bcc0` (off, the level table by type, the crossfade's two pairs, 1.0, or 0.7); on `Vc2SetChildPool` with
         the voice's bytes at +1; xt_vc2sets' fifth part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' mix").
+      - the TVA's done (v285): `Vc2SetTvas`, the 24 words, constructor and conversion (the velocity curve's level),
+        update, copy and the block writer `0x893a6260` (the level with CC 7 and 11, two depths, the pan with CC 10,
+        the outputs by a route, two sends with CC 93, the part's gain, the global step); xt_vc2sets' sixth part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' TVA"). Item 8 is done.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

@@ -75,7 +75,8 @@ VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
-         Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck)
+         Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck
+         Vc2SetTva Vc2SetTvaCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -190,6 +191,7 @@ VC2PORTS=(
     "vc2setchildhead|Vc2SetChildHead.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setlfo|Vc2SetLfo.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmix|Vc2SetMix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2settva|Vc2SetTva.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port
