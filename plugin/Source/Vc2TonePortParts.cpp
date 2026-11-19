@@ -12,9 +12,7 @@ constexpr uint32_t kNoBuffer = 0xff, kByte = 0xff;
 uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 int32_t oscCode(int osc) { return tonePartCode(static_cast<Piece>((int)Piece::osc1 + osc), 0); }
 int32_t cosmCode(int cosm) { return tonePartCode(static_cast<Piece>((int)Piece::cosm1 + cosm), 0); }
-int32_t lfoCode(int lfo) { return tonePartCode(Piece::lfos, lfo); }
 const int32_t kTvaCode = tonePartCode(Piece::tva, 0);
-size_t freeIndex(uint32_t free) { return (free - kToneFreeAt) / kToneFreeStride; }
 uint32_t byteOf(int32_t x) { return (uint32_t)x & kByte; }
 } // namespace
 
@@ -30,7 +28,7 @@ void TonePortParts::destroy(Vc2TonePiece piece) {
     else log(kDestroy, tonePartCode(piece, 0));
 }
 
-void TonePortParts::unfollow(int lfo) { log(kUnfollow, lfoCode(lfo)); }
+void TonePortParts::unfollow(int lfo) { s_.frees.release(mods.lfos[(size_t)lfo].w.follow); }
 void TonePortParts::unlist(bool fromOne) { log(kUnlist, kToneNone, { fromOne ? 1u : 0u }); }
 
 void TonePortParts::tickEnvelope(int envelope, int32_t n) { mods.envelopes[(size_t)envelope].tick(n); }
@@ -76,31 +74,31 @@ void TonePortParts::noteOnEnvelope(int envelope, const uint32_t* block) {
 void TonePortParts::noteOnLfo(int lfo, const uint32_t* block, float x) { mods.lfos[(size_t)lfo].noteOn(block, x); }
 
 void TonePortParts::followLfo(int lfo, int tone, const uint32_t* block) {
-    log(kFollowLfo, lfoCode(lfo), { (uint32_t)tone, blockOf(block), (uint32_t)lfo });
+    ++s_.follows;
+    const Vc2ToneLfo& other = (*s_.parts)[(size_t)tone].mods.lfos[(size_t)lfo];
+    mods.lfos[(size_t)lfo].follow(other, block, s_.frees);
 }
 
 uint32_t TonePortParts::freeLfo(uint32_t id, int lfo) {
-    log(kFreeLfo, kToneNone, { id, (uint32_t)lfo }, false);
-    return kToneFreeAt + kToneFreeStride * (uint32_t)lfo;
+    ++s_.takes;
+    return s_.frees.take(id, lfo);
 }
 
-void TonePortParts::attachFree(int lfo, uint32_t free) { log(kAttachFree, lfoCode(lfo), { free }); }
-float TonePortParts::freeValue(uint32_t free) { return s_.draws.freeValue[freeIndex(free)]; }
+void TonePortParts::attachFree(int lfo, uint32_t free) { mods.lfos[(size_t)lfo].attach(free, s_.frees); }
+float TonePortParts::freeValue(uint32_t free) { return s_.frees.object(free).phase; }
 
-void TonePortParts::startFree(int lfo, const uint32_t* block, float value, float x) {
-    log(kStartFree, lfoCode(lfo), { blockOf(block), bits(value), bits(x) });
+void TonePortParts::startFree(int lfo, const uint32_t* block, float, float x) {
+    mods.lfos[(size_t)lfo].startFree(block, x, s_.frees);
 }
 
-void TonePortParts::relist(uint32_t follow, uint32_t id, int lfo) {
-    log(kRelist, kToneNone, { follow, id, (uint32_t)lfo }, false);
-}
-
-void TonePortParts::list(uint32_t id, int lfo) { log(kList, kToneNone, { id, (uint32_t)lfo }, false); }
+void TonePortParts::relist(uint32_t follow, uint32_t id, int lfo) { s_.frees.addClock(follow, id, lfo); }
+void TonePortParts::list(uint32_t id, int lfo) { s_.frees.removeClock(id, lfo); }
 
 // The free object's +0 (the LFO's number) and +4 (the id), as the note-on leaves them
 void TonePortParts::markFree(uint32_t free, uint32_t id, int lfo) {
-    std::array<uint32_t, 2>& marks = s_.free[freeIndex(free)];
-    marks = { (uint32_t)lfo, id };
+    Vc2FreeLfoWords& o = s_.frees.object(free);
+    o.lfo = lfo;
+    o.id = id;
 }
 
 // The bound envelopes on (+0x68 1) and LFOs not (+0x80 0), as each binding leaves them

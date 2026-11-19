@@ -43,6 +43,7 @@ public:
     float phase() const { return ph; }
 private:
     friend class XtLfo;
+    friend class Vc2FreeLfos;                       // rom.4's free LFOs are these on rom.4's words (v271)
     float rateHz = 1.0f, ph = 0.0f;                 // +0x08, +0x10
     int sync = 0, wrap = 0, count = 0;              // +0x18, +0x28, +0x2c
     float step = 0.0f, target = 72.0f;              // +0x1c, +0x20

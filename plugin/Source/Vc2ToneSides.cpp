@@ -10,12 +10,11 @@ using In = Vc2ToneInput;
 // [FW] the pool's words
 constexpr uint32_t kHeadAt = 0x8993fb48;
 constexpr uint32_t kSerialAt = 0x8993fb4c;
-// [FW] the LFOs' constructors' generator; a tone's own words by offset: the tail, the pool's link; a free object's float
+// [FW] the LFOs' constructors' generator; a tone's own words by offset: the tail, the pool's link
 constexpr uint32_t kChaosAt = 0x89999668;
 constexpr uint32_t kTailAt = 0x1af8;
 constexpr uint32_t kLinkAt = 0x2618;
-constexpr uint32_t kFreeValue = 0x10;
-constexpr int kListed = 3;                      // the most tones the lists hold
+constexpr int kListed = 3;                     // the most tones the lists hold
 constexpr uint32_t kNoSerial = 0x7ffffff0;      // a serial no tone of a case reaches
 constexpr uint32_t kFixMix = 4, kFixKind = 3, kFixWave = 10, kFixedWave = 2;   // [FW] the note-on's fix-up's case
 
@@ -158,10 +157,7 @@ std::string toneDifference(ToneSides& s, int only) {
     }
     const auto& in = s.shared.input.words;
     if (what.empty()) what = vc2FirstDifference(s.fw, kToneInputAt, in.data(), sizeof in, "the input");
-    for (uint32_t l = 0; l < Vc2Tone::kLfos && what.empty(); ++l) {
-        const auto& marks = s.shared.free[l];
-        what = vc2FirstDifference(s.fw, kToneFreeAt + kToneFreeStride * l, marks.data(), sizeof marks, "a free object");
-    }
+    if (what.empty() && only < 0) what = toneFreeLfosDifference(s);   // the events that can reach the manager
     return what.empty() ? toneCallsDifference(s.rom, s.shared.calls) : what;
 }
 
@@ -172,13 +168,6 @@ void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     d.tvaHeld = drawFlag(rng);
     std::ranges::generate(d.installOsc, [&] { return (uint32_t)rng(); });
     std::ranges::generate(d.installCosm, [&] { return drawFlag(rng) ? rng() % 2 : (uint32_t)rng(); });
-    std::ranges::generate(d.freeValue, [&] { return drawFloat(rng); });
-    for (uint32_t l = 0; l < Vc2Tone::kLfos; ++l) {
-        const uint32_t at = kToneFreeAt + kToneFreeStride * l;
-        s.shared.free[l] = {};
-        s.fw.cpu.write(at, s.shared.free[l].data(), sizeof s.shared.free[l]);
-        s.fw.cpu.write(at + kFreeValue, &d.freeValue[l], sizeof(float));
-    }
     s.parts[(size_t)i].words = drawWords(rng);
     toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
     toneDrawModulatorWords(s, i, rng);

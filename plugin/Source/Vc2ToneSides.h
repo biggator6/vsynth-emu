@@ -15,7 +15,8 @@ inline constexpr uint32_t kToneEndedWordAt = 0x1b14, kToneRendersAt = 0x1b34;
 
 struct ToneCounts {
     long events = 0, makes = 0, full = 0, inPlace = 0, unmakes = 0, back = 0, updates = 0, ends = 0, renders = 0;
-    long noteOns = 0, takes = 0, follows = 0, frees = 0, fixes = 0;
+    long noteOns = 0, takes = 0, fixes = 0;
+    long freeTicks = 0, freeClocks = 0;   // v271: the free LFOs' two passes
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
     std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
@@ -59,6 +60,16 @@ void toneDrawMixBlock(Vc2ToneInput& in, std::mt19937& rng);
 std::string toneMixPrepareRender(ToneSides& s, int i, std::mt19937& rng);
 std::string toneMixRendered(ToneSides& s, int i);
 std::string toneMixPlayOn(ToneSides& s, std::mt19937& rng);
+
+// The real free LFOs (v271, Vc2FreeLfoCheck.cpp): the manager against rom.4's words; built afresh on both sides; whether a
+// note-on's LFOs can all take an object (rom.4 reads from address 0 past the last); an LFO's +0x7c as the tone may find
+// it; and the manager's two passes
+std::string toneFreeLfosDifference(ToneSides& s);
+std::string toneFreeLfosFresh(ToneSides& s);
+bool toneFreeLfosHaveRoom(ToneSides& s);
+uint32_t toneDrawFollow(std::mt19937& rng);
+std::string toneFreeTickOn(ToneSides& s, std::mt19937& rng);
+std::string toneFreeClockOn(ToneSides& s, std::mt19937& rng);
 
 // A word of tone i's own set on both sides: `mine`, the port's, and rom.4's at the tone's `offset`
 template <class Word>

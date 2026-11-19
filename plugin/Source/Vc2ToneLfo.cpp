@@ -1,5 +1,6 @@
 // The VC-2 tone's LFO: see Vc2ToneLfo.h (v268).
 #include "Vc2ToneLfo.h"
+#include "Vc2FreeLfos.h"
 #include "XtFloat.h"
 #include "XtLfo.h"
 #include <cmath>
@@ -88,19 +89,72 @@ void Vc2ToneLfo::construct(float& generator) {
 
 void Vc2ToneLfo::destroy() { w.vtable = kVtable; }
 
+void Vc2ToneLfo::takeBlock(const uint32_t* block) { std::memcpy(&w.wave, block, kBlockBytes); }
+
 void Vc2ToneLfo::noteOn(const uint32_t* block, float tempo) {
     using namespace xtf;
-    std::memcpy(&w.wave, block, kBlockBytes);
+    takeBlock(block);
     w.tempo = tempo;
     w.phase = 0.0f;
     if (w.sync != 0) {
         w.clockTarget = 0.0f;
         w.clockCount = 0;
+        w.rate = std::floor(w.rate);       // [FW] 0x893acdea: a note value's whole clocks
         w.rate = w.rate > kMostClocks ? kMostClocks : (kFewestClocks > w.rate ? kFewestClocks : w.rate);
         w.clockStep = div(kPhaseSpan, w.rate);
         w.clockTime = div(div(kMinute, tempo), kClocksABeat);
     }
+    trigger();
+}
+
+void Vc2ToneLfo::follow(const Vc2ToneLfo& other, const uint32_t* block, Vc2FreeLfos& frees) {
+    const Vc2LfoWords& o = other.w;
+    w.index = o.index;
+    w.out = o.out;
+    w.unread3c = o.unread3c;
+    w.phase = o.phase;
+    w.previous = o.previous;
+    w.held = o.held;
+    w.chaos = o.chaos;
+    w.unread70 = o.unread70;
+    w.tempo = o.tempo;
+    w.waveCase = o.waveCase;
+    w.follow = o.follow;
+    w.on = o.on;
+    w.clockStep = o.clockStep;
+    w.clockTarget = o.clockTarget;
+    w.clockTime = o.clockTime;
+    w.clockWrap = o.clockWrap;
+    w.clockCount = o.clockCount;
+    takeBlock(block);
+    if (w.follow != 0) ++frees.object(w.follow).refs;
+    trigger();
+}
+
+void Vc2ToneLfo::attach(uint32_t free, Vc2FreeLfos& frees) {
+    w.follow = free;
+    ++frees.object(free).refs;
+}
+
+void Vc2ToneLfo::startFree(const uint32_t* block, float tempo, Vc2FreeLfos& frees) {
+    takeBlock(block);
+    if (w.follow != 0) {
+        frees.setRate(w.follow, w.sync, w.rate, tempo);
+        const Vc2FreeLfoWords& f = frees.object(w.follow);
+        w.phase = f.phase;
+        w.clockStep = f.clockStep;
+        w.clockTarget = f.clockTarget;
+        w.clockTime = f.clockTime;
+        w.clockWrap = f.wrapped;
+        w.clockCount = f.clockCount;
+        w.tempo = f.tempo;
+    }
+    trigger();
+}
+
+void Vc2ToneLfo::trigger() {
     w.mode = (uint32_t)w.fadeMode;
+    w.waveCase = 0;                        // [FW] 0x893acd70: for the eight waves a converter gives
     XtLfo l;
     load(l);
     l.setDir(w.fadeMode % 2);              // 0x893ac830: modes 1 and 3 fade down

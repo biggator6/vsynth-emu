@@ -101,7 +101,6 @@ lfo-same-node|return pool.indexOf(tone);|return pool.indexOf(node);|vc2tonenoteo
 lfo-same-any-id|        if (tone != 0 && pool.at(tone).head.id == id) return pool.indexOf(tone);|        if (tone != 0) return pool.indexOf(tone);|vc2tonenoteon
 lfo-free-serial|        const uint32_t free = parts.freeLfo(t.head.id, lfo);|        const uint32_t free = parts.freeLfo((uint32_t)t.head.serial, lfo);|vc2tonenoteon
 lfo-free-attach-lost|        parts.attachFree(lfo, free);\n||vc2tonenoteon
-lfo-free-value|        parts.startFree(lfo, block, parts.freeValue(free), x);|        parts.startFree(lfo, block, x, x);|vc2tonenoteon
 lfo-free-swapped|        parts.startFree(lfo, block, parts.freeValue(free), x);|        parts.startFree(lfo, block, x, parts.freeValue(free));|vc2tonenoteon
 lfo-listed-ignored|        if (parts.lfoListed(lfo)) {|        if (false) {|vc2tonenoteon
 lfo-relist-word|            parts.relist(parts.lfoFollow(lfo), t.head.id, lfo);|            parts.relist(0, t.head.id, lfo);|vc2tonenoteon
@@ -266,7 +265,7 @@ lfo-build-held|    w.out = w.unread3c = w.phase = w.previous = w.held = 0.0f;|  
 lfo-build-chaos-signed|    w.chaos = std::fabs(next);|    w.chaos = next;|vc2tonelfo
 lfo-build-follow|    w.waveCase = w.follow = w.on = 0;|    w.waveCase = w.on = 0;|vc2tonelfo
 lfo-build-on|    w.waveCase = w.follow = w.on = 0;|    w.waveCase = w.follow = 0;|vc2tonelfo
-lfo-note-on-no-block|    std::memcpy(&w.wave, block, kBlockBytes);\n||vc2tonelfo
+lfo-note-on-no-block|    takeBlock(block);\n    w.tempo = tempo;|    w.tempo = tempo;|vc2tonelfo
 lfo-note-on-tempo|    w.tempo = tempo;\n||vc2tonelfo
 lfo-note-on-phase-kept|    w.phase = 0.0f;\n    if (w.sync|    if (w.sync|vc2tonelfo
 lfo-note-on-always-clocks|    if (w.sync != 0) {|    if (true) {|vc2tonelfo
@@ -453,3 +452,116 @@ mixt-rate-floor|{ 0x893e431c, &t.rateFloor }|{ 0x893e4318, &t.rateFloor }|vc2ton
 mixt-half|{ 0x893adc6c, &t.half }|{ 0x893e4670, &t.half }|vc2tonemixtables
 mixt-full|{ 0x893add74, &t.fullScale }|{ 0x893e4988, &t.fullScale }|vc2tonemixtables
 mixt-span|{ 0x893e4988, &t.delaySpan }|{ 0x893e46f0, &t.delaySpan }|vc2tonemixtables
+# v271: the free LFOs' manager, port vc2freelfos (Vc2FreeLfos.cpp), and the LFO's follow, attach and free start (vc2tonelfo).
+# Not planted, as nothing can tell them apart: an empty pool's 0 (rom.4 reads from address 0, so the check keeps a
+# note-on's seven objects spare), a full clock list (384 nodes, one an object), a follow's copies of the number the
+# tone keeps for the LFO, of the output its first tick forms again and of the +0x78 its fade start sets, and the free object's phase the note-on passes to
+# 0x893acf10 in fr4, which that routine overwrites before reading it (v229's plant on it is gone).
+free-load-rate|    f.rateHz = o.rate;\n||vc2freelfos
+free-load-phase|    f.ph = o.phase;\n||vc2freelfos
+free-load-sync|    f.sync = o.sync;\n||vc2freelfos
+free-load-wrap|    f.wrap = o.wrapped;\n||vc2freelfos
+free-load-count|    f.count = o.clockCount;\n||vc2freelfos
+free-load-step|    f.step = o.clockStep;\n||vc2freelfos
+free-load-target|    f.target = o.clockTarget;\n||vc2freelfos
+free-load-time|    f.dt = o.clockTime;\n||vc2freelfos
+free-load-tempo|    f.tempo = o.tempo;\n||vc2freelfos
+free-load-clocked|    f.clocked = true;\n||vc2freelfos
+free-keep-rate|    o.rate = f.rateHz;\n||vc2freelfos
+free-keep-phase|    o.phase = f.ph;\n||vc2freelfos
+free-keep-sync|    o.sync = f.sync;\n||vc2freelfos
+free-keep-wrap|    o.wrapped = f.wrap;\n||vc2freelfos
+free-keep-count|    o.clockCount = f.count;\n||vc2freelfos
+free-keep-step|    o.clockStep = f.step;\n||vc2freelfos
+free-keep-target|    o.clockTarget = f.target;\n||vc2freelfos
+free-keep-time|    o.clockTime = f.dt;\n||vc2freelfos
+free-keep-tempo|    o.tempo = f.tempo;\n||vc2freelfos
+free-step-phase|    f.ph = 0.0f;\n||vc2freelfos
+free-step-wrap|    f.wrap = 1;\n||vc2freelfos
+free-step-two|    f.tick(1);|    f.tick(2);|vc2freelfos
+free-append-head|    while (node(tail).next != 0) tail = node(tail).next;\n||vc2freelfos
+free-append-next|    node(at).next = 0;\n||vc2freelfos
+free-append-prev|    node(at).prev = tail;|    node(at).prev = addressOf(&list);|vc2freelfos
+free-move-prev|    if (n.next != 0) node(n.next).prev = n.prev;\n||vc2freelfos
+free-move-next|    node(n.prev).next = n.next;\n||vc2freelfos
+free-ctor-unread|        n.unread = kNone;|        n.unread = 0;|vc2freelfos
+free-ctor-links|        n.next = n.prev = 0;|        n.prev = 0;|vc2freelfos
+free-ctor-heads|{ &w.taken, &w.spare, &w.clocked, &w.unclocked }|{ &w.taken, &w.spare, &w.clocked }|vc2freelfos
+free-ctor-spare-zero|    w.spareCount = w.takenCount = 0;|    w.takenCount = 0;|vc2freelfos
+free-ctor-taken-zero|    w.spareCount = w.takenCount = 0;|    w.spareCount = 0;|vc2freelfos
+free-ctor-keeps-clock|        fresh.step = o.clockStep;          // [FW] 0x893aca00 leaves the clock's step\n||vc2freelfos
+free-ctor-step|        o.step = stepOf(fresh);\n||vc2freelfos
+free-ctor-lfo|        o.lfo = kNone;|        o.lfo = 0;|vc2freelfos
+free-ctor-id|        o.id = (uint32_t)kNone;|        o.id = 0;|vc2freelfos
+free-ctor-refs|        o.refs = 0;\n||vc2freelfos
+free-ctor-node|        o.node = addressOf(&w.nodes[k]);|        o.node = addressOf(&w.clockNodes[k]);|vc2freelfos
+free-ctor-object|        w.nodes[k].object = addressOf(&o);\n||vc2freelfos
+free-ctor-spare-list|        append(w.spare, o.node);|        append(w.taken, o.node);|vc2freelfos
+free-ctor-spare-count|        ++w.spareCount;\n||vc2freelfos
+free-ctor-clock-list|        append(w.unclocked, addressOf(&w.clockNodes[k]));\n||vc2freelfos
+free-take-id|        if (o.id == id && o.lfo == lfo) break;|        if (o.lfo == lfo) break;|vc2freelfos
+free-take-lfo|        if (o.id == id && o.lfo == lfo) break;|        if (o.id == id) break;|vc2freelfos
+free-take-no-match|        if (o.id == id && o.lfo == lfo) break;\n||vc2freelfos
+free-take-list|    moveTo(w.taken, at);|    moveTo(w.spare, at);|vc2freelfos
+free-take-spare-count|    --w.spareCount;\n    ++w.takenCount;|    ++w.takenCount;|vc2freelfos
+free-take-taken-count|    --w.spareCount;\n    ++w.takenCount;|    --w.spareCount;|vc2freelfos
+free-release-past|    if (--o.refs != 0) return;|    if (--o.refs > 0) return;|vc2freelfos
+free-release-always|    if (--o.refs != 0) return;|    --o.refs;|vc2freelfos
+free-release-kept|    if (--o.refs != 0) return;|    if (o.refs - 1 != 0) return;|vc2freelfos
+free-release-list|    moveTo(w.spare, o.node);|    moveTo(w.taken, o.node);|vc2freelfos
+free-release-taken|    --w.takenCount;\n    ++w.spareCount;|    ++w.spareCount;|vc2freelfos
+free-release-spare|    --w.takenCount;\n    ++w.spareCount;|    --w.takenCount;|vc2freelfos
+free-clock-id|        if (o.id == id && o.lfo == lfo) return at;|        if (o.lfo == lfo) return at;|vc2freelfos
+free-clock-lfo|        if (o.id == id && o.lfo == lfo) return at;|        if (o.id == id) return at;|vc2freelfos
+free-add-again|    if (onClock(id, lfo) != 0 \|\| at == 0) return;|    if (at == 0) return;|vc2freelfos
+free-add-object|    node(at).object = free;\n||vc2freelfos
+free-add-list|    moveTo(w.clocked, at);|    moveTo(w.unclocked, at);|vc2freelfos
+free-remove-sync|    object(node(at).object).sync = 0;\n||vc2freelfos
+free-remove-list|    moveTo(w.unclocked, at);|    moveTo(w.clocked, at);|vc2freelfos
+free-rate-sync|    o.sync = sync;\n    o.rate = rate;|    o.rate = rate;|vc2freelfos
+free-rate-rate|    o.sync = sync;\n    o.rate = rate;|    o.sync = sync;|vc2freelfos
+free-rate-step|    o.step = stepOf(f);                    // [FW] 0x893acae0: from the rate as given, before a note value's own\n||vc2freelfos
+free-rate-step-late|.sync = sync }, tempo);\n    keep(f, o);|.sync = sync }, tempo);\n    o.step = stepOf(f);\n    keep(f, o);|vc2freelfos
+free-rate-floor|.rate = sync != 0 ? std::floor(rate) : rate,|.rate = rate,|vc2freelfos
+free-rate-floor-all|.rate = sync != 0 ? std::floor(rate) : rate,|.rate = std::floor(rate),|vc2freelfos
+free-rate-tempo|.sync = sync }, tempo);|.sync = sync }, 120.0f);|vc2freelfos
+free-rate-no-sync|: rate, .sync = sync }|: rate, .sync = 0 }|vc2freelfos
+free-tick-halfword|static_cast<int32_t>(static_cast<int16_t>(n))|n|vc2freelfos
+free-tick-lost|        f.tick(ticks);\n||vc2freelfos
+free-tick-kept|        f.tick(ticks);\n        keep(f, o);|        f.tick(ticks);|vc2freelfos
+free-clock-other-list|for (uint32_t at = w.clocked.next; at != 0; at = node(at).next) {|for (uint32_t at = w.unclocked.next; at != 0; at = node(at).next) {|vc2freelfos
+free-clock-lost|        f.clock(seconds);\n||vc2freelfos
+free-clock-kept|        f.clock(seconds);\n        keep(f, o);|        f.clock(seconds);|vc2freelfos
+lfo-note-floor|        w.rate = std::floor(w.rate);       // [FW] 0x893acdea: a note value's whole clocks\n||vc2tonelfo
+lfo-note-trigger|kClocksABeat);\n    }\n    trigger();|kClocksABeat);\n    }|vc2tonelfo
+lfo-follow-3c|    w.unread3c = o.unread3c;\n||vc2tonelfo
+lfo-follow-phase|    w.phase = o.phase;\n||vc2tonelfo
+lfo-follow-previous|    w.previous = o.previous;\n||vc2tonelfo
+lfo-follow-held|    w.held = o.held;\n||vc2tonelfo
+lfo-follow-chaos|    w.chaos = o.chaos;\n||vc2tonelfo
+lfo-follow-70|    w.unread70 = o.unread70;\n||vc2tonelfo
+lfo-follow-tempo|    w.tempo = o.tempo;\n||vc2tonelfo
+lfo-trigger-case|    w.waveCase = 0;                        // [FW] 0x893acd70: for the eight waves a converter gives\n||vc2tonelfo
+lfo-follow-follow|    w.follow = o.follow;\n||vc2tonelfo
+lfo-follow-on|    w.on = o.on;\n||vc2tonelfo
+lfo-follow-step|    w.clockStep = o.clockStep;\n||vc2tonelfo
+lfo-follow-target|    w.clockTarget = o.clockTarget;\n||vc2tonelfo
+lfo-follow-time|    w.clockTime = o.clockTime;\n||vc2tonelfo
+lfo-follow-wrap|    w.clockWrap = o.clockWrap;\n||vc2tonelfo
+lfo-follow-count|    w.clockCount = o.clockCount;\n||vc2tonelfo
+lfo-follow-block|    takeBlock(block);\n    if (w.follow != 0) ++frees|    if (w.follow != 0) ++frees|vc2tonelfo
+lfo-follow-refs|    if (w.follow != 0) ++frees.object(w.follow).refs;\n||vc2tonelfo
+lfo-follow-trigger|.refs;\n    trigger();|.refs;|vc2tonelfo
+lfo-attach-follow|    w.follow = free;\n||vc2tonelfo
+lfo-attach-refs|    ++frees.object(free).refs;\n||vc2tonelfo
+lfo-free-block|    takeBlock(block);\n    if (w.follow != 0) {|    if (w.follow != 0) {|vc2tonelfo
+lfo-free-sync|frees.setRate(w.follow, w.sync, w.rate, tempo);|frees.setRate(w.follow, 0, w.rate, tempo);|vc2tonelfo
+lfo-free-tempo|frees.setRate(w.follow, w.sync, w.rate, tempo);|frees.setRate(w.follow, w.sync, w.rate, w.tempo);|vc2tonelfo
+lfo-free-phase|        w.phase = f.phase;\n||vc2tonelfo
+lfo-free-step|        w.clockStep = f.clockStep;\n||vc2tonelfo
+lfo-free-target|        w.clockTarget = f.clockTarget;\n||vc2tonelfo
+lfo-free-time|        w.clockTime = f.clockTime;\n||vc2tonelfo
+lfo-free-wrap|        w.clockWrap = f.wrapped;\n||vc2tonelfo
+lfo-free-count|        w.clockCount = f.clockCount;\n||vc2tonelfo
+lfo-free-tempo-word|        w.tempo = f.tempo;\n||vc2tonelfo
+lfo-free-trigger|        w.tempo = f.tempo;\n    }\n    trigger();|        w.tempo = f.tempo;\n    }|vc2tonelfo

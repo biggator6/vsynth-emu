@@ -1546,6 +1546,66 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's free LFOs (2026-11-18, v271) {#vc2-free-lfos}
+
+Step 4.2's tone parts. A key-unsynced LFO starts from another sounding tone's LFO of the same number, or, with none sounding, from a free object kept for its tone id and LFO number. The manager is one static object at `0x8a0c6d84`, 0x8448 bytes, built by the static initializer at `0x893b2010`. `Vc2FreeLfos` holds it word for word, the links as rom.4's addresses. A free object's laws are rom.2's `XtLfoFree`, run on rom.4's words.
+
+**The manager's words.**
+
+| Offset | Word |
+|---|---|
+| +0x0000, +0x0010 | the heads of the taken and spare lists |
+| +0x0020 | 384 nodes of 0x10 bytes for those two lists |
+| +0x1820, +0x1830 | the heads of the clock's list and of its unused nodes |
+| +0x1840 | 384 nodes of 0x10 bytes for those two |
+| +0x3040 | 384 free objects of 0x38 bytes |
+| +0x8440, +0x8444 | the counts of spare and taken objects |
+
+A node is the object's address, a word set to −1 and read by nothing, next and previous.
+
+**A free object's words.**
+
+| Offset | Word |
+|---|---|
+| +0x00, +0x04 | the LFO number and tone id that last took it, −1 before any |
+| +0x08, +0x0c | the rate, the phase a tick moves as that rate left it |
+| +0x10 | the phase |
+| +0x14 | the LFOs following it |
+| +0x18 | a note value |
+| +0x1c…+0x2c | a note value's clock: step, target, time, wrapped, count |
+| +0x30 | the tempo |
+| +0x34 | its node in the taken and spare lists |
+
+**The routines.**
+
+| Routine | What it does |
+|---|---|
+| `0x893ad4b0` | The constructor (`0x893ad4c0` is inside it, past its register saves): every object spare, every clock node unused |
+| `0x893ad640` | The take: the spare object of this id and LFO number, else the first spare, moved to the taken list; 0 with none spare |
+| `0x893acfc0` | The attach: the LFO's +0x7c, and one more follower |
+| `0x893acf10` | The free start: the object takes the note's rate, the LFO its phase, clock words and tempo, then the fade starts |
+| `0x893ace60` | The follow: another tone's LFO's state and what it follows, one more follower on that object, then the fade starts |
+| `0x893ad780` | On the clock's list, unless that id and LFO number are already on it |
+| `0x893ad800` | Off the clock's list, the object's note value cleared |
+| `0x893ad720` | The release: one follower fewer, and at none the object is spare again |
+| `0x893ad870` | The clock pass, each object on the clock's list |
+| `0x893ad5f0` | The tick pass, all 384 objects |
+
+**The tick pass has no caller.** Nothing in rom.4 reaches `0x893ad5f0`: no branch, no call and no word holds its address. The manager's address is loaded at four places only: the constructor's call, the clock pass's call, the release's and the note-on's. rom.2's scheduler ticks its free objects at every control tick, and rom.4's doesn't. Only that pass moves +0x10 after the constructor, so on the VC-2 a free object's phase stays 0 and a key-unsynced LFO with none sounding starts from 0. `Vc2FreeLfos::tick` is the routine, held to rom.4's, but the wiring must not call it.
+
+**Two corrections to v268,** each found by drawing a word v268 never varied:
+- rom.4's LFO note-on takes a note value's clocks through `0x895065ac`, floorf, before keeping them between 3 and 192 (`0x893acdea`). The free object's rate does the same (`0x893acafa`). A converter's clocks are whole, so this shows only on a drawn fraction.
+- The fade start `0x893acca0` writes the LFO's +0x78 by its wave: 0 for the eight waves a converter gives.
+
+**Details of the laws.**
+- The object's +0x0c is worked out from the rate as given, before a note value's whole clocks replace it.
+- `0x893acf10` is passed the object's phase in fr4 and overwrites fr4 before reading it.
+- Releasing an object that is already spare moves it to the end of the spare list and still changes both counts, so the counts can drift from the lists. The check reads the list itself.
+
+**What is left out.** With no object spare the take returns 0, and rom.4's attach then reads from address 0x14. The check never lets that happen: a note-on is skipped unless seven objects are spare. `Vc2FreeLfos::object` gives such a 0 a word of its own, and the check holds that word untouched.
+
+**The check.** `xt_vc2tone` no longer hooks `0x893ad720`, `0x893ad640`, `0x893ad780`, `0x893ad800`, `0x893acfc0`, `0x893acf10` or `0x893ace60`. Each case builds the manager afresh on both sides. All 0x8448 bytes are compared after each event that can reach them, and two new events run the tick and clock passes. 0 different at seed 2024 (40 cases) and at seeds 7 and 31337 (400 cases each). Every line of the new code runs. `mutate_vc2.py --tone`: 546 planted, 108 of them new, 0 missed.
+
 ### The VC-2's OSC mix (2026-11-18, v269) {#vc2-osc-mix}
 
 Step 4.2's tone parts. The mix joins the two OSC voices' buffers in the tone's whole render, before COSM 1 and the TVA. Its object is at the tone's +0x1ab8, 0x5c bytes, and its last 0x1c bytes are the words `Vc2ToneTail` holds from +0x40 on. `Vc2ToneMix` holds the first 0x40 as `Vc2MixWords` and takes the tail by reference. `Vc2ToneMixRings` is the delay lines, one pair a tone by its index.
@@ -1640,7 +1700,7 @@ Step 4.2's tone parts. A tone holds 14 envelopes of 0x70 bytes at +0x1b38 and 8 
 - `XtEnvelope` reads rom.2's shape table. rom.4's first differs at entry 130, and a segment's position reads entries 0…128 only.
 - Waves 8…12, which name a case at +0x78, come from no converter.
 
-**Left for v271.** The free LFOs' manager at `0x8a0c6d84` (0x8448 bytes, 384 free objects of 0x38 bytes, constructor `0x893ad4c0`) and what reaches it: the take `0x893ad640`, `unfollow` `0x893ad720`, the lists `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, and the free objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass `0x893ad870`). The seven the tone calls stay hooked in `xt_vc2tone`. The envelopes' and LFOs' note-offs and updates are the part's (step 4.3).
+**Left for v271 (done there, "The VC-2's free LFOs").** The free LFOs' manager at `0x8a0c6d84` (0x8448 bytes, 384 free objects of 0x38 bytes, constructor `0x893ad4c0`) and what reaches it: the take `0x893ad640`, `unfollow` `0x893ad720`, the lists `0x893ad780` and `0x893ad800`, the attach `0x893acfc0`, the free start `0x893acf10`, the follow `0x893ace60`, and the free objects' tick (`0x893aca60`, the manager's pass `0x893ad5f0`) and clock (`0x893acba0`, the manager's pass `0x893ad870`). The seven the tone calls stay hooked in `xt_vc2tone`. The envelopes' and LFOs' note-offs and updates are the part's (step 4.3).
 
 **The check.** `xt_vc2tone` no longer hooks the constructors, `0x893ac1c0`, `0x893abe80`, `0x893acda0`, `0x893ad100` or `0x893ad080`: rom.4's own routines run, and all 14 and 8 objects are compared word for word after every event, with the generator's word. A note-on's blocks are drawn as the converters write them, and `toneBoundOn` holds the words the OSC voice and the TVA read to rom.4's memory.
 

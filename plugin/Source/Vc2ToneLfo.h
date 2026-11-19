@@ -2,11 +2,13 @@
 // The VC-2 tone's LFO (v268): rom.4's object, 0x98 bytes word for word, over XtLfo.  rom.4's LFO code (0x893ac4f0…
 // 0x893ad720) is rom.2's opcode for opcode but for its pool's addresses, so its laws are XtLfo's, run on rom.4's words
 // and stored back.  The note-on is rom.4's own order on the words as they stand, where XtLfo::noteOn starts from a base
-// just built.  The free LFOs' manager (0x8a0c6d84) and what reaches it, a key-unsynced note's, are not here.  Bit for
-// bit: xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs".  Audio thread.
+// just built.  A key-unsynced note starts from another tone's LFO or a free object (v271, Vc2FreeLfos).  Bit for bit:
+// xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs", "The VC-2's free
+// LFOs".  Audio thread.
 #include <cstdint>
 
 class XtLfo;
+class Vc2FreeLfos;
 
 struct Vc2LfoWords {
     uint8_t state = 0;        // +0x00: the delay and fade's
@@ -59,12 +61,19 @@ public:
     void construct(float& generator);    // 0x893acbf0: its chaos state the shared generator's next value, made positive
     void destroy();                      // 0x893acc70 but the delete
     void noteOn(const uint32_t* block, float tempo);   // 0x893acda0
+    // 0x893ace60: key-unsynced with another tone of the id sounding: that tone's LFO's state, and what it follows
+    void follow(const Vc2ToneLfo& other, const uint32_t* block, Vc2FreeLfos& frees);
+    void attach(uint32_t free, Vc2FreeLfos& frees);    // 0x893acfc0: it follows a free object
+    // 0x893acf10: key-unsynced with none sounding: the free object takes this note's rate, the LFO its phase and clock
+    void startFree(const uint32_t* block, float tempo, Vc2FreeLfos& frees);
     void tick(int32_t n);                // 0x893ad100
     void clock(float seconds);           // 0x893ad080
 
     Vc2LfoWords w {};
 
 private:
+    void takeBlock(const uint32_t* block);
+    void trigger();                      // 0x893acca0: the fade by the block's mode, then a tick of none
     void load(XtLfo& l) const;
     void store(const XtLfo& l);
     void storeTicked(const XtLfo& l);    // store, with the word only a tick writes
