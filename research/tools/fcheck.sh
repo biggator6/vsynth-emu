@@ -168,6 +168,11 @@ if [ -x "$X/xt_vc2libm" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4")
   part xt_vc2libm 'echo "== xt_vc2libm"; "$X/xt_vc2libm" "$ROM4" 20000 2024 | grep -v "^  "'
 fi
+# rom.4's part's voices and their lists against its own (v272): on rom.4
+if [ -x "$X/xt_vc2voices" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2voices 'echo "== xt_vc2voices"; "$X/xt_vc2voices" "$ROM4" 40 2024 | grep -v "^  "'
+fi
 # The same in XtSynth, against the firmware's own beside the firmware's tone: xt_tone's MSM mode (v193)
 [ -x "$X/xt_tone" ] && part xt_tone 'echo "== xt_tone msm"; "$X/xt_tone" "$ROM" msm 200 2024'
 # The effect chip against JE-8086's interpreter, on the XT's own programs, and the firmware's own numbers on it

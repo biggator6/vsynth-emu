@@ -41,7 +41,9 @@
 # Vc2CosmFilters.cpp, Vc2CosmDynamics.cpp and Vc2CosmConverters.cpp (vc2cosmfilters, vc2cosmdynamics, vc2cosmtypes: the
 # converters' first batch, v237), through xt_vc2cosm, [cases] its cases (40).  --libm: vc2libm_muts.txt, in
 # Vc2LibMath.cpp and Vc2LibMathTables.cpp (PORT=vc2libm, vc2libmtables: the library's logf and powf), through
-# xt_vc2libm, [cases] its draws a routine (20000, fcheck's).  One line
+# xt_vc2libm, [cases] its draws a routine (20000, fcheck's).  --voices: vc2voices_muts.txt, in Vc2PartVoices.cpp and
+# Vc2PartVoicesTables.cpp (PORT=vc2voices, vc2voicestables: the part's voices and their lists, v272), through
+# xt_vc2voices, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -72,6 +74,8 @@ HARNESSES = {
               '40'),
     '--tva': (mutlist.Harness('mutate_vc2', 'xt_vc2tva', 'vc2tva_muts.txt', ('vc2tva', '2024'), 'XT_VC2TVA_STOP'),
               '40'),
+    '--voices': (mutlist.Harness('mutate_vc2', 'xt_vc2voices', 'vc2voices_muts.txt', ('vc2voices', '2024'),
+                                 'XT_VC2VOICES_STOP'), '40'),
     '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
                '40'),
     '--libm': (mutlist.Harness('mutate_vc2', 'xt_vc2libm', 'vc2libm_muts.txt', ('vc2libm', '2024'), 'XT_VC2LIBM_STOP'),

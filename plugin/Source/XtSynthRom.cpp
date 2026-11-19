@@ -22,6 +22,7 @@
 #include "Vc2ToneMixTables.h"
 #include "Vc2TvaTables.h"
 #include "Vc2PartMixerTables.h"
+#include "Vc2PartVoicesTables.h"
 #include "Vc2Params.h"
 #include "Vc2Unvoiced.h"
 #include "Vc2VocoderTables.h"
@@ -107,14 +108,15 @@ bool loadTables(const char* path) {
 // (Vc2AutoNoteTables.cpp, v226), the part mixer's (Vc2PartMixerTables.cpp, v227), the OSC voice's (Vc2OscTables.cpp,
 // v230), the TVA's (Vc2TvaTables.cpp, v233), COSM's (Vc2CosmTables.cpp, v234), the Matrix's (Vc2MatrixTables.cpp, v235),
 // the pitch ramp's (Vc2RampTables.cpp, v236), the OSC block's converter's (Vc2OscConvertTables.cpp, v251), the
-// library's logf and powf (Vc2LibMathTables.cpp), the tone's OSC mix's (Vc2ToneMixTables.cpp, v269); the VC-2's other
+// library's logf and powf (Vc2LibMathTables.cpp), the tone's OSC mix's (Vc2ToneMixTables.cpp, v269), the part's
+// voices' (Vc2PartVoicesTables.cpp, v272); the VC-2's other
 // ports' tables go here as they come, read at this start and never at a switch of modes
 bool loadVc2(const char* path) {
     return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)
            && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)
            && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)
            && vc2LoadCosm(path) && vc2LoadMatrix(path) && vc2LoadRamp(path) && vc2LoadOscConvert(path)
-           && vc2LoadLibMath(path) && vc2LoadToneMix(path);
+           && vc2LoadLibMath(path) && vc2LoadToneMix(path) && vc2LoadPartVoices(path);
 }
 
 // An image in the tables: loaded by the first file taken, then only compared with.  The lock and what it guards are

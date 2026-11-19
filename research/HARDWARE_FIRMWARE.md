@@ -1546,6 +1546,61 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's voices and their lists (2026-11-19, v272) {#vc2-part-voices}
+
+Step 4.3's first version (VC2_MODE_PLAN.md, step 4.3, item 1). The part has 24 voices V and four lists, all run on the notes' task. `Vc2PartVoices` holds rom.4's words for them word for word, the links as rom.4's addresses: the 24 voices at the addresses of the table `0x895354b0` (from `0x89981b6c`, 0x60 apart), the four lists' heads from `0x89982594` (0x50 apart: sounding, free, prepared, reserved), the words `0x899826d4…0x899826fc` and the next note's age at `0x8998270c`. Read from the disassembly.
+
+**A voice's words.** A list's head is the base class's 0x50 bytes; a voice adds 0x10 for the note's class.
+
+| Offset | Word |
+|---|---|
+| +0x00, +0x04, +0x08, +0x0c | the update queue's node: its links (itself out of a queue, `0x89394f30`), its flag, the byte naming its queue (`0x89989cc4` + 36 × it) |
+| +0x10 | the vtable: `0x898cd1a8` the base's, `0x898cd3dc` a note's voice's |
+| +0x14, +0x18 | its list's links, previous and next |
+| +0x1c | where its age is: `0x89535510`, a word 0 in the image, or its own +0x20 |
+| +0x20, +0x24 | its ages as a note: −1 when prepared, then `0x89391ae0`'s count with three flags at the top, and 0x5fffffff |
+| +0x28 | the voice after it by number, the 24th's the first |
+| +0x2c | its state: 0 or 1 sounding, 2 free, 3 reserved |
+| +0x30 | bit 0: an update asked for |
+| +0x34, +0x38, +0x3c | its channel state, its note's source, its part |
+| +0x40 | its number |
+| +0x44 | what a move runs first: `0x89391740` (its vtable's +0x24, the virtual destroy) or `0x89391750` (nothing) |
+| +0x48 | the key's and the pedals' bits |
+| +0x4c | its note W, 0 none |
+| +0x50, +0x52, +0x5c | the note's class's: 0, −1, its conversion set C |
+
+**The words beside the lists.** `0x899826d4` the reserve's count, `0x899826d8` the CPU budget, `0x899826dc` the offset each tone's cost has added, `0x899826e0` the four heads' addresses, and three floats at `0x899826f0…0x899826f8`. Only the static initializer writes those three, and nothing reads them.
+
+**The routines.**
+
+| Routine | What it does |
+|---|---|
+| `0x89391450` | The static initializer: the four heads built as update-queue nodes with the voices' vtable, and the three unread floats |
+| `0x89391ba0` | The voices' init (the part's init's first, then `0x89391270`): each voice built as a node with the base vtable; its number, its age the zero word's, +0x44 nothing, the next voice by number, no note, state 2 |
+| `0x89391270` | The lists' init: the four heads into the table, each list empty, the voices onto the free list in the table's order, the reserve's count 0, the budget 0.0004, the offset 0 |
+| `0x893919b0` | To prepared, with a state: +0x20 at −1 and its age pointed there, onto the list's tail, the state, then +0x44's routine, then +0x44 nothing |
+| `0x893918e0`, `0x89391930` | To free (state 2) and to reserved (state 3): its age the zero word's, onto the list's tail, the state, +0x44's routine, +0x44 nothing; then `0x8998270c` is 0 if no voice sounds |
+| `0x893905a0` | The take: the free list's first; else the sounding voice of kind 0 (W's +0x742) with the lowest age, the first of equals, compared unsigned; moved to prepared with state 0 |
+| `0x893906c0`, `0x89390700` | The steal's two parts: the same oldest voice, and that voice freed if there is one |
+| `0x893911b0` | The reserve (count, offset): voices from count + offset to 23 reserved, those from the offset to below that freed if reserved (state above 2), those below the offset reserved; a voice already reserved isn't moved again |
+| `0x89390ee0` | The ended scan: each sounding voice's tone asked its vtable's +0x60 (`Vc2Tone::held`); a voice whose tone answers is freed, and the scan starts the list again |
+| `0x89390f40` | Stop all: the sounding list's first freed until none is left |
+| `0x89390610`, `0x89390630` | A voice's cost (its tone's, `0x893b4020`, and the offset) and a list's: the voices' costs added, but of kind 1 only the first |
+| `0x893912e0` | The sounding voices' count and the sum of their costs, kind 1 counted every time |
+| `0x89391240`, `0x89391260` | The budget, CPU Power Max for TG ÷ 10⁶, and the offset, CPU Power Offset for Voice ÷ 10⁷, each a FLOAT then an FDIV |
+| `0x893912d0` | The reserve's count and the budget |
+| `0x89390850` | Whether the prepared list holds a voice |
+
+**A voice is built again at each take.** `0x893969e0` (the assigner's) calls the take, then builds the note's class in place on the voice it got. It runs the node constructor, writes the base vtable and then `0x898cd3dc`, sets +0x50 to 0 and +0x52 to −1, and sets +0x44 to `0x89391740`. So the virtual destroy runs on leaving a list only once a take has built a note there. The derived destroy `0x893973a0` takes the voice off its update queue, ends W's tone (`0x89396590`) and C's conversion (`0x893a7a20`), and clears both and +0x30. The base's `0x893916d0` does the same for W alone. Neither puts back the base vtable.
+
+**Out-of-line copies with no caller.** Stop all `0x89390f40`, a list's cost `0x89390630`, a voice's cost `0x89390610`, the steal's parts `0x893906c0` and `0x89390700`, and the legato partner's search `0x89390720` are reached by no branch, call or word. The assigner's start `0x89390860` holds the same code inline. That inline code covers the partner, the new tone's cost, the sum over the sounding list with the kind-1 rule, and the loop that steals and frees the oldest while the budget isn't above the sum. The port and the check hold these copies, so item 5 can build its start from routines already proven. The same holds for `0x89391340` (any voice sounding), `0x89391410` (a sounding voice of a kind), `0x89391a00` (a voice's init by number), `0x89391aa0`, and `0x89391040` and `0x893910a0`, which mark every sounding voice for an update. The port leaves these out.
+
+**The age's pointer.** Only the three moves and the two inits write +0x1c. It holds either the zero word or the voice's own +0x20, although `0x89391a50` also tests for +0x24. The port reads its age through it as rom.4 does: the zero word from the image, else the voice's own word.
+
+**Left to later versions.** The assigner's own (item 5): the prepared list's splice onto the sounding list's front, the budget loop, `0x893913a0` and `0x893907d0`. The voice's methods that change its words: `0x89391760`, `0x89391820`, `0x89391880` (key off and the pedals), `0x89391a50` and `0x89391ae0`, `0x89391b40` (a note's start). The update queue (item 6): the node constructor `0x89394f30` beyond the three words the port writes on a node given, and the passes `0x89390fd0`, `0x89391120`, `0x89391180` and `0x89390f70`. `Vc2VoiceParts` stands in for the calls out: the virtual destroy, W's tone and kind (item 3's note), the tone's end test and its cost (item 2).
+
+**The check.** `xt_vc2voices` runs rom.4's own routines on its own voices, heads and words in .bss. It hooks the two vtables' destroys, the tone's end test (`0x893b4040`, reached through each tone's real vtable `0x898cd568`) and the cost `0x893b4020`. Each hook logs its routine and object and answers from one queue drawn for both sides, and a destroy writes the voice's note, state, +0x30, +0x44 and age as drawn, so the moves' order around it shows. The notes W and the tones are rom.4's own, their words drawn in its memory. Before each event, voices' words are drawn now and then, and so are the lists: the prepared list moved onto the sounding list's front, or every voice dealt to a list anew, a sounding voice always given a note. After each event the whole span `0x89981b6c…0x89982710` is compared word for word (the port's words, and nothing else moved), then the calls and the answer. 0 different at seed 2024 (40 cases) and at seeds 7 and 31337 (400 cases each). Every line and branch of `Vc2PartVoices.cpp` runs; of `Vc2PartVoicesTables.cpp` all but `vc2PartVoicesLoaded`, which `VSynthEmuRomTest` calls. `mutate_vc2.py --voices`: 92 planted, 0 missed.
+
 ### The VC-2's free LFOs (2026-11-18, v271) {#vc2-free-lfos}
 
 Step 4.2's tone parts. A key-unsynced LFO starts from another sounding tone's LFO of the same number, or, with none sounding, from a free object kept for its tone id and LFO number. The manager is one static object at `0x8a0c6d84`, 0x8448 bytes, built by the static initializer at `0x893b2010`. `Vc2FreeLfos` holds it word for word, the links as rom.4's addresses. A free object's laws are rom.2's `XtLfoFree`, run on rom.4's words.

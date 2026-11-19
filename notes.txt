@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's voices v272 (2026-11-19, on its own branch from vc2-mode's 8052ad3; HARDWARE_FIRMWARE.md, "The VC-2 part's
+  voices and their lists"): step 4.3's first version. Vc2PartVoices is rom.4's 24 voices, four lists' heads and the words
+  beside them word for word, the links rom.4's addresses: the inits, the take and the steal, the three moves, the reserve,
+  the ended scan, stop all, the costs and the budget; its table and pool words in Vc2PartVoicesTables, read by loadVc2.
+  New check xt_vc2voices (in fcheck): rom.4's own routines on its own .bss, the destroys, the tone's end test and its cost
+  hooked: 0 different at seeds 2024, 7 and 31337. mutate_vc2.py --voices: 92 planted, 0 missed. Found: stop all, the two
+  costs and the steal's parts have no caller, being the assigner's start's code (0x89390860) out of line; a voice is built
+  again at each take (0x893969e0). Not in the sound yet.
+
 The VC-2's free LFOs v271 (2026-11-18, after vc2-mode's merge of v268 to v270; HARDWARE_FIRMWARE.md, "The VC-2's free
   LFOs"): step 4.2's tone parts. Vc2FreeLfos is rom.4's manager at 0x8a0c6d84 word for word, its 384 free objects on
   XtLfoFree's laws; Vc2ToneLfo gains the follow, the attach and the free start. xt_vc2tone runs rom.4's own routines for
