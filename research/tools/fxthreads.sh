@@ -3,7 +3,7 @@
 source "$(dirname "$0")/env.sh"
 S="$REPO/plugin/Source"; O="$WORK/fxthreads"; mkdir -p "$O"
 "$TC/clang++" -isysroot "$SDK" -std=c++20 -O1 -g -fsanitize=thread -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" -I"$S" \
-  "$S/XtFxChip.cpp" "$S/XtFxControl.cpp" "$S/XtFxImage.cpp" "$S/XtFxValueText.cpp" \
+  "$S/XtFxChip.cpp" "$S/XtFxControl.cpp" "$S/XtFxUnit.cpp" "$S/XtFxImage.cpp" "$S/XtFxValueText.cpp" \
   "$S/Sh4Interp.cpp" "$S/Sh4Setup.cpp" \
   "$S/XtFxInput.cpp" "$S/XtExtIn.cpp" "$S"/XtFxCheck*.cpp "${HARNESS_SWITCHES[@]}" -o "$O/xt_fx_tsan" 2>&1 \
   | grep -E " error"   # the input's way in and the check's parts (v204)

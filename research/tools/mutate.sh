@@ -114,17 +114,19 @@ elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck
     L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
     F=XtFxChip.cpp
-    fxParts XtFxControl XtFxImage XtFxValueText XtFxInput XtExtIn
-elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fx4c|fx4i)$ ]]; then   # XtFxControl (fxv: its values' text, XtFxValueText.cpp,
-    # v199; fxi: the input's way in, XtFxInput.cpp, v204; fxe: the input's ring and its copy without the chip, XtExtIn.cpp,
+    fxParts XtFxControl XtFxUnit XtFxImage XtFxValueText XtFxInput XtExtIn
+elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu|fx4c|fx4i|fx4u)$ ]]; then
+    # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199; fxi: the input's way in, XtFxInput.cpp, v204; fxe: the input's ring and its copy without the chip, XtExtIn.cpp,
     # v205; fxim: each image's driver, XtFxImage.cpp) against its checks in xt_fx; [cases] is the events of "xt_fx control";
-    # fx4c and fx4i: XtFxControl.cpp and XtFxImage.cpp under "xt_fx <rom.4> vc2"; the others of the five are kept objects
+    # fx4c and fx4i: XtFxControl.cpp and XtFxImage.cpp under "xt_fx <rom.4> vc2"; fxu and fx4u: the unit, XtFxUnit.cpp
+    # (v274), under each; the others are kept objects
     case "$PORT" in
-        fxv) F=XtFxValueText.cpp; KEEP=(XtFxControl XtFxImage XtFxInput XtExtIn) ;;
-        fxi) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxImage XtFxValueText XtExtIn) ;;
-        fxe) F=XtExtIn.cpp; KEEP=(XtFxControl XtFxImage XtFxValueText XtFxInput) ;;
-        fxim | fx4i) F=XtFxImage.cpp; KEEP=(XtFxControl XtFxValueText XtFxInput XtExtIn) ;;
-        *) F=XtFxControl.cpp; KEEP=(XtFxImage XtFxValueText XtFxInput XtExtIn) ;;
+        fxv) F=XtFxValueText.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxInput XtExtIn) ;;
+        fxi) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxValueText XtExtIn) ;;
+        fxe) F=XtExtIn.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxValueText XtFxInput) ;;
+        fxim | fx4i) F=XtFxImage.cpp; KEEP=(XtFxControl XtFxUnit XtFxValueText XtFxInput XtExtIn) ;;
+        fxu | fx4u) F=XtFxUnit.cpp; KEEP=(XtFxControl XtFxImage XtFxValueText XtFxInput XtExtIn) ;;
+        *) F=XtFxControl.cpp; KEEP=(XtFxUnit XtFxImage XtFxValueText XtFxInput XtExtIn) ;;
     esac
     [[ "$PORT" == fx4* ]] && IMAGE="$ROM4"
     fxParts XtFxChip "${KEEP[@]}"
@@ -253,7 +255,7 @@ if [ "$PORT" = enc ]; then
     echo "enc: $(grep -c . "$M/$N.out") waves differ from the baseline"
     exit
 fi
-[[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim)$ ]] && ARGS=("$C") && C=control
+[[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu)$ ]] && ARGS=("$C") && C=control
 [[ "$PORT" =~ ^fx4 ]] && ARGS=("$C") && C=vc2   # rom.4's driver (IMAGE above): [cases] its events
 # a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500): it counts as one that died
 timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$IMAGE" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"

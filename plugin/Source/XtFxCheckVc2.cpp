@@ -8,6 +8,7 @@
 // - The patch EQ: each of its six parameters, live, on the bus, and the same as a patch that has it.
 // XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
+#include "XtFxCheckUnit.h"
 #include "XtFxCheckVc2.h"
 
 namespace xtfxcheck {
@@ -154,6 +155,9 @@ void vc2Control(const char* rom, int events, uint32_t seed) {
     handOutsideClock(rom);
     blocksRead(rom);
     patchEq(rom);
+    unitConversion(rom, seed, vc2Way());   // v274: the frame's way through the unit
+    unitLevels(rom, false, vc2Way());
+    unitAgainstReference(rom, events, seed, vc2Way());
 }
 } // namespace xtfxcheck
 #endif

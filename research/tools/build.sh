@@ -158,7 +158,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_files" &
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxCheck*.cpp \
-   XtFxControl.cpp XtFxImage.cpp XtFxValueText.cpp XtFxInput.cpp XtExtIn.cpp "${SH4[@]}" -o "$O/xt_fx" &
+   XtFxControl.cpp XtFxUnit.cpp XtFxImage.cpp XtFxValueText.cpp XtFxInput.cpp XtExtIn.cpp "${SH4[@]}" -o "$O/xt_fx" &
 # The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on (v189)
 ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp XtArpeggioCases.cpp XtTempoTicks.cpp
      XtTempoTicksCheck.cpp XtArpeggioPatch.cpp)

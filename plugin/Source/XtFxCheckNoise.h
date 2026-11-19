@@ -13,16 +13,23 @@ struct InputNoise {
     Rng r;
     double level[kCount] = {};
     explicit InputNoise(uint32_t seed) : r(seed) {}
-    void into(XtFxChip& chip, Reference& ref, long sample) {
+    // The sample's value at each input, a chip word (v274: the unit's check takes the frame's eight as a frame)
+    void next(long sample, int32_t* x) {
         if (sample % 256 == 0) {
             const int w = r.below(kCount);
             level[w] = kLevels[r.below(4)];
         }
         for (int i = 0; i < kCount; i++) {
             const double v = level[i] * ((int32_t)r.next() / 2147483648.0) * 8388608.0;
-            const auto x = (int32_t)std::clamp(v, -8388608.0, 8388607.0);
-            chip.setGram(kInputs[i], x);
-            ref.runtime().writeGram(x, (uint8_t)kInputs[i]);
+            x[i] = (int32_t)std::clamp(v, -8388608.0, 8388607.0);
+        }
+    }
+    void into(XtFxChip& chip, Reference& ref, long sample) {
+        int32_t x[kCount];
+        next(sample, x);
+        for (int i = 0; i < kCount; i++) {
+            chip.setGram(kInputs[i], x[i]);
+            ref.runtime().writeGram(x[i], (uint8_t)kInputs[i]);
         }
     }
 };

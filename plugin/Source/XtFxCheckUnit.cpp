@@ -1,77 +1,148 @@
 // xt_fx: the unit (XtFxUnit, the frame's way through the chip), the audio thread's allocations and main (XtFxCheck.h;
-// moved from XtFxChip.cpp as it stood, v204).  XT_FX_MAIN only.
+// moved from XtFxChip.cpp as it stood, v204; the frame's parts by an image's way from v274, XtFxCheckUnit.h).
+// XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
-#include "XtFxCheck.h"
+#include "XtFxCheckUnit.h"
 
 namespace xtfxcheck {
 // ------------------------------------------------------------------ the unit
-// The frame's way in, against the firmware's own: 0x894db2b0 truncates the bus to int32, and the chip has the top 24 bits.
-void unitConversion(const char* rom, uint32_t seed) {
-    Sh4 c; if (!c.loadRom(rom)) return; c.mapRam(0x8C000000, 0x100000);
+const UnitWay& rom2Way() {
+    static const UnitWay way = { rom2Ids(), "the", 0x894db2b0, 0x89d2cb10, 0x89cf7a78, 0.0625f, 0x70, 0x3e, 0.125,
+                                 true };
+    return way;
+}
+const UnitWay& vc2Way() {
+    static const UnitWay way = { vc2Ids(), "vc2's", 0x89396200, 0x89998e20, 0x8998a080, 1.0f, 0x72, 0x40, 2.0, false };
+    return way;
+}
+
+Truncation::Truncation(const char* rom, const UnitWay& w) : way(w) {
+    if (c.loadRom(rom)) c.mapRam(0x8C000000, 0x100000);
+}
+
+bool Truncation::run(const float* in, int32_t* out) {
+    for (uint32_t i = 0; i < kWords; i++) {
+        uint32_t b;
+        std::memcpy(&b, &in[i], 4);
+        c.wr32(way.floats + 4 * i, b);
+    }
+    if (!c.call(way.truncate, {}, kSp)) return false;
+    for (uint32_t i = 0; i < kWords; i++) out[i] = (int32_t)c.rd32(way.words + 4 * i);
+    return true;
+}
+
+// The frame's way in, against the image's own: its routine truncates the bus to int32, and the chip has the top 24 bits.
+// The frame's gain isn't in it: the image's bus is its frame as it goes in.
+void unitConversion(const char* rom, uint32_t seed, const UnitWay& way) {
+    // everything a sum of tones can be: tiny, around a word's step, ordinary, around full scale, and then past it
+    static constexpr float kScales[] = { 1e-6f, 1024.0f, 1e6f, 2147483648.0f, 1e12f };
+    constexpr int kKinds = (int)std::size(kScales) + 1;
+    Truncation fw(rom, way);
     Rng r(seed); long tried = 0, different = 0; float firstX = 0; int32_t firstFw = 0, firstPort = 0;
     for (int round = 0; round < 200; round++) {
-        float in[256];
+        float in[Truncation::kWords];
+        int32_t words[Truncation::kWords];
         for (float& x : in) {
-            const int k = r.below(6);                                            // everything a sum of tones can be: tiny, around a word's step, ordinary, around full scale and past it
+            const int k = r.below(kKinds);
             const float u = (float)(int32_t)r.next() / 2147483648.0f;
-            x = k == 0 ? u * 1e-6f : k == 1 ? u * 1024.0f : k == 2 ? u * 1e6f : k == 3 ? u * 2147483648.0f : k == 4 ? u * 1e12f : (u < 0 ? -2147483648.0f : 2147483648.0f) * (1.0f + (float)r.below(3) * 1e-6f - 1e-6f);
+            const auto past = [&] {
+                return (u < 0 ? -2147483648.0f : 2147483648.0f) * (1.0f + (float)r.below(3) * 1e-6f - 1e-6f);
+            };
+            x = k < kKinds - 1 ? u * kScales[k] : past();
         }
-        for (uint32_t i = 0; i < 256; i++) { uint32_t b; std::memcpy(&b, &in[i], 4); c.wr32(0x89d2cb10 + 4 * i, b); }
-        if (!c.call(0x894db2b0, {}, kSp)) { std::printf("fault in the truncation: %s\n", c.error().c_str()); different++; break; }
-        for (uint32_t i = 0; i < 256; i++) {
-            const int32_t fw = (int32_t)c.rd32(0x89cf7a78 + 4 * i) >> 8, port = XtFxUnit::toChip(in[i] * 16.0f);      // toChip has the tone's Out Gain in it too, a sixteenth
+        if (!fw.run(in, words)) {
+            std::printf("fault in the truncation: %s\n", fw.c.error().c_str());
+            different++;
+            break;
+        }
+        for (int i = 0; i < Truncation::kWords; i++) {
+            const int32_t chipWord = words[i] >> 8, port = XtFxUnit::toChip(in[i]);
             tried++;
-            if (fw != port) { if (!different) { firstX = in[i]; firstFw = fw; firstPort = port; } different++; }
+            if (chipWord == port) continue;
+            if (!different) {
+                firstX = in[i];
+                firstFw = chipWord;
+                firstPort = port;
+            }
+            different++;
         }
     }
     if (different && xtSwitch("XT_FX_FIRST"))
         std::printf("  unit: %.9g to the chip: firmware %d, port %d\n", firstX, firstFw, firstPort);
-    std::printf("the frame into the chip against the firmware's truncation: %ld samples, %ld different\n", tried, different);
+    std::printf("%s frame into the chip against the firmware's truncation: %ld samples, %ld different\n", way.whose,
+                tried, different);
 }
 
-// Through the unit: each word of the frame to its place, at the level the plugin has without the chip (⅛, −18.06 dB), and how long it takes.
+// A quarter of full scale at 1 kHz, sample i, in the bus's units
+float quarterSine(int i) { return (float)(0.25 * std::sin(2 * std::numbers::pi * 1000 * i / 44100.0)) * 0x1p31f; }
+
+// Through the unit: each word of the frame to its place, at the image's level (rom.2's the level the plugin has without
+// the chip, ⅛, −18.06 dB), and how long it takes.
 struct UnitLine { double left = 0, right = 0; int delay = -1; };
-UnitLine unitLine(const char* rom, int word, bool eq) {
-    auto u = std::make_unique<XtFxUnit>(rom);
-    u->control().set(0x70, eq ? 1 : 0); u->control().update(); u->settle();
+UnitLine unitLine(const char* rom, int word, bool eq, const UnitWay& way) {
+    auto u = std::make_unique<XtFxUnit>(rom, way.fx.image);
+    u->control().set(way.eqSwitch, eq ? 1 : 0);
+    u->control().update();
+    u->settle();
     float frame[8] = {}, lr[2] = {};
     UnitLine out; double in = 0;
     for (int i = 0; i < 20000; i++) {
-        const float v = (float)(0.25 * std::sin(2 * M_PI * 1000 * i / 44100.0)) * 0x1p31f;
+        const float v = quarterSine(i);
         frame[word] = v; u->process(frame, lr, 1);
-        if (i > 10000) { in = std::max(in, std::fabs((double)v) * 0x1p-31); out.left = std::max(out.left, std::fabs((double)lr[0])); out.right = std::max(out.right, std::fabs((double)lr[1])); }
+        if (i <= 10000) continue;
+        in = std::max(in, std::fabs((double)v) * 0x1p-31);
+        out.left = std::max(out.left, std::fabs((double)lr[0]));
+        out.right = std::max(out.right, std::fabs((double)lr[1]));
     }
     // the delay: a click, in a chip that's settled.  The DC cut's tail is much smaller.
     frame[word] = 0; for (int i = 0; i < 2000; i++) u->process(frame, lr, 1);
-    for (int i = 0; i < 64; i++) { frame[word] = i == 0 ? 0x1p30f : 0.0f; u->process(frame, lr, 1); if (out.delay < 0 && (std::fabs(lr[0]) > 0.0125f || std::fabs(lr[1]) > 0.0125f)) out.delay = i; }
+    for (int i = 0; i < 64; i++) {
+        frame[word] = i == 0 ? 0x1p30f : 0.0f;
+        u->process(frame, lr, 1);
+        if (out.delay < 0 && (std::fabs(lr[0]) > 0.0125f || std::fabs(lr[1]) > 0.0125f)) out.delay = i;
+    }
     out.left /= in; out.right /= in;
     return out;
 }
-void unitLevels(const char* rom, bool print) {
+void unitLevels(const char* rom, bool print, const UnitWay& way) {
     int tried = 0, different = 0;
-    static const char* const kName[8] = { "MAIN L", "MAIN R", "Reverb send", "Chorus send", "MULTI L", "MULTI R", "DIR L", "DIR R" };
+    static const char* const kName[8] = { "MAIN L", "MAIN R", "Reverb send", "Chorus send", "MULTI L", "MULTI R",
+                                          "DIR L", "DIR R" };
     const auto near = [](double x, double to, double tol) { return std::fabs(x - to) <= tol; };
     for (int w = 0; w < 8; w++) {
-        const UnitLine a = unitLine(rom, w, false);
-        const bool isLeft = w == 0 || w == 4 || w == 6, isSend = w == 2 || w == 3;
+        const UnitLine a = unitLine(rom, w, false, way);
+        const bool isLeft = w == 0 || w == 4 || w == 6, silent = w == 2 || w == 3 || (w >= 6 && !way.dirOut);
+        const double heard = isLeft ? a.left : a.right, other = isLeft ? a.right : a.left;
         tried++;
-        const bool good = isSend ? a.left < 1.25e-5 && a.right < 1.25e-5 : near(db(isLeft ? a.left : a.right), 20 * std::log10(0.125), 0.05) && (isLeft ? a.right : a.left) < 1.25e-5 && a.delay == 1;
+        const bool good = silent ? a.left < 1.25e-5 && a.right < 1.25e-5
+                                 : near(db(heard), db(way.level), 0.05) && other < 1.25e-5 && a.delay == 1;
         if (!good) {
             different++;
             if (xtSwitch("XT_FX_FIRST"))
                 std::printf("  unit: %s: left %.3f dB, right %.3f dB\n", kName[w], db(a.left), db(a.right));
         }
-        if (print) std::printf("through the unit, %s: left %+.2f dB, right %+.2f dB, %d samples late\n", kName[w], db(a.left), db(a.right), a.delay);
+        if (print)
+            std::printf("through the unit, %s: left %+.2f dB, right %+.2f dB, %d samples late\n", kName[w],
+                        db(a.left), db(a.right), a.delay);
     }
-    const UnitLine e = unitLine(rom, 4, true);
+    const UnitLine e = unitLine(rom, 4, true, way);
     if (print) std::printf("through the unit, MULTI L with the system's EQ on at its defaults: %+.2f dB\n", db(e.left));
     {   // With it running, an edit reaches the chip through the queue: Master Level down, and the level follows.
-        auto u = std::make_unique<XtFxUnit>(rom);
+        auto u = std::make_unique<XtFxUnit>(rom, way.fx.image);
         u->settle();
         float frame[8] = {}, lr[2] = {};
-        const auto level = [&](int n) { double top = 0; for (int i = 0; i < n; i++) { frame[4] = (float)(0.25 * std::sin(2 * M_PI * 1000 * i / 44100.0)) * 0x1p31f; u->process(frame, lr, 1); if (i > n / 2) top = std::max(top, std::fabs((double)lr[0])); } return top; };
+        const auto level = [&](int n) {
+            double top = 0;
+            for (int i = 0; i < n; i++) {
+                frame[4] = quarterSine(i);
+                u->process(frame, lr, 1);
+                if (i > n / 2) top = std::max(top, std::fabs((double)lr[0]));
+            }
+            return top;
+        };
         const double before = level(4000);
-        u->control().set(0x3e, 64); u->control().update();
+        u->control().set(way.masterLevel, 64);
+        u->control().update();
         const double after = level(4000);
         tried++;
         if (!(after < before * 0.5)) {
@@ -79,7 +150,7 @@ void unitLevels(const char* rom, bool print) {
             if (xtSwitch("XT_FX_FIRST")) std::printf("  unit: Master Level moved, from %.3f to %.3f\n", before, after);
         }
     }
-    if (!print) std::printf("the frame through the unit: %d samples, %d different\n", tried, different);
+    if (!print) std::printf("%s frame through the unit: %d samples, %d different\n", way.whose, tried, different);
 }
 
 // The outside input through the unit (v204): words 4 and 5 handed back, against External Input Type's law as the manual
@@ -153,7 +224,12 @@ int main(int argc, char** argv) {
     using namespace xtfxcheck;
     if (argc < 2) { std::fprintf(stderr, "xt_fx <rom> [frames] [seed] | numbers | speed | control [events] [seed]\n"); return 2; }
     const char* rom = argv[1];
-    if (argc > 2 && !std::strcmp(argv[2], "numbers")) { numbers(rom); changeUnderTone(rom); unitLevels(rom, true); return 0; }
+    if (argc > 2 && !std::strcmp(argv[2], "numbers")) {
+        numbers(rom);
+        changeUnderTone(rom);
+        unitLevels(rom, true, rom2Way());
+        return 0;
+    }
     if (argc > 2 && !std::strcmp(argv[2], "threads")) {
         threads(rom, argOr(argc, argv, 3, 200), (uint32_t)argOr(argc, argv, 4, 2024));
         return 0;
@@ -163,7 +239,15 @@ int main(int argc, char** argv) {
         const uint32_t seed = (uint32_t)argOr(argc, argv, 4, 2024);
         rom2Start(rom);
         matrixThroughQueue(rom);
-        readers(rom, seed); behaviour(rom); valueText(rom); liveEdits(rom, events, seed); threads(rom, events, seed); againstReference(rom, events, seed); unitConversion(rom, seed); unitLevels(rom, false);
+        readers(rom, seed);
+        behaviour(rom);
+        valueText(rom);
+        liveEdits(rom, events, seed);
+        threads(rom, events, seed);
+        againstReference(rom, events, seed);
+        unitConversion(rom, seed, rom2Way());
+        unitLevels(rom, false, rom2Way());
+        unitAgainstReference(rom, events, seed, rom2Way());
         unitInput(rom);
         copyWithoutChip(rom, seed);
         return 0;
