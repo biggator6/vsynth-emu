@@ -844,6 +844,7 @@ vocoder: 16000 events, 3479 with an EXTIN OSC, 542 with a template's offsets (57
 modes: 16000 events: 5372 wrappers, 5364 rows, 5264 Auto Note switches; 8885 All Sound Offs, 116 reads through a leftover object (264903 calls)
 dispatchers: 16000 events: 2655 parts (273 read whole), 2687 systems, 2635 assignments, 2701 calibrations, 2645 channel words, 2677 Matrix settings; 3983 of G's words from a channel's state (7291156 reads)
 Category: 16000 events, 1236 holding a note, 14764 all notes off (179082 calls)
+static M: 16000 events: 8143 static initializers, 7857 part inits (16000 calls)
 settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
 xt_vc2settings: 0 different
 == xt_tone msm

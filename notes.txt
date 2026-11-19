@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's static M v295 (2026-11-19, on claude/vc2-part-4-3 after v294; HARDWARE_FIRMWARE.md, "The VC-2 part's
+  static M"): step 4.3's twenty-third version, item 9's tenth part. Vc2StaticMatrix: the part's own Matrix object at
+  0x89997108, 0x290 bytes word for word (M's words and links, its update queue node at +0x170 and the two vtables, the
+  levels, a float, its own channel state at +0x198, the unreceived channel word at +0x284, two floats); its static
+  initializer 0x893a3020 (three pool floats by Vc2PartSettingsTables, the node as 0x89394f30 makes one, the vtables,
+  the channel state's set-up 0x89317a10) and the part's init 0x893a2fe0 (velocity 0, keys 60, part 0, the channel
+  word, the node queued by 0x89394fa0), the set-up and the enqueue through Vc2StaticMatrixParts. xt_vc2settings gains
+  a ninth part (Vc2StaticMatrixCheck.cpp); its calls' log and port's calls out split into Vc2PartSettingsCalls.h: 0
+  different at seeds 2024, 7 and 31337, the first eight parts' lines unchanged; mutate_vc2.py --settings 440
+  planted, 0 missed; mutate_panel.py's three rom4- loaders' caught. Item 9 done but for event 0x200 (item 10's). Not
+  in the sound yet.
+
 The VC-2 part's settings by ID, the Category and budget v294 (2026-11-19, on claude/vc2-part-4-3 after v293;
   HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the Category and budget"): step 4.3's twenty-second version,
   item 9's ninth part. On Vc2PartSettings (Vc2PartSettingsCategory.cpp): rom.4's 0x89392c60, Patch Category read twice

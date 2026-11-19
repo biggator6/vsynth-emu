@@ -14,7 +14,9 @@ struct Read : Vc2PartSettingsTables {
         image.read(0x8954012c, oscIds.data(), sizeof oscIds);
         for (uint32_t r = 0; r < kRecords; ++r)
             templateShifts[r] = std::bit_cast<float>(image.rd32(kRecordsAt + kRecordBytes * r + kShiftAt));
-        const Vc2PoolWord pool[] = { { 0x893a75ec, &shiftBase }, { 0x893a75f0, &shiftStep }, { 0x893a75f8, &per127 } };
+        const Vc2PoolWord pool[] = { { 0x893a75ec, &shiftBase }, { 0x893a75f0, &shiftStep }, { 0x893a75f8, &per127 },
+                                     { 0x893a3098, &staticFloats[0] }, { 0x893a30a0, &staticFloats[1] },
+                                     { 0x893a30a4, &staticFloats[2] } };
         vc2ReadPool(image, pool);
         for (int t = 0; t < kCosmTypes; ++t) {
             const int first = cosmRuns[2 * t], last = cosmRuns[2 * t + 1];

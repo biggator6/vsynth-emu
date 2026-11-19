@@ -764,6 +764,11 @@ version against rom.4's routines with what it calls hooked:
         voices truncated, Auto Note's switch, all notes off with no note held, through `Vc2SettingsParts`;
         xt_vc2settings' eighth part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the Category and budget").
         Left: the static M's initializers and event 0x200 (the notes' task's: item 10).
+      - the static M done (v295): `Vc2StaticMatrix`, its 0x290 bytes at `0x89997108` (M, links, its queue node and
+        vtables, the levels, its own channel state, the unreceived channel word, three floats), the static initializer
+        `0x893a3020` and the part's init `0x893a2fe0`, the channel state's set-up and the enqueue through
+        `Vc2StaticMatrixParts`; xt_vc2settings' ninth part (HARDWARE_FIRMWARE.md, "The VC-2 part's static M"). Item 9
+        is done but for event 0x200, which the notes' task raises and handles: item 10's.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

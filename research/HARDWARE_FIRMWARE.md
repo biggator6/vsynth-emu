@@ -1546,6 +1546,44 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's static M (2026-11-19, v295) {#vc2-part-static-m}
+
+Step 4.3's twenty-third version (VC2_MODE_PLAN.md, step 4.3, item 9's tenth part): the part's own Matrix object, the
+static M at `0x89997108`, as `Vc2StaticMatrix`, and its two initializers, checked by `xt_vc2settings`' ninth part.
+
+**The object**, 0x290 bytes word for word, as far as read:
+- +0x000 M's words (v243's `Vc2MatrixWords`) and +0x168 its links (the channel state's word, the part; v247's);
+- +0x170 its update queue node, a list head's first 0x14 bytes (links, flag, queue byte, and its class's vtable at
+  +0x180, `0x898cd460`, whose +0xc holds −0x170: the node is a base class 0x170 into the object);
+- +0x184 the object's vtable `0x898cd448`, whose +0x14 is M's init `0x893a2ee0` (v247): what the queue runs when it
+  takes the node;
+- +0x188 the part's levels (v247's `0x89997290`), +0x194 a float;
+- +0x198 its own channel state, 0xec bytes like the 64 of the channel states' table, set up by `0x89317a10`;
+- +0x284 the word G's channel word takes with Receive Switch off (v292's `0x8999738c`), +0x288 and +0x28c two
+  floats. G follows at `0x89997398`.
+
+**The static initializer** `0x893a3020` (from the init table `0x898c5e74`): the three floats from its pool
+(`0x893a3098`, `0x893a30a0`, `0x893a30a4`: about 100.23 into +0x288, 0.01996 into +0x28c, 0.009375 into +0x194; read
+by `Vc2PartSettingsTables`); the node made by `0x89394f30` (v272's: its links to itself, the node class's vtable
+`0x898cd340`); the two vtables, +0x184 then +0x180 over the node's; then `0x89317a10(+0x198, 0)`, the channel
+state's set-up, which goes out through `Vc2StaticMatrixParts`.
+
+**The part's init** `0x893a2fe0` (from the part's init's last call, `0x8939b200`): the part halfword +0x16c 0, the
+head's velocity 0 and its two keys 60, the channel word from +0x284, then the node onto the update queue
+(`0x89394fa0(0x89989cc4, +0x170)`, v279's enqueue, which goes out too: the ported queue knows voices and heads by
+address, not this node).
+
+**The check.** `xt_vc2settings`' ninth part, on the seed eight after the run's. Each event gives the static M noise on
+both sides, then runs one initializer; `0x89317a10` and `0x89394fa0` are hooked to log, `0x89394f30` runs as rom.4's
+own; after each, the tables as every part has them, the static M word for word and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first eight parts' lines as they were.
+- Every line of `Vc2StaticMatrix.cpp` is reached (it has no branch), and the three floats' reads.
+- `mutate_vc2.py --settings`: 440 plants, none missed; v295's 21 new. `mutate_panel.py rom4-no-tables
+  rom4-no-setenvelopes rom4-no-partsettings`: 3, none missed (they reach the loader's failure tests, which the check
+  can't).
+
 ### The VC-2 part's settings by ID: the Category and budget (2026-11-19, v294) {#vc2-part-settings-category}
 
 Step 4.3's twenty-second version (VC2_MODE_PLAN.md, step 4.3, item 9's ninth part): `0x89392c60(node)`, which the

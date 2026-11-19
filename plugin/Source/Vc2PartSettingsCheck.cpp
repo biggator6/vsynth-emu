@@ -127,9 +127,9 @@ const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCount
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
-    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow })
+    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kCategoryPartRow);
+    return different + settingsRunPart(s, run, kStaticPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

@@ -15,6 +15,9 @@ struct Vc2PartSettingsTables {
     // its pool's −64/63, 1/63 and 1/127 (0x893a75ec, 0x893a75f0, 0x893a75f8)
     std::array<float, kRecords> templateShifts {};
     float shiftBase = 0, shiftStep = 0, per127 = 0;
+    // The static M's three floats (v295): its +0x288, +0x28c and +0x194, from 0x893a3020's pool (0x893a3098, 0x893a30a0,
+    // 0x893a30a4)
+    std::array<float, 3> staticFloats {};
 };
 
 [[nodiscard]] bool vc2LoadPartSettings(const char* path);

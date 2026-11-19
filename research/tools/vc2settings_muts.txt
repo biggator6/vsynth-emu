@@ -6,8 +6,9 @@
 # planted at its call, by the source and part it's given), vc2settingsdispatch (Vc2PartSettingsDispatch.cpp, v292) and
 # vc2settingsmatrix (Vc2MatrixSetup.cpp's flag tests, v292, which xt_vc2settings' flips reach and xt_vc2cosm's
 # don't; the dispatcher's part given to the Matrix's set-up is not planted: the check gives part 0 alone, as rom.4's
-# handler does) and vc2settingscategory (Vc2PartSettingsCategory.cpp, v294; the held Categories' test of `known` is
-# not planted: 10 and 11 are known either way).  Not planted: the depth
+# handler does), vc2settingscategory (Vc2PartSettingsCategory.cpp, v294; the held Categories' test of `known` is
+# not planted: 10 and 11 are known either way) and vc2staticmatrix (Vc2StaticMatrix.cpp, v295; the order of its
+# stores isn't planted, as no store reads another).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -434,3 +435,24 @@ category-no-autonote|    autoNoteSwitch(out);\n    if (t.heldNote|    if (t.held
 category-notes-off-test|    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote != 0) out.allNotesOff();|vc2settingscategory
 category-notes-off-first|    autoNoteSwitch(out);\n    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote == 0) out.allNotesOff();\n    autoNoteSwitch(out);|vc2settingscategory
 category-control-first|    out.setBudget(static_cast<int32_t>(power));\n    out.controller(|    out.controller(|vc2settingscategory
+static-float-first|    floats[0] = f[0];|    floats[0] = f[1];|vc2staticmatrix
+static-float-second|    floats[1] = f[1];|    floats[1] = f[0];|vc2staticmatrix
+static-scale|    scale = f[2];|    scale = f[1];|vc2staticmatrix
+static-node-prev|    node.prev = kNodeAt;|    node.prev = kStateAt;|vc2staticmatrix
+static-node-next|    node.next = kNodeAt;|    node.next = 0;|vc2staticmatrix
+static-node-class|kNodeClass = 0x898cd460,|kNodeClass = 0x898cd340,|vc2staticmatrix
+static-matrix-class|kMatrixClass = 0x898cd448;|kMatrixClass = 0x898cd460;|vc2staticmatrix
+static-no-vtable|    vtable = kMatrixClass;\n||vc2staticmatrix
+static-state-at|    parts.channelStateInit(kStateAt, kNoArg);|    parts.channelStateInit(kNodeAt, kNoArg);|vc2staticmatrix
+static-state-arg|kNoArg = 0;|kNoArg = 1;|vc2staticmatrix
+static-no-state|    parts.channelStateInit(kStateAt, kNoArg);\n||vc2staticmatrix
+static-part|    links.part = 0;|    links.part = 1;|vc2staticmatrix
+static-velocity|kNoVelocity = 0,|kNoVelocity = 1,|vc2staticmatrix
+static-keys|kMiddleKey = 60;|kMiddleKey = 64;|vc2staticmatrix
+static-poly-key|    m.head[2] = kMiddleKey;\n||vc2staticmatrix
+static-key|    m.head[1] = kMiddleKey;\n||vc2staticmatrix
+static-channel|    links.channel = unreceived;|    links.channel = 0;|vc2staticmatrix
+static-enqueue-node|parts.enqueue(Vc2UpdateQueue::kAt, kNodeAt);|parts.enqueue(Vc2UpdateQueue::kAt, kAt);|vc2staticmatrix
+static-no-enqueue|    parts.enqueue(Vc2UpdateQueue::kAt, kNodeAt);\n||vc2staticmatrix
+tables-static-first|{ 0x893a3098, &staticFloats[0] }|{ 0x893a309c, &staticFloats[0] }|vc2settingstables
+tables-static-last|{ 0x893a30a4, &staticFloats[2] }|{ 0x893a30a0, &staticFloats[2] }|vc2settingstables
