@@ -46,8 +46,9 @@
 # xt_vc2voices, [cases] its cases (40).  --notes: vc2notes_muts.txt, in Vc2Notes.cpp (PORT=vc2notes: the part's
 # notes W, v275), through xt_vc2notes, [cases] its cases (40).  --keys: vc2keys_muts.txt, in Vc2Keys.cpp and
 # Vc2KeysTables.cpp (PORT=vc2keys, vc2keystables: the part's keys, v276), through xt_vc2keys, [cases] its cases
-# (40).  --sets: vc2sets_muts.txt, in Vc2Sets.cpp and Vc2NoteMatrix.cpp (PORT=vc2sets, vc2notematrix: the part's
-# conversion sets and the notes' Matrix objects, v280), through xt_vc2sets, [cases] its cases (40).  One line
+# (40).  --sets: vc2sets_muts.txt, in Vc2Sets.cpp, Vc2NoteMatrix.cpp and Vc2SetCommon.cpp (PORT=vc2sets, vc2notematrix,
+# vc2setcommon: the part's conversion sets, the notes' Matrix objects, v280, and C's common, v281), through
+# xt_vc2sets, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist

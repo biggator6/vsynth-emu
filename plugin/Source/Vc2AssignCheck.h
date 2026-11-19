@@ -3,6 +3,7 @@
 // through VoicesPortParts, the assigner's logged into the same log with their arguments), the counts, and the events.
 // XT_VC2VOICES_MAIN only.
 #include "Vc2Assigner.h"
+#include "Vc2CheckMain.h"
 #include "Vc2PartVoicesCheck.h"
 #include <memory>
 
@@ -94,14 +95,12 @@ template <class Sides, auto Install, auto Start, auto Draw, auto Events, auto Co
 long voicesPart(VoicesSides& s, const Vc2Run& run, uint32_t offset) {
     const auto x = std::make_unique<Sides>(s);
     Install(*x);
-    Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
-    Vc2Run own = run;
-    own.seed = run.seed + offset;
-    vc2RunCases(own, tally, "", x->n.events, [&](std::mt19937& rng, bool) {
-        return voicesPartCase<Start, Draw, Events, Count>(*x, s, rng);
-    });
+    const long different = vc2CheckPart(run, offset, { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" }, x->n.events,
+                                        [&](std::mt19937& rng) {
+                                            return voicesPartCase<Start, Draw, Events, Count>(*x, s, rng);
+                                        });
     Say(x->n);
-    return tally.different;
+    return different;
 }
 
 // A case's start (the voices noise, the notes drawn, rom.4's three inits; what differs), the second part's draws

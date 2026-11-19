@@ -189,6 +189,12 @@ uint8_t SetPortParts::controlOf(uint32_t channel, uint32_t number) {
 
 uint8_t SetPortParts::modeOf(uint32_t part, uint32_t kind) { return fw_.cpu.rd8(kSetsModesAt + 16 * part + kind); }
 
+std::array<uint16_t, 3> SetPortParts::commonOf(uint32_t part) {
+    std::array<uint16_t, 3> words;
+    fw_.cpu.read(kSetsCommonsAt + kSetsCommonBytes * part, words.data(), sizeof words);
+    return words;
+}
+
 std::string setsOnBoth(SetSides& s, const Vc2CheckRoutine& routine, std::initializer_list<uint32_t> args,
                        const std::function<uint32_t()>& mine) {
     s.fw.cpu.write(Vc2Sets::kAt, &s.port.items, sizeof s.port.items);
@@ -207,6 +213,6 @@ std::string setsOnBoth(SetSides& s, const Vc2CheckRoutine& routine, std::initial
 
 int main(int argc, char** argv) {
     const Vc2CheckStart start { "xt_vc2sets", vc2LoadAll<vc2LoadMatrix>, { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" } };
-    return vc2CheckMain<SetSides>(argc, argv, start, setsCase, saySetCounts);
+    return vc2CheckMain<SetSides>(argc, argv, start, setsCase, saySetCounts, vc2SetCommonPart);
 }
 #endif

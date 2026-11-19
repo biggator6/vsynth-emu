@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's sets' common v281 (2026-11-19, on claude/vc2-part-4-3 after v280; HARDWARE_FIRMWARE.md, "The VC-2
+  part's sets' common"): step 4.3's ninth version, item 8's first child. Vc2SetCommons, rom.4's 24 commons word for
+  word, the constructor, conversion, update and copy with its twin: the block at W+0xc, two switches and a level by
+  velocity in rom.4's integer arithmetic (its divisions by 127² by the magic 0x82061029). xt_vc2sets gains a second
+  part on the seed after the sets', nothing hooked: 0 different at seeds 2024, 7 and 31337; mutate_vc2.py --sets 118
+  planted (34 new), 0 missed. vc2CheckMain takes a check's further parts, vc2CheckPart runs one (xt_vc2voices'
+  voicesPart on it). Not in the sound yet.
+
 The VC-2 part's conversion sets and the notes' Matrix v280 (2026-11-19, on claude/vc2-part-4-3 after v279;
   HARDWARE_FIRMWARE.md, "The VC-2 part's conversion sets and the notes' Matrix"): step 4.3's eighth version, item 7
   done. Vc2Sets, rom.4's 24 conversion sets C word for word with the placement, make, end, conversion, release,

@@ -1546,6 +1546,54 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's sets' common (2026-11-19, v281) {#vc2-set-common}
+
+Step 4.3's ninth version (VC2_MODE_PLAN.md, step 4.3, item 8's first child): C's common, which only a kind-0 note
+has. `Vc2SetCommons` is bit for bit against rom.4's own in `xt_vc2sets`' second part.
+
+**Its words.** There are 24 commons of 12 bytes from `0x89996f68`, one by a voice's number. The allocator
+`0x893a1940` is given 10 but steps by 12.
+- +0 holds the voice's key (its +0x41) and +1 its +0x43.
+- +4…+9 hold the part's three words from `0x89997090` + 6 × the part. The routines read bytes +4 and +5 (two
+  switches), byte +6 (a level) and the halfword +8 (a signed depth).
+
+**The block** is the common's in the note's input, W+0xc: what each OSC voice's `0x893ae610` is given (v230). Two
+routines write it, `0x893a1870` and the copy `0x893a1a10`, the same code twice.
+- +0 takes whether +4 is set, +4 and +8 take 0, and +0x10 takes whether +5 is set.
+- +0xc takes a float, the level by velocity:
+  - The level x gives A = x² × 10000 / 127². x = 1 gives 1, where the division would give 0.
+  - The depth d gives B = d × v² × A / (127² × 16). v is the velocity, or 127 less it when d is negative, as a byte;
+    d's negation is held to 16 bits.
+  - Each division is rom.4's signed multiply by `0x82061029`, keeping the high word plus the dividend, shifted by 13
+    or 17 and rounded toward 0. The products are 32-bit, A is held to 16 bits, and A − B is too. Below 0 gives 0;
+    then it becomes the float.
+
+**The routines.**
+- The constructor `0x893a1960(common, call, block)` writes the voice's two bytes and the part's words, then the block.
+  It answers the common.
+- The conversion `0x893a19c0(common, call, block)` writes the voice's two bytes again, then the block.
+- The update `0x893a19e0(common, call)` writes the part's words again.
+- The end `0x893a19b0` is a bare return.
+
+**The check.** It is xt_vc2sets' second part, on the seed after the sets' part, so the first part's lines stay as they
+were. Nothing is hooked: the sets' part's hooks on these routines are taken off, and the routines call nothing.
+
+The draws, beyond the sets' part's:
+- the parts' words: the switches 0 or 1, or now and then any; the level 0, 1, 2, 64, 126, 127, 128, 255 or any; the
+  depth 0, ±1, ±63, ±127, 32767, −32768, −32767 or any;
+- the commons' own words the same way, the velocity below 128 half the time.
+
+Each case is noise in the commons, then 400 events: the placement, the constructor, the end, the conversion, the
+update, the copy and its twin. After each, the commons, W and the answer are compared.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2SetCommon.cpp` is reached.
+- `mutate_vc2.py --sets`: the common's 34 plants with the 84 before them, none missed.
+
+`vc2CheckMain` now takes a check's further parts. `vc2CheckPart` (Vc2CheckMain.h) runs a part's cases on the seed
+after, and xt_vc2voices' runner `voicesPart` uses it too.
+
 ### The VC-2 part's conversion sets and the notes' Matrix (2026-11-19, v280) {#vc2-part-sets}
 
 Step 4.3's eighth version (VC2_MODE_PLAN.md, step 4.3, item 7): a voice's conversion set C, which v279's virtuals call,

@@ -54,6 +54,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
    Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp \
+   $( [ -f Vc2SetCommonCheck.cpp ] && echo Vc2SetCommon.cpp Vc2SetCommonCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2sets" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

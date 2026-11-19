@@ -698,6 +698,9 @@ version against rom.4's routines with what it calls hooked:
         the OSC blocks' and COSM inputs' are behind the same interface, their converters v251's, v256's and v235's.
    8. C's children with no port, a version each: the common's (`0x893a1940…`), the envelopes' (`0x8939a620…`), the LFOs'
       (`0x8939b690…`), the mix's (`0x8939bd90…`), the TVA's (`0x893a67d0…`).
+      - the common's done (v281): `Vc2SetCommons`, its 24 words, constructor, conversion, update, copy and its twin
+        `0x893a1870` (the block at W+0xc); xt_vc2sets' second part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets'
+        common").
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

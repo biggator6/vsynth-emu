@@ -28,8 +28,9 @@ struct Vc2SetVoice {
     uint8_t byte43 = 0;    // +0x43: the velocity or word the voice took
 };
 
-// What C and M read past their own words: the voice by a call, an object's first byte, K's channel state, the channel's
-// bend and controllers (its +0x84 + number), the part's byte by kind (rom.4's 0x89998a14 + 16 × part + kind)
+// What C, M and C's children read past their own words: the voice by a call, an object's first byte, K's channel state,
+// the channel's bend and controllers (its +0x84 + number), the part's byte by kind (rom.4's 0x89998a14 + 16 × part +
+// kind), the part's three words the common takes (0x89997090 + 6 × part, v281)
 class Vc2SetReads {
 public:
     virtual ~Vc2SetReads() = default;
@@ -39,6 +40,7 @@ public:
     virtual int16_t bendOf(uint32_t channel) = 0;
     virtual uint8_t controlOf(uint32_t channel, uint32_t number) = 0;
     virtual uint8_t modeOf(uint32_t part, uint32_t kind) = 0;
+    virtual std::array<uint16_t, 3> commonOf(uint32_t part) = 0;
 };
 
 struct Vc2NoteMatrixWords {

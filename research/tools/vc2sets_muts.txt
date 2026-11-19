@@ -86,3 +86,37 @@ matrix-head-part|in.partLinks, part, {|in.partLinks, part + 1, {|vc2notematrix
 matrix-update-kind|fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|fromPart(at(m), reads.firstByte(v.part), 0, in, reads);|vc2notematrix
 matrix-update-channel|    const Vc2SetVoice v = reads.voiceAt(call.channelAt);\n    fromPart(at(m)|    const Vc2SetVoice v = reads.voiceAt(call.channelAt);\n    at(m).links.channel = reads.channelOf(v.keys);\n    fromPart(at(m)|vc2notematrix
 matrix-update-head|    fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|    at(m).m.head[1] = v.key;\n    fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|vc2notematrix
+common-magic|0x82061029u|0x82061028u|vc2setcommon
+common-shift|kBySquare = 13|kBySquare = 12|vc2setcommon
+common-shift-sixteen|kBySquareSixteen = 17|kBySquareSixteen = 16|vc2setcommon
+common-scale|kLevelScale = 10000|kLevelScale = 10001|vc2setcommon
+common-top|kTop = 127|kTop = 128|vc2setcommon
+common-magic-round|    return q + static_cast<int32_t>(static_cast<uint32_t>(q) >> 31);|    return q;|vc2setcommon
+common-magic-add|static_cast<uint32_t>(high) + static_cast<uint32_t>(n)|static_cast<uint32_t>(high)|vc2setcommon
+common-block-first|block[0] = w.firstSwitch != 0;|block[0] = w.firstSwitch;|vc2setcommon
+common-block-second|block[4] = w.secondSwitch != 0;|block[4] = w.firstSwitch != 0;|vc2setcommon
+common-block-one|    block[1] = 0;\n|\n|vc2setcommon
+common-block-two|    block[2] = 0;\n|\n|vc2setcommon
+common-sens-side|if (sens < 0) {|if (sens < -1) {|vc2setcommon
+common-sens-velocity|velocity = kTop - velocity;|velocity = kTop - velocity + 1;|vc2setcommon
+common-sens-negate|        sens = -sens;\n|\n|vc2setcommon
+common-level-one|x == 1 ? 1 : byMagic|x == 1 ? 0 : byMagic|vc2setcommon
+common-level-two|x == 1 ? 1 : byMagic|x == 2 ? 1 : byMagic|vc2setcommon
+common-level-wide|const int16_t level = static_cast<int16_t>(square);|const int32_t level = square;|vc2setcommon
+common-velocity-mask|const uint32_t v = velocity & 0xff;|const uint32_t v = velocity;|vc2setcommon
+common-product-sens|asWord(static_cast<int16_t>(sens))|asWord(sens)|vc2setcommon
+common-out-floor|out < 0 ? 0 : out|out|vc2setcommon
+common-out-wide|const auto out = static_cast<int16_t>(level - byMagic(|const auto out = static_cast<int32_t>(level - byMagic(|vc2setcommon
+common-voice-key|w.key = v.key;|w.key = v.byte42;|vc2setcommon
+common-voice-velocity|w.velocity = v.byte43;|w.velocity = v.key;|vc2setcommon
+common-part-first|w.firstSwitch = static_cast<uint8_t>(words[0]);|w.firstSwitch = static_cast<uint8_t>(words[0] >> 8);|vc2setcommon
+common-part-second|w.secondSwitch = static_cast<uint8_t>(words[0] >> 8);|w.secondSwitch = static_cast<uint8_t>(words[0]);|vc2setcommon
+common-part-level|w.level = static_cast<uint8_t>(words[1]);|w.level = static_cast<uint8_t>(words[1] >> 8);|vc2setcommon
+common-part-unread|    w.unread07 = static_cast<uint8_t>(words[1] >> 8);\n|\n|vc2setcommon
+common-part-sens|w.sens = static_cast<int16_t>(words[2]);|w.sens = static_cast<int16_t>(words[1]);|vc2setcommon
+common-part-which|reads.commonOf(reads.firstByte(v.part))|reads.commonOf(0)|vc2setcommon
+common-make-part|    fromVoice(w, call, reads);\n    fromPart(w, call, reads);\n|    fromVoice(w, call, reads);\n|vc2setcommon
+common-make-block|    fromPart(w, call, reads);\n    blockOfCommon(w, block);|    fromPart(w, call, reads);|vc2setcommon
+common-convert-voice|    Vc2CommonWords& w = at(common);\n    fromVoice(w, call, reads);\n    blockOfCommon|    Vc2CommonWords& w = at(common);\n    blockOfCommon|vc2setcommon
+common-convert-part|    fromVoice(w, call, reads);\n    blockOfCommon(w, block);\n}\n\nvoid Vc2SetCommons::update|    fromVoice(w, call, reads);\n    fromPart(w, call, reads);\n    blockOfCommon(w, block);\n}\n\nvoid Vc2SetCommons::update|vc2setcommon
+common-update-voice|    fromPart(at(common), call, reads);|    fromVoice(at(common), call, reads);\n    fromPart(at(common), call, reads);|vc2setcommon

@@ -20,6 +20,7 @@ inline constexpr uint32_t kSetsModesAt = 0x89998a14;                // [FW] the 
 inline constexpr uint32_t kSetsMatrixAt = 0x89997108;               // [FW] the part's own M
 inline constexpr uint32_t kSetsControls = 0x84;                     // [FW] a channel's controllers
 inline constexpr uint32_t kSetsSettingsAt = 0x89997398;             // [FW] the Matrix's settings G
+inline constexpr uint32_t kSetsCommonsAt = 0x89997090, kSetsCommonBytes = 6;   // [FW] the parts' words for the common
 
 enum SetMethod : int32_t { kSetAllocate, kSetConstruct, kSetEnd, kSetConvert, kSetUpdate, kSetCopy, kSetRelease,
                            kSetRefresh, kSetMethods };
@@ -51,6 +52,7 @@ public:
     int16_t bendOf(uint32_t channel) override { return static_cast<int16_t>(fw_.cpu.rd16(channel)); }
     uint8_t controlOf(uint32_t channel, uint32_t number) override;
     uint8_t modeOf(uint32_t part, uint32_t kind) override;
+    std::array<uint16_t, 3> commonOf(uint32_t part) override;
 
 private:
     void logged(int32_t kind, uint32_t routine, std::array<uint32_t, 8> args);
@@ -107,3 +109,7 @@ void setsDraw(SetSides& s, std::mt19937& rng, bool all);
 uint32_t setsSet(std::mt19937& rng);
 uint32_t setsNote(std::mt19937& rng);
 uint32_t setsCall(SetSides& s, std::mt19937& rng);
+
+// The further parts, each on the seed after the last's, saying its counts; how many of its cases differ: the common's
+// (v281, Vc2SetCommonCheck.cpp)
+long vc2SetCommonPart(SetSides& s, const Vc2Run& run);

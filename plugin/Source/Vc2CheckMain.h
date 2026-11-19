@@ -39,16 +39,32 @@ struct Vc2CheckStart {
     Vc2Tally tally;
 };
 
+// A check's further part, on the seed `offset` after the run's: each case by `oneCase(rng)` under `tally`'s switches,
+// `events` its count of events; how many cases differ
+template <class Case>
+long vc2CheckPart(const Vc2Run& run, uint32_t offset, Vc2Tally tally, const long& events, Case oneCase) {
+    Vc2Run own = run;
+    own.seed = run.seed + (int)offset;
+    vc2RunCases(own, tally, "", events, [&](std::mt19937& rng, bool) { return oneCase(rng); });
+    return tally.different;
+}
+
+template <class Sides>
+long vc2NoMoreParts(Sides&, const Vc2Run&) { return 0; }
+
 // A check's main: rom.4 and the port's tables, the `Sides` made on the interpreter (they hold the port and its counts,
-// `n`, with its events), then each case by `oneCase(sides, rng)` under the tally's switches, and the counts said by
+// `n`, with its events), then each case by `oneCase(sides, rng)` under the tally's switches, the check's further parts
+// by `more(sides, run)` (each saying its counts and answering how many of its cases differ), and the counts said by
 // `say(run, counts, different)`
-template <class Sides, class Case, class Say>
-int vc2CheckMain(int argc, char** argv, Vc2CheckStart start, Case oneCase, Say say) {
+template <class Sides, class Case, class Say, class More = long (*)(Sides&, const Vc2Run&)>
+int vc2CheckMain(int argc, char** argv, Vc2CheckStart start, Case oneCase, Say say,
+                 More more = vc2NoMoreParts<Sides>) {
     Vc2Fw fw;
     const auto run = vc2Start(argc, argv, fw, start.name, start.load);
     if (!run) return 1;
     const auto s = std::make_unique<Sides>(fw);
     vc2RunCases(*run, start.tally, "", s->n.events, [&](std::mt19937& rng, bool) { return oneCase(*s, rng); });
-    say(*run, s->n, start.tally.different);
+    const long further = more(*s, *run);
+    say(*run, s->n, start.tally.different + further);
     return 0;
 }

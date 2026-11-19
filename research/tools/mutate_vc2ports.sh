@@ -32,7 +32,7 @@
 # (vc2keys, v276) and their tables (vc2keystables) under xt_vc2keys; the assigner's first part (vc2assign, v277)
 # under xt_vc2voices, its second part; its second part (vc2release, vc2nodenotes, v278) under its third; the voice's
 # virtuals (vc2class, v279) and the update queue (vc2queue) under its fourth; the conversion sets C (vc2sets, v280) and
-# the notes' Matrix objects M (vc2notematrix) under xt_vc2sets.
+# the notes' Matrix objects M (vc2notematrix) under xt_vc2sets; C's common (vc2setcommon, v281) under its second part.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -73,7 +73,7 @@ VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEve
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
-         Vc2SetsEvents)
+         Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -182,6 +182,7 @@ VC2PORTS=(
     "vc2keystables|Vc2KeysTables.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setcommon|Vc2SetCommon.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port
