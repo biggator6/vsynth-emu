@@ -778,6 +778,13 @@ version against rom.4's routines with what it calls hooked:
          (HARDWARE_FIRMWARE.md, "The VC-2 part's system readers and budget"). Next: the parameters' messages
          themselves (`0x89392890` by kind, the part's `0x89392830`, `0x89392b10`, `0x89392720`, `0x89392750`,
          `0x8939b0c0`, `0x89394370`), the receive channel's nodes `0x89393fd0`, then the controllers.
+       - the parameters' messages done (v297): `0x89392890` by kind as a table of ways and the part's `0x89392830`,
+         with `0x89391500`, `0x89392750` and `0x89394370`, on `Vc2PartWorld`; the reload task's request `0x8939af40`
+         and run `0x8939af10`, the receive channel `0x89393fb0`, the routing's reset `0x89393e30` and every voice's
+         truncation `0x89391120` through `Vc2SettingsParts`; xt_vc2settings' eleventh part (HARDWARE_FIRMWARE.md, "The
+         VC-2 part's parameters' messages"). Next: the receive channel `0x89393fd0` and the routing's reset
+         `0x89393e30` (the parameter store's read objects `0x893206f0`/`0x89320700`, `0x89318a20`/`0x89318a90`), the
+         reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the controllers.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

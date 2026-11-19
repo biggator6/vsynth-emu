@@ -8,6 +8,7 @@
 #include "Vc2CheckCalls.h"
 #include "Vc2CheckMain.h"
 #include "Vc2LibMathTables.h"
+#include "Vc2KeysTables.h"
 #include "Vc2MatrixTables.h"
 #include "Vc2PartSettingsCalls.h"
 #include "Vc2PartSettingsTables.h"
@@ -104,7 +105,8 @@ struct SettingsCounts {
     long categoryEvents = 0, categoryCalls = 0, heldNotes = 0, notesOff = 0;    // the eighth's (v294)
     long staticEvents = 0, staticCalls = 0;                                     // the ninth's (v295)
     long systemEvents = 0, systemCalls = 0;                                     // the tenth's (v296)
-    std::array<long, 43> byEvent {};
+    long messageEvents = 0, messageCalls = 0;                                   // the eleventh's (v297)
+    std::array<long, 47> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -122,6 +124,7 @@ struct SettingsSides {
     SettingsMatrixParams matrixParams { mine };
     Vc2MatrixSetup setup { matrixParams, outs };
     Vc2StaticMatrix staticM {};       // v295
+    Vc2Keys keys {};                  // v297: v276's keys, which a node's class install resets
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -139,6 +142,7 @@ void settingsDraw(SettingsSides& s, std::mt19937& rng, uint32_t flipped);
 struct SettingsCallee {
     uint32_t at;
     SettingsCall (*called)(Sh4&);
+    uint32_t (*answer)(SettingsSides&) = nullptr;   // v297: its answer, else 0
 };
 void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees);
 // A further part (v289): its seed's offset from the run's, its counts, a case of its events, its line, and what it
@@ -167,6 +171,8 @@ extern const SettingsPartRow kCategoryPartRow;
 extern const SettingsPartRow kStaticPartRow;
 // The tenth (v296): the system's readers and the budget (Vc2PartSettingsSystemCheck.cpp)
 extern const SettingsPartRow kSystemPartRow;
+// The eleventh (v297): the parameters' messages (Vc2PartSettingsMessagesCheck.cpp)
+extern const SettingsPartRow kMessagePartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words
@@ -178,48 +184,6 @@ inline void settingsNoise(void* at, size_t bytes, std::mt19937& rng) {
 }
 
 using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
-
-// A part's reader on a drawn part, the port's side `mine(part)` (v289)
-template <uint32_t Routine, uint32_t TableAt, size_t Counted, class Mine>
-std::string partEventWith(SettingsSides& s, std::mt19937& rng, const Mine& mine) {
-    const int part = (int)(rng() % kSettingsParts);
-    ++s.n.byEvent[Counted];
-    return settingsOnBoth(s, { Routine, "a part's reader", vc2R0 }, { TableAt, (uint32_t)part },
-                          [&] { return (uint32_t)mine(part); });
-}
-
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string partEvent(SettingsSides& s, std::mt19937& rng) {
-    const auto mine = [&](int part) { return (s.settings.*Member)(s.rows, part); };
-    return partEventWith<Routine, TableAt, Counted>(s, rng, mine);
-}
-
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string kindEvent(SettingsSides& s, std::mt19937& rng) {
-    const int part = (int)(rng() % kSettingsParts), kind = (int)(rng() % kSettingsKinds);
-    ++s.n.byEvent[Counted];
-    return settingsOnBoth(s, { Routine, "a kind's row", vc2R0 }, { TableAt, (uint32_t)part, (uint32_t)kind },
-                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part, kind); });
-}
-
-template <auto Member, uint32_t Routine, uint32_t TableAt, int Rows, size_t Counted>
-std::string rowEvent(SettingsSides& s, std::mt19937& rng) {
-    const int part = (int)(rng() % kSettingsParts), kind = (int)(rng() % kSettingsKinds), i = (int)(rng() % Rows);
-    ++s.n.byEvent[Counted];
-    const Vc2CheckRoutine r { Routine, "a row", vc2R0 };
-    return settingsOnBoth(s, r, { TableAt, (uint32_t)part, (uint32_t)kind, (uint32_t)i },
-                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part, kind, i); });
-}
-
-// A system's reader: rom.4's answers 1 (0x893a71d0 reads no table: the word it's given unread)
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string systemEvent(SettingsSides& s, std::mt19937&) {
-    ++s.n.byEvent[Counted];
-    return settingsOnBoth(s, { Routine, "a system's reader", vc2R0 }, { TableAt }, [&] {
-        (s.settings.*Member)(s.rows);
-        return 1u;
-    });
-}
 
 // A case: noise in the tables up to `Noised` bytes in (each part's draws as it first drew them), the tables into
 // rom.4's memory, then 400 of `Events` with `Flipped` flags to set, counted in `events` and `calls`

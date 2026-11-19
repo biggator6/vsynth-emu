@@ -10,7 +10,7 @@
 # not planted: 10 and 11 are known either way), vc2staticmatrix (Vc2StaticMatrix.cpp, v295; the order of its
 # stores isn't planted, as no store reads another) and vc2settingssystem (Vc2PartSettingsSystem.cpp, v296; the sum's
 # 32-bit wrap isn't planted: the holds keep both below 25; nor its test at 24 by one: at a sum of 24, 24 − offset is the
-# count itself).  Not planted: the depth
+# count itself) and vc2settingsmessages (Vc2PartSettingsMessages.cpp, v297).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -483,3 +483,36 @@ static-enqueue-node|parts.enqueue(Vc2UpdateQueue::kAt, kNodeAt);|parts.enqueue(V
 static-no-enqueue|    parts.enqueue(Vc2UpdateQueue::kAt, kNodeAt);\n||vc2staticmatrix
 tables-static-first|{ 0x893a3098, &staticFloats[0] }|{ 0x893a309c, &staticFloats[0] }|vc2settingstables
 tables-static-last|{ 0x893a30a4, &staticFloats[2] }|{ 0x893a30a0, &staticFloats[2] }|vc2settingstables
+messages-routing-bit|kRoutingOn = 0x80;|kRoutingOn = 0x40;|vc2settingsmessages
+messages-node-bytes|kNodeBytes = 16;|kNodeBytes = 32;|vc2settingsmessages
+messages-stop-node|w.nodes.stop(partNode(0), w.nodeParts); }|w.nodes.stop(partNode(1), w.nodeParts); }|vc2settingsmessages
+messages-routing-no-matrix|    w.setup.settings(w.g, 0);\n||vc2settingsmessages
+messages-routing-matrix-part|    w.setup.settings(w.g, 0);|    w.setup.settings(w.g, 1);|vc2settingsmessages
+messages-routing-test|if (w.out.routing(on)) s.heldNoteSwitch|if (!w.out.routing(on)) s.heldNoteSwitch|vc2settingsmessages
+messages-routing-flag|s.heldNoteSwitch(w.t, on, w.out);|s.heldNoteSwitch(w.t, true, w.out);|vc2settingsmessages
+messages-calibration-no-dispatch|    s.readCalibration(w.t);\n||vc2settingsmessages
+messages-calibration-no-counts|    s.voiceCounts(w.t, w.out);\n||vc2settingsmessages
+messages-calibration-no-stop|    s.voiceCounts(w.t, w.out);\n    stopPartZero(w);|    s.voiceCounts(w.t, w.out);|vc2settingsmessages
+messages-system-no-dispatch|    s.readSystem(w.t, w.g, w.states);\n||vc2settingsmessages
+messages-system-no-receive|    if (w.out.receive()) s.patchRemain(w.t);|    s.patchRemain(w.t);|vc2settingsmessages
+messages-system-receive-test|    if (w.out.receive()) s.patchRemain(w.t);|    if (!w.out.receive()) s.patchRemain(w.t);|vc2settingsmessages
+messages-assigns-no-dispatch|    s.readAssigns(w.t, w.g, w.setup);\n||vc2settingsmessages
+messages-assigns-no-run|    w.out.reloadRun(0);\n||vc2settingsmessages
+messages-assigns-no-trip|    s.tripAssigns(w.t);\n||vc2settingsmessages
+messages-part-refuse|    if (part != 0) return;\n    w.out.reloadRun(part);|    w.out.reloadRun(part);|vc2settingsmessages
+messages-part-no-stop|    w.nodes.stop(partNode(part), w.nodeParts);\n||vc2settingsmessages
+messages-ways-3-4|routingWay, nullptr, nullptr, calibrationWay, systemWay,|routingWay, nullptr, nullptr, systemWay, calibrationWay,|vc2settingsmessages
+messages-ways-1|{ routingWay, nullptr, nullptr,|{ routingWay, routingWay, nullptr,|vc2settingsmessages
+messages-ways-9|nullptr,    nullptr, nullptr, partWay,        partWay,|nullptr,    nullptr, partWay, partWay,        partWay,|vc2settingsmessages
+messages-ways-13|partWay,   partWay,    partWay };|partWay,   partWay,    nullptr };|vc2settingsmessages
+messages-ways-6|systemWay, assignsWay, partWay,|systemWay, assignsWay, nullptr,|vc2settingsmessages
+messages-part-kind|if (kind != 0 \|\| part != 0) return;|if (part != 0) return;|vc2settingsmessages
+messages-part-part|if (kind != 0 \|\| part != 0) return;|if (kind != 0) return;|vc2settingsmessages
+messages-part-no-request|    w.out.reloadRequest(part);\n||vc2settingsmessages
+messages-part-class|    nodeClass(w, part, 0);|    nodeClass(w, part, 1);|vc2settingsmessages
+messages-part-no-category|    category(w.t, w.nodes, part, w.out);\n||vc2settingsmessages
+messages-part-no-steps|    clearSteps(w.t);\n}|}|vc2settingsmessages
+messages-held-word|if (t.heldNote == 0 && on) out.truncateAll();|if (on) out.truncateAll();|vc2settingsmessages
+messages-held-flag|if (t.heldNote == 0 && on) out.truncateAll();|if (t.heldNote == 0) out.truncateAll();|vc2settingsmessages
+messages-steps|t.steps.fill(0);|t.steps.fill(1);|vc2settingsmessages
+messages-class-flag|plain == 0 ? Vc2NodeClass::kHeld : Vc2NodeClass::kPlain|plain != 0 ? Vc2NodeClass::kHeld : Vc2NodeClass::kPlain|vc2settingsmessages

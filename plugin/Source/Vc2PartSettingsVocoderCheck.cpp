@@ -4,7 +4,7 @@
 // the pivots, and the stereo flag), the port's calls out the same through SettingsPortOuts; robot human depth's word
 // and Unvoice Level's compared as memory.  XT_VC2SETTINGS_MAIN only.
 #ifdef XT_VC2SETTINGS_MAIN
-#include "Vc2PartSettingsCheck.h"
+#include "Vc2PartSettingsEvents.h"
 
 namespace {
 constexpr uint32_t kVocoderReader = 0x893a72f0, kSettingsWrapper = 0x893b1be0;   // [FW]

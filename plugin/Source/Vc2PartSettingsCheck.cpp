@@ -5,7 +5,7 @@
 // the tables, then 400 events: each reader, its rows, the systems' and the two laws alone; after each the tables word
 // for word, the calls and the answer.  XT_VC2SETTINGS_MAIN only.
 #ifdef XT_VC2SETTINGS_MAIN
-#include "Vc2PartSettingsCheck.h"
+#include "Vc2PartSettingsEvents.h"
 
 namespace {
 using Settings = Vc2PartSettings;
@@ -132,9 +132,9 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
     for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
-                                      &kStaticPartRow })
+                                      &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kSystemPartRow);
+    return different + settingsRunPart(s, run, kMessagePartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -194,7 +194,7 @@ void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> calle
     for (const SettingsCallee& k : callees)
         s.fw.cpu.hook(k.at, [&s, k](Sh4& c) {
             s.rom.log.push_back(k.called(c));
-            c.ret(0);
+            c.ret(k.answer != nullptr ? k.answer(s) : 0);
         });
 }
 
@@ -250,7 +250,8 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 }
 
 int main(int argc, char** argv) {
-    const Vc2CheckStart start { "xt_vc2settings", vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath, vc2LoadMatrix>,
+    const Vc2CheckStart start { "xt_vc2settings",
+                                vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath, vc2LoadMatrix, vc2LoadKeys>,
                                 { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" } };
     return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts, settingsMoreParts);
 }

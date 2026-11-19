@@ -6,7 +6,7 @@
 // reader and the part's reader on part 0, the Wave Number held half the time, the step counts compared.
 // XT_VC2SETTINGS_MAIN only.
 #ifdef XT_VC2SETTINGS_MAIN
-#include "Vc2PartSettingsCheck.h"
+#include "Vc2PartSettingsEvents.h"
 
 namespace {
 using Settings = Vc2PartSettings;

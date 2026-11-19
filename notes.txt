@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's parameters' messages v297 (2026-11-19, on claude/vc2-part-4-3 after v296; HARDWARE_FIRMWARE.md, "The
+  VC-2 part's parameters' messages"): step 4.3's twenty-fifth version, item 10's second part. On Vc2PartSettings
+  (Vc2PartSettingsMessages.cpp): rom.4's 0x89392890 by the message's kind as a table of ways (0: the Matrix's settings
+  for part 0, the routing's reset and the held note's switch 0x89391500; 3: the calibration's dispatcher and the voices'
+  counts; 4: the system's dispatcher, the receive channel and Patch Remain; 5: the assignments' dispatcher, the reload
+  run and Time Trip's assigns; 6 and 10…13: a part's reload run; each with part 0's node's voices stopped) and the
+  part's 0x89392830 (the reload request, the node's held class 0x89394370, the Category, the step counts' clear
+  0x89392750), on Vc2PartWorld; the reload task, the receive channel, the routing's reset and every voice's truncation
+  through Vc2SettingsParts. xt_vc2settings gains an eleventh part (Vc2PartSettingsMessagesCheck.cpp, with v276's keys
+  and v293's nodes); its header split (Vc2PartSettingsEvents.h, Vc2PartSettingsStates.h): 0 different at seeds 2024,
+  7 and 31337, the first ten parts' lines unchanged; mutate_vc2.py --settings 498 planted, 0 missed. Not in the
+  sound yet.
+
 The VC-2 part's system readers and budget v296 (2026-11-19, on claude/vc2-part-4-3 after v295; HARDWARE_FIRMWARE.md,
   "The VC-2 part's system readers and budget"): step 4.3's twenty-fourth version, item 10's first part. On
   Vc2PartSettings (Vc2PartSettingsSystem.cpp): rom.4's Time Trip's assigns 0x893943f0 (into 0x89989404, OFF and CC32

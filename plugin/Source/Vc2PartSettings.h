@@ -85,6 +85,14 @@ public:
     // v296, the voices' counts': the reserve of `count` voices from `offset`, CPU Power Offset for Voice's setter
     virtual void reserve(int32_t count, int32_t offset) = 0;                                   // 0x893911b0
     virtual void setPowerOffset(int32_t power) = 0;                                            // 0x89391260
+    // v297, the parameters' messages': the reload task's request and run for a part (by its object at 0x89996120 + 24
+    // × part), part 0's receive channel and the routing's reset (each answering whether it changed anything), and
+    // every sounding voice truncated
+    virtual void reloadRequest(int part) = 0;                                                  // 0x8939af40
+    virtual void reloadRun(int part) = 0;                                                      // 0x8939af10
+    virtual bool receive() = 0;                                                                // 0x89393fb0
+    virtual bool routing(bool on) = 0;                                                         // 0x89393e30
+    virtual void truncateAll() = 0;                                                            // 0x89391120
 };
 
 // G's channel word's two sources (v292): the word at 0x8999738c, with Part 1 Receive Switch off; and with it on, the
@@ -94,6 +102,19 @@ public:
     virtual ~Vc2ChannelStates() = default;
     virtual uint32_t unreceived() = 0;
     virtual uint32_t receiving(int32_t channel) = 0;
+};
+
+// What the parameters' messages reach (v297): the tables, G and the Matrix's set-up, the nodes and keys, the channel
+// states, the calls out and the nodes' own
+struct Vc2PartWorld {
+    Vc2PartRows& t;
+    Vc2MatrixSettings& g;
+    Vc2MatrixSetup& setup;
+    Vc2PartNodes& nodes;
+    Vc2Keys& keys;
+    Vc2ChannelStates& states;
+    Vc2SettingsParts& out;
+    Vc2NodeParts& nodeParts;
 };
 
 // The OSC block's reader the part's reader calls for each kind and OSC, false to stop (v289)
@@ -149,6 +170,13 @@ public:
     void tripAssigns(Vc2PartRows& t);                             // 0x893943f0
     void patchRemain(Vc2PartRows& t);                             // 0x89391520
     void voiceCounts(Vc2PartRows& t, Vc2SettingsParts& out);      // 0x89391550
+    // v297, Vc2PartSettingsMessages.cpp: the parameters' messages by kind and the part's, given a message's two
+    // bytes; the held note's switch; the step counts' clear (part 0's alone are kept); a node's class by a flag
+    void parameters(Vc2PartWorld& w, uint8_t kind, uint8_t byte1);       // 0x89392890
+    void partParameters(Vc2PartWorld& w, uint8_t kind, uint8_t part);   // 0x89392830
+    void heldNoteSwitch(Vc2PartRows& t, bool on, Vc2SettingsParts& out);   // 0x89391500
+    void clearSteps(Vc2PartRows& t);                                      // 0x89392750, part 0
+    void nodeClass(Vc2PartWorld& w, int part, int32_t plain);             // 0x89394370
 
 private:
     void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)

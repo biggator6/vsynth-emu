@@ -1546,6 +1546,56 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's parameters' messages (2026-11-19, v297) {#vc2-part-parameter-messages}
+
+Step 4.3's twenty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's second part): the two routines the notes'
+task runs on a parameters' message from its mailbox (`0x8939005c` and `0x893900ea`), on `Vc2PartSettings`
+(`Vc2PartSettingsMessages.cpp`), with what they reach in `Vc2PartWorld`, checked by `xt_vc2settings`' eleventh part.
+
+**By kind** `0x89392890(…, message)`: the message's first byte picks a way through a braf table of 14 (past 13
+nothing), which the port keeps as a table of ways:
+- **0**: the Matrix's settings for part 0 (`0x8939b0c0` → `0x893a51c0(G, 0)`, its answer unread), the routing's
+  reset `0x89393e30(…, flag)` with the second byte's bit 0x80 as its flag, and if that answers non-zero the held note's
+  switch `0x89391500(…, flag)`: with the held note's word clear and the flag set, every sounding voice truncated
+  (`0x89391120`);
+- **3**: the calibration's dispatcher, the voices' counts (v296);
+- **4**: the system's dispatcher, part 0's receive channel `0x89393fb0`, and if that answers non-zero Patch Remain;
+- **5**: the assignments' dispatcher, part 0's reload run (`0x89392b10` → `0x8939af10` on its object at
+  `0x89996120`), Time Trip's assigns;
+- **6 and 10…13**: with the second byte (a part) 0, its reload run and its node's voices stopped (kind 6's first call,
+  `0x89394360`, answers 1 and does nothing else, so the five are alike);
+- **1, 2, 7…9**: nothing.
+
+Kinds 3 to 5 end with part 0's node of source 1's voices stopped (`0x89392720` → `0x89393360`, v293's).
+
+**The part's** `0x89392830(…, message)`: only kind 0, and only part 0 (the second byte unsigned ≥ 1 is refused): the
+reload task's request (`0x8939af40` on the part's object), the node of source 1's held class (`0x89394370(…, part, 0)`:
+0 the held class `0x893932c0`, else the plain `0x89393310`; v293's), the Category and budget (v294's), and part 0's step
+counts cleared (`0x89392750`: 64 bytes, part 0's alone being kept, v289's).
+
+The reload task's request and run, the receive channel, the routing's reset and the truncation of every voice go out
+through `Vc2SettingsParts`; the receive channel (`0x89393fd0`) and the routing's reset are long routines on the
+parameter store's own read objects (`0x893206f0`, `0x89320700`) and the nodes, keys and glides, for the next versions.
+
+**The check.** `xt_vc2settings`' eleventh part, on the seed ten after the run's. Each case gives every table, the
+nodes (each one's object index 0…15), G, v276's keys, the part objects (an index 0…15) and the class bytes noise and
+draws G's channel word's sources. Every routine reached is rom.4's own but the five calls out and `0x89390f70` (a node's
+voices' stop), hooked to log; the receive channel and the routing answer as each event draws. A message's two bytes sit
+in Vc2Fw's RAM, its kind 0…15 and its second byte 0 half the time; the part's message is kind 0 half the time. Events:
+a message by kind, the part's, the held note's switch alone (its word 0 half the time, its flag 0, 1 or any) and a
+node's class alone (any part, flag 0 half the time). After each, the tables, the keys' span, the nodes, the part
+objects, the class bytes and the calls; no answer is compared. The store gives the Matrix Controls' Sens −128…127 and
+Receive Channel 0…15 always, as the seventh part's (`kMatrixNarrow`, now shared in `Vc2PartSettingsStates.h`).
+
+Before it the check header was split by what its parts do (the 300-line limit): the event templates into
+`Vc2PartSettingsEvents.h`, G's channel word's sources and the Matrix-safe narrow IDs into `Vc2PartSettingsStates.h`; a
+callee hooked may answer (`SettingsCallee::answer`).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first ten parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsMessages.cpp` is reached.
+- `mutate_vc2.py --settings`: 498 plants, none missed; v297's 33 new.
+
 ### The VC-2 part's system readers and budget (2026-11-19, v296) {#vc2-part-system-readers}
 
 Step 4.3's twenty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's first part): the readers the parameters'

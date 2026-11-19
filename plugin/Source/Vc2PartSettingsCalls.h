@@ -4,6 +4,7 @@
 // logged as rom.4's hooks log theirs.  XT_VC2SETTINGS_MAIN only.
 #include "Vc2PartSettings.h"
 #include "Vc2StaticMatrix.h"
+#include <array>
 #include <bit>
 #include <cstring>
 #include <vector>
@@ -29,16 +30,34 @@ inline constexpr int32_t kOutBudget = 20, kOutController = 21, kOutTruncate = 22
 inline constexpr int32_t kOutChannelState = 24, kOutEnqueue = 25;
 // The voices' counts' (v296): the reserve (its count and offset as the kind and ID), the power offset's setter
 inline constexpr int32_t kOutReserve = 26, kOutPowerOffset = 27;
+// The parameters' messages' (v297): the reload's request and run (the part as the ID), the receive channel, the
+// routing's reset (its flag as the ID), every voice truncated, a node's voices stopped (its word as the ID)
+inline constexpr int32_t kOutReloadRequest = 28, kOutReloadRun = 29, kOutReceive = 30, kOutRouting = 31;
+inline constexpr int32_t kOutTruncateAll = 32, kOutStopVoices = 33;
 inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
 
 // The port's calls out: each logged as rom.4's hooks log theirs, Unvoice Level kept to compare with rom.4's word; and
 // (v292) the Matrix set-up's 0x893b1ee0, the mixer's targets, which the dispatchers' set-up routines never reach
-class SettingsPortOuts final : public Vc2SettingsParts, public Vc2MatrixPart, public Vc2StaticMatrixParts {
+class SettingsPortOuts final : public Vc2SettingsParts, public Vc2MatrixPart, public Vc2StaticMatrixParts,
+                               public Vc2NodeParts {
 public:
     explicit SettingsPortOuts(std::vector<SettingsCall>& log) : log_(log) {}
     float unvoiceLevel = 0.0f;
+    std::array<bool, 2> answers {};   // v297: the receive channel's and the routing reset's, drawn for both sides
+    void reloadRequest(int part) override { logOut(log_, kOutReloadRequest, (uint32_t)part); }
+    void reloadRun(int part) override { logOut(log_, kOutReloadRun, (uint32_t)part); }
+    bool receive() override {
+        logOut(log_, kOutReceive, 0);
+        return answers[0];
+    }
+    bool routing(bool on) override {
+        logOut(log_, kOutRouting, on ? 1u : 0u);
+        return answers[1];
+    }
+    void truncateAll() override { logOut(log_, kOutTruncateAll, 0); }
+    void stopVoices(uint32_t word) override { logOut(log_, kOutStopVoices, word); }
     void levelsMoved() override { mixerTargets(); }
     void setUnvoiceLevel(float v) override { unvoiceLevel = v; }
     void setDirect(float v) override { logOut(log_, kOutDirect, std::bit_cast<uint32_t>(v)); }

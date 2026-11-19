@@ -8,45 +8,16 @@
 // anywhere in its reads, so that each reader is the one to give up now and then; the Matrix's settings alone too,
 // whose answer the dispatcher can't show.  XT_VC2SETTINGS_MAIN only.
 #ifdef XT_VC2SETTINGS_MAIN
-#include "Vc2PartSettingsCheck.h"
+#include "Vc2PartSettingsStates.h"
 
 namespace {
-// [FW] G's channel word's sources: the word, the source byte, the table (64 bytes a source, four sources)
-constexpr uint32_t kUnreceivedAt = 0x8999738c, kStateSourceAt = 0x8950d6d9, kStatesAt = 0x8950d6e0;
-constexpr uint32_t kSourceBytes = 64, kSources = 4;
-// [FW] Part 1 Receive Switch and Receive Channel (system B's); the eight Matrix Controls' Sens 1 and 2 (five IDs each
-// from 0x16a: Source, Dest 1, Sens 1, Dest 2, Sens 2), −128…127 always as v247's check draws them (rom.4's depth
-// routine reads its tables by them)
-constexpr int kControls = 8, kControlIds = 5, kSensFrom = -128;
-constexpr int16_t kSens1 = 0x16c, kSens2 = 0x16e;
-constexpr auto kDispatchNarrow = [] {
-    std::array<SettingsNarrow, 2 + 2 * kControls> n { { { 71, 2, kHalfTheTime }, { 72, 16, kAlways } } };
-    for (int k = 0; k < kControls; ++k)
-        for (int j = 0; j < 2; ++j)
-            n[(size_t)(2 + 2 * k + j)] = { (int16_t)((j == 0 ? kSens1 : kSens2) + kControlIds * k), 256, kAlways,
-                                           kSensFrom };
-    return n;
-}();
 // About as many reads as the part's dispatcher makes with every reader through, and as its first three make (the
 // common's flag 0 test after the bytes' and its own, 20 reads, is seldom reached otherwise)
 constexpr uint32_t kPartReads = 7000, kFirstReads = 64;
 constexpr uint32_t kMatrixReads = 128;   // a little past the Matrix's settings' reads (11 assignments, a record's 83)
 constexpr uint32_t kHeldFlags = 5;
 
-// The port's two sources, read where rom.4 reads them
-class SettingsPortStates final : public Vc2ChannelStates {
-public:
-    explicit SettingsPortStates(Sh4& cpu) : cpu_(cpu) {}
-    uint32_t unreceived() override { return cpu_.rd32(kUnreceivedAt); }
-    uint32_t receiving(int32_t channel) override {
-        return cpu_.rd32(kStatesAt + kSourceBytes * cpu_.rd8(kStateSourceAt) + 4 * (uint32_t)channel);
-    }
-
-private:
-    Sh4& cpu_;
-};
-
-void narrowDispatch(SettingsSides& s) { s.rom.store.narrow = kDispatchNarrow; }
+void narrowDispatch(SettingsSides& s) { s.rom.store.narrow = kMatrixNarrow; }
 
 // The part's dispatcher on part 0, a flag set after a read drawn over all of its reads or, half the time, its first
 // three readers'; the parts read whole counted
@@ -92,7 +63,7 @@ std::string dispatchEvent(SettingsSides& s, std::mt19937&) {
         d.mine(s);
         return 1u;
     });
-    for (const SettingsCall& c : s.mine.log) s.n.received += c.id == kDispatchNarrow[1].id;
+    for (const SettingsCall& c : s.mine.log) s.n.received += c.id == kMatrixNarrow[1].id;
     return what;
 }
 
@@ -113,8 +84,7 @@ const SettingsEvent kDispatchEvents[] = { partDispatchEvent, dispatchEvent<0>, d
 std::string dispatchCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
     settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
     settingsNoise(&s.g, sizeof s.g, rng);
-    s.fw.cpu.wr8(kStateSourceAt, (uint8_t)(rng() % kSources));
-    s.fw.cpu.wr32(kUnreceivedAt, (uint32_t)rng());
+    settingsDrawStates(s, rng);
     return settingsCaseOf<kDispatchEvents, kV293Rows, kHeldFlags>(s, rng, events, calls);
 }
 
