@@ -72,7 +72,9 @@ std::string settingsDifference(SettingsSides& s) {
         { kModesAt, &t.modes, sizeof t.modes, "mode rows" },
         { kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes, "nodes" }, { kMatrixAt, &s.g, sizeof s.g, "G" },
         { kHeldNoteAt, &t.heldNote, sizeof t.heldNote, "the held note" },
-        { kVoiceCountsAt, t.voiceCounts.data(), sizeof t.voiceCounts, "the voices' counts" } });
+        { kVoiceCountsAt, t.voiceCounts.data(), sizeof t.voiceCounts, "the voices' counts" },
+        { kChordMemoryAt, &t.chordMemory, sizeof t.chordMemory, "ChordMemory Switch's last read" },
+        { kHoldLiftsAt, t.holdLifts.data(), sizeof t.holdLifts, "the Hold-release bytes" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -135,8 +137,8 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
-    different += settingsRunPart(s, run, kMessagePartRow);
-    return different + settingsRunPart(s, run, kReceivePartRow);
+    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow }) different += settingsRunPart(s, run, *p);
+    return different + settingsRunPart(s, run, kRoutingPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

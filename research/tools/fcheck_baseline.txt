@@ -848,6 +848,7 @@ static M: 16000 events: 8143 static initializers, 7857 part inits (16000 calls)
 system readers: 16000 events: 3926 Time Trip assigns, 3969 Patch Remains, 4041 voices' counts, 4064 budgets (52802 calls)
 messages: 16000 events: 6349 by kind, 3246 the part's, 3212 held note switches, 3193 node classes (72332 calls)
 receive channel: 16000 events: 8083 parts' channels, 3938 part 0's, 3979 system messages, 19230 controllers heard, 3200 held notes on (152236 calls)
+routing reset: 16000 events: 10739 resets, 5261 kind 0's messages, 8815 all notes off heard (345138 calls)
 settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
 xt_vc2settings: 0 different
 == xt_tone msm

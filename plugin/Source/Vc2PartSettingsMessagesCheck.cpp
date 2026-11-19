@@ -24,13 +24,12 @@ SettingsCall requested(Sh4& c) { return { kOutReloadRequest, 0, 0, 0, (int32_t)c
 SettingsCall ran(Sh4& c) { return { kOutReloadRun, 0, 0, 0, (int32_t)((c.r[4] - kReloadObjects) / kReloadBytes) }; }
 SettingsCall received(Sh4&) { return { kOutReceive, 0, 0, 0, 0 }; }
 SettingsCall routed(Sh4& c) { return { kOutRouting, 0, 0, 0, (int32_t)c.r[5] }; }
-SettingsCall truncatedAll(Sh4&) { return { kOutTruncateAll, 0, 0, 0, 0 }; }
 uint32_t receiveAnswer(SettingsSides& s) { return s.outs.answers[0] ? 1u : 0u; }
 uint32_t routingAnswer(SettingsSides& s) { return s.outs.answers[1] ? 1u : 0u; }
 constexpr SettingsCallee kParameterCallees[] = { { 0x8939af40, requested }, { 0x8939af10, ran },
                                                  { 0x89393fb0, received, receiveAnswer },
                                                  { 0x89393e30, routed, routingAnswer },
-                                                 { 0x89391120, truncatedAll }, kSettingsStopCallee };
+                                                 kSettingsTruncateAllCallee, kSettingsStopCallee };
 
 void hookParameterCalls(SettingsSides& s) {
     s.rom.store.narrow = kMatrixNarrow;
@@ -89,6 +88,7 @@ constexpr SettingsSaid kMessageSaid[] = { { 43, "by kind" }, { 44, "the part's" 
 } // namespace
 
 const SettingsPartRow kMessagePartRow { 10, &SettingsCounts::messageEvents, &SettingsCounts::messageCalls,
-                                        settingsWorldCaseOf<kMessageEvents, false>, nullptr, hookParameterCalls,
+                                        settingsWorldCaseOf<kMessageEvents, false, kV298Rows>, nullptr,
+                                        hookParameterCalls,
                                         "messages", kMessageSaid };
 #endif

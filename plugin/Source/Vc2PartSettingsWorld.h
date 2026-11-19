@@ -9,8 +9,9 @@
 
 // A case: the nodes noise, their object indices within rom.4's table and, with `Lists` (v298), their sources, channels
 // and lists drawn as xt_vc2keys' second part draws them; G, the keys, the part objects and the class bytes noise (the
-// indices within the table), the channel states' sources drawn, then the tables' and the events
-template <const auto& Events, bool Lists>
+// indices within the table), the channel states' sources drawn, then the tables' (noise up to `Noised` bytes in, from
+// v299) and the events
+template <const auto& Events, bool Lists, size_t Noised>
 std::string settingsWorldCaseOf(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
     Vc2PartNodes& n = s.nodes;
     settingsNoise(n.nodes.data(), sizeof n.nodes, rng);
@@ -25,7 +26,7 @@ std::string settingsWorldCaseOf(SettingsSides& s, std::mt19937& rng, long& event
     s.fw.cpu.write(Vc2PartNodes::kObjectsAt, n.objects.data(), sizeof n.objects);
     s.fw.cpu.write(Vc2PartNodes::kClassesAt, n.classes.data(), sizeof n.classes);
     settingsDrawStates(s, rng);
-    return settingsCaseOf<Events, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
+    return settingsCaseOf<Events, Noised, 5>(s, rng, events, calls);
 }
 
 // A routine on both sides with the world it reaches, the port's `mine(w)` giving the answer when the routine has one

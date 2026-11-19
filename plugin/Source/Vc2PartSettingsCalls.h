@@ -51,6 +51,7 @@ public:
     float unvoiceLevel = 0.0f;
     std::array<bool, 2> answers {};   // v297: the receive channel's and the routing reset's, drawn for both sides
     std::function<bool()> receiving {};   // v298: the port's own receive channel, where rom.4's runs its own
+    std::function<bool(bool)> routed {};  // v299: the port's own routing reset, the same
     void reloadRequest(int part) override { logOut(log_, kOutReloadRequest, (uint32_t)part); }
     void reloadRun(int part) override { logOut(log_, kOutReloadRun, (uint32_t)part); }
     bool receive() override {
@@ -60,6 +61,7 @@ public:
     }
     void heldNoteOn() override { logOut(log_, kOutHeldNoteOn, 0); }
     bool routing(bool on) override {
+        if (routed) return routed(on);
         logOut(log_, kOutRouting, on ? 1u : 0u);
         return answers[1];
     }

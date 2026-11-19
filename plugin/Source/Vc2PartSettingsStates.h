@@ -21,6 +21,22 @@ inline constexpr auto kMatrixNarrow = [] {
     return n;
 }();
 
+// [FW] Part 1 Receive Switch and Channel, two IDs a part (the twelfth part's, v298; shared with the thirteenth from
+// v299): each part's switch 0 or 1 half the time, its channel −1…17 always, both sides of 0…15 (a channel below −2
+// reads past rom.4's lists, and −2's every-list moves are xt_vc2keys')
+inline constexpr int16_t kReceiveSwitchId = 71, kReceiveChannelId = 72, kReceiveIds = 2;
+inline constexpr uint32_t kReceiveChannelsDrawn = 19;
+inline constexpr int32_t kReceiveChannelFrom = -1;
+inline constexpr auto kReceiveNarrow = [] {
+    std::array<SettingsNarrow, (size_t)(kReceiveIds * kSettingsParts)> n {};
+    for (int p = 0; p < kSettingsParts; ++p) {
+        n[(size_t)(kReceiveIds * p)] = { (int16_t)(kReceiveSwitchId + kReceiveIds * p), 2, kHalfTheTime };
+        n[(size_t)(kReceiveIds * p + 1)] = { (int16_t)(kReceiveChannelId + kReceiveIds * p), kReceiveChannelsDrawn,
+                                             kAlways, kReceiveChannelFrom };
+    }
+    return n;
+}();
+
 // The port's two sources, read where rom.4 reads them
 class SettingsPortStates final : public Vc2ChannelStates {
 public:

@@ -1546,6 +1546,50 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's routing reset (2026-11-19, v299) {#vc2-part-routing-reset}
+
+Step 4.3's twenty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's fourth part): the routine kind 0's
+parameters' message (v297) runs with its second byte's flag 0x80, on `Vc2PartSettings` (`routing`, in
+`Vc2PartSettingsReceive.cpp` beside the receive channel it calls), checked by `xt_vc2settings`' thirteenth part.
+
+**The routing's reset** `0x89393e30(…, flag)` (its first argument handed on to the receive channel, unread there):
+- ChordMemory Switch (ID 55) on the system's fourth read object (`0x893206f0`, v298's), against its last read, the
+  word `0x8993d03c`; a change is stored there and all notes off is sent (`0x89391e30`, the notes' task's event 0x80).
+- With the flag 0 it answers 1 there.
+- With it set, for each source (0…3), part (0…15) and each of the part's two glides: the node of the source and part
+  moved to no channel (`0x89393100(node, −1, −1)`: given no source, a node ends on no channel, so the second move finds
+  nothing to do), the glide aimed at the spare table `0x89988620` and reset (`0x893923c0`, v276's P reset, which leaves
+  its table word alone).
+- Then for each channel (0…15) its byte at `0x899893e0` set to 1 and the four sources' key tables of that channel reset
+  (`0x89392040`, v276's). The byte lets the Hold pedal's release (a value below 64) be heard on that channel: with it 0,
+  `0x89393980` takes no Hold-off there; the constructor `0x893939e0` sets all 16 to 1 as well.
+- Then part 0's receive channel (`0x89393fd0(…, 0)`, v298's), which answers 1, so it goes on (with 0 it would answer 0).
+- Then `0x89392820(0x899888ac, 0)`, a bare answer of 0, chooses the held class (`0x893932c0`, v293's) for part 0's node of
+  source 1 over the plain (`0x89393310`).
+- It answers 1 on every way, so kind 0's message always runs the held note's switch after it.
+
+The two words are `Vc2PartRows::chordMemory` and `holdLifts`. The messages reach the reset through
+`Vc2SettingsParts::routing` (v297's), which the wiring gives `Vc2PartSettings::routing`.
+
+**The check.** `xt_vc2settings`' thirteenth part, on the seed twelve after the run's. Each case gives every table
+(v299's words too), G, the keys, the part objects and the class bytes noise, and the nodes' sources, channels and lists
+drawn as the twelfth part's. Before each event, ChordMemory Switch's last read is set to the store's answer half the
+time (no change heard), and the held note's word is 0 half the time, else 1 or any. The store gives ChordMemory Switch
+0 or 1 half the time, the receive channel's IDs as the twelfth part's (`kReceiveNarrow`, now in
+`Vc2PartSettingsStates.h`), and the Matrix Controls' Sens as the seventh's (kind 0's way runs the Matrix's settings).
+The controller, all notes off, the held note's event, every voice's truncation and a node's voices' stop are hooked to
+log (all now shared callees); the eleventh part's hook on `0x89393e30` is taken off. Events: the reset alone (its flag
+0 half the time, else 0x80 or any word), and kind 0's message (the flag set half the time) running rom.4's own reset
+against the port's (`SettingsPortOuts::routed`). After each, the tables, the nodes, the lists, the keys' span, the part
+objects, the class bytes, the calls and the reset's answer. The tenth to twelfth parts' noise stops before v299's
+words (`kV298Rows`; `settingsWorldCaseOf` given how far).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first twelve parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsReceive.cpp` is reached.
+- `mutate_vc2.py --settings`: 557 plants, none missed; v299's 23 new (and v298's `receive-glides-one` on the glides'
+  helper its text now names).
+
 ### The VC-2 part's receive channel (2026-11-19, v298) {#vc2-part-receive-channel}
 
 Step 4.3's twenty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's third part): the routine the system's

@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's routing reset v299 (2026-11-19, on claude/vc2-part-4-3 after v298; HARDWARE_FIRMWARE.md, "The VC-2
+  part's routing reset"): step 4.3's twenty-seventh version, item 10's fourth part. On Vc2PartSettings
+  (Vc2PartSettingsReceive.cpp, beside the receive channel it calls): rom.4's 0x89393e30 (ChordMemory Switch, ID 55 on
+  the system's fourth block, against its last read 0x8993d03c, all notes off on a change; with its flag every node to
+  no channel, every glide on the spare table and reset, each channel's Hold-release byte 0x899893e0 set and its four
+  key tables reset, part 0's receive channel, part 0's node of source 1 the held class), answering 1; the two words in
+  Vc2PartRows (chordMemory, holdLifts). xt_vc2settings gains a thirteenth part (Vc2PartSettingsRoutingCheck.cpp), kind
+  0's message on rom.4's own reset against the port's; the receive narrow IDs and five callees shared: 0 different at
+  seeds 2024, 7 and 31337, the first twelve parts' lines unchanged; mutate_vc2.py --settings 557 planted, 0 missed.
+  Not in the sound yet.
+
 The VC-2 part's receive channel v298 (2026-11-19, on claude/vc2-part-4-3 after v297; HARDWARE_FIRMWARE.md, "The VC-2
   part's receive channel"): step 4.3's twenty-sixth version, item 10's third part. On Vc2PartSettings
   (Vc2PartSettingsReceive.cpp): rom.4's 0x89393fd0 for a part (its Receive Switch and Channel on system B's block; the

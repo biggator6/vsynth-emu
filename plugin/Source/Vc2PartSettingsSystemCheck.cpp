@@ -68,6 +68,6 @@ constexpr SettingsSaid kSystemSaid[] = { { 39, "Time Trip assigns" }, { 40, "Pat
 } // namespace
 
 const SettingsPartRow kSystemPartRow { 9, &SettingsCounts::systemEvents, &SettingsCounts::systemCalls,
-                                       settingsCaseOf<kSystemEvents, sizeof(Vc2PartRows), 5>, nullptr, hookSystem,
+                                       settingsCaseOf<kSystemEvents, kV298Rows, 5>, nullptr, hookSystem,
                                        "system readers", kSystemSaid };
 #endif

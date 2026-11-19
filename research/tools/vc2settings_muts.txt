@@ -13,7 +13,9 @@
 # count itself) and vc2settingsmessages (Vc2PartSettingsMessages.cpp, v297) and vc2settingsreceive
 # (Vc2PartSettingsReceive.cpp, v298; its test of part 0 isn't planted: another part's moves leave part 0's node of
 # source 3 as it was, so the test of a change after them says none either way; nor the glides' table by the channel
-# moved onto, which past 15 is −1, the spare table either way).  Not planted: the depth
+# moved onto, which past 15 is −1, the spare table either way; v299's routing reset there too: not its move's channel
+# alone, as with no source a node ends on no channel whatever the channel, nor the receive channel's answer, always
+# 1).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -542,7 +544,7 @@ receive-last-source|constexpr int kLastSource = Vc2PartNodes::kSources - 1;|cons
 receive-table-below|if (channel < 0 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|if (channel < -1 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|vc2settingsreceive
 receive-table-past|if (channel < 0 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|if (channel < 0 \|\| channel > Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|vc2settingsreceive
 receive-table-spare|channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|channel >= Vc2Keys::kChannels) return Vc2Keys::kOwnAt;|vc2settingsreceive
-receive-glides-one|for (int n = 0; n < kGlidesAPart; ++n) keys|for (int n = 0; n < kGlidesAPart - 1; ++n) keys|vc2settingsreceive
+receive-glides-one|for (int n = 0; n < kGlidesAPart; ++n) glideOf(keys, source, part, n).table = table;|for (int n = 0; n < kGlidesAPart - 1; ++n) glideOf(keys, source, part, n).table = table;|vc2settingsreceive
 receive-glides-source|kGlidesASource = kGlidesAPart * Vc2Keys::kChannels;|kGlidesASource = kGlidesAPart * Vc2Keys::kSources;|vc2settingsreceive
 receive-glides-part|kGlidesASource * source + kGlidesAPart * part + n|kGlidesASource * source + part + n|vc2settingsreceive
 receive-unchanged|    if (after == before) return true;|    if (after == before && after == kNoChannel) return true;|vc2settingsreceive
@@ -555,3 +557,26 @@ receive-after-none|    if (after == kNoChannel) return true;|    if (after == 0)
 receive-held-test|    if (w.t.heldNote == 0) {|    if (w.t.heldNote != 1) {|vc2settingsreceive
 receive-held-on|    w.out.heldNoteOn();\n    return true;|    w.out.allNotesOff();\n    return true;|vc2settingsreceive
 receive-part-zero|{ return receiveChannel(w, kPartZero); }|{ return receiveChannel(w, 1); }|vc2settingsreceive
+routing-chord-id|constexpr int16_t kChordMemoryId = 55;|constexpr int16_t kChordMemoryId = 56;|vc2settingsreceive
+routing-chord-block|p_.value(Block::kSystemD, 0, 0, kChordMemoryId);|p_.value(Block::kSystemB, 0, 0, kChordMemoryId);|vc2settingsreceive
+routing-chord-keep|        w.t.chordMemory = chordMemory;\n|\n|vc2settingsreceive
+routing-chord-test|    if (chordMemory != w.t.chordMemory) {|    if (chordMemory > w.t.chordMemory) {|vc2settingsreceive
+routing-chord-notes-off|        w.out.allNotesOff();\n    }\n    if (!on)|    }\n    if (!on)|vc2settingsreceive
+routing-off|    if (!on) return true;|    if (on) return true;|vc2settingsreceive
+routing-off-answer|    if (!on) return true;|    if (!on) return false;|vc2settingsreceive
+routing-sources|    for (int s = 0; s < Vc2PartNodes::kSources; ++s)\n        for (int p|    for (int s = 0; s < Vc2PartNodes::kSources - 1; ++s)\n        for (int p|vc2settingsreceive
+routing-parts|for (int p = 0; p < Vc2PartNodes::kParts; ++p) release(w, s, p);|for (int p = 0; p < Vc2PartNodes::kParts - 1; ++p) release(w, s, p);|vc2settingsreceive
+release-move-onto|addressOf(source + 1, part), kNoSource, kNoChannel);|addressOf(source + 1, part), source, 0);|vc2settingsreceive
+release-node-part|addressOf(source + 1, part), kNoSource, kNoChannel);|addressOf(source + 1, 0), kNoSource, kNoChannel);|vc2settingsreceive
+release-spare|        g.table = Vc2Keys::kSpareAt;|        g.table = Vc2Keys::kOwnAt;|vc2settingsreceive
+release-no-reset|        g.reset();\n|\n|vc2settingsreceive
+release-glides|    for (int n = 0; n < kGlidesAPart; ++n) {\n        w.nodes.move|    for (int n = 0; n < kGlidesAPart - 1; ++n) {\n        w.nodes.move|vc2settingsreceive
+release-glide-n|        Vc2KeyGlide& g = glideOf(w.keys, source, part, n);|        Vc2KeyGlide& g = glideOf(w.keys, source, part, 0);|vc2settingsreceive
+routing-hold-lift|        w.t.holdLifts[static_cast<size_t>(c)] = 1;|        w.t.holdLifts[static_cast<size_t>(c)] = 0;|vc2settingsreceive
+routing-key-channels|    for (int c = 0; c < Vc2Keys::kChannels; ++c) {|    for (int c = 0; c < Vc2Keys::kChannels - 1; ++c) {|vc2settingsreceive
+routing-key-sources|        for (int s = 0; s < Vc2Keys::kSources; ++s)\n            w.keys.table|        for (int s = 0; s < Vc2Keys::kSources - 1; ++s)\n            w.keys.table|vc2settingsreceive
+routing-key-reset|static_cast<uint32_t>(c))).reset();|static_cast<uint32_t>(c))).clear();|vc2settingsreceive
+routing-no-receive|    receiveChannel(w, kPartZero);\n    w.nodes.install|    w.nodes.install|vc2settingsreceive
+routing-receive-part|    receiveChannel(w, kPartZero);\n    w.nodes.install|    receiveChannel(w, 1);\n    w.nodes.install|vc2settingsreceive
+routing-class|Vc2NodeClass::kHeld, w.keys);\n    return true;|Vc2NodeClass::kPlain, w.keys);\n    return true;|vc2settingsreceive
+routing-class-node|w.nodes.install(Vc2PartNodes::addressOf(1, kPartZero)|w.nodes.install(Vc2PartNodes::addressOf(2, kPartZero)|vc2settingsreceive

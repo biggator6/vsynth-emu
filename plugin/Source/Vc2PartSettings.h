@@ -60,6 +60,10 @@ struct Vc2PartRows {
     std::array<int8_t, 2> tripAssigns {};
     uint8_t patchRemain = 0;
     std::array<int16_t, 4> voiceCounts {};
+    // v299: ChordMemory Switch as last read (0x8993d03c); each channel's byte (0x899893e0) that lets the Hold pedal's
+    // release (below 64) be heard there (0x89393980), 1 after the routing's reset
+    int32_t chordMemory = 0;
+    std::array<uint8_t, 16> holdLifts {};
 };
 
 // What the vocoder reader hands on (v290): kind 6's Unvoice Level, the part mixer's setters and targets, Auto Note's
@@ -90,8 +94,8 @@ public:
     virtual void setPowerOffset(int32_t power) = 0;                                            // 0x89391260
     // v297, the parameters' messages': the reload task's request and run for a part (by its object at 0x89996120 + 24
     // × part), part 0's receive channel and the routing's reset (each answering whether it changed anything; the
-    // receive channel's always 1, v298's `Vc2PartSettings::receive`, which the wiring gives here), and every sounding
-    // voice truncated
+    // receive channel's always 1, v298's `Vc2PartSettings::receive`, which the wiring gives here; the routing's reset's
+    // always 1 too, v299's `Vc2PartSettings::routing`), and every sounding voice truncated
     virtual void reloadRequest(int part) = 0;                                                  // 0x8939af40
     virtual void reloadRun(int part) = 0;                                                      // 0x8939af10
     virtual bool receive() = 0;                                                                // 0x89393fb0
@@ -187,6 +191,9 @@ public:
     // their glides on the key tables; part 0's source 3 channel's change heard) and part 0's, each answering 1
     bool receiveChannel(Vc2PartWorld& w, int part);                       // 0x89393fd0
     bool receive(Vc2PartWorld& w);                                        // 0x89393fb0
+    // v299, the same file: the routing's reset (ChordMemory Switch's change heard; with `on`, every node to no
+    // channel, every glide and key table reset, part 0's receive channel, its node's held class), answering 1
+    bool routing(Vc2PartWorld& w, bool on);                               // 0x89393e30
 
 private:
     void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)

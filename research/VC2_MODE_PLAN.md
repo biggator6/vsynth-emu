@@ -791,6 +791,12 @@ version against rom.4's routines with what it calls hooked:
          `0x89393fb0`, each answering 1; the event through `Vc2SettingsParts::heldNoteOn`; xt_vc2settings' twelfth
          part (HARDWARE_FIRMWARE.md, "The VC-2 part's receive channel"). Next: the routing's reset `0x89393e30`, the
          reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the controllers.
+       - the routing's reset done (v299): `0x89393e30` (ChordMemory Switch's change against `0x8993d03c`, all notes
+         off; with its flag every node to no channel, every glide on the spare table and reset, each channel's
+         Hold-release byte at `0x899893e0` set and its key tables reset, part 0's receive channel, part 0's node of
+         source 1 the held class), answering 1; xt_vc2settings' thirteenth part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's routing reset"). Next: the reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the
+         controllers.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

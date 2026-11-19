@@ -16,23 +16,8 @@ namespace {
 constexpr uint32_t kReceiveChannel = 0x89393fd0, kReceive = 0x89393fb0, kMessages = 0x89392890;   // [FW]
 constexpr uint32_t kMessageAt = kVc2Args;
 constexpr uint8_t kSystemKind = 4;   // [FW] the system's parameters' message, whose way runs part 0's receive channel
-// [FW] Part 1 Receive Switch and Channel, two IDs a part
-constexpr int16_t kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;
-constexpr uint32_t kChannelsDrawn = 19;
-constexpr int32_t kChannelFrom = -1;
-constexpr auto kReceiveNarrow = [] {
-    std::array<SettingsNarrow, (size_t)(kIdsAPart * kSettingsParts)> n {};
-    for (int p = 0; p < kSettingsParts; ++p) {
-        n[(size_t)(kIdsAPart * p)] = { (int16_t)(kSwitchId + kIdsAPart * p), 2, kHalfTheTime };
-        n[(size_t)(kIdsAPart * p + 1)] = { (int16_t)(kChannelId + kIdsAPart * p), kChannelsDrawn, kAlways,
-                                           kChannelFrom };
-    }
-    return n;
-}();
-
-SettingsCall heldOn(Sh4&) { return { kOutHeldNoteOn, 0, 0, 0, 0 }; }
 constexpr SettingsCallee kReceiveCallees[] = { kSettingsControllerCallee, kSettingsNotesOffCallee,
-                                               { 0x89391e50, heldOn }, kSettingsStopCallee };
+                                               kSettingsHeldOnCallee, kSettingsStopCallee };
 constexpr uint32_t kReceiveOwn[] = { kReceive };
 
 void hookReceive(SettingsSides& s) {
@@ -97,6 +82,6 @@ constexpr SettingsSaid kReceiveSaid[] = { { 47, "parts' channels" }, { 48, "part
 } // namespace
 
 const SettingsPartRow kReceivePartRow { 11, &SettingsCounts::receiveEvents, &SettingsCounts::receiveCalls,
-                                        settingsWorldCaseOf<kReceiveEvents, true>, nullptr, hookReceive,
+                                        settingsWorldCaseOf<kReceiveEvents, true, kV298Rows>, nullptr, hookReceive,
                                         "receive channel", kReceiveSaid };
 #endif

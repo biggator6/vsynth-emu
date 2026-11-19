@@ -4,7 +4,11 @@
 // (0x89318a20 leaves its record's first byte 0 on every way, so 0x89318a90 answers 0 and the held class's install
 // after it, 0x89393310, is never reached; the bank's count 0x893273c0 it reads is only compared), so only the reads
 // are kept; each source's node moved and its two glides aimed; for part 0, source 3's channel's change heard.  Both
-// routines answer 1 on every way.
+// routines answer 1 on every way.  And (v299) the routing's reset 0x89393e30, which calls the receive channel for part
+// 0: ChordMemory Switch's change; with its flag every node to no channel, their glides on the spare table and reset
+// (each node moved once a glide, as rom.4 does, the second move finding nothing to do), then by channel its Hold-release
+// byte and the four sources' key tables reset, the receive channel (whose 1 lets it go on), and part 0's node of source 1
+// given the held class (0x89392820, a bare answer of 0, chooses it over the plain).  It answers 1 on every way.
 #include "Vc2PartSettings.h"
 #include <utility>
 
@@ -12,8 +16,9 @@ namespace {
 using Block = Vc2ParamBlock;
 constexpr int16_t kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;   // [FW] Part 1 Receive Switch and Channel
 constexpr int16_t kRecordIds[] = { 0, 1, 2, 52 };                   // [FW] 0x89320700's, given 0
+constexpr int16_t kChordMemoryId = 55;                              // [FW] ChordMemory Switch, the system's fourth
 constexpr int kGlidesAPart = 2, kGlidesASource = kGlidesAPart * Vc2Keys::kChannels;
-constexpr int32_t kNoChannel = -1;
+constexpr int32_t kNoChannel = -1, kNoSource = -1;
 // [FW] source 4's glides are aimed at its channel 0's table whatever the channel; the others' at their table for it,
 // the spare one off 0…15
 constexpr int kLastSource = Vc2PartNodes::kSources - 1;
@@ -28,9 +33,25 @@ uint32_t tableFor(int source, int32_t channel) {
     return Vc2Keys::tableAt(static_cast<uint32_t>(source), static_cast<uint32_t>(channel));
 }
 
-// A part's two glides of `source` (less 1), aimed at `table`
+// A part's glide `n` of `source` (less 1)
+Vc2KeyGlide& glideOf(Vc2Keys& keys, int source, int part, int n) {
+    return keys.glides[kGlidesASource * source + kGlidesAPart * part + n];
+}
+
+// A part's two glides of `source`, aimed at `table`
 void aim(Vc2Keys& keys, int source, int part, uint32_t table) {
-    for (int n = 0; n < kGlidesAPart; ++n) keys.glides[kGlidesASource * source + kGlidesAPart * part + n].table = table;
+    for (int n = 0; n < kGlidesAPart; ++n) glideOf(keys, source, part, n).table = table;
+}
+
+// The routing's reset of a part's node of `source`: for each of its glides the node moved to no channel, the glide on
+// the spare table and reset
+void release(Vc2PartWorld& w, int source, int part) {
+    for (int n = 0; n < kGlidesAPart; ++n) {
+        w.nodes.move(Vc2PartNodes::addressOf(source + 1, part), kNoSource, kNoChannel);
+        Vc2KeyGlide& g = glideOf(w.keys, source, part, n);
+        g.table = Vc2Keys::kSpareAt;
+        g.reset();
+    }
 }
 } // namespace
 
@@ -60,3 +81,22 @@ bool Vc2PartSettings::receiveChannel(Vc2PartWorld& w, int part) {
 }
 
 bool Vc2PartSettings::receive(Vc2PartWorld& w) { return receiveChannel(w, kPartZero); }
+
+bool Vc2PartSettings::routing(Vc2PartWorld& w, bool on) {
+    const int32_t chordMemory = p_.value(Block::kSystemD, 0, 0, kChordMemoryId);
+    if (chordMemory != w.t.chordMemory) {
+        w.t.chordMemory = chordMemory;
+        w.out.allNotesOff();
+    }
+    if (!on) return true;
+    for (int s = 0; s < Vc2PartNodes::kSources; ++s)
+        for (int p = 0; p < Vc2PartNodes::kParts; ++p) release(w, s, p);
+    for (int c = 0; c < Vc2Keys::kChannels; ++c) {
+        w.t.holdLifts[static_cast<size_t>(c)] = 1;
+        for (int s = 0; s < Vc2Keys::kSources; ++s)
+            w.keys.table(Vc2Keys::tableAt(static_cast<uint32_t>(s), static_cast<uint32_t>(c))).reset();
+    }
+    receiveChannel(w, kPartZero);
+    w.nodes.install(Vc2PartNodes::addressOf(1, kPartZero), Vc2NodeClass::kHeld, w.keys);
+    return true;
+}
