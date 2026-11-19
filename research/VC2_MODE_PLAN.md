@@ -736,6 +736,12 @@ version against rom.4's routines with what it calls hooked:
         the Harm Formant's three; xt_vc2settings' fourth part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID:
         the OSC block's reader"). The VC-2 takes part 0 alone on this path (the handler `0x89392830`). Left: the mode
         row, `0x893a72f0`, the dispatchers, the Category and budget and the nodes.
+      - the vocoder reader done (v290): `0x893a72f0`, the vocoder's settings struct (Formant Shift's ratio by powf, a
+        template's offsets from rom.4's records when Auto Note is on with an EXTIN OSC), Unvoice Level into kind 6's
+        global, the part mixer's Direct Sound and sends and its targets, Auto Note's switch and legato, robot human
+        depth, the vocoder's mode and settings, through `Vc2SettingsParts`; xt_vc2settings' fifth part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the vocoder reader"). Left: the mode row, `0x89396f90`,
+        the dispatchers, the Category and budget and the nodes.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

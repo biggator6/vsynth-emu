@@ -12,7 +12,9 @@ using Settings = Vc2PartSettings;
 using Block = Vc2ParamBlock;
 constexpr uint32_t kHeldAt = 0x8993d0c0, kGetter = 0x89324350, kTypedGetter = 0x89324370;    // [FW]
 constexpr int16_t kCosmTypeId = 0x463;                       // [FW] a COSM input's type, 0…16 (the run table's)
-constexpr int16_t kOscTypeIds[] = { 0x2e5, 0x319 };          // [FW] the OSCs' Types, drawn 0…3 half the time (v289)
+// [FW] IDs drawn within a few values half the time: the OSCs' Types 0…3 (v289), Formant Template 0…17 (v290), either
+// side of the templates' 16
+constexpr std::pair<int16_t, uint32_t> kNarrowIds[] = { { 0x2e5, 4 }, { 0x319, 4 }, { 0x1a0, 18 } };
 constexpr uint32_t kLfoWords = 0x3200, kTvaWords = 0x1804;   // the tables' words; the bytes past them by hand
 constexpr uint32_t kHandle = 0x01000000;                     // a handle: block << 16, part << 8, kind << 2, COSM
 
@@ -60,7 +62,9 @@ std::string settingsDifference(SettingsSides& s) {
         { kEnvelopesAt, &t.envelopes, sizeof t.envelopes, "envelopes" }, { kLfosAt, &t.lfos, kLfoWords, "LFOs" },
         { kMixesAt, &t.mixes, sizeof t.mixes, "mix" }, { kTvasAt, &t.tvas, kTvaWords, "TVAs" },
         { kBytesAt, &t.bytes, sizeof t.bytes, "bytes" }, { kCosmsAt, &t.cosms, sizeof t.cosms, "COSM inputs" },
-        { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" }, { kStepsAt, &t.steps, sizeof t.steps, "step counts" } });
+        { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" }, { kStepsAt, &t.steps, sizeof t.steps, "step counts" },
+        { kRobotAt, &t.robot, sizeof t.robot, "robot human depth" },
+        { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -120,7 +124,7 @@ const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCount
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
-    return different;
+    return different + settingsRunPart(s, run, kVocoderPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -154,7 +158,8 @@ int32_t SettingsStore::value(const SettingsCall& c) const {
     const uint32_t pick = h & 7, v = h >> 3;
     if (c.block == kOscBlockCall) return v % 64 == 0 ? 0 : pick < 6 ? 1 : (int32_t)(h | 0x100);
     if (c.id == kCosmTypeId) return (int32_t)(v % Vc2PartSettingsTables::kCosmTypes);
-    if (std::ranges::count(kOscTypeIds, c.id) != 0 && pick < 4) return (int32_t)(v % 4);
+    for (const auto& [id, values] : kNarrowIds)
+        if (c.id == id && pick < 4) return (int32_t)(v % values);
     if (pick < 4) return (int32_t)(v % 128);
     if (pick < 6) return (int32_t)(v % 129) - 64;
     return pick == 6 ? kEdges[v % std::size(kEdges)] : (int32_t)(h * 2654435761u);
@@ -173,6 +178,17 @@ long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow&
         [&](std::mt19937& rng) { return p.oneCase(s, rng, n.*p.events, n.*p.calls); });
     p.say(n);
     return different;
+}
+
+void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value) {
+    log.push_back({ what, 0, 0, 0, (int32_t)value });
+}
+
+void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo) {
+    constexpr int kPivots = 4, kPivotWords = 2;   // [FW] +0x10, +0x14
+    for (int k = 0; k < kSettingsWords; ++k)
+        if (k < kPivots || k >= kPivots + kPivotWords) log.push_back({ kOutSettings, 0, k, 0, (int32_t)words[k] });
+    log.push_back({ kOutSettings, 0, kStereoIndex, 0, stereo });
 }
 
 uint32_t SettingsSides::romRead(Sh4& c, const SettingsCall& call) {
@@ -216,7 +232,7 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 }
 
 int main(int argc, char** argv) {
-    const Vc2CheckStart start { "xt_vc2settings", vc2LoadPartSettings,
+    const Vc2CheckStart start { "xt_vc2settings", vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath>,
                                 { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" } };
     return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts, settingsMoreParts);
 }

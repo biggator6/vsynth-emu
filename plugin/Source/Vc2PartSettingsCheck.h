@@ -6,8 +6,11 @@
 // Vc2PartSettingsOscCheck.cpp).  XT_VC2SETTINGS_MAIN only.
 #include "Vc2CheckCalls.h"
 #include "Vc2CheckMain.h"
+#include "Vc2LibMathTables.h"
 #include "Vc2PartSettings.h"
 #include "Vc2PartSettingsTables.h"
+#include <bit>
+#include <cstring>
 #include <vector>
 
 // [FW] the tables, rom.4's
@@ -16,6 +19,7 @@ inline constexpr uint32_t kMixesAt = 0x89e32a60, kTvasAt = 0x89e4987c, kControls
 inline constexpr uint32_t kBytesAt = 0x89998a14, kCosmsAt = 0x89e2003c;   // v287's
 inline constexpr uint32_t kOscsAt = 0x89e371e0;                            // v288's
 inline constexpr uint32_t kStepsAt = 0x89989c84;                           // v289's: part 0's step counts
+inline constexpr uint32_t kRobotAt = 0x89997fdc, kUnvoiceLevelAt = 0x899d9968;   // v290's
 inline constexpr int kSettingsParts = 16, kSettingsKinds = 16, kEventsACase = 400;
 // [FW] The OSC block's reader, hooked in the first three parts (v288), and its call as the log has it then, a block
 // past the read objects'
@@ -59,12 +63,45 @@ private:
     SettingsReads& reads_;
 };
 
+// The vocoder reader's calls out as the log has them (v290): a block past the reads', the value's bits as the ID;
+// the settings struct a word each by its index as the kind (the pivots, +0x10 and +0x14, left out: rom.4 hands the
+// stack's leftovers there, which the settings path writes before reading), the stereo flag as index 15
+inline constexpr int32_t kOutDirect = 10, kOutReverb = 11, kOutMfx = 12, kOutTargets = 13, kOutAutoNote = 14;
+inline constexpr int32_t kOutLegato = 15, kOutMode = 16, kOutSettings = 17;
+inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
+void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
+void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
+
+// The port's calls out: each logged as rom.4's hooks log theirs, Unvoice Level kept to compare with rom.4's word
+class SettingsPortOuts final : public Vc2SettingsParts {
+public:
+    explicit SettingsPortOuts(SettingsReads& reads) : log_(reads.log) {}
+    float unvoiceLevel = 0.0f;
+    void setUnvoiceLevel(float v) override { unvoiceLevel = v; }
+    void setDirect(float v) override { logOut(log_, kOutDirect, std::bit_cast<uint32_t>(v)); }
+    void setReverbSend(float v) override { logOut(log_, kOutReverb, std::bit_cast<uint32_t>(v)); }
+    void setMfxSend(float v) override { logOut(log_, kOutMfx, std::bit_cast<uint32_t>(v)); }
+    void mixerTargets() override { logOut(log_, kOutTargets, 0); }
+    void setAutoNote(int32_t on) override { logOut(log_, kOutAutoNote, (uint32_t)on); }
+    void setAutoNoteLegato() override { logOut(log_, kOutLegato, 0); }
+    void setVocoderMode(int32_t mode) override { logOut(log_, kOutMode, (uint32_t)mode); }
+    void vocoderSettings(Vc2VocoderSettings& s, int32_t stereo) override {
+        uint32_t words[kSettingsWords];
+        std::memcpy(words, &s, sizeof words);
+        logSettingsWords(log_, words, stereo);
+    }
+
+private:
+    std::vector<SettingsCall>& log_;
+};
+
 struct SettingsCounts {
     long events = 0, calls = 0, gaveUp = 0, flipped = 0;
     long moreEvents = 0, moreCalls = 0;   // the second part's (v287)
     long oscEvents = 0, oscCalls = 0;     // the third's (v288)
     long blockEvents = 0, blockCalls = 0; // the fourth's (v289)
-    std::array<long, 26> byEvent {};
+    long vocoderEvents = 0, vocoderCalls = 0, extin = 0, offsets = 0;   // the fifth's (v290)
+    std::array<long, 27> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -76,6 +113,7 @@ struct SettingsSides {
     SettingsReads rom {}, mine {};
     SettingsPortParams params { mine };
     Vc2PartSettings settings { params };
+    SettingsPortOuts outs { mine };   // v290
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -101,8 +139,9 @@ struct SettingsPartRow {
 // Its cases, its line, how many differ
 long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow& p);
 // The third part (v288): the OSC table's readers, the block reader hooked; the fourth (v289): rom.4's own
-// (Vc2PartSettingsOscCheck.cpp)
+// (Vc2PartSettingsOscCheck.cpp); the fifth (v290): the vocoder reader (Vc2PartSettingsVocoderCheck.cpp)
 extern const SettingsPartRow kOscPartRows[2];
+extern const SettingsPartRow kVocoderPartRow;
 
 using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
 
@@ -165,6 +204,8 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kCosmsAt, &t.cosms, sizeof t.cosms);
     s.fw.cpu.write(kOscsAt, &t.oscs, sizeof t.oscs);
     s.fw.cpu.write(kStepsAt, &t.steps, sizeof t.steps);
+    s.fw.cpu.write(kRobotAt, &t.robot, sizeof t.robot);
+    s.fw.cpu.write(kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);

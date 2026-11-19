@@ -1546,6 +1546,59 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the vocoder reader (2026-11-19, v290) {#vc2-part-settings-vocoder}
+
+Step 4.3's eighteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's fifth part): `0x893a72f0(0x89997fdc, part)`, the
+reader that sets up the vocoder, the part mixer's levels and Auto Note. It is on `Vc2PartSettings`
+(`Vc2PartSettingsVocoder.cpp`) and checked by `xt_vc2settings`' fifth part. What it hands on goes through
+`Vc2SettingsParts`, which the wiring gives the objects already ported.
+
+**The reader**, in rom.4's order (flag 0 tested before and after; the part's block first):
+- **Formant Shift** (0x19f): its value as a float, 1 for 0, gives the ratio 2^(x × 1/63 − 64/63). That is one FMAC
+  (the product, then the sum) and rom.4's powf (`vc2LibPow`). Both sides' ratios take it.
+- **The settings struct** (`Vc2VocoderSettings`, on rom.4's stack):
+  - Vocoder Sound Level, Vocoder Depth and Unvoice Level, each × 1/127;
+  - Unvoice Detect + 24, and Unvoice Spread as 0 or 1;
+  - Env Attack, Env Release and Formant Template as they are; Hold Dump Time × 1/127.
+
+  The pivots (+0x10, +0x14) are never written: rom.4 hands the stack's leftovers, and the settings path sets both
+  before anything reads them.
+- **Unvoice Level** goes into kind 6's global `0x899d9968` too. Direct Sound Level × 1/127 goes to the part mixer's
+  setter `0x893b1eb0`.
+- **Kind 0's sends** (flag 1): its first block's Reverb and MFX Sends (0x2e2, 0x2e0) × 1/127 go to `0x893b1ec0` and
+  `0x893b1ed0`, and its first OSC's Type is read. Then the mixer's targets (`0x893b1ee0`) are called, whatever the
+  flag. Flag 1 is tested again, and kind 1's first OSC's Type is read.
+- **Auto Note**, when either kind's first OSC is EXTIN (Type 2):
+  - it reads Auto Note On Switch, Legato Switch (read and dropped) and robot human depth; the last × 1/127 goes into
+    `0x89997fdc`;
+  - Auto Note's switch (`0x893ebc20`) takes the On Switch, and its legato setter (`0x893ebc60`) is called with 0;
+  - with the On Switch above 0 and Formant Template below 16, each side's offset is a record's float on the same
+    scale as Formant Shift: x × 1/63 − 64/63. The records are 140 bytes each at `0x89540904`, the float at +8;
+    template T takes record T on the left and T + 16 on the right (`Vc2PartSettingsTables`).
+
+  Otherwise `0x89997fdc` is 0, Auto Note's switch gets 0 and the legato setter is called; the offsets are 0.
+- **The vocoder's mode** (`0x893b1c00` → `0x893f0600`) is (Vocoder Type + 1) × Vocoder Sw. Its settings
+  (`0x893b1be0` → `0x893f06a0`) take the struct, and the mixer keeps Stereo Process Sw == 1 (its word `eac8`).
+
+It answers flag 0 clear. The pool's three floats (−64/63, 1/63, 1/127) are read from rom.4 by
+`Vc2PartSettingsTables`, with the records' 32 floats.
+
+**The check.** It is `xt_vc2settings`' fifth part, on the seed four after the run's, so the earlier parts' draws and
+lines are as they were. rom.4's powf runs as its own. The eight callees are hooked to log their values among the reads:
+the setters' floats as bits, the targets, Auto Note's two, the mode, the settings struct word for word without the
+pivots, and the stereo flag. The port's calls out log the same through `SettingsPortOuts`. `0x89997fdc` and
+`0x899d9968` are compared as memory in every part. Each case is noise in every table, then 400 events of the reader
+on a drawn part. The store gives the OSCs' Types 0…3 half the time, so about one event in five has an EXTIN OSC, and
+Formant Template 0…17 half the time, either side of the templates' 16.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first four parts' lines as they were. At seed
+  2024, 3,479 events had an EXTIN OSC and 542 a template's offsets.
+- Every line and branch of `Vc2PartSettingsVocoder.cpp` is reached.
+- `mutate_vc2.py --settings`: 297 plants, none missed; v290's 42 new. The templates' bound by one is not planted:
+  template 15's two records hold 64, an offset of 0. A first run missed a bound at 15, which is why; it also showed
+  that Formant Template below 16 was drawn too seldom, so the store now draws it within 0…17 half the time.
+
 ### The VC-2 part's settings by ID: the OSC block's reader (2026-11-19, v289) {#vc2-part-settings-osc-block}
 
 Step 4.3's seventeenth version (VC2_MODE_PLAN.md, step 4.3, item 9's fourth part): `0x893a04e0`, the reader v288's
@@ -1574,8 +1627,8 @@ Harm Formant's 5, are taken once for any OSC past 1. In rom.4's order:
   +0x48, +0x49; Formant and its three likewise into +0x4e, +0x50, +0x52, +0x53; Tempo Sync, Robot Voice, Playback
   Mode, Loop, Vari and Energy into +0x58…+0x5c and +0x5e; Time Offset (0x30b, read here, after Energy) into +0x5d;
   Time Trip and its Beat Keep into +0x5f, +0x60;
-- for kind 0, when +1 (the Type) is 2: the Harm Formant, its Keyfollow × 10 and its Style (0x371, 0x372, 0x375) into
-  +0x4e, +0x50 and +0x5e, over the Formant's and Energy's.
+- for kind 0, when +1 (the Type) is 2, EXTIN (the Types are ANALOG, PCM, EXTIN, VOCODER): the Harm Formant, its
+  Keyfollow × 10 and its Style (0x371, 0x372, 0x375) into +0x4e, +0x50 and +0x5e, over the Formant's and Energy's.
 
 **Part 0 alone.** The step counts hold part 0's 64 bytes; the update queue (v279) follows at `0x89989cc4`. For a part
 past 0, rom.4 would clear a halfword over the queue and what follows it. Its handler `0x89392830` takes no part but 0

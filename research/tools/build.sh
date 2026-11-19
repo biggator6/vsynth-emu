@@ -66,6 +66,8 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    Vc2SetChildHead.cpp $( [ -f Vc2PartSettingsTables.cpp ] && echo Vc2PartSettingsTables.cpp ) \
    $( [ -f Vc2PartSettingsOsc.cpp ] && echo Vc2PartSettingsWords.cpp Vc2PartSettingsOsc.cpp \
       Vc2PartSettingsOscCheck.cpp ) $( [ -f Vc2PartSettingsOscBlock.cpp ] && echo Vc2PartSettingsOscBlock.cpp ) \
+   $( [ -f Vc2PartSettingsVocoder.cpp ] && echo Vc2PartSettingsVocoder.cpp Vc2PartSettingsVocoderCheck.cpp \
+      Vc2LibMath.cpp Vc2LibMathTables.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

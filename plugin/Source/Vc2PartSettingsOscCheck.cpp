@@ -76,11 +76,13 @@ void sayBlockPart(const SettingsCounts& n) {
 void unhookBlock(SettingsSides& s) { s.fw.cpu.unhook(kOscBlock); }
 } // namespace
 
-// The third part's noise stops before the step counts (v289's), so its draws are v288's
+// The third part's noise stops before the step counts (v289's), the fourth's after them (before v290's word), so
+// their draws are as they were
+constexpr size_t kV289Rows = offsetof(Vc2PartRows, steps) + sizeof(Vc2PartRows::steps);
 const SettingsPartRow kOscPartRows[2] = {
     { 2, &SettingsCounts::oscEvents, &SettingsCounts::oscCalls,
       settingsCaseOf<kOscEvents, offsetof(Vc2PartRows, steps), 5>, sayOscPart },
     { 3, &SettingsCounts::blockEvents, &SettingsCounts::blockCalls,
-      settingsCaseOf<kBlockEvents, sizeof(Vc2PartRows), 5>, sayBlockPart, unhookBlock },
+      settingsCaseOf<kBlockEvents, kV289Rows, 5>, sayBlockPart, unhookBlock },
 };
 #endif

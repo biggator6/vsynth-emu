@@ -1,13 +1,15 @@
 # Planted errors in the VC-2 part's settings by ID, for mutate_vc2.py --settings: each must make xt_vc2settings, on
 # rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286),
 # vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp), vc2settingsosc
-# (Vc2PartSettingsOsc.cpp, v288) and vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289).  Not planted: the depth
+# (Vc2PartSettingsOsc.cpp, v288), vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289) and vc2settingsvocoder
+# (Vc2PartSettingsVocoder.cpp, v290).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
 # one byte wider (what the next store overwrites), the loader's test of the twelve IDs (rom.4's are never 0); in the
 # block reader, its part (the check gives part 0 alone, as rom.4's handler does) and the guard on a part past 0, and a
-# once-past-OSC-1 step taken by the OSC (the same for OSCs 0 and 1, all the part's reader gives).
+# once-past-OSC-1 step taken by the OSC (the same for OSCs 0 and 1, all the part's reader gives); in the vocoder
+# reader, the templates' bound by one (template 15's records hold 64, an offset of 0).
 kinds|    for (int kind = 0; kind < kKinds; ++kind)|    for (int kind = 0; kind < kKinds - 1; ++kind)|vc2settingswords
 envelope-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 12, kLfos = 5;|vc2settings
 lfo-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 13, kLfos = 4;|vc2settings
@@ -263,3 +265,45 @@ block-harm-tens|{ 0x372, 5, true, 0x50, tens }|{ 0x372, 5, true, 0x50, put16 }|v
 block-harm-style|{ 0x375, 5, true, 0x5e, put8 }|{ 0x374, 5, true, 0x5e, put8 }|vc2settingsblock
 block-once|const int n = r.once ? (osc != 0 ? 1 : 0) : osc;|const int n = r.once ? 0 : osc;|vc2settingsblock
 put32-short|void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, sizeof v); }|void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, 3); }|vc2settingswords
+vocoder-held-before|    if (p_.held(kHeldCommon)) return false;\n    const auto get|    const auto get|vc2settingsvocoder
+vocoder-held-after|    return !p_.held(kHeldCommon);|    return true;|vc2settingsvocoder
+vocoder-kind-held-first|    if (!p_.held(kHeldKind)) {|    if (true) {|vc2settingsvocoder
+vocoder-kind-held-second|    if (p_.held(kHeldKind)) return false;\n    const int32_t secondType|    const int32_t secondType|vc2settingsvocoder
+vocoder-shift-id|kFormantShift = 0x19f,|kFormantShift = 0x19e,|vc2settingsvocoder
+vocoder-shift-zero|if (shift == 0.0f) shift = 1.0f;|if (shift == 0.0f) shift = 0.0f;|vc2settingsvocoder
+vocoder-pow-order|vc2LibPow(kTwo, formantExponent(shift))|vc2LibPow(formantExponent(shift), kTwo)|vc2settingsvocoder
+vocoder-ratio-right|s.ratio[1] = s.ratio[0];|s.ratio[1] = shift;|vc2settingsvocoder
+vocoder-exponent|xtf::add(xtf::mul(x, tb.shiftStep), tb.shiftBase)|xtf::mul(xtf::add(x, tb.shiftBase), tb.shiftStep)|vc2settingsvocoder
+vocoder-per127|xtf::mul(xtf::flt(v), vc2PartSettingsTables().per127)|xtf::mul(xtf::flt(v + 1), vc2PartSettingsTables().per127)|vc2settingsvocoder
+vocoder-sound-id|kSoundLevel = 0x196,|kSoundLevel = 0x197,|vc2settingsvocoder
+vocoder-sound-order|    s.soundLevel = per127(get(kSoundLevel));\n    s.depth = per127(get(kDepth));|    s.depth = per127(get(kDepth));\n    s.soundLevel = per127(get(kSoundLevel));|vc2settingsvocoder
+vocoder-detect|kDetectFrom = 24;|kDetectFrom = 23;|vc2settingsvocoder
+vocoder-spread|s.spread = get(kSpread) != 0 ? 1 : 0;|s.spread = get(kSpread);|vc2settingsvocoder
+vocoder-template-id|kTemplate = 0x1a0;|kTemplate = 0x1a1;|vc2settingsvocoder
+vocoder-dump-id|kDump = 0x19e,|kDump = 0x19d,|vc2settingsvocoder
+vocoder-unvoice-out|out.setUnvoiceLevel(s.unvoiceLevel);|out.setUnvoiceLevel(s.depth);|vc2settingsvocoder
+vocoder-direct-id|kDirect = 0x195,|kDirect = 0x196,|vc2settingsvocoder
+vocoder-sends|kReverbSend = 0x2e2, kMfxSend = 0x2e0,|kReverbSend = 0x2e0, kMfxSend = 0x2e2,|vc2settingsvocoder
+vocoder-send-kind|kindGet(kFirstKind, kReverbSend)|kindGet(kSecondKind, kReverbSend)|vc2settingsvocoder
+vocoder-type-id|kOscType = 0x2e5;|kOscType = 0x2e6;|vc2settingsvocoder
+vocoder-targets|    out.mixerTargets();\n|\n|vc2settingsvocoder
+vocoder-extin|kExtin = 2,|kExtin = 3,|vc2settingsvocoder
+vocoder-extin-second|firstType == kExtin \|\| secondType == kExtin|firstType == kExtin|vc2settingsvocoder
+vocoder-extin-first|firstType == kExtin \|\| secondType == kExtin|secondType == kExtin|vc2settingsvocoder
+vocoder-legato-read|        get(kLegato);   // read, its answer tested and dropped\n|\n|vc2settingsvocoder
+vocoder-robot-id|kRobot = 0x1a3;|kRobot = 0x1a2;|vc2settingsvocoder
+vocoder-robot-kept|    t.robot = 0.0f;\n    if (firstType|    if (firstType|vc2settingsvocoder
+vocoder-autonote|out.setAutoNote(on);|out.setAutoNote(on > 0);|vc2settingsvocoder
+vocoder-legato|    out.setAutoNoteLegato();\n|\n|vc2settingsvocoder
+vocoder-offset-on|if (on > 0 && record < kTemplates)|if (on >= 0 && record < kTemplates)|vc2settingsvocoder
+vocoder-offset-bound|if (on > 0 && record < kTemplates)|if (on > 0 && record < kTemplates / 2)|vc2settingsvocoder
+vocoder-offset-right|formantExponent(shifts[record + kTemplates])|formantExponent(shifts[record])|vc2settingsvocoder
+vocoder-mode-plus|static_cast<uint32_t>(type) + 1u|static_cast<uint32_t>(type) + 0u|vc2settingsvocoder
+vocoder-mode-order|    const int32_t vocoderOn = get(kVocoderSw);\n    const int32_t type = get(kVocoderType);|    const int32_t type = get(kVocoderType);\n    const int32_t vocoderOn = get(kVocoderSw);|vc2settingsvocoder
+vocoder-stereo|get(kStereo) == kStereoOn ? 1 : 0|get(kStereo) != 0 ? 1 : 0|vc2settingsvocoder
+vocoder-stereo-id|kStereo = 0x1a4;|kStereo = 0x1a5;|vc2settingsvocoder
+tables-records-at|kRecordsAt = 0x89540904,|kRecordsAt = 0x89540908,|vc2settingstables
+tables-records-bytes|kRecordBytes = 140,|kRecordBytes = 136,|vc2settingstables
+tables-records-shift|kShiftAt = 8;|kShiftAt = 4;|vc2settingstables
+tables-pool-base|{ 0x893a75ec, &shiftBase }|{ 0x893a75f0, &shiftBase }|vc2settingstables
+tables-pool-127|{ 0x893a75f8, &per127 }|{ 0x893a75f0, &per127 }|vc2settingstables

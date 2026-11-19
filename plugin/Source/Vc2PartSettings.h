@@ -8,6 +8,7 @@
 // type's run of IDs from Vc2PartSettingsTables.  The parameters by read object and ID, and the flags, through
 // Vc2PartParams.  Not in the
 // sound yet.  Bit for bit: xt_vc2settings.  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID".  The notes' task.
+#include "Vc2Engine.h"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -43,6 +44,23 @@ struct Vc2PartRows {
     // 0x89989c84: the OSCs' step counts, a halfword by kind and OSC, part 0's alone (the update queue follows); the
     // OSC block's reader clears one when its Wave Number changes (v289)
     std::array<uint8_t, 64> steps {};
+    float robot = 0.0f;   // 0x89997fdc: robot human depth ÷ 127 when a kind's OSC is EXTIN, else 0 (v290)
+};
+
+// What the vocoder reader hands on (v290): kind 6's Unvoice Level, the part mixer's setters and targets, Auto Note's
+// setters, the vocoder's mode switch and its settings' wrapper
+class Vc2SettingsParts {
+public:
+    virtual ~Vc2SettingsParts() = default;
+    virtual void setUnvoiceLevel(float v) = 0;                               // 0x899d9968
+    virtual void setDirect(float v) = 0;                                     // 0x893b1eb0
+    virtual void setReverbSend(float v) = 0;                                 // 0x893b1ec0
+    virtual void setMfxSend(float v) = 0;                                    // 0x893b1ed0
+    virtual void mixerTargets() = 0;                                         // 0x893b1ee0
+    virtual void setAutoNote(int32_t on) = 0;                                // 0x893ebc20
+    virtual void setAutoNoteLegato() = 0;                                    // 0x893ebc60, given 0
+    virtual void setVocoderMode(int32_t mode) = 0;                           // 0x893b1c00 → 0x893f0600
+    virtual void vocoderSettings(Vc2VocoderSettings& s, int32_t stereo) = 0; // 0x893b1be0 → 0x893f06a0
 };
 
 // The OSC block's reader the part's reader calls for each kind and OSC, false to stop (v289)
@@ -78,6 +96,8 @@ public:
     // and the OSC block's reader, Vc2PartSettingsOscBlock.cpp
     bool oscRows(Vc2PartRows& t, int part, const Vc2OscBlockReader& block);
     bool oscBlock(Vc2PartRows& t, int part, int kind, int osc);     // 0x893a04e0
+    // v290, Vc2PartSettingsVocoder.cpp: the vocoder's settings, the mixer's levels and Auto Note's switch
+    bool vocoder(Vc2PartRows& t, int part, Vc2SettingsParts& out);  // 0x893a72f0
 
 private:
     void velocityPair(uint8_t* curve, uint8_t* depth, int part, int kind, int envelope);
