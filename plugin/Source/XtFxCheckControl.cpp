@@ -16,15 +16,6 @@ namespace xtfxcheck {
 //   allocates nothing.  research/tools/fxthreads.sh runs this part under the thread sanitizer.
 void apply(XtFxControl& c, const Edit& e) { if (e.matrix) { c.setMatrix(e.prm[0], e.prm[1], e.prm[2]); return; } if (e.clockMs) { c.outsideClock(e.clockMs); return; } for (const auto& s : e.sets) c.set(s.first, s.second); if (e.patch) c.loadPatch(); else c.update(); }
 
-// The reference with the driver on its bus.  Its waits run the samples, and the samples run both chips.
-struct DirectBus : XtFxControl::Bus {
-    Reference& ref; std::function<void()> sample;
-    explicit DirectBus(Reference& r) : ref(r) {}
-    void write(uint8_t c, uint16_t i, uint32_t w) override { ref.hostWrite(0x2003, c); for (uint32_t k = 0; k < 4; k++) ref.hostWrite((uint32_t)i * 4 + k, (uint8_t)(w >> (8 * k))); }
-    uint32_t read(uint16_t i) override { write(0x37, i, 0); uint32_t v = 0; for (uint32_t k = 0; k < 4; k++) v |= (uint32_t)ref.hostRead(k) << (8 * k); return v & 0x0fffffff; }
-    void wait(uint32_t n) override { for (uint32_t i = 0; i < n; i++) sample(); }
-};
-
 const FxIds& rom2Ids() {
     static constexpr int kLevels[] = { 0x178, 0x179, 0x17a, 0x1fd, 0x1fe, 0x231, 0x3e, 0x76, 0x51e, 0x11d, 0x120, 0x121,
                                        0x122, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70,

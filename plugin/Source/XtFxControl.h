@@ -145,7 +145,8 @@ XtFxCatalog xtFxCatalog(const char* romPath);
 // The effects whole, as XtSynth uses them: the chip, its driver and the frame's way through.  One control thread and one audio thread, as above.
 class XtFxUnit : public XtBusSink {
 public:
-    explicit XtFxUnit(const char* romPath);
+    // image: rom.2's unless said, and romPath that image's (XtFxImage.h); its frame's gain is the image's (v274)
+    explicit XtFxUnit(const char* romPath, const XtFxImage& image = xtVSynthFx());
     ~XtFxUnit() override;
     bool ok() const { return control_.ok(); }
 
@@ -155,9 +156,9 @@ public:
     void settle();
 
     // Audio thread: `frames` frames of the output bus (XtSynth::frame, 8 floats a frame, the XT's units) through the chip, and ±1 stereo out.  Mix and DIR come out together, as the plugin has one stereo output.
-    // Between the two, the XT's numbers: the frame reaches the chip at Out Gain for TG's −24, a sixteenth, so a tone can be switched between this and the plain path without a jump, and the chip adds +6 dB.
+    // Between the two, the XT's numbers: the frame reaches the chip at the image's frameGain, rom.2's Out Gain for TG's −24, a sixteenth, so a tone can be switched between this and the plain path without a jump, and the chip adds +6 dB.
     // So a raw wave comes out of here at ⅛ of the chip's full scale, and XtSynth::busOut plays it at the same level without the chip.  Whether a real XT's outputs do just that, only a capture can say.
-    // At most 32 frames a call, the bus's block.
+    // rom.4's frame goes in as the VC-2 makes it, and its DIR words reach no output (v274).  At most 32 frames a call, the bus's block.
     void process(const float* frame, float* lr, int frames) override;
     // Audio thread: the outside input as the converter hands it, int32 L then R a frame at the XT's full scale (±2^31),
     // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204)
@@ -165,7 +166,7 @@ public:
     // What the chip handed back for the EXT IN OSCs in the last process() (XtBus.h): words 4 and 5 of each frame
     const int32_t* returned() const override { return back_; }
 
-    // A float of the bus as the chip takes it (0x894db2b0 truncates to int32; the chip has the top 24 bits), and one of its words as the plugin's ±1, the chip's full scale.
+    // A float of the bus as the chip takes it (0x894db2b0 truncates to int32, and rom.4's 0x89396200, the same routine; the chip has the top 24 bits), and one of its words as the plugin's ±1, the chip's full scale.
     static int32_t toChip(float x);
     static float fromChip(int32_t word);
 
@@ -176,6 +177,7 @@ private:
     void frameBack(int i);                    // and what the chip hands back of it, after the frame
     std::unique_ptr<XtFxChip> chip_;
     XtFxControl control_;
+    float frameGain_;                         // the image's (XtFxImage.h)
     XtExtInput in_;
     int32_t back_[64] = {};
 };

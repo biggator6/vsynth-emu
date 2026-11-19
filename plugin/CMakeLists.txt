@@ -156,6 +156,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtPatch.cpp
     Source/XtFxChip.cpp
     Source/XtFxControl.cpp
+    Source/XtFxUnit.cpp
     Source/XtFxImage.cpp
     Source/XtFxInput.cpp
     Source/PluginExtIn.cpp

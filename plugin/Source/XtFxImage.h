@@ -29,6 +29,10 @@ struct XtFxImage {
     std::array<uint32_t, 2> reads;          // (section or 0, id) → the value
     std::array<uint32_t, 7> answered;       // the spins, and what the start touches outside the driver: they return 0
     std::span<const IdRow> idRows;
+    // What the bus frame takes on its way into the chip besides the firmware's truncation (XtFxUnit, v274): rom.2's
+    // tones play in XtSynth at Out Gain for TG 0, so Out Gain's default, a sixteenth, goes here (v136); rom.4's frame comes
+    // as the VC-2 makes it, its tones at their own Out Gain and the mic and the vocoder added past it, so nothing
+    float frameGain;
 };
 
 const XtFxImage& xtVSynthFx();   // rom.2's

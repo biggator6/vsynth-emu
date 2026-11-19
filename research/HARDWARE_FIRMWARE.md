@@ -1546,6 +1546,63 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's frame through the unit (2026-11-19, v274) {#vc2-fx-frame}
+
+Step 4.4's second item (research/VC2_MODE_PLAN.md). `XtFxUnit` takes an image: rom.4's runs rom.4's driver, with the frame
+at rom.4's level. rom.2's unit is as it was, bit for bit.
+
+**The way, on rom.4.** rom.4's audio task (its loop `0x89395b1c…0x89395c2e`; rom.2's `0x894daac0`, compiled anew) runs a
+block as rom.2's does:
+1. The part mixer (`0x893b1820`) writes 32 frames of 8 floats to `0x89998e20`, in the V-Synth's order (MAIN L, R, the
+   Reverb and Chorus sends, MULTI L, R, DIR L, R).
+2. `0x89396200` truncates them to int32 in `0x8998a080`. It is rom.2's `0x894db2b0` instruction for instruction, moved by
+   0x1450b0, on its own buffers. With Out DC cut for TG on (ID 0x532, default off) `0x89396270` does it instead, rom.2's
+   `0x894db320`.
+3. `0x89396300` adds a stereo source from `0x89989f00` into the block when `0x8998a480` + 0x18 is set (written by
+   `0x89358be0` on `0x8997cbc0`; not traced, like rom.2's flags in `0x894db3e0`), then copies the block to the DMA's buffer
+   at `0x8cc3f000` + 1024·i.
+4. The same DMA settings as rom.2's (CHCR 0x95044) send it.
+
+So the frame's eight words reach program A's slots 0x20…0x2e in the frame's order, as on rom.2.
+
+**The level.** rom.4 has Out Gain for TG too (ID 0x533, centre 64, default 40, so −24 dB). `0x893a7160` (rom.2's
+`0x894eb2f0`) reads it into the tone generator's object `0x89e4987c` + 0x1800. The TVA's block applies it as 2^(g/6) on
+the tone's gains (`0x893a670c`, as rom.2's `0x894ea380`). But the part mixer adds the mic's direct sound and the vocoder
+into the frame at its own levels (0.025 of full scale at 127: VC2_VOCAL_DESIGNER.md, "The part mixer, run"), and no Out
+Gain multiplies them. So the sixteenth rom.2's unit gives the whole frame, standing in for the V-Synth's tones' Out Gain,
+would put the mic 24 dB down on rom.4. `XtFxImage::frameGain` is therefore rom.2's 1/16 as before and rom.4's 1: rom.4's
+frame goes in as the VC-2 makes it. The VC-2's tones are to take Out Gain themselves, in the TVA block's port (step 4.3).
+A raw full-scale word comes out of rom.4's unit at ×2, the chip's +6 dB, where rom.2's comes out at ⅛.
+
+**What comes out.** The mix at 0xa1 and 0xa3, as on rom.2. DIR's words reach nothing, so 0xa5 and 0xa7 stay 0 and the
+unit's sum of the mix and DIR is the mix alone. The Reverb's stereo input is the chip's program's, in the reference too.
+
+**The checks** (`xt_fx <rom.4> vc2`, three parts new; `xt_fx control`, one new):
+
+| Part | rom.4 | rom.2 |
+|---|---|---|
+| The frame into the chip against the image's own truncation in the interpreter, values from tiny to past full scale | 51,200 values | 51,200, as before |
+| The frame through the unit: each word to its place at the image's level (within 0.05 dB, a sample late), the sends silent, DIR silent on rom.4, Master Level followed | 9 of 9 | 9 of 9, as before |
+| The frame through the unit against the reference: `process()` against JE-8086's chip on the image's programs, its driver on its bus, each frame through the image's own truncation at the check's own gain, the whole state each sample, the outputs bit for bit, 200 edits between | 289,442 samples | 184,755 samples |
+
+All 0 different at seed 2024, and at 7 and 31337 (rom.4 319,183 and 281,273 samples against the reference, rom.2
+177,274 and 149,977). The check's rows (`UnitWay`, XtFxCheckUnit.h) are written apart from XtFxImage.cpp: the truncation's
+address and buffers, the gain, the EQ Switch (rom.4's 0x72) and Master Level (0x40), the level, and whether DIR comes
+out. Coverage: every line, region and function of `XtFxUnit.cpp`; of the check's files, all but the lines that report a
+difference.
+
+**Split first.** `XtFxControl.cpp` was at 300 lines, so the unit went into `XtFxUnit.cpp` as it stood, and its plants
+went to the port `fxu` (`fx4u` under rom.4's check). The check's `DirectBus` moved into XtFxCheck.h, and `InputNoise`'s
+draws became `next()`, so the unit's check takes the frame's eight as a frame.
+
+**Plants.** `mutate_fx.py --control`: 183 of 183 caught, the unit's moved to `fxu` and one new (`unit-gain-unused`).
+`mutate_fx.py --vc2`: 58 of 58, eight new (rom.4's gain at a sixteenth, the unit on rom.2's driver, its gain fixed, the
+slots, the word's shift, the sides, the queue unserviced). `fxthreads.sh`: no races.
+
+**Not done.** The VC-2's tones must take rom.4's Out Gain for TG in the TVA's block for them to sit at the XT's level
+(step 4.3). The extra source `0x89396300` adds and the DC cut aren't modelled, as on rom.2. What DIR out carries on a real
+VC-2 isn't known; nothing here is checked against one.
+
 ### The VC-2's tone: its remaining methods (2026-11-19, v273) {#vc2-tone-methods}
 
 Step 4.3's second version: what the part calls on a tone beyond the frame (v228) and the note-on (v229), and the part's two lists of tones. `Vc2Tone` gains the methods (`Vc2ToneMethods.cpp`), `Vc2ToneLists` holds the lists, and `Vc2ToneMix` gains its settings update.

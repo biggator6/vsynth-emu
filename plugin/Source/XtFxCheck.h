@@ -260,6 +260,15 @@ struct Recorder : XtFxControl::Bus {
     void wait(uint32_t s) override { waits.push_back({ n, s }); }
 };
 
+// The reference with the driver on its bus.  Its waits run the samples, and the samples run both chips (XtFxCheckControl.cpp's, from v274 shared)
+struct DirectBus : XtFxControl::Bus {
+    Reference& ref; std::function<void()> sample;
+    explicit DirectBus(Reference& r) : ref(r) {}
+    void write(uint8_t c, uint16_t i, uint32_t w) override { ref.hostWrite(0x2003, c); for (uint32_t k = 0; k < 4; k++) ref.hostWrite((uint32_t)i * 4 + k, (uint8_t)(w >> (8 * k))); }
+    uint32_t read(uint16_t i) override { write(0x37, i, 0); uint32_t v = 0; for (uint32_t k = 0; k < 4; k++) v |= (uint32_t)ref.hostRead(k) << (8 * k); return v & 0x0fffffff; }
+    void wait(uint32_t n) override { for (uint32_t i = 0; i < n; i++) sample(); }
+};
+
 // ------------------------------------------------------------------ each part's entry, by its file
 void compare(const char* rom, const char* label, int mfxType, int revType, int choType, int frames, uint32_t seed,
              bool roam);                                                                // XtFxCheckRig.cpp
@@ -277,9 +286,7 @@ double stepUnderTone(const char* rom, bool honoured, bool patch);
 void changeUnderTone(const char* rom);
 void behaviour(const char* rom);                                                        // XtFxCheckBehaviour.cpp
 void valueText(const char* rom);                                                        // XtFxCheckText.cpp
-void unitConversion(const char* rom, uint32_t seed);                                    // XtFxCheckUnit.cpp
-void unitLevels(const char* rom, bool print);
-void unitInput(const char* rom);
+void unitInput(const char* rom);   // XtFxCheckUnit.cpp; the frame's parts are XtFxCheckUnit.h's (v274)
 void copyWithoutChip(const char* rom, uint32_t seed);                                  // XtFxCheckCopy.cpp, v205
 } // namespace xtfxcheck
 #endif

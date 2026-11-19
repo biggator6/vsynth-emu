@@ -76,19 +76,20 @@ boot-no-patch|send(BlockSystem, true);|send(BlockSystem, false);
 boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });
 boot-route-first|    send(BlockSystem, true);\n    routeInput();|    routeInput();\n    send(BlockSystem, true);
 no-null-page|    sh4_->mapRam(0x00000000, 0x00001000);\n|
-# The unit
-unit-gain|const float v = x * 0.0625f;|const float v = x * 0.125f;
-unit-round|: (int32_t)v;|: (int32_t)std::lrint(v);
-unit-word|return i >> 8;|return i >> 7;
-unit-scale|(float)word * 0x1p-23f|(float)word * 0x1p-22f
-unit-in-order|chip.setGram(0x20 + 2 * w, toChip(f[w]));|chip.setGram(0x20 + 2 * (w ^ 1), toChip(f[w]));
-unit-in-slot|chip.setGram(0x20 + 2 * w, toChip(f[w]));|chip.setGram(0x21 + 2 * w, toChip(f[w]));
-unit-left-right|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.gram(0xa3))
-unit-left-slot|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.gram(0xa0))
-unit-no-dir-l| + fromChip(chip.gram(0xa5));|;
-unit-no-dir-r| + fromChip(chip.gram(0xa7));|;
-unit-no-service|    for (int i = 0; i < frames; ++i) {\n        control_.service(chip);\n|    for (int i = 0; i < frames; ++i) {\n
-unit-no-settle|while (ok() && !control_.drained()) { control_.pump(); control_.service(chip); chip.runFrame(); }|
+# The unit (XtFxUnit.cpp from v274, port fxu; its frame's gain XtFxImage.cpp's)
+unit-gain|kVSynthFrameGain = 0.0625f,|kVSynthFrameGain = 0.125f,|fxim
+unit-gain-unused|toChip(f[w] * frameGain_)|toChip(f[w])|fxu
+unit-round|: (int32_t)x;|: (int32_t)std::lrint(x);|fxu
+unit-word|return i >> 8;|return i >> 7;|fxu
+unit-scale|(float)word * 0x1p-23f|(float)word * 0x1p-22f|fxu
+unit-in-order|chip.setGram(0x20 + 2 * w,|chip.setGram(0x20 + 2 * (w ^ 1),|fxu
+unit-in-slot|chip.setGram(0x20 + 2 * w,|chip.setGram(0x21 + 2 * w,|fxu
+unit-left-right|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.gram(0xa3))|fxu
+unit-left-slot|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.gram(0xa0))|fxu
+unit-no-dir-l| + fromChip(chip.gram(0xa5));|;|fxu
+unit-no-dir-r| + fromChip(chip.gram(0xa7));|;|fxu
+unit-no-service|    for (int i = 0; i < frames; ++i) {\n        control_.service(chip);\n|    for (int i = 0; i < frames; ++i) {\n|fxu
+unit-no-settle|while (ok() && !control_.drained()) { control_.pump(); control_.service(chip); chip.runFrame(); }||fxu
 tick-no-gate|    if (!drained()) return;\n    if (patchWanted_)|    if (patchWanted_)
 tick-no-patch|    if (patchWanted_) { patchWanted_ = false; loadPatch(); }\n    else update();|    update();
 tick-patch-twice|patchWanted_ = false; loadPatch();|loadPatch();
@@ -176,8 +177,8 @@ route-block|{ 0x78, 0x78, BlockInput }, { 0x7c, 0x7c, BlockInput },||fxim
 route-send|if (blocks & BlockInput) routeInput();|
 route-patch|dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;
 route-post|kPostEvent { 0x894aee70, 0x89391e50 }|kPostEvent { 0, 0x89391e50 }|fxim
-unit-input-taken|in_.take(frames);|in_.take(0);
-unit-input-back|        frameBack(i);\n|
+unit-input-taken|in_.take(frames);|in_.take(0);|fxu
+unit-input-back|        frameBack(i);\n||fxu
 route-event|    call(image_.inputEvent);\n||fxi
 in-slot|kAnalogL = 0x10,|kAnalogL = 0x11,|fxi
 in-usb|    chip.setGram(kUsbL, l);\n||fxi

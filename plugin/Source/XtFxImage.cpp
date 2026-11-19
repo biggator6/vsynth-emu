@@ -52,8 +52,8 @@ constexpr Row kVc2Rows[] = {
     { 0x1b7, 0x1ba, BlockMfx }, { 0x23c, 0x23e, BlockChorus }, { 0x270, 0x271, BlockReverb },
 };
 
-// An image's driver from its side of the places
-constexpr XtFxImage imageOn(Side s, int firstHigh, int ids, int revTypes, std::span<const Row> rows) {
+// An image's driver from its side of the places, and its frame's gain into the chip
+constexpr XtFxImage imageOn(Side s, int firstHigh, int ids, int revTypes, std::span<const Row> rows, float frameGain) {
     return {
         .self = kSelf.*s, .message = kMessage.*s, .clock = kClock.*s,
         .descLow = kDescLow.*s, .descHigh = kDescHigh.*s, .firstHigh = firstHigh, .ids = ids,
@@ -68,12 +68,16 @@ constexpr XtFxImage imageOn(Side s, int firstHigh, int ids, int revTypes, std::s
         .reads = { kRead.*s, kReadTyped.*s },
         .answered = { kSpinA.*s, kSpinB.*s, kListA.*s, kListB.*s, kListC.*s, kSystemEnd.*s, kPostEvent.*s },
         .idRows = rows,
+        .frameGain = frameGain,
     };
 }
 
-// [FW] each image's descriptors' IDs, and the Reverb Types a patch can choose (rom.4's descriptor: 0…14)
-constexpr XtFxImage kVSynth = imageOn(&Place::vSynth, 0x55d, 0x8d0, 11, kVSynthRows);
-constexpr XtFxImage kVc2 = imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows);
+// [FW] each image's descriptors' IDs, and the Reverb Types a patch can choose (rom.4's descriptor: 0…14).  The frame's
+// gains are XtFxImage.h's: rom.2's Out Gain for TG at its default, −24 dB, which the firmware's powf gives as exactly
+// 1/16; rom.4's tones take theirs in the TVA's block (0x893a670c, as rom.2's 0x894ea380), so its frame goes in whole
+constexpr float kVSynthFrameGain = 0.0625f, kVc2FrameGain = 1.0f;
+constexpr XtFxImage kVSynth = imageOn(&Place::vSynth, 0x55d, 0x8d0, 11, kVSynthRows, kVSynthFrameGain);
+constexpr XtFxImage kVc2 = imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows, kVc2FrameGain);
 } // namespace
 
 const XtFxImage& xtVSynthFx() { return kVSynth; }

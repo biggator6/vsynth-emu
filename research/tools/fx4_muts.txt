@@ -22,9 +22,9 @@ list-a|kListA { 0x894d9230, 0x893951b0 }|kListA { 0x894d9230, 0x893951b4 }|fx4i
 # rom.4's descriptors and types
 desc-low|kDescLow { 0x897a167c, 0x8950f0b0 }|kDescLow { 0x897a167c, 0x8950f0bc }|fx4i
 desc-high|kDescHigh { 0x897a56d8, 0x895131a8 }|kDescHigh { 0x897a56d8, 0x895131b0 }|fx4i
-first-high|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows)|imageOn(&Place::vc2, 0x55d, 0x9ac, 15, kVc2Rows)|fx4i
-ids-short|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows)|imageOn(&Place::vc2, 0x56a, 0x8d0, 15, kVc2Rows)|fx4i
-rev-types|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows)|imageOn(&Place::vc2, 0x56a, 0x9ac, 11, kVc2Rows)|fx4i
+first-high|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, 0x55d, 0x9ac, 15, kVc2Rows,|fx4i
+ids-short|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, 0x56a, 0x8d0, 15, kVc2Rows,|fx4i
+rev-types|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, 0x56a, 0x9ac, 11, kVc2Rows,|fx4i
 mfx-table|kMfxIds { 0x897a8218, 0x895164ec }|kMfxIds { 0x897a8218, 0x895164f0 }|fx4i
 cho-table|kChoIds { 0x897a82e4, 0x895165b8 }|kChoIds { 0x897a82e4, 0x895165bc }|fx4i
 rev-table|kRevIds { 0x897a8310, 0x895165e4 }|kRevIds { 0x897a8310, 0x895165e8 }|fx4i
@@ -52,5 +52,14 @@ message-second|sh4_->wr8(image_.message + 1, (uint8_t)second);|sh4_->wr8(image_.
 message-fourth|sh4_->wr8(image_.message + 3, (uint8_t)fourth);|sh4_->wr8(image_.message + 2, (uint8_t)fourth);|fx4c
 call-self|call(image_.takeMessage, { image_.self });|call(image_.takeMessage, { image_.message });|fx4c
 matrix-guard|if (!error_.empty() \|\| !image_.matrixTake) return;|if (!error_.empty()) return;|fx4c
+# The frame's way through the unit (v274): its gain XtFxImage.cpp's, the unit XtFxUnit.cpp's
+frame-gain|kVc2FrameGain = 1.0f;|kVc2FrameGain = 0.0625f;|fx4i
+unit-image|control_(romPath, nullptr, image)|control_(romPath)|fx4u
+unit-gain-fixed|frameGain_(image.frameGain)|frameGain_(0.0625f)|fx4u
+unit-in-order|chip.setGram(0x20 + 2 * w,|chip.setGram(0x20 + 2 * (w ^ 1),|fx4u
+unit-in-slot|chip.setGram(0x20 + 2 * w,|chip.setGram(0x21 + 2 * w,|fx4u
+unit-word|return i >> 8;|return i >> 7;|fx4u
+unit-left-right|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.gram(0xa3))|fx4u
+unit-no-service|    for (int i = 0; i < frames; ++i) {\n        control_.service(chip);\n|    for (int i = 0; i < frames; ++i) {\n|fx4u
 boot-no-start-task|    call(image_.startTask, { image_.self });\n||fx4c
 boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });|fx4c
