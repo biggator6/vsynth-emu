@@ -16,7 +16,7 @@ constexpr uint32_t kModeBytes = 32, kKeyModeAt = 0x18, kVocoderAt = 0x16;
 // [FW] Auto Note's switch's second read object's word, in its frame (r14 and pr pushed, then 24 bytes)
 constexpr uint32_t kLeftoverWordAt = kVc2Sp - 20;
 // The IDs drawn narrow: Modulator Key Mode 0…2, Vocoder Sw 0…1
-constexpr std::pair<int16_t, uint32_t> kModeNarrow[] = { { kKeyModeId, 3 }, { kVocoderSwId, 2 } };
+constexpr SettingsNarrow kModeNarrow[] = { { kKeyModeId, 3, kHalfTheTime }, { kVocoderSwId, 2, kHalfTheTime } };
 
 // [FW] the message's routines: 0x89393c00 makes one by its number, 0x89393ba0 hands it on to a source's channel
 SettingsCall made(Sh4& c) { return { kOutMessage, 0, 0, 0, (int32_t)c.r[5] }; }
@@ -71,8 +71,7 @@ const SettingsEvent kModeEvents[] = { modeEvent<kModeWrapper, 27>, modeEvent<kMo
 
 // A case: the nodes noise, then the tables' and the events
 std::string modeCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    auto* node = reinterpret_cast<uint8_t*>(s.nodes.nodes.data());
-    for (size_t k = 0; k < sizeof s.nodes.nodes; ++k) node[k] = (uint8_t)rng();
+    settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
     return settingsCaseOf<kModeEvents, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
 }
 

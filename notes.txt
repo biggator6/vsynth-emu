@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's settings by ID, the dispatchers and G's channel word v292 (2026-11-19, on claude/vc2-part-4-3 after
+  v291; HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the dispatchers and G's channel word"): step 4.3's
+  twentieth version, item 9's seventh part. On Vc2PartSettings (Vc2PartSettingsDispatch.cpp): rom.4's dispatchers, the
+  part's 0x8939b170 (the mode row, bytes, common, OSC table, mix, envelopes, LFOs, COSM inputs, TVAs, the Matrix's
+  settings 0x893a51c0 by v247's Vc2MatrixSetup, given, and the vocoder reader, the first to give up stopping the rest),
+  the system's 0x8939b0d0, the assignments' 0x8939b110 and the calibration's 0x8939b140, and G's channel word
+  0x893a5050 (Receive Switch off: the word 0x8999738c; on: the channel states' table 0x8950d6e0 by the source byte
+  0x8950d6d9 and Receive Channel, + 2) through Vc2ChannelStates. v247's record tests flag 0 after its reads too
+  (Vc2MatrixParams::held), as rom.4's 0x893a46f0 and 0x893a51c0 do; xt_vc2cosm's line as it was. xt_vc2settings gains
+  a seventh part (Vc2PartSettingsDispatchCheck.cpp), every reader rom.4's own, the store's special IDs one table of
+  SettingsNarrow rows (the Matrix Controls' Sens within −128…127 always): 0 different at seeds 2024, 7 and 31337, the
+  first six parts' lines unchanged; mutate_vc2.py --settings 392 planted, 0 missed (the Matrix's settings alone an
+  event of their own, as the dispatcher can't show their answer); --cosm 1439 and --sets 374, 0 missed. Not in the
+  sound yet.
+
 The VC-2 part's settings by ID, the mode row and Auto Note's switch v291 (2026-11-19, on claude/vc2-part-4-3 after
   v290; HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the mode row and Auto Note's switch"): step 4.3's
   nineteenth version, item 9's sixth part. On Vc2PartSettings (Vc2PartSettingsModes.cpp): rom.4's mode row 0x89396e20

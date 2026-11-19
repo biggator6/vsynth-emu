@@ -9,6 +9,7 @@
 // Vc2PartParams.  Not in the
 // sound yet.  Bit for bit: xt_vc2settings.  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID".  The notes' task.
 #include "Vc2Engine.h"
+#include "Vc2MatrixSetup.h"
 #include "Vc2PartNodes.h"
 #include <array>
 #include <cstdint>
@@ -71,6 +72,15 @@ public:
     virtual void allSoundOff(int source, int32_t channel) = 0;
 };
 
+// G's channel word's two sources (v292): the word at 0x8999738c, with Part 1 Receive Switch off; and with it on, the
+// channel states' table 0x8950d6e0's word for the channel, by the source byte at 0x8950d6d9 (64 bytes a source)
+class Vc2ChannelStates {
+public:
+    virtual ~Vc2ChannelStates() = default;
+    virtual uint32_t unreceived() = 0;
+    virtual uint32_t receiving(int32_t channel) = 0;
+};
+
 // The OSC block's reader the part's reader calls for each kind and OSC, false to stop (v289)
 using Vc2OscBlockReader = std::function<bool(int kind, int osc)>;
 
@@ -109,6 +119,14 @@ public:
     // v291, Vc2PartSettingsModes.cpp: the mode row (All Sound Off to the part's nodes' channels) and Auto Note's switch
     bool modes(Vc2PartRows& t, int part, const Vc2PartNodes& nodes, Vc2SettingsParts& out);   // 0x89396f70
     void autoNoteSwitch(Vc2SettingsParts& out);                                                // 0x89396f90
+    // v292, Vc2PartSettingsDispatch.cpp: the dispatchers, each reader in turn, the part's stopping at the first that
+    // gives up (the others' each answer 1), the Matrix's set-up v247's, given; and G's channel word
+    bool readPart(Vc2PartRows& t, Vc2MatrixSettings& g, Vc2MatrixSetup& setup, int part, const Vc2PartNodes& nodes,
+                  Vc2SettingsParts& out);                                        // 0x8939b170
+    void readSystem(Vc2PartRows& t, Vc2MatrixSettings& g, Vc2ChannelStates& states);   // 0x8939b0d0
+    void readAssigns(Vc2PartRows& t, Vc2MatrixSettings& g, Vc2MatrixSetup& setup);    // 0x8939b110
+    void readCalibration(Vc2PartRows& t);                                             // 0x8939b140
+    void matrixChannel(Vc2MatrixSettings& g, Vc2ChannelStates& states);               // 0x893a5050
 
 private:
     void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)

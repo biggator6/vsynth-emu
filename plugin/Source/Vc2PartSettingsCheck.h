@@ -7,6 +7,7 @@
 #include "Vc2CheckCalls.h"
 #include "Vc2CheckMain.h"
 #include "Vc2LibMathTables.h"
+#include "Vc2MatrixTables.h"
 #include "Vc2PartSettings.h"
 #include "Vc2PartSettingsTables.h"
 #include <bit>
@@ -22,6 +23,7 @@ inline constexpr uint32_t kOscsAt = 0x89e371e0;                            // v2
 inline constexpr uint32_t kStepsAt = 0x89989c84;                           // v289's: part 0's step counts
 inline constexpr uint32_t kRobotAt = 0x89997fdc, kUnvoiceLevelAt = 0x899d9968;   // v290's
 inline constexpr uint32_t kModesAt = 0x89995390, kNodesAt = 0x899888d0;           // v291's: the mode rows, the nodes
+inline constexpr uint32_t kMatrixAt = 0x89997398;                                 // v292's: G, the Matrix's settings
 // A read object's handle the set-ups' hooks leave: this, the block << 16, part << 8, kind << 2, COSM; and (v291) the
 // one rom.4's stack is given where Auto Note's switch reads through a read object never set up, a block past the
 // OSC block's call
@@ -41,10 +43,17 @@ struct SettingsCall {
 
 // The parameters' values, one draw per event: by a hash of the seed and the read, mostly a byte's or a depth's, now
 // and then at the laws' edges or any word; the OSC block's reader's answer mostly 1, now and then 0 or any word; a
-// part's own IDs drawn within a few values half the time (v291's, after the run's)
+// part's own IDs drawn within a few values (v291's, after the run's)
+// An ID drawn within `values` from `from` when the draw's pick (0…7) is below `picks`: 4 half the time, 8 always (v292)
+struct SettingsNarrow {
+    int16_t id;
+    uint32_t values, picks;
+    int32_t from = 0;
+};
+inline constexpr uint32_t kHalfTheTime = 4, kAlways = 8;
 struct SettingsStore {
     uint32_t seed = 0;
-    std::span<const std::pair<int16_t, uint32_t>> narrow {};
+    std::span<const SettingsNarrow> narrow {};
     int32_t value(const SettingsCall& c) const;
 };
 
@@ -74,6 +83,20 @@ private:
     SettingsReads& reads_;
 };
 
+// v247's Matrix set-up's parameters on the same reads (v292): the part's block, the system's, flag 0
+class SettingsMatrixParams final : public Vc2MatrixParams {
+public:
+    explicit SettingsMatrixParams(SettingsReads& reads) : reads_(reads) {}
+    int32_t partValue(int part, int16_t id) override {
+        return reads_.read({ (int32_t)Vc2ParamBlock::kPart, part, 0, 0, id });
+    }
+    int32_t systemValue(int16_t id) override { return reads_.read({ (int32_t)Vc2ParamBlock::kSystem, 0, 0, 0, id }); }
+    bool held() override { return reads_.flags[0] != 0; }
+
+private:
+    SettingsReads& reads_;
+};
+
 // The vocoder reader's calls out as the log has them (v290): a block past the reads', the value's bits as the ID;
 // the settings struct a word each by its index as the kind (the pivots, +0x10 and +0x14, left out: rom.4 hands the
 // stack's leftovers there, which the settings path writes before reading), the stereo flag as index 15
@@ -86,9 +109,11 @@ inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
 
-// The port's calls out: each logged as rom.4's hooks log theirs, Unvoice Level kept to compare with rom.4's word
-class SettingsPortOuts final : public Vc2SettingsParts {
+// The port's calls out: each logged as rom.4's hooks log theirs, Unvoice Level kept to compare with rom.4's word; and
+// (v292) the Matrix set-up's 0x893b1ee0, the mixer's targets, which the dispatchers' set-up routines never reach
+class SettingsPortOuts final : public Vc2SettingsParts, public Vc2MatrixPart {
 public:
+    void levelsMoved() override { mixerTargets(); }
     explicit SettingsPortOuts(SettingsReads& reads) : log_(reads.log) {}
     float unvoiceLevel = 0.0f;
     void setUnvoiceLevel(float v) override { unvoiceLevel = v; }
@@ -120,7 +145,8 @@ struct SettingsCounts {
     long blockEvents = 0, blockCalls = 0; // the fourth's (v289)
     long vocoderEvents = 0, vocoderCalls = 0, extin = 0, offsets = 0;   // the fifth's (v290)
     long modeEvents = 0, modeCalls = 0, soundOffs = 0, leftovers = 0;   // the sixth's (v291)
-    std::array<long, 30> byEvent {};
+    long dispatchEvents = 0, dispatchCalls = 0, wholeParts = 0, received = 0;   // the seventh's (v292)
+    std::array<long, 36> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -134,6 +160,9 @@ struct SettingsSides {
     Vc2PartSettings settings { params };
     SettingsPortOuts outs { mine };   // v290
     Vc2PartNodes nodes {};            // v291
+    Vc2MatrixSettings g {};           // v292: G, and v247's set-up on the same reads
+    SettingsMatrixParams matrixParams { mine };
+    Vc2MatrixSetup setup { matrixParams, outs };
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -171,6 +200,13 @@ extern const SettingsPartRow kOscPartRows[2];
 extern const SettingsPartRow kVocoderPartRow;
 // The sixth (v291): the mode row and Auto Note's switch (Vc2PartSettingsModesCheck.cpp)
 extern const SettingsPartRow kModePartRow;
+// The seventh (v292): the dispatchers and G's channel word (Vc2PartSettingsDispatchCheck.cpp)
+extern const SettingsPartRow kDispatchPartRow;
+// Noise in `bytes` bytes at `at` (a part's case's own objects, v291's nodes and v292's G)
+inline void settingsNoise(void* at, size_t bytes, std::mt19937& rng) {
+    auto* b = static_cast<uint8_t*>(at);
+    for (size_t k = 0; k < bytes; ++k) b[k] = (uint8_t)rng();
+}
 
 using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
 
@@ -237,6 +273,7 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel);
     s.fw.cpu.write(kModesAt, &t.modes, sizeof t.modes);
     s.fw.cpu.write(kNodesAt, &s.nodes, sizeof s.nodes);
+    s.fw.cpu.write(kMatrixAt, &s.g, sizeof s.g);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);

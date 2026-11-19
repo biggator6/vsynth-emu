@@ -810,7 +810,7 @@ setup-dest-source|if (source == 0 \|\| sens == 0 \|\||if (sens == 0 \|\||vc2matr
 setup-dest-edge|static_cast<uint32_t>(dest) > kLastDest) return 0;\n    const Vc2MatrixDest|static_cast<uint32_t>(dest) >= kLastDest) return 0;\n    const Vc2MatrixDest|vc2matrixsetup
 setup-uses-or|uses[d.group] = static_cast<uint16_t>(uses[d.group] \| d.bit);|uses[d.group] = d.bit;|vc2matrixsetup
 setup-depth-source|if (source == 0 \|\| static_cast<uint32_t>(dest) > kLastDest) return 0;\n    //|if (static_cast<uint32_t>(dest) > kLastDest) return 0;\n    //|vc2matrixsetup
-setup-held|    if (held) return false;\n||vc2matrixsetup
+setup-held|    if (params_.held()) return false;\n||vc2matrixsetup
 setup-head-down|std::memcpy(rec.head + sizeof up, &down|std::memcpy(rec.head + 1, &down|vc2matrixsetup
 setup-uses-init|    int at = kZeros;\n    fromZeros(rec.uses, at);\n||vc2matrixsetup
 setup-source-raw|rec.sources[k] = static_cast<uint8_t>(source);|rec.sources[k] = static_cast<uint8_t>(v);|vc2matrixsetup
@@ -820,7 +820,7 @@ setup-sens-ids|static_cast<int16_t>(id + 2 + 2 * j)|static_cast<int16_t>(id + 4 
 setup-slot-order|rec.slots[2 * k + j];|rec.slots[2 * k + 1 - j];|vc2matrixsetup
 setup-depth-none|slot.depth = vc2MatrixDepth(static_cast<uint8_t>(source), dest, sens);|slot.depth = vc2MatrixDepth(1, dest, sens);|vc2matrixsetup
 setup-beam-zero|g.beams[i] = v == 0 \|\| v == kNoSource ? kNoBeam|g.beams[i] = v == kNoSource ? kNoBeam|vc2matrixsetup
-setup-settings-assigns|    assigns(g);\n    return record(g, part, held);|    return record(g, part, held);|vc2matrixsetup
+setup-settings-assigns|    assigns(g);\n    return record(g, part);|    return record(g, part);|vc2matrixsetup
 setup-init-part|vc2MatrixFromRecord(m, g.parts[links.part]);|vc2MatrixFromRecord(m, g.parts[0]);|vc2matrixsetup
 setup-init-uses|    std::ranges::copy(rec.uses, m.uses);\n||vc2matrixsetup
 setup-init-slots|    std::ranges::copy(rec.slots, m.slots);\n||vc2matrixsetup

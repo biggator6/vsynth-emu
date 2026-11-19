@@ -55,8 +55,8 @@ int16_t vc2MatrixDepth(uint8_t source, int32_t dest, int32_t sens) {
     return vc2MatrixDepthOf(dest, sens);
 }
 
-bool Vc2MatrixSetup::record(Vc2MatrixSettings& g, int part, bool held) {
-    if (held) return false;
+bool Vc2MatrixSetup::record(Vc2MatrixSettings& g, int part) {
+    if (params_.held()) return false;
     Vc2MatrixFront& rec = g.parts[part];
     const int32_t category = params_.partValue(part, kCategory);
     const auto up = static_cast<int16_t>(static_cast<uint32_t>(params_.partValue(part, kBendUp)) * kBendScale);
@@ -79,7 +79,7 @@ bool Vc2MatrixSetup::record(Vc2MatrixSettings& g, int part, bool held) {
             slot.depth = vc2MatrixDepth(static_cast<uint8_t>(source), dest, sens);
         }
     }
-    return true;
+    return !params_.held();
 }
 
 void Vc2MatrixSetup::assigns(Vc2MatrixSettings& g) {
@@ -91,9 +91,9 @@ void Vc2MatrixSetup::assigns(Vc2MatrixSettings& g) {
         g.assigns[i] = static_cast<uint8_t>(params_.systemValue(kAssigns[i]));
 }
 
-bool Vc2MatrixSetup::settings(Vc2MatrixSettings& g, int part, bool held) {
+bool Vc2MatrixSetup::settings(Vc2MatrixSettings& g, int part) {
     assigns(g);
-    return record(g, part, held);
+    return record(g, part);
 }
 
 void Vc2MatrixSetup::init(Vc2MatrixWords& m, Vc2MatrixLinks& links, const Vc2MatrixSettings& g,

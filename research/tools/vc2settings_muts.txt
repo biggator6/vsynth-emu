@@ -2,8 +2,11 @@
 # rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286),
 # vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp), vc2settingsosc
 # (Vc2PartSettingsOsc.cpp, v288), vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289), vc2settingsvocoder
-# (Vc2PartSettingsVocoder.cpp, v290) and vc2settingsmodes (Vc2PartSettingsModes.cpp, v291; Vc2PartNodes.h's `of`
-# planted at its call, by the source and part it's given).  Not planted: the depth
+# (Vc2PartSettingsVocoder.cpp, v290), vc2settingsmodes (Vc2PartSettingsModes.cpp, v291; Vc2PartNodes.h's `of`
+# planted at its call, by the source and part it's given), vc2settingsdispatch (Vc2PartSettingsDispatch.cpp, v292) and
+# vc2settingsmatrix (Vc2MatrixSetup.cpp's flag tests, v292, which xt_vc2settings' flips reach and xt_vc2cosm's
+# don't; the dispatcher's part given to the Matrix's set-up is not planted: the check gives part 0 alone, as rom.4's
+# handler does).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -368,3 +371,38 @@ modes-autonote-legato-read|        p_.value(block, kPartZero, 0, kLegato);   // 
 modes-autonote-off|    int32_t on = 0;|    int32_t on = 1;|vc2settingsmodes
 modes-autonote-set|    out.setAutoNote(on);|    out.setAutoNote(on != 0);|vc2settingsmodes
 modes-autonote-legato|    out.setAutoNoteLegato();\n|\n|vc2settingsmodes
+dispatch-no-modes|    return modes(t, part, nodes, out) && bytes(t, part)|    return bytes(t, part)|vc2settingsdispatch
+dispatch-no-bytes|&& bytes(t, part) && common(t, part)|&& common(t, part)|vc2settingsdispatch
+dispatch-no-common|&& common(t, part) && oscs(t, part)|&& oscs(t, part)|vc2settingsdispatch
+dispatch-no-oscs|&& oscs(t, part) && mixes(t, part)|&& mixes(t, part)|vc2settingsdispatch
+dispatch-no-mixes| && mixes(t, part) &&\n| &&\n|vc2settingsdispatch
+dispatch-no-envelopes|           envelopes(t, part) && lfos(t, part)|           lfos(t, part)|vc2settingsdispatch
+dispatch-no-lfos|&& lfos(t, part) && cosms(t, part)|&& cosms(t, part)|vc2settingsdispatch
+dispatch-no-cosms|&& cosms(t, part) && tvas(t, part)|&& tvas(t, part)|vc2settingsdispatch
+dispatch-no-tvas|&& tvas(t, part) && setup.settings(g, part)|&& setup.settings(g, part)|vc2settingsdispatch
+dispatch-no-matrix| && setup.settings(g, part) &&\n| &&\n|vc2settingsdispatch
+dispatch-no-vocoder|setup.settings(g, part) &&\n           vocoder(t, part, out);|setup.settings(g, part);|vc2settingsdispatch
+dispatch-bytes-common|bytes(t, part) && common(t, part)|common(t, part) && bytes(t, part)|vc2settingsdispatch
+dispatch-mixes-envelopes|&& mixes(t, part) &&\n           envelopes(t, part) &&|&& envelopes(t, part) &&\n           mixes(t, part) &&|vc2settingsdispatch
+dispatch-matrix-vocoder|setup.settings(g, part) &&\n           vocoder(t, part, out);|vocoder(t, part, out) &&\n           setup.settings(g, part);|vc2settingsdispatch
+dispatch-matrix-record|setup.settings(g, part) &&|setup.record(g, part) &&|vc2settingsdispatch
+system-no-trailer|    oscTrailer(t);\n|\n|vc2settingsdispatch
+system-no-lfo|    lfoSystem(t);\n|\n|vc2settingsdispatch
+system-no-route|    tvaRoute(t);\n|\n|vc2settingsdispatch
+system-no-channel|    matrixChannel(g, states);\n|\n|vc2settingsdispatch
+system-order|    lfoSystem(t);\n    tvaRoute(t);|    tvaRoute(t);\n    lfoSystem(t);|vc2settingsdispatch
+assigns-no-assigns|    setup.assigns(g);\n|\n|vc2settingsdispatch
+assigns-no-controls|    tvaControls(t);\n|\n|vc2settingsdispatch
+assigns-order|    setup.assigns(g);\n    tvaControls(t);|    tvaControls(t);\n    setup.assigns(g);|vc2settingsdispatch
+calibration-no-osc|    oscCalibration(t);\n|\n|vc2settingsdispatch
+calibration-no-trailer|    tvaTrailer(t);\n|\n|vc2settingsdispatch
+calibration-order|    oscCalibration(t);\n    tvaTrailer(t);|    tvaTrailer(t);\n    oscCalibration(t);|vc2settingsdispatch
+channel-switch-id|kReceiveSwitch = 71,|kReceiveSwitch = 70,|vc2settingsdispatch
+channel-channel-id|kReceiveChannel = 72;|kReceiveChannel = 73;|vc2settingsdispatch
+channel-switch-test|kReceiveSwitch) == 0) {|kReceiveSwitch) != 0) {|vc2settingsdispatch
+channel-state-at|kStateAt = 2;|kStateAt = 0;|vc2settingsdispatch
+channel-unreceived-at|        g.channel = states.unreceived();|        g.channel = states.unreceived() + kStateAt;|vc2settingsdispatch
+channel-block|p_.value(Block::kSystemB, 0, 0, kReceiveSwitch)|p_.value(Block::kSystem, 0, 0, kReceiveSwitch)|vc2settingsdispatch
+channel-falls-on|        return;\n    }\n    g.channel = states.receiving|    }\n    g.channel = states.receiving|vc2settingsdispatch
+matrix-held-end|    return !params_.held();\n}|    return true;\n}|vc2settingsmatrix
+matrix-held-start|    if (params_.held()) return false;\n|\n|vc2settingsmatrix

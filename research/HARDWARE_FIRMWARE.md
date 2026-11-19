@@ -1546,6 +1546,60 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the dispatchers and G's channel word (2026-11-19, v292) {#vc2-part-settings-dispatch}
+
+Step 4.3's twentieth version (VC2_MODE_PLAN.md, step 4.3, item 9's seventh part): the four routines that run the
+readers, and G's channel word `0x893a5050`, on `Vc2PartSettings` (`Vc2PartSettingsDispatch.cpp`), checked by
+`xt_vc2settings`' seventh part. The Matrix's set-up (v247's `Vc2MatrixSetup`) is given to them.
+
+**The dispatchers.** Each calls its readers in turn and tests each answer:
+- **the part's** `0x8939b170(part)`, which the reload task `0x8939af10` calls with its object's part: the mode row
+  (`0x89396f70`), the part's bytes, the common, the OSC table, the mix, the envelopes, the LFOs, the COSM inputs, the
+  TVAs, the Matrix's settings (`0x893a51c0` on G), then the vocoder reader. The first that answers 0 stops the rest,
+  and the dispatcher answers the last answer it got.
+- **the system's** `0x8939b0d0()`: the OSC table's trailer (`0x893a1000`), the LFOs' system byte, the TVA's route,
+  then G's channel word.
+- **the assignments'** `0x8939b110()`: the Matrix's system assignments (`0x893a50b0`), then the TVA's controls flag.
+- **the calibration's** `0x8939b140()`: the OSC table's calibration (`0x893a1060`), then the TVA's trailer.
+
+Every reader the last three call answers 1, so their tests never stop them; the port calls them in order.
+
+**G's channel word** (`0x893a5050(G)`, system B's read object `0x89320760`): with Part 1 Receive Switch (ID 71) at 0,
+G+0x840 is the word at `0x8999738c` (by `0x893a3010`); otherwise it is the word in the channel states' table
+`0x8950d6e0` at 64 × the byte at `0x8950d6d9` + 4 × Part 1 Receive Channel (ID 72), plus 2. It answers 1. In the image
+that byte is 0 and the table holds 64 channel states' addresses (16 a source; sources 2 and 3 alike), and
+`0x8999738c` is 0. The port takes both words through `Vc2ChannelStates`.
+
+**v247's record, put right.** rom.4's `0x893a46f0` and `0x893a51c0` test flag 0 after their reads as well as before,
+and answer 0 if it was set in between. v247's port answered true there, and took the flag as a bool given at the start;
+xt_vc2cosm's fourth part never sets the flag during a read, so it couldn't show it. `Vc2MatrixParams` now has `held()`,
+which `record` tests before and after, as the other readers do; xt_vc2cosm's line is as it was.
+
+**The check.** It is `xt_vc2settings`' seventh part, on the seed six after the run's. Each case is noise in every
+table, the nodes and G (`0x89997398`, compared as memory in every part), the source byte drawn 0…3 and `0x8999738c`
+drawn, the table left as rom.4 holds it; the port's `Vc2ChannelStates` reads the same words. Then 400 events: the
+part's dispatcher on part 0 (as rom.4's handler `0x89392830` gives), the other three, G's channel word alone, or the
+Matrix's settings alone (`0x893a51c0` on a drawn part, the flip within its reads). The last is there because in the
+part's dispatcher the Matrix's answer can't show: the vocoder reader after it tests flag 0 before any read, so a
+record that wrongly answered true would stop there all the same (a first run of the plants missed it). Every
+reader is rom.4's own, the Matrix's set-up too, against v247's on `SettingsMatrixParams`, the same reads; the earlier
+parts' hooks on the mode row's messages and the vocoder's callees stay. The store's special IDs are now one table of
+`SettingsNarrow` rows (an ID, its count of values, how often, where from), which this part extends:
+- Receive Switch 0…1 half the time, Receive Channel 0…15 always (past the table rom.4 reads what lies around it);
+- the eight Matrix Controls' Sens 1 and 2 −128…127 always, as v247's check draws them: rom.4's depth routine
+  (`0x893a36a0`) reads its tables by them, and faulted on the store's wider words in a first run.
+
+The part's dispatcher draws its flip over its whole run of reads (about 7,000), or half the time over its first 64:
+a flag 0 set during the bytes' or the common's 20 reads is the only way the common is the one to give up.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first six parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsDispatch.cpp` is reached, every reader in the chain giving up now and
+  then; and `Vc2MatrixSetup.cpp`'s flag tests (its other routines are xt_vc2cosm's).
+- `mutate_vc2.py --settings`: 392 plants, none missed; v292's 35 new, two of them on `Vc2MatrixSetup.cpp`'s flag
+  tests (port `vc2settingsmatrix`). `--cosm`: 1,439, none missed, its two plants on the record's flag and the
+  settings' order given the new signature's text. `--sets`: 374, none missed.
+
 ### The VC-2 part's settings by ID: the mode row and Auto Note's switch (2026-11-19, v291) {#vc2-part-settings-modes}
 
 Step 4.3's nineteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's sixth part): the dispatcher's first reader,

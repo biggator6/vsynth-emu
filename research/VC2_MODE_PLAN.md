@@ -749,6 +749,11 @@ version against rom.4's routines with what it calls hooked:
         or 1 taking the part's Auto Note On Switch; xt_vc2settings' sixth part (HARDWARE_FIRMWARE.md, "The VC-2 part's
         settings by ID: the mode row and Auto Note's switch"). Left: the dispatchers, the Category and budget and the
         nodes.
+      - the dispatchers and G's channel word done (v292): `0x8939b170` (every reader of a part in rom.4's order, the
+        Matrix's settings v247's), `0x8939b0d0`, `0x8939b110`, `0x8939b140`, and `0x893a5050` through
+        `Vc2ChannelStates`; v247's record now tests flag 0 after its reads too, as rom.4's does; xt_vc2settings' seventh
+        part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the dispatchers and G's channel word"). Left: the
+        nodes, the Category and budget, the static M and event 0x200.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

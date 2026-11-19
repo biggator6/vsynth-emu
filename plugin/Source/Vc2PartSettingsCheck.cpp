@@ -11,10 +11,11 @@ namespace {
 using Settings = Vc2PartSettings;
 using Block = Vc2ParamBlock;
 constexpr uint32_t kHeldAt = 0x8993d0c0, kGetter = 0x89324350, kTypedGetter = 0x89324370;    // [FW]
-constexpr int16_t kCosmTypeId = 0x463;                       // [FW] a COSM input's type, 0…16 (the run table's)
-// [FW] IDs drawn within a few values half the time: the OSCs' Types 0…3 (v289), Formant Template 0…17 (v290), either
-// side of the templates' 16
-constexpr std::pair<int16_t, uint32_t> kNarrowIds[] = { { 0x2e5, 4 }, { 0x319, 4 }, { 0x1a0, 18 } };
+// [FW] IDs drawn within a few values: a COSM input's type always, 0…16 (the run table's); half the time the OSCs'
+// Types 0…3 (v289), Formant Template 0…17 (v290), either side of the templates' 16
+constexpr SettingsNarrow kNarrowIds[] = { { 0x463, Vc2PartSettingsTables::kCosmTypes, kAlways },
+                                          { 0x2e5, 4, kHalfTheTime }, { 0x319, 4, kHalfTheTime },
+                                          { 0x1a0, 18, kHalfTheTime } };
 constexpr uint32_t kLfoWords = 0x3200, kTvaWords = 0x1804;   // the tables' words; the bytes past them by hand
 
 // [FW] the read objects' set-ups, by block
@@ -64,7 +65,8 @@ std::string settingsDifference(SettingsSides& s) {
         { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" }, { kStepsAt, &t.steps, sizeof t.steps, "step counts" },
         { kRobotAt, &t.robot, sizeof t.robot, "robot human depth" },
         { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" },
-        { kModesAt, &t.modes, sizeof t.modes, "mode rows" }, { kNodesAt, &s.nodes, sizeof s.nodes, "nodes" } });
+        { kModesAt, &t.modes, sizeof t.modes, "mode rows" }, { kNodesAt, &s.nodes, sizeof s.nodes, "nodes" },
+        { kMatrixAt, &s.g, sizeof s.g, "G" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -124,8 +126,8 @@ const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCount
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
-    different += settingsRunPart(s, run, kVocoderPartRow);
-    return different + settingsRunPart(s, run, kModePartRow);
+    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow }) different += settingsRunPart(s, run, *p);
+    return different + settingsRunPart(s, run, kDispatchPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -158,11 +160,9 @@ int32_t SettingsStore::value(const SettingsCall& c) const {
     h ^= h >> 15;
     const uint32_t pick = h & 7, v = h >> 3;
     if (c.block == kOscBlockCall) return v % 64 == 0 ? 0 : pick < 6 ? 1 : (int32_t)(h | 0x100);
-    if (c.id == kCosmTypeId) return (int32_t)(v % Vc2PartSettingsTables::kCosmTypes);
-    for (const auto& [id, values] : kNarrowIds)
-        if (c.id == id && pick < 4) return (int32_t)(v % values);
-    for (const auto& [id, values] : narrow)
-        if (c.id == id && pick < 4) return (int32_t)(v % values);
+    for (const std::span<const SettingsNarrow> ids : { std::span<const SettingsNarrow>(kNarrowIds), narrow })
+        for (const SettingsNarrow& n : ids)
+            if (c.id == n.id && pick < n.picks) return n.from + (int32_t)(v % n.values);
     if (pick < 4) return (int32_t)(v % 128);
     if (pick < 6) return (int32_t)(v % 129) - 64;
     return pick == 6 ? kEdges[v % std::size(kEdges)] : (int32_t)(h * 2654435761u);
@@ -243,7 +243,7 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 }
 
 int main(int argc, char** argv) {
-    const Vc2CheckStart start { "xt_vc2settings", vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath>,
+    const Vc2CheckStart start { "xt_vc2settings", vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath, vc2LoadMatrix>,
                                 { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" } };
     return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts, settingsMoreParts);
 }
