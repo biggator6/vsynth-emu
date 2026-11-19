@@ -100,4 +100,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2AssignNotes.cpp
     Source/Vc2VoiceQueue.cpp
     Source/Vc2VoiceClass.cpp
+    Source/Vc2NoteMatrix.cpp
+    Source/Vc2Sets.cpp
 )

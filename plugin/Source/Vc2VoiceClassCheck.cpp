@@ -32,7 +32,7 @@ constexpr Hook kHooks[] = {
     { 0x89396650, kVoicesNote, Shape::regs0 }, { 0x893967a0, kVoicesNote, Shape::regs0 },
     { 0x893968b0, kVoicesNote, Shape::regs0 }, { 0x893a76a0, kVoicesSet, Shape::regs1 },
     { 0x893a76d0, kVoicesSet, Shape::setNote }, { 0x893a7a20, kVoicesSet, Shape::regs1 },
-    { 0x893a7b20, kVoicesSet, Shape::setNote }, { 0x893a7c50, kVoicesSet, Shape::regs1 },
+    { 0x893a7b20, kVoicesSet, Shape::setNote }, { 0x893a7c50, kVoicesSet, Shape::regs2 },
     { 0x893a7cc0, kVoicesSet, Shape::set },    { 0x893a7df0, kVoicesSet, Shape::regs1 },
     { 0x893a7f10, kVoicesSet, Shape::set },    { 0x893018e0, kVoicesOs, Shape::regs0 },
     { 0x893018f0, kVoicesOs, Shape::regs0 },   { 0x893018b0, kVoicesOs, Shape::regs0 },
@@ -209,8 +209,8 @@ void ClassPortParts::convertSet(uint32_t set, const Vc2SetCall& call, uint32_t n
     logged(kVoicesSet, kHooks[kConvert].routine, set, { call.channelAt, call.byteAt, call.word, note });
 }
 
-void ClassPortParts::releaseSet(uint32_t set, uint32_t velocity) {
-    logged(kVoicesSet, kHooks[kReleaseSet].routine, set, { velocity });
+void ClassPortParts::releaseSet(uint32_t set, uint32_t velocity, uint32_t note) {
+    logged(kVoicesSet, kHooks[kReleaseSet].routine, set, { velocity, note });
 }
 
 void ClassPortParts::updateSet(uint32_t set, const Vc2SetCall& call) {

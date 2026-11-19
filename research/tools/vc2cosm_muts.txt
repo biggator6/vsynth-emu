@@ -821,7 +821,7 @@ setup-slot-order|rec.slots[2 * k + j];|rec.slots[2 * k + 1 - j];|vc2matrixsetup
 setup-depth-none|slot.depth = vc2MatrixDepth(static_cast<uint8_t>(source), dest, sens);|slot.depth = vc2MatrixDepth(1, dest, sens);|vc2matrixsetup
 setup-beam-zero|g.beams[i] = v == 0 \|\| v == kNoSource ? kNoBeam|g.beams[i] = v == kNoSource ? kNoBeam|vc2matrixsetup
 setup-settings-assigns|    assigns(g);\n    return record(g, part, held);|    return record(g, part, held);|vc2matrixsetup
-setup-init-part|const Vc2MatrixFront& rec = g.parts[links.part];|const Vc2MatrixFront& rec = g.parts[0];|vc2matrixsetup
+setup-init-part|vc2MatrixFromRecord(m, g.parts[links.part]);|vc2MatrixFromRecord(m, g.parts[0]);|vc2matrixsetup
 setup-init-uses|    std::ranges::copy(rec.uses, m.uses);\n||vc2matrixsetup
 setup-init-slots|    std::ranges::copy(rec.slots, m.slots);\n||vc2matrixsetup
 setup-init-routines|    std::ranges::copy(rec.routines, m.routines);\n||vc2matrixsetup

@@ -1,0 +1,88 @@
+# Planted errors in the VC-2 part's conversion sets C and the notes' Matrix objects M, for mutate_vc2.py --sets: each
+# must make xt_vc2sets, on rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2sets (Vc2Sets.cpp, v280)
+# and vc2notematrix (Vc2NoteMatrix.cpp).  Not planted: the make's test of M's address (never 0: a base plus a multiple),
+# the bend's test of 0 (the two other ways give 0 there too).
+sets-first-child|kFirstChild = 0x04;|kFirstChild = 0x08;|vc2sets
+sets-osc-stride|kOscStride = In::kOscs[1] - In::kOscs[0],|kOscStride = In::kOscs[1] - In::kOscs[0] + 4,|vc2sets
+sets-cosm-stride|kCosmStride = In::kCosms[1] - In::kCosms[0];|kCosmStride = In::kCosms[1] - In::kCosms[0] + 4;|vc2sets
+sets-common-bytes|0, 0, 10, 0x04, 1, In::kOscSet|0, 0, 12, 0x04, 1, In::kOscSet|vc2sets
+sets-common-block|In::kOscSet, 0 },|In::kStructure, 0 },|vc2sets
+sets-osc-bytes|0x893a0150, 0x108, 0x08, 2,|0x893a0150, 0x100, 0x08, 2,|vc2sets
+sets-osc-refresh|0x893a0310, 0, 0x893a0150,|0x893a0310, 0, 0x893a0151,|vc2sets
+sets-mix-block|In::kMix, 0 },|In::kMix + 4, 0 },|vc2sets
+sets-mix-routine|0x8939bd90, 0x8939bdb0, 0x8939be30, 0x8939be40, 0x8939be60,|0x8939bd90, 0x8939bdb0, 0x8939be30, 0x8939be60, 0x8939be40,|vc2sets
+sets-env-count|0x8939a810, 0, 28, 0x14, 13,|0x8939a810, 0, 28, 0x14, 12,|vc2sets
+sets-env-block|In::kEnvelopes + In::kEnvelopeStride, In::kEnvelopeStride },|In::kEnvelopes, In::kEnvelopeStride },|vc2sets
+sets-env-release|0x8939a800, 0x8939a810, 0, 28|0x8939a800, 0, 0, 28|vc2sets
+sets-env-bytes|0, 28, 0x14, 13,|0, 32, 0x14, 13,|vc2sets
+sets-lfo-block|In::kLfos + In::kLfoStride, In::kLfoStride }|In::kLfos, In::kLfoStride }|vc2sets
+sets-lfo-count|0, 0, 20, 0x48, 5,|0, 0, 20, 0x48, 4,|vc2sets
+sets-lfo-stride|In::kLfos + In::kLfoStride, In::kLfoStride }|In::kLfos + In::kLfoStride, In::kLfoStride * 2 }|vc2sets
+sets-tva-block|In::kTva, 0 },|In::kTva + 4, 0 },|vc2sets
+sets-tva-slot|40, 0x64, 1,|40, 0x60, 1,|vc2sets
+sets-block-stride|return note + row.noteAt + row.noteStride * i;|return note + row.noteAt + row.noteStride * (i + 1);|vc2sets
+make-kind|    c.kind = w.kind;|    c.kind = w.part;|vc2sets
+make-mode-kind|c.mode = parts.modeOf(parts.firstByte(v.part), c.kind);\n    w.input|c.mode = parts.modeOf(parts.firstByte(v.part), 0);\n    w.input|vc2sets
+make-structure|    w.input.at(In::kStructure) = c.mode;\n    const uint32_t m|    const uint32_t m|vc2sets
+make-matrix-number|matrices.addressOf(v.number)|matrices.addressOf(v.key % 24u)|vc2sets
+make-matrix-kind|matrices.construct(m, call, c.kind, in, parts);|matrices.construct(m, call, 0, in, parts);|vc2sets
+make-matrix-store|    c.matrix = m;\n    eachChild|    eachChild|vc2sets
+make-matrix-late|    if (m != 0) matrices.construct(m, call, c.kind, in, parts);\n    c.matrix = m;|    c.matrix = 0;\n    if (m != 0) matrices.construct(m, call, c.kind, in, parts);|vc2sets
+make-common-kind|if (isCommon(row) && c.kind != 0) {|if (isCommon(row) && c.mode != 0) {|vc2sets
+make-common-note|            w.input.at(In::kOscSet) = 0;\n|\n|vc2sets
+make-common-clear|            child = 0;\n            w.input|            w.input|vc2sets
+make-alloc-index|parts.allocate(row, v.number, i)|parts.allocate(row, v.number, 0)|vc2sets
+make-alloc-number|parts.allocate(row, v.number, i)|parts.allocate(row, v.key, i)|vc2sets
+make-construct-test|if (made != 0) parts.construct(|parts.construct(|vc2sets
+make-construct-matrix|childBlock(row, note, i), c.matrix, c.kind, i });|childBlock(row, note, i), 0, c.kind, i });|vc2sets
+make-construct-index|c.matrix, c.kind, i });|c.matrix, c.kind, 0 });|vc2sets
+make-construct-kind|c.matrix, c.kind, i });|c.matrix, c.mode, i });|vc2sets
+make-child-store|        child = made;\n|\n|vc2sets
+end-test|if (child != 0) parts.end(row, child);|parts.end(row, child);|vc2sets
+end-null|    if (set == 0) return;\n|    if (set == 0) set = kAt;\n|vc2sets
+convert-structure|    notes.at(note).input.at(In::kStructure) = c.mode;\n    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.convert|    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.convert|vc2sets
+convert-block|parts.convert(row, child, call, childBlock(row, note, i));|parts.convert(row, child, call, childBlock(row, note, 0));|vc2sets
+live-test|if (!isCommon(row) \|\| child != 0) call(row, child, i);|call(row, child, i);|vc2sets
+live-common|if (!isCommon(row) \|\| child != 0) call(row, child, i);|if (child != 0) call(row, child, i);|vc2sets
+release-velocity|static_cast<uint8_t>(velocity)|velocity|vc2sets
+release-test|if (child != 0) parts.release(|parts.release(|vc2sets
+release-row|const Vc2SetChild& row = kChildren[kEnvelopes];|const Vc2SetChild& row = kChildren[kEnvelopes + 1];|vc2sets
+release-block|static_cast<uint8_t>(velocity), childBlock(row, note, i));|static_cast<uint8_t>(velocity), note);|vc2sets
+update-mode|    c.mode = parts.modeOf(parts.firstByte(v.part), c.kind);\n    matrices.update|    matrices.update|vc2sets
+update-matrix|    matrices.update(c.matrix, call, c.kind, in, parts);\n|\n|vc2sets
+update-matrix-kind|matrices.update(c.matrix, call, c.kind, in, parts);|matrices.update(c.matrix, call, c.mode, in, parts);|vc2sets
+update-call|parts.update(row, child, call); });|parts.update(row, child, Vc2SetCall {}); });|vc2sets
+copy-structure|    notes.at(note).input.at(In::kStructure) = c.mode;\n    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.copy|    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.copy|vc2sets
+copy-block|parts.copy(row, child, childBlock(row, note, i));|parts.copy(row, child, note);|vc2sets
+refresh-first|if (parts.refresh(row, childSlot(c, row, 0), call) != 0) return 1;|if (parts.refresh(row, childSlot(c, row, 0), call) != 0) return 0;|vc2sets
+refresh-word|return parts.refresh(row, childSlot(c, row, 1), call) != 0 ? 1 : 0;|return parts.refresh(row, childSlot(c, row, 1), call);|vc2sets
+refresh-row|const Vc2SetChild& row = kChildren[kOsc];|const Vc2SetChild& row = kChildren[kOsc + 1];|vc2sets
+refresh-both|if (parts.refresh(row, childSlot(c, row, 0), call) != 0) return 1;|parts.refresh(row, childSlot(c, row, 0), call);|vc2sets
+matrix-bend-centre|kBendCentre = 8192;|kBendCentre = 8191;|vc2notematrix
+matrix-controls-order|{ 7, 11, 10, 93, 91 }|{ 7, 10, 11, 93, 91 }|vc2notematrix
+matrix-controls-93|{ 7, 11, 10, 93, 91 }|{ 7, 11, 10, 94, 91 }|vc2notematrix
+matrix-half-slots|kHalfSlots = 8;|kHalfSlots = 4;|vc2notematrix
+matrix-bend-shift|(static_cast<uint32_t>(v) * up << 3) >> 16|(static_cast<uint32_t>(v) * up << 2) >> 16|vc2notematrix
+matrix-bend-down|(below * down << 3) >> 16|(below * up << 3) >> 16|vc2notematrix
+matrix-bend-sign|return -static_cast<int32_t>((below|return static_cast<int32_t>((below|vc2notematrix
+matrix-bend-side|if (v > 0) return|if (v > 1) return|vc2notematrix
+matrix-bend-wide|const int16_t v = static_cast<int16_t>(raw - kBendCentre);|const int32_t v = raw - kBendCentre;|vc2notematrix
+matrix-half-at|bytes[0] \| bytes[1] << 8|bytes[1] \| bytes[0] << 8|vc2notematrix
+matrix-bend-down-at|halfAt(rec.head + 2)|halfAt(rec.head + 1)|vc2notematrix
+matrix-main-up|w.bendUp = main ? halfAt(rec.head) : 0;|w.bendUp = halfAt(rec.head);|vc2notematrix
+matrix-main-down|w.bendDown = main ? halfAt(rec.head + 2) : 0;|w.bendDown = halfAt(rec.head + 2);|vc2notematrix
+matrix-part-link|    w.links.part = part;\n|\n|vc2notematrix
+matrix-record|    vc2MatrixFromRecord(w.m, rec);\n|\n|vc2notematrix
+matrix-slots-from|const std::size_t from = main ? kHalfSlots : 0;|const std::size_t from = main ? 0 : kHalfSlots;|vc2notematrix
+matrix-slot-field|w.m.slots[k].dest = 0;|w.m.slots[k].unread = 0;|vc2notematrix
+matrix-cleared|    w.cleared.fill(0);\n|\n|vc2notematrix
+matrix-controls-at|reads.controlOf(channel, kControls[k]);|reads.controlOf(channel, kControls[k] + 1);|vc2notematrix
+matrix-channel|w.links.channel = reads.channelOf(v.keys);|w.links.channel = v.keys;|vc2notematrix
+matrix-head0|w.m.head[0] = kind == 0 ? v.byte43 : 0;|w.m.head[0] = v.byte43;|vc2notematrix
+matrix-head1|w.m.head[1] = v.key;|w.m.head[1] = v.byte42;|vc2notematrix
+matrix-head2|w.m.head[2] = v.byte42;|w.m.head[2] = v.key;|vc2notematrix
+matrix-head-call|    vc2MatrixHead(in.partM, in.partLinks, part, { w.m.head[0], w.m.head[1], w.m.head[2] });\n|\n|vc2notematrix
+matrix-head-part|in.partLinks, part, {|in.partLinks, part + 1, {|vc2notematrix
+matrix-update-kind|fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|fromPart(at(m), reads.firstByte(v.part), 0, in, reads);|vc2notematrix
+matrix-update-channel|    const Vc2SetVoice v = reads.voiceAt(call.channelAt);\n    fromPart(at(m)|    const Vc2SetVoice v = reads.voiceAt(call.channelAt);\n    at(m).links.channel = reads.channelOf(v.keys);\n    fromPart(at(m)|vc2notematrix
+matrix-update-head|    fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|    at(m).m.head[1] = v.key;\n    fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|vc2notematrix

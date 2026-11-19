@@ -1546,6 +1546,110 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's conversion sets and the notes' Matrix (2026-11-19, v280) {#vc2-part-sets}
+
+Step 4.3's eighth version (VC2_MODE_PLAN.md, step 4.3, item 7): a voice's conversion set C, which v279's virtuals call,
+and the note's Matrix object M. `Vc2Sets` and `Vc2NoteMatrices` are bit for bit against rom.4's own routines in
+`xt_vc2sets`.
+
+**C.** There are 24 sets of 0x6c bytes from `0x89997fe8`, one by a voice's number (`0x893a76a0` multiplies by 108
+whatever its r4 says).
+- +0 holds the note's kind (W+0x742).
+- +1 holds the part's byte by kind, read at `0x89998a14` + 16 × the part + the kind.
+- +4…+0x67 hold the children, 0 for none: +4 the common, +8 and +0xc the two OSC blocks', +0x10 the mix, +0x14…+0x44
+  13 envelopes, +0x48…+0x58 5 LFOs, +0x5c and +0x60 the two COSM inputs, +0x64 the TVA.
+- +0x68 holds the note's M.
+
+**The children.** Each kind has an allocator, a constructor, an end, a conversion, an update and a copy; the envelopes
+a release too, the OSC blocks a refresh. Each child converts a block of the note's input (W):
+
+| Kind | Count | Allocator (bytes) | Constructor | Block in W |
+|---|---|---|---|---|
+| common | 1 | `0x893a1940` (10) | `0x893a1960` | +0xc |
+| OSC | 2 | `0x8939fdd0` (0x108) | `0x8939fe00` | +0x434, +0x53c |
+| mix | 1 | `0x8939bd90` (32) | `0x8939bdb0` | +0x644 |
+| envelope | 13 | `0x8939a620` (28) | `0x8939a690` | +0x15c + 0x38 × n: the input's envelope blocks 2…14 |
+| LFO | 5 | `0x8939b690` (20) | `0x8939b6c0` | +0x44 + 0x20 × n: its LFO blocks 2…6 |
+| COSM input | 2 | `0x89399ae0` (60) | `0x89399b10` | +0x658, +0x6a0 |
+| TVA | 1 | `0x893a67d0` (40) | `0x893a67f0` | +0x6e8 |
+
+- An allocator is given its bytes and the voice's number. The OSCs', envelopes', LFOs' and COSM inputs' are given the
+  index as well.
+- A constructor is given the object, C's call struct, its block, M, and on the stack the kind. The ones with an index
+  take it on the stack after the kind. The common's takes neither M nor the stack.
+- The ends: `0x893a19b0`, `0x893a0000`, `0x8939be30`, `0x8939a780`, `0x8939b740`, `0x89399b80`, `0x893a68b0`, each given
+  the object and 3.
+- The conversions: `0x893a19c0`, `0x893a0040`, `0x8939be40`, `0x8939a790`, `0x8939b750`, `0x89399b90`, `0x893a68c0`.
+- The updates: `0x893a19e0`, `0x893a0250`, `0x8939be60`, `0x8939a7b0`, `0x8939b770`, `0x89399bb0`, `0x893a6940`.
+- The copies: `0x893a1a10`, `0x893a0310`, `0x8939bec0`, `0x8939a800`, `0x8939b7c0`, `0x89399c00`, `0x893a69a0`.
+- The envelopes' release is `0x8939a810`, the OSCs' refresh `0x893a0150`.
+
+**C's routines.** Each passes over the children in the table's order.
+- **The make `0x893a76d0(C, call, W)`.**
+  - C+0 takes the note's kind and C+1 the part's byte, which W+0 takes too.
+  - M is the voice's number's (`0x89e4741c` + 0x184 × it, `0x893a5d80`); it is constructed and kept at +0x68.
+  - Then each child is allocated and, when there is one, constructed and kept. The common is made for kind 0 alone;
+    otherwise C+4 and W+0xc take 0.
+- **The end `0x893a7a20(C, 3)`.** It does nothing for no C. Otherwise M's end, then each child's end, each only when
+  there is one.
+- **The conversion `0x893a7b20(C, call, W)`.** W+0 takes C+1 again, then each child's conversion on its block.
+- **The update `0x893a7cc0(C, call)`.** C+1 is read again, then M's update and each child's update.
+- **The copy `0x893a7df0(C, W)`.** W+0 takes C+1, then M's copy and each child's copy into its block.
+- In the conversion, the update and the copy, only the common is tested for none; the others are called whatever C
+  holds.
+- **The release `0x893a7c50(C, velocity, W)`.** It runs each envelope's release, given the velocity as a byte and its
+  block, when there is one. v279's key-off gives it W in r6, which v279's port left out: it does now.
+- **The refresh `0x893a7f10(C, call)`.** It answers 1 when the first OSC block's refresh answers anything but 0, else
+  whether the second's does.
+
+**The note's M.** There are 24 objects of 0x184 bytes from `0x89e4741c`. Up to +0x168 they are the Matrix's words
+(v243, v247).
+- +0x168 is the channel's state K's first word names, and +0x16c the part.
+- +0x170 and +0x172 hold the part's record's head, its Bend Ranges, or 0 when the kind isn't 0.
+- +0x174 holds the channel's bend by them: from the centre 8192, the product of the distance and the range × 8 / 65536,
+  negative below.
+- +0x178…+0x17c hold the channel's CC 7, 11, 10, 93 and 91 (its +0x84 + the number). +0x180…+0x183 are cleared.
+
+**M's routines.**
+- **The constructor `0x893a5db0(M, call, kind)`.**
+  - It writes +0x168, then the head: for kind 0 the voice's +0x43, its key and its +0x42; for any other kind 0, the
+    key and +0x42.
+  - The part's own M (`0x89997108`) takes the head when its part is the note's (v247's `0x893a2eb0`).
+  - Then the pass the update is too.
+- **The update `0x893a6010(M, call, kind)`.** It keeps +0x168. It copies the record's sources, uses, slots and
+  routines. +0x84…+0x165 take rom.4's 0xe2 bytes from `0x895402f6`, the run v247's M init takes, by the block move
+  `0x895061bc`; the two now share `vc2MatrixFromRecord`.
+  - Kind 0 clears the second eight slots' destinations, any other kind the first eight.
+  - Then the Bend Ranges, the bend, the controllers and the cleared bytes.
+- **M's end `0x893a5fe0` and copy `0x893a61f0`** are bare returns.
+
+**The check.** `xt_vc2sets` (40 cases in fcheck) runs rom.4's own on its own C, M, W, Matrix settings G and the part's
+M in .bss. Every routine of the children is hooked to log its arguments: a call struct is read through its pointer,
+and the stacked words read. Which arguments each routine reads is the check's own table: when it was the port's, a
+planted error in it changed both sides alike. An allocator answers an object or none; a refresh answers 0, 1 or any
+word. Each side's answers come from a generator of its own, the two seeded alike before each event. M's routines, the
+head and the block move run on both.
+
+The draws, before each event:
+- the voices' 16 bytes a call points at (their key tables, parts and numbers below 24);
+- the key tables' channel words, the channels' bends (the centre, its ends, near the centre, any) and the bytes past
+  them;
+- the parts' numbers (below 16, a few half the time, where the part's M's matches) and the part's bytes by kind;
+- C's words (the kinds 0 half the time, the children an object or none, M one of the pool);
+- M's words and channel;
+- W's kind, +0 and +0xc;
+- G's records, and the part's M with its part a few half the time.
+
+Each case is noise, then 400 events: the two placements, the make, the end (of none one time in eight), the
+conversion, the release, the update, the copy, the refresh, and M's constructor and update with any kind. After each,
+C, M, W, the part's M, the calls and the answer are compared.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line of `Vc2Sets.cpp` and `Vc2NoteMatrix.cpp` is reached, and every branch but the make's test of M's address,
+  rom.4's own, which can't fail.
+- `mutate_vc2.py --sets`: 84 plants, none missed.
+
 ### The VC-2 part's voices' virtuals and update queue (2026-11-19, v279) {#vc2-voice-class}
 
 Step 4.3's seventh version (VC2_MODE_PLAN.md, step 4.3, item 6): the note voice's class (vtable `0x898cd3dc`, which

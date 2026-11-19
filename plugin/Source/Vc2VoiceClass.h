@@ -7,16 +7,10 @@
 // unread, so the port isn't given it).  The note W's routines (v275), the conversion set C's (step 4.3's next
 // item), the update queue's (Vc2VoiceQueue) and the OS's lock through Vc2VoiceClassParts.  Bit for bit: xt_vc2voices'
 // fourth part.  HARDWARE_FIRMWARE.md, "The VC-2 part's voices' virtuals and update queue".  The notes' task.
+#include "Vc2NoteMatrix.h"
 #include "Vc2PartVoices.h"
 
 class Vc2Keys;
-
-// What C's routines are given: the voice's +0x34 and +0x53, by address, and a word
-struct Vc2SetCall {
-    uint32_t channelAt = 0;
-    uint32_t byteAt = 0;
-    uint32_t word = 0;
-};
 
 // What the virtuals call beyond the voice
 class Vc2VoiceClassParts {
@@ -31,7 +25,7 @@ public:
     virtual void makeSet(uint32_t set, const Vc2SetCall& call, uint32_t note) = 0;   // 0x893a76d0
     virtual void endSet(uint32_t set) = 0;                                          // 0x893a7a20(C, 3)
     virtual void convertSet(uint32_t set, const Vc2SetCall& call, uint32_t note) = 0;    // 0x893a7b20
-    virtual void releaseSet(uint32_t set, uint32_t velocity) = 0;                   // 0x893a7c50
+    virtual void releaseSet(uint32_t set, uint32_t velocity, uint32_t note) = 0;    // 0x893a7c50
     virtual void updateSet(uint32_t set, const Vc2SetCall& call) = 0;               // 0x893a7cc0
     virtual void copySet(uint32_t set, uint32_t note) = 0;                          // 0x893a7df0
     virtual uint32_t refreshSet(uint32_t set, const Vc2SetCall& call) = 0;          // 0x893a7f10

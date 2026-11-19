@@ -242,7 +242,7 @@ destroy-note-clear|        parts.endNote(w.node.note);\n        w.node.note = 0;
 destroy-set-clear|        parts.endSet(w.set);\n        w.set = 0;|        parts.endSet(w.set);|vc2class
 destroy-updated|    w.node.updated = 0;\n}\n\nvoid Vc2VoiceClass::keyOff|}\n\nvoid Vc2VoiceClass::keyOff|vc2class
 destroy-order|        parts.endSet(w.set);\n        w.set = 0;\n    }\n    w.node.updated = 0;|        w.set = 0;\n    }\n    w.node.updated = 0;\n    if (w.set != 0) parts.endSet(w.set);|vc2class
-keyoff-velocity|parts.releaseSet(w.set, w.node.byte2f);|parts.releaseSet(w.set, w.node.byte2e);|vc2class
+keyoff-velocity|parts.releaseSet(w.set, w.node.byte2f, w.node.note);|parts.releaseSet(w.set, w.node.byte2e, w.node.note);|vc2class
 keyoff-no-wait|    parts.waitQueue(kQueueAt + kQueueBytes * w.node.queue, voice);\n    if (w.set == 0 \|\| w.node.note == 0) return;\n    parts.releaseSet|    if (w.set == 0 \|\| w.node.note == 0) return;\n    parts.releaseSet|vc2class
 keyoff-release|    parts.noteRelease(w.node.note);|    parts.noteUpdate(w.node.note);|vc2class
 prepare-released|w.node.released = 1;|w.node.released = 0;|vc2class
@@ -302,3 +302,4 @@ waitall-signal|void Vc2UpdateQueue::waitAll(Vc2QueueParts& parts) { waitCurrent(
 moveto-advance|    advance(node, v);\n    unlink(node, v);\n    link(|    unlink(node, v);\n    link(|vc2queue
 moveto-unlink|    unlink(node, v);\n    link(node, kHeadAt|    link(node, kHeadAt|vc2queue
 moveto-queue|    v.at(node).queue = (uint8_t)queue;\n}|}|vc2queue
+keyoff-note|parts.releaseSet(w.set, w.node.byte2f, w.node.note);|parts.releaseSet(w.set, w.node.byte2f, w.set);|vc2class

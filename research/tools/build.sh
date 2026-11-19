@@ -30,15 +30,12 @@ SARP+=($( [ -f XtSinc.cpp ] && echo XtSinc.cpp ))   # render's windowed sinc, it
 # descriptors' form, XtPatchStore.cpp, is with each program's own
 source "$REPO/research/tools/vc2_tables.sh"
 V4=($(vc2Tables . .cpp))
-rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
-rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
-rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,xt_vc2tone,xt_vc2osc,classifier_test,rd}
-rm -f "$O"/xt_vc2tva
-rm -f "$O"/xt_vc2cosm
-rm -f "$O"/xt_vc2libm
-rm -f "$O"/xt_vc2voices
-rm -f "$O"/xt_vc2notes
-rm -f "$O"/xt_vc2keys
+# Every program this builds, gone first, so one that fails to build isn't run as it was
+BUILT=(xt_osc xt_cosm xt_lfo xt_env xt_fw xt_enc xt_analog xt_synth xt_tone xt_fx xt_files xt_arp xt_msm xt_vc2params
+       xt_vc2in xt_vc2legacy xt_vc2hireso xt_vc2vocoder xt_vc2carrier xt_vc2tracker xt_vc2kind6 xt_vc2autonote
+       xt_vc2mixer xt_vc2tone xt_vc2osc classifier_test rd xt_vc2tva xt_vc2cosm xt_vc2libm xt_vc2voices xt_vc2notes
+       xt_vc2keys xt_vc2sets)
+for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
    Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp \
@@ -54,6 +51,10 @@ rm -f "$O"/xt_vc2keys
 # The part's keys (v276) against rom.4's own routines, the OS clock hooked
 [ -f Vc2KeysCheck.cpp ] && cc -DXT_VC2KEYS_MAIN Vc2KeysCheck.cpp Vc2KeysEvents.cpp Vc2Keys.cpp Vc2KeysTables.cpp \
    "${SH4[@]}" -o "$O/xt_vc2keys" &
+# The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
+[ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
+   Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp \
+   "${SH4[@]}" -o "$O/xt_vc2sets" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
    "${SH4[@]}" -o "$O/xt_vc2libm" &

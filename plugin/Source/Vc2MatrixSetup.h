@@ -73,6 +73,9 @@ private:
     Vc2MatrixPart& part_;
 };
 
+// M's words from a part's record, as 0x893a2ee0 and a note's M (0x893a5db0, v280) take them: the record's sources,
+// uses, slots and routines, then +0x084…+0x165 the zeros' run (rom.4's 0xe2 bytes from 0x895402f6)
+void vc2MatrixFromRecord(Vc2MatrixWords& m, const Vc2MatrixFront& rec);
 // 0x893a2eb0: a note's velocity, key and poly key into M's head when it is M's part
 void vc2MatrixHead(Vc2MatrixWords& m, const Vc2MatrixLinks& links, int32_t part, const std::array<uint8_t, 3>& bytes);
 // 0x893a30d0: a patch's destination as M's, its uses bit set; 0 for none (no source, no sensitivity, past 78)

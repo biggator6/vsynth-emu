@@ -691,6 +691,11 @@ version against rom.4's routines with what it calls hooked:
         (HARDWARE_FIRMWARE.md, "The VC-2 part's voices' virtuals and update queue").
    7. C's frame: `0x893a76d0`, `0x893a7a20`, `0x893a7b20`, `0x893a7c50`, `0x893a7cc0`, `0x893a7df0`, `0x893a7f10`, and
       the note's M (`0x893a5db0`, `0x893a5fe0`, `0x893a6010`, `0x893a61f0`), its children behind an interface.
+      - done (v280): `Vc2Sets`, C's 24 sets word for word and its seven routines (and the placement), each a pass over
+        the children by a table of kinds behind `Vc2SetParts`; `Vc2NoteMatrices`, the notes' 24 M word for word, the
+        constructor and update (the end and copy are bare returns); xt_vc2sets (HARDWARE_FIRMWARE.md, "The VC-2 part's
+        conversion sets and the notes' Matrix"). The children of item 8 are the common, mix, envelopes, LFOs and TVA;
+        the OSC blocks' and COSM inputs' are behind the same interface, their converters v251's, v256's and v235's.
    8. C's children with no port, a version each: the common's (`0x893a1940…`), the envelopes' (`0x8939a620…`), the LFOs'
       (`0x8939b690…`), the mix's (`0x8939bd90…`), the TVA's (`0x893a67d0…`).
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the

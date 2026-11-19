@@ -98,7 +98,12 @@ bool Vc2MatrixSetup::settings(Vc2MatrixSettings& g, int part, bool held) {
 
 void Vc2MatrixSetup::init(Vc2MatrixWords& m, Vc2MatrixLinks& links, const Vc2MatrixSettings& g,
                           Vc2MatrixRefresh& refresh) {
-    const Vc2MatrixFront& rec = g.parts[links.part];
+    vc2MatrixFromRecord(m, g.parts[links.part]);
+    links.channel = g.channel;
+    levels(m, refresh);
+}
+
+void vc2MatrixFromRecord(Vc2MatrixWords& m, const Vc2MatrixFront& rec) {
     std::ranges::copy(rec.sources, m.sources);
     std::ranges::copy(rec.uses, m.uses);
     std::ranges::copy(rec.slots, m.slots);
@@ -108,8 +113,6 @@ void Vc2MatrixSetup::init(Vc2MatrixWords& m, Vc2MatrixLinks& links, const Vc2Mat
     fromZeros(m.last, at);
     fromZeros(m.terms, at);
     fromZeros(m.sums, at);
-    links.channel = g.channel;
-    levels(m, refresh);
 }
 
 void Vc2MatrixSetup::levels(Vc2MatrixWords& m, Vc2MatrixRefresh& refresh) {

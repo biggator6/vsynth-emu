@@ -46,7 +46,8 @@
 # xt_vc2voices, [cases] its cases (40).  --notes: vc2notes_muts.txt, in Vc2Notes.cpp (PORT=vc2notes: the part's
 # notes W, v275), through xt_vc2notes, [cases] its cases (40).  --keys: vc2keys_muts.txt, in Vc2Keys.cpp and
 # Vc2KeysTables.cpp (PORT=vc2keys, vc2keystables: the part's keys, v276), through xt_vc2keys, [cases] its cases
-# (40).  One line
+# (40).  --sets: vc2sets_muts.txt, in Vc2Sets.cpp and Vc2NoteMatrix.cpp (PORT=vc2sets, vc2notematrix: the part's
+# conversion sets and the notes' Matrix objects, v280), through xt_vc2sets, [cases] its cases (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist
@@ -82,6 +83,8 @@ HARNESSES = {
     '--notes': (mutlist.Harness('mutate_vc2', 'xt_vc2notes', 'vc2notes_muts.txt', ('vc2notes', '2024'),
                                 'XT_VC2NOTES_STOP'), '40'),
     '--keys': (mutlist.Harness('mutate_vc2', 'xt_vc2keys', 'vc2keys_muts.txt', ('vc2keys', '2024'), 'XT_VC2KEYS_STOP'),
+               '40'),
+    '--sets': (mutlist.Harness('mutate_vc2', 'xt_vc2sets', 'vc2sets_muts.txt', ('vc2sets', '2024'), 'XT_VC2SETS_STOP'),
                '40'),
     '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
                '40'),

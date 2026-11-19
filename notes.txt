@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's conversion sets and the notes' Matrix v280 (2026-11-19, on claude/vc2-part-4-3 after v279;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's conversion sets and the notes' Matrix"): step 4.3's eighth version, item 7
+  done. Vc2Sets, rom.4's 24 conversion sets C word for word with the placement, make, end, conversion, release,
+  update, copy and refresh, each a pass over C's children (the common, OSC blocks, mix, 13 envelopes, 5 LFOs, COSM
+  inputs, TVA) by a table behind Vc2SetParts; Vc2NoteMatrices, the notes' 24 Matrix objects M with the constructor and
+  update on v247's record words (vc2MatrixFromRecord, now shared with M's init); Vc2PoolOf, a pool of rom.4's objects
+  by number. New check xt_vc2sets: 0 different at seeds 2024, 7 and 31337; mutate_vc2.py --sets 84 planted, 0 missed.
+  v279's key-off now gives C's release the note W, as rom.4 does in r6 (a plant for it). Found: which arguments the
+  children's routines read belongs in the check's own table, not the port's, or a plant there changes both sides.
+  build.sh's programs to remove are one list. Not in the sound yet.
+
 The VC-2 part's voices' virtuals and update queue v279 (2026-11-19, on claude/vc2-part-4-3 after v278;
   HARDWARE_FIRMWARE.md, "The VC-2 part's voices' virtuals and update queue"): step 4.3's seventh version, item 6 done.
   Vc2VoiceClass, the note voice's six virtuals (the update, retune, destroy, key-off, prepare and change test) and the

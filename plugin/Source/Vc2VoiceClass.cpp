@@ -89,7 +89,7 @@ void Vc2VoiceClass::keyOff(uint32_t voice, Vc2PartVoices& v, Vc2VoiceClassParts&
     Vc2Voice& w = v.voice(voice);
     parts.waitQueue(kQueueAt + kQueueBytes * w.node.queue, voice);
     if (w.set == 0 || w.node.note == 0) return;
-    parts.releaseSet(w.set, w.node.byte2f);
+    parts.releaseSet(w.set, w.node.byte2f, w.node.note);
     parts.noteRelease(w.node.note);
 }
 

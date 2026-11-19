@@ -826,6 +826,10 @@ xt_vc2notes: 0 different
 keys: 40 cases, 16000 events: 682 inits, 663 resets, 1311 note-ons (56 at the most), 1370 note-offs (96 releasing), 673 Holds, 1475 Sostenutos (720 latching or clearing), 689 clears, 632 velocity factors
 queries: 1410 highest in a range (588 found), 695 highest, 709 sets, 641 fills, 677 tests; glides: 654 constructors, 677 resets, 1353 note-ons, 1397 note-offs (485 found); initializers: 94, 96 and 102
 xt_vc2keys: 0 different
+== xt_vc2sets
+sets: 40 cases, 16000 events: 1176 placements, 2516 makes (1290 with no common), 1213 ends, 1244 conversions, 1257 releases, 1326 updates, 1236 copies, 1175 refreshes; M: 1215 placements, 2379 constructors, 1263 updates
+children: 61610 allocations, 54034 constructors, 19721 ends, 30796 conversions, 32775 updates, 30568 copies, 12351 releases, 1520 refreshes
+xt_vc2sets: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

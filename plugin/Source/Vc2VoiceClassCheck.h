@@ -23,7 +23,7 @@ public:
     void makeSet(uint32_t set, const Vc2SetCall& call, uint32_t note) override;
     void endSet(uint32_t set) override;
     void convertSet(uint32_t set, const Vc2SetCall& call, uint32_t note) override;
-    void releaseSet(uint32_t set, uint32_t velocity) override;
+    void releaseSet(uint32_t set, uint32_t velocity, uint32_t note) override;
     void updateSet(uint32_t set, const Vc2SetCall& call) override;
     void copySet(uint32_t set, uint32_t note) override;
     uint32_t refreshSet(uint32_t set, const Vc2SetCall& call) override;
