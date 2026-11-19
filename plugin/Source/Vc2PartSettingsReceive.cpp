@@ -6,7 +6,7 @@
 // are kept; each source's node moved and its two glides aimed; for part 0, source 3's channel's change heard.  Both
 // routines answer 1 on every way.  And (v299) the routing's reset 0x89393e30, which calls the receive channel for part
 // 0: ChordMemory Switch's change; with its flag every node to no channel, their glides on the spare table and reset
-// (each node moved once a glide, as rom.4 does, the second move finding nothing to do), then by channel its Hold-release
+// (each node moved once a glide, as rom.4 does, the second move finding nothing to do), then by channel its Hold-press
 // byte and the four sources' key tables reset, the receive channel (whose 1 lets it go on), and part 0's node of source 1
 // given the held class (0x89392820, a bare answer of 0, chooses it over the plain).  It answers 1 on every way.
 #include "Vc2PartSettings.h"
@@ -92,7 +92,7 @@ bool Vc2PartSettings::routing(Vc2PartWorld& w, bool on) {
     for (int s = 0; s < Vc2PartNodes::kSources; ++s)
         for (int p = 0; p < Vc2PartNodes::kParts; ++p) release(w, s, p);
     for (int c = 0; c < Vc2Keys::kChannels; ++c) {
-        w.t.holdLifts[static_cast<size_t>(c)] = 1;
+        w.t.holdPresses[static_cast<size_t>(c)] = 1;
         for (int s = 0; s < Vc2Keys::kSources; ++s)
             w.keys.table(Vc2Keys::tableAt(static_cast<uint32_t>(s), static_cast<uint32_t>(c))).reset();
     }

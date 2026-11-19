@@ -793,7 +793,7 @@ version against rom.4's routines with what it calls hooked:
          reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the controllers.
        - the routing's reset done (v299): `0x89393e30` (ChordMemory Switch's change against `0x8993d03c`, all notes
          off; with its flag every node to no channel, every glide on the spare table and reset, each channel's
-         Hold-release byte at `0x899893e0` set and its key tables reset, part 0's receive channel, part 0's node of
+         Hold-press byte at `0x899893e0` set and its key tables reset, part 0's receive channel, part 0's node of
          source 1 the held class), answering 1; xt_vc2settings' thirteenth part (HARDWARE_FIRMWARE.md, "The VC-2
          part's routing reset"). Next: the reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the
          controllers.
@@ -818,6 +818,13 @@ version against rom.4's routines with what it calls hooked:
          the classes' handlers (`0x893938d0` with the listeners' `0x89390ea0`, Hold `0x89393980`, `0x89393a10`,
          `0x89393a70`, `0x89393ac0`, `0x89393ba0`, `0x89393c10`, `0x89393c80`, `0x89393ce0`), then `0x8939b200`, the
          Time Trip object and the MIDI dispatcher.
+       - the number classes' handlers done (v303): each a class row's way on `Vc2PartNumbers` (the base's listeners,
+         Hold by the channel's Hold-press byte, Sostenuto, CC 84's key, Reset All Controllers, All Sound Off, Mono,
+         Poly, the notes off) and the glides' held flags of a channel's nodes `0x89393000`; the listeners
+         `0x89390ea0`, the vocoder's pedal and v278's release path through `Vc2NumberParts`; v299's byte the Hold's
+         press, not its release (`holdPresses`); xt_vc2settings' seventeenth part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's controller handlers"). Next: the listeners' run `0x89390ea0` (the list at `[0x899826e0]`), `0x8939b200`,
+         the Time Trip object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -48,6 +48,9 @@ inline constexpr int32_t kOutNumber = 39, kOutTripSet = 40, kOutTripMove = 41;
 // The number classes' handlers (v302): the handler's source, channel and value as the part, kind and COSM, its address
 // as the ID; then its object as the ID
 inline constexpr int32_t kOutHandler = 42, kOutHandlerObject = 43;
+// The handlers' calls out (v303): the listeners of a state, the vocoder's pedal (the value as the ID), and the release
+// path's routines on a key table (which, 0…4, as the part, the table as the ID)
+inline constexpr int32_t kOutNotify = 44, kOutVocoderHold = 45, kOutKeyRoutine = 46;
 // The held flags as a log carries them
 inline SettingsCall settingsUnposted(const uint8_t* held, uint32_t object) {
     const auto low = (int32_t)(held[0] | held[1] << 8 | held[2] << 16 | (uint32_t)held[3] << 24);

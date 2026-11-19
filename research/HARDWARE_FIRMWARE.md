@@ -1546,6 +1546,57 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's controller handlers (2026-11-19, v303) {#vc2-part-number-handlers}
+
+Step 4.3's thirty-first version (VC2_MODE_PLAN.md, step 4.3, item 10's eighth part): the number classes' handlers
+(v302's table), each called as `handler(object, source, channel, value)`, the source counting from 1, now the port's
+own on `Vc2PartNumbers` (a class row's way), checked by `xt_vc2settings`' seventeenth part. Below, K is the key table
+of the source and channel (`0x89982720 + 0x1340 (source − 1) + 0x134 channel`, v276's):
+- **The base** `0x893938d0` (and the three that branch to it): with no channel (−1) nothing; else the channel's state
+  (its source's row at `0x8950d6d8 + source`, its word at `0x8950d6e0 + 64 row + 4 channel`, + 2) to `0x89390ea0`,
+  which runs the listeners of that state.
+- **Hold (64)** `0x89393980`: the base; a press (64 and up) only with the channel's Hold-press byte set
+  (`0x899893e0`), a release always: K's Hold (`0x89391f60`), v278's `holdOff` (`0x89390cd0`) on K, the vocoder's pedal
+  (`0x893b1c10` → `0x893f0770`, v220's `Vc2Vocoder::hold`) with the value.
+- **Sostenuto (66)** `0x89393a10`: the base; K's Sostenuto (`0x89391f70`), v278's `sostenutoOff` (`0x89390d10`).
+- **CC 84** `0x89393a70`: the base; the value as K's +0x130 byte, which v276 named `wasReset` (0xff after a reset):
+  CC 84's key (Portamento Control).
+- **Reset All Controllers (121)** `0x89393ac0`: K's Hold and Sostenuto 0, its +0x130 0xff, `holdOff`, `sostenutoOff`,
+  the channel's state to the listeners (no test of the channel), the vocoder's pedal 0.
+- **All Sound Off (120)** `0x89393ba0`: with the held note's word (`0x899891d0`) 0 and the value 0: K cleared
+  (`0x89391fe0`), the glides' held flags of the channel's nodes cleared (`0x89393000`), v278's `truncateTable`
+  (`0x89390d50`).
+- **Mono (126)** `0x89393c10`: with the value 16 or less, the same with v278's `releaseBut` (`0x89390da0`).
+- **Poly (127)** `0x89393c80`: with the value 0, the same.
+- **All Notes Off and the Omnis (123…125)** `0x89393ce0`: below 0 (the Category's and the receive channel's −1), the
+  same with v278's `releaseAll` (`0x89390e20`); at 0 with no note held, with `releaseBut`; else nothing.
+
+**The glides' held flags** `0x89393000(source, channel)`: each node on the source's channel's list, for its two glides
+(by the node's source byte and object index: `0x89987420 + 0x480 source + 0x48 index + 0x24 n`), the four held bytes
+(+0x23, +0x1d, +0x1b, +0x21) 0.
+
+The listeners, the vocoder's pedal and v278's five key-table routines go out through `Vc2NumberParts` (the release
+path is `Vc2Assigner`'s, which the wiring gives). A correction to v299: the bytes at `0x899893e0` let a Hold press be
+heard, not a release (`cmp/ge #64` then `bf` to the Hold for a value below 64); `Vc2PartRows::holdLifts` is now
+`holdPresses`.
+
+**The check.** `xt_vc2settings`' seventeenth part, on the seed sixteen after the run's: rom.4's own controller on its
+own number objects, the sixteenth part's hooks on the handlers taken off, the listeners, the vocoder's pedal and the
+five key-table routines hooked to log, the part's controller's trip routines as the fifteenth part's. Each case gives
+every table noise, the nodes noise with their lists drawn (each one's object index 0…15, its word a byte with a part
+0…15), the keys and the trip objects noise (`settingsListsCaseOf`, the fifteenth part's case made one template with
+it). Each event takes a source 1…4, a channel 0…15 (or, one time in 16 from source 2, none, on a number of the base's),
+a number of a class's own half the time, else 0…127, and a value at the handlers' edges (0, 1, 16, 17, 63, 64, 127, −1,
+−128) or any; before it the held note's word 0 half the time and the channel's Hold-press byte 0, 1 or any. After each,
+the tables, the keys' span, the trip objects and the calls. Not drawn: no channel on the other classes (Hold,
+Sostenuto, CC 84, Reset All Controllers and the notes off read before their bytes or tables with it).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first sixteen parts' lines as they were.
+- Every line and branch of `Vc2PartNumbers.cpp` is reached.
+- `mutate_vc2.py --settings`: 693 plants, none missed; v303's 40 new (and v302's five on the class rows, the
+  dispatch and the init's channel moved to the code's new text).
+
 ### The VC-2 part's controller numbers and init (2026-11-19, v302) {#vc2-part-numbers-init}
 
 Step 4.3's thirtieth version (VC2_MODE_PLAN.md, step 4.3, item 10's seventh part): the objects the controller (v301)
@@ -1576,7 +1627,7 @@ is its vtable's +0x14 (+0xc, the adjustment, is 0 in all):
 | 123, 124, 125 | `0x89393d80` | `0x898cd310` | `0x89393ce0` |
 | 6, 38 | `0x89393da0` (its third argument, 1 for 6, unread) | `0x898cd328` | `0x89393d90` (the base's) |
 
-Each maker writes the number and the base's vtable, then its own; Hold's maker also sets each channel's Hold-release
+Each maker writes the number and the base's vtable, then its own; Hold's maker also sets each channel's Hold-press
 byte (`0x899893e0`, v299's) to 1. The base handler gives the channel's state (the sources' rows at `0x8950d6d8` and
 `0x8950d6e0`, v292's; nothing for channel −1) to `0x89390ea0`, which runs the virtual of each listener on the list at
 `[0x899826e0]` whose +0x34 names that state; the others work the key tables' pedals and the notes before or instead
@@ -1722,14 +1773,15 @@ parameters' message (v297) runs with its second byte's flag 0x80, on `Vc2PartSet
   nothing to do), the glide aimed at the spare table `0x89988620` and reset (`0x893923c0`, v276's P reset, which leaves
   its table word alone).
 - Then for each channel (0…15) its byte at `0x899893e0` set to 1 and the four sources' key tables of that channel reset
-  (`0x89392040`, v276's). The byte lets the Hold pedal's release (a value below 64) be heard on that channel: with it 0,
-  `0x89393980` takes no Hold-off there; the constructor `0x893939e0` sets all 16 to 1 as well.
+  (`0x89392040`, v276's). The byte lets the Hold pedal's press (a value of 64 and up) be heard on that channel: with it
+  0, `0x89393980` takes no Hold-on there, a release always heard; the constructor `0x893939e0` sets all 16 to 1 as well.
+  (v299 had it the release; v303's reading of `0x89393980` puts it right.)
 - Then part 0's receive channel (`0x89393fd0(…, 0)`, v298's), which answers 1, so it goes on (with 0 it would answer 0).
 - Then `0x89392820(0x899888ac, 0)`, a bare answer of 0, chooses the held class (`0x893932c0`, v293's) for part 0's node of
   source 1 over the plain (`0x89393310`).
 - It answers 1 on every way, so kind 0's message always runs the held note's switch after it.
 
-The two words are `Vc2PartRows::chordMemory` and `holdLifts`. The messages reach the reset through
+The two words are `Vc2PartRows::chordMemory` and `holdPresses` (`holdLifts` until v303). The messages reach the reset through
 `Vc2SettingsParts::routing` (v297's), which the wiring gives `Vc2PartSettings::routing`.
 
 **The check.** `xt_vc2settings`' thirteenth part, on the seed twelve after the run's. Each case gives every table

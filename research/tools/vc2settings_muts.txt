@@ -578,7 +578,7 @@ release-spare|        g.table = Vc2Keys::kSpareAt;|        g.table = Vc2Keys::kO
 release-no-reset|        g.reset();\n|\n|vc2settingsreceive
 release-glides|    for (int n = 0; n < kGlidesAPart; ++n) {\n        w.nodes.move|    for (int n = 0; n < kGlidesAPart - 1; ++n) {\n        w.nodes.move|vc2settingsreceive
 release-glide-n|        Vc2KeyGlide& g = glideOf(w.keys, source, part, n);|        Vc2KeyGlide& g = glideOf(w.keys, source, part, 0);|vc2settingsreceive
-routing-hold-lift|        w.t.holdLifts[static_cast<size_t>(c)] = 1;|        w.t.holdLifts[static_cast<size_t>(c)] = 0;|vc2settingsreceive
+routing-hold-lift|        w.t.holdPresses[static_cast<size_t>(c)] = 1;|        w.t.holdPresses[static_cast<size_t>(c)] = 0;|vc2settingsreceive
 routing-key-channels|    for (int c = 0; c < Vc2Keys::kChannels; ++c) {|    for (int c = 0; c < Vc2Keys::kChannels - 1; ++c) {|vc2settingsreceive
 routing-key-sources|        for (int s = 0; s < Vc2Keys::kSources; ++s)\n            w.keys.table|        for (int s = 0; s < Vc2Keys::kSources - 1; ++s)\n            w.keys.table|vc2settingsreceive
 routing-key-reset|static_cast<uint32_t>(c))).reset();|static_cast<uint32_t>(c))).clear();|vc2settingsreceive
@@ -653,25 +653,25 @@ ctl-match-x|{ rows_.tripAssigns[0], rows_.tripAssigns[1], kResetAll }|{ rows_.tr
 ctl-ways|{ &Vc2PartControllers::padX, &Vc2PartControllers::padY, &Vc2PartControllers::rest }|{ &Vc2PartControllers::padY, &Vc2PartControllers::padX, &Vc2PartControllers::rest }|vc2partcontrollers
 ctl-ways-count|for (size_t k = 0; k < std::size(kWays); ++k)|for (size_t k = 0; k + 1 < std::size(kWays); ++k)|vc2partcontrollers
 ctl-first-match|if (number == matches[k]) (this->*kWays[k])(part, value);|if (number == matches[k]) {\n            (this->*kWays[k])(part, value);\n            break;\n        }|vc2partcontrollers
-num-class-vtable|{ 0x898cd250, 0x89393920, false },|{ 0x898cd268, 0x89393920, false },|vc2partnumbers
-num-class-handler|{ 0x898cd268, 0x89393950, false },|{ 0x898cd268, 0x89393920, false },|vc2partnumbers
-num-hold-lifts|{ 0x898cd238, 0x89393980, true },|{ 0x898cd238, 0x89393980, false },|vc2partnumbers
+num-class-vtable|{ 0x898cd250, 0x89393920, base, false },|{ 0x898cd268, 0x89393920, base, false },|vc2partnumbers
+num-class-handler|{ 0x898cd268, 0x89393950, base, false },|{ 0x898cd268, 0x89393920, base, false },|vc2partnumbers
+num-hold-lifts|{ 0x898cd238, 0x89393980, hold, true },|{ 0x898cd238, 0x89393980, hold, false },|vc2partnumbers
 num-hold-class|{ 64, 3 },|{ 64, 4 },|vc2partnumbers
 num-switch-5|{ 5, 2 },|{ 5, 1 },|vc2partnumbers
 num-switch-6|{ 6, 11 },|{ 6, 0 },|vc2partnumbers
 num-default|row == std::end(kNumberClasses) ? 0 : row->second|row == std::end(kNumberClasses) ? 1 : row->second|vc2partnumbers
 num-number|o.number = static_cast<uint8_t>(n);|o.number = 0;|vc2partnumbers
 num-table|table[static_cast<size_t>(n)] = kObjectsAt + kObjectBytes * static_cast<uint32_t>(n);|table[static_cast<size_t>(n)] = kObjectsAt;|vc2partnumbers
-num-lifts-value|if (c.holdLifts) t.holdLifts.fill(1);|if (c.holdLifts) t.holdLifts.fill(2);|vc2partnumbers
-num-changed-table|const uint32_t at = table[static_cast<size_t>(number)];|const uint32_t at = kObjectsAt + kObjectBytes * static_cast<uint32_t>(number);|vc2partnumbers
-num-changed-object|parts.handle(c->handler, at, source, channel, value);|parts.handle(c->handler, kObjectsAt, source, channel, value);|vc2partnumbers
-num-changed-value|parts.handle(c->handler, at, source, channel, value);|parts.handle(c->handler, at, source, channel, 0);|vc2partnumbers
+num-lifts-value|if (c.holdPresses) t.holdPresses.fill(1);|if (c.holdPresses) t.holdPresses.fill(2);|vc2partnumbers
+num-changed-table|{ return table[static_cast<size_t>(number)]; }|{ return kObjectsAt + kObjectBytes * static_cast<uint32_t>(number); }|vc2partnumbers
+num-changed-object|return classAt(*this, objectOf(number)).handler;|return classAt(*this, kObjectsAt).handler;|vc2partnumbers
+num-changed-value|classAt(*this, objectOf(number)).way(w, { source, channel, value });|classAt(*this, objectOf(number)).way(w, { source, channel, 0 });|vc2partnumbers
 init-plain|constexpr uint32_t kPlainClass = 0x898cd184;|constexpr uint32_t kPlainClass = 0x898cd1fc;|vc2partnumbers
 init-vtable|        object.vtable = kPlainClass;\n|\n|vc2partnumbers
 init-object|n.object = Vc2PartNodes::kObjectsAt;|n.object = 0;|vc2partnumbers
 init-byte-e|        n.byteE = 0;|        n.byteE = 1;|vc2partnumbers
 init-source|n.source = static_cast<int8_t>(s);|n.source = 0;|vc2partnumbers
-init-channel|constexpr int8_t kNoChannel = -1;|constexpr int8_t kNoChannel = -2;|vc2partnumbers
+init-channel|        n.channel = kNoChannel;|        n.channel = 0;|vc2partnumbers
 init-held|        w.t.heldNote = 0;|        w.t.heldNote = 1;|vc2partnumbers
 init-word|n.word8 = vc2PartSettingsTables().nodeWord;|n.word8 = 0;|vc2partnumbers
 init-index|        object.index = 0;|        object.index = 1;|vc2partnumbers
@@ -682,3 +682,43 @@ init-glides-init|    w.keys.glidesInit();\n|\n|vc2partnumbers
 init-lists|w.nodes.lists.fill(0);|w.nodes.lists.fill(1);|vc2partnumbers
 init-numbers|    w.numbers.make(w.t);\n|\n|vc2partnumbers
 tables-node-word|nodeWord = image.rd32(0x8950d7a0);|nodeWord = image.rd32(0x8950d7a4);|vc2settingstables
+h-no-channel|    if (h.channel == kNoChannel) return;\n    w.parts.notify|    if (h.channel == 0) return;\n    w.parts.notify|vc2partnumbers
+h-state-word|constexpr uint32_t kStateWord = 2;|constexpr uint32_t kStateWord = 3;|vc2partnumbers
+h-state-row|k.sources[static_cast<size_t>(h.source - 1)]|k.sources[0]|vc2partnumbers
+h-hold-press|if (h.value >= kPressed && w.t.holdPresses|if (h.value < kPressed && w.t.holdPresses|vc2partnumbers
+h-hold-pressed|kNoChannel = -1, kPressed = 64, kMonoMost = 16;|kNoChannel = -1, kPressed = 65, kMonoMost = 16;|vc2partnumbers
+h-hold-byte|w.t.holdPresses[static_cast<size_t>(h.channel)] == 0) return;|w.t.holdPresses[static_cast<size_t>(h.channel)] != 0) return;|vc2partnumbers
+h-hold-set|w.keys.table(k).setHold(static_cast<uint32_t>(h.value));|w.keys.table(k).setHold(0);|vc2partnumbers
+h-hold-off|    w.parts.holdOff(k);\n    w.parts.vocoderHold(h.value);|    w.parts.vocoderHold(h.value);|vc2partnumbers
+h-hold-pedal|w.parts.vocoderHold(h.value);|w.parts.vocoderHold(0);|vc2partnumbers
+h-hold-base|void hold(Vc2NumberWorld& w, const Hand& h) {\n    base(w, h);|void hold(Vc2NumberWorld& w, const Hand& h) {|vc2partnumbers
+h-sost|w.keys.table(k).setSostenuto(h.value);|w.keys.table(k).setSostenuto(0);|vc2partnumbers
+h-sost-off|    w.parts.sostenutoOff(k);\n}\n\n// 0x89393a70|}\n\n// 0x89393a70|vc2partnumbers
+h-key84|.wasReset = static_cast<uint8_t>(h.value);|.wasReset = 0;|vc2partnumbers
+h-key84-base|void portamentoKey(Vc2NumberWorld& w, const Hand& h) {\n    base(w, h);|void portamentoKey(Vc2NumberWorld& w, const Hand& h) {|vc2partnumbers
+h-reset-hold|    t.setHold(0);|    t.setHold(1);|vc2partnumbers
+h-reset-sost|    t.setSostenuto(0);|    t.setSostenuto(1);|vc2partnumbers
+h-reset-key|t.wasReset = kNoKey;|t.wasReset = 0;|vc2partnumbers
+h-reset-order|    w.parts.holdOff(k);\n    w.parts.sostenutoOff(k);|    w.parts.sostenutoOff(k);\n    w.parts.holdOff(k);|vc2partnumbers
+h-reset-notify|    w.parts.notify(stateOf(h));\n    w.parts.vocoderHold(0);|    w.parts.vocoderHold(0);|vc2partnumbers
+h-reset-pedal|w.parts.vocoderHold(0);|w.parts.vocoderHold(1);|vc2partnumbers
+h-soundoff-held|if (w.t.heldNote != 0 \|\| h.value != 0) return;|if (h.value != 0) return;|vc2partnumbers
+h-soundoff-value|if (w.t.heldNote != 0 \|\| h.value != 0) return;|if (w.t.heldNote != 0) return;|vc2partnumbers
+h-soundoff-then|clearThen(w, h, &Vc2NumberParts::truncateTable);|clearThen(w, h, &Vc2NumberParts::releaseBut);|vc2partnumbers
+h-mono|if (h.value > kMonoMost) return;|if (h.value >= kMonoMost) return;|vc2partnumbers
+h-mono-then|    clearThen(w, h, &Vc2NumberParts::releaseBut);\n}\n\n// 0x89393c80|    clearThen(w, h, &Vc2NumberParts::releaseAll);\n}\n\n// 0x89393c80|vc2partnumbers
+h-poly|    if (h.value != 0) return;\n    clearThen(w, h, &Vc2NumberParts::releaseBut);\n}\n\n// 0x89393ce0|    if (h.value > 0) return;\n    clearThen(w, h, &Vc2NumberParts::releaseBut);\n}\n\n// 0x89393ce0|vc2partnumbers
+h-notes-neg|    if (h.value < 0) {|    if (h.value < -1) {|vc2partnumbers
+h-notes-all|clearThen(w, h, &Vc2NumberParts::releaseAll);|clearThen(w, h, &Vc2NumberParts::releaseBut);|vc2partnumbers
+h-notes-held|if (h.value != 0 \|\| w.t.heldNote != 0) return;|if (h.value != 0) return;|vc2partnumbers
+h-clear|    w.keys.table(k).clear();\n|\n|vc2partnumbers
+h-clear-glides|    clearGlideHolds(w, h);\n    (w.parts.*then)(k);|    (w.parts.*then)(k);|vc2partnumbers
+h-glides-flag|p.lastMonoHeld = 0;|p.lastMonoHeld = 1;|vc2partnumbers
+h-glides-prev|            p.prevMonoHeld = 0;\n|\n|vc2partnumbers
+h-glides-index|kGlidesASource * n.source + 2 * n.byteE + g|kGlidesASource * n.source + 2 * n.byteE|vc2partnumbers
+h-glides-list|Vc2PartNodes::kChannels * (h.source - 1) + h.channel)|Vc2PartNodes::kChannels * (h.source - 1) + (h.channel & 7))|vc2partnumbers
+h-glides-walk|at != 0; at = w.nodes.node(at).next)|at != 0; at = 0)|vc2partnumbers
+h-table|return Vc2Keys::tableAt(static_cast<uint32_t>(h.source - 1), static_cast<uint32_t>(h.channel));|return Vc2Keys::tableAt(static_cast<uint32_t>(h.source % 4), static_cast<uint32_t>(h.channel));|vc2partnumbers
+h-class-sost|{ 0x898cd280, 0x89393a10, sostenuto, false },|{ 0x898cd280, 0x89393a10, hold, false },|vc2partnumbers
+h-class-11|{ 0x898cd328, 0x89393d90, base, false },|{ 0x898cd328, 0x89393d90, poly, false },|vc2partnumbers
+h-class-1|{ 0x898cd250, 0x89393920, base, false },|{ 0x898cd250, 0x89393920, soundOff, false },|vc2partnumbers

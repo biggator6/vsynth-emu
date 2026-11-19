@@ -85,7 +85,7 @@ VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSetting
     Vc2PartSettingsSystem Vc2PartSettingsSystemCheck Vc2PartSettingsMessages Vc2PartSettingsMessagesCheck
     Vc2PartNodes Vc2Keys Vc2KeysTables Vc2PartSettingsReceive Vc2PartSettingsReceiveCheck
     Vc2PartSettingsRoutingCheck Vc2PartReloads Vc2PartReloadsCheck Vc2PartControllers Vc2PartControllersCheck
-    Vc2PartNumbers Vc2PartNumbersCheck)
+    Vc2PartNumbers Vc2PartNumbersCheck Vc2PartHandlersCheck)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(

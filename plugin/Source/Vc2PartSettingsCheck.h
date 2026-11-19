@@ -28,8 +28,8 @@ inline constexpr uint32_t kMatrixAt = 0x89997398;                               
 inline constexpr uint32_t kHeldNoteAt = 0x899891d0;                               // v294's: the held note's word
 // v296's: Time Trip Assign X and Y's bytes, Patch Remain's, the voices' counts' last reads
 inline constexpr uint32_t kTripAssignsAt = 0x89989404, kPatchRemainAt = 0x899826fd, kVoiceCountsAt = 0x8993d02c;
-// v299's: ChordMemory Switch's last read, the channels' Hold-release bytes
-inline constexpr uint32_t kChordMemoryAt = 0x8993d03c, kHoldLiftsAt = 0x899893e0;
+// v299's: ChordMemory Switch's last read, the channels' Hold-press bytes
+inline constexpr uint32_t kChordMemoryAt = 0x8993d03c, kHoldPressesAt = 0x899893e0;
 // The held flags (Vc2PartSettingsCheck.cpp's until v300, when the reload objects' part reads them too)
 inline constexpr uint32_t kHeldAt = 0x8993d0c0;
 // A read object's handle the set-ups' hooks leave: this, the block << 16, part << 8, kind << 2, COSM; and (v291) the
@@ -121,9 +121,11 @@ struct SettingsCounts {
     long reloadEvents = 0, reloadCalls = 0;                                     // the fourteenth's (v300)
     long controllerEvents = 0, controllerCalls = 0;                             // the fifteenth's (v301)
     long numberEvents = 0, numberCalls = 0;                                     // the sixteenth's (v302)
+    long handlerEvents = 0, handlerCalls = 0;                                   // the seventeenth's (v303)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
-    // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69
-    std::array<long, 70> byEvent {};
+    // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69,
+    // v303's at 70…72
+    std::array<long, 73> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -228,6 +230,8 @@ extern const SettingsPartRow kReloadPartRow;
 extern const SettingsPartRow kControllerPartRow;
 // The sixteenth (v302): the controller numbers and the part's init (Vc2PartNumbersCheck.cpp)
 extern const SettingsPartRow kNumberPartRow;
+// The seventeenth (v303): the number classes' handlers (Vc2PartHandlersCheck.cpp)
+extern const SettingsPartRow kHandlerPartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words
@@ -269,7 +273,7 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.wr8(kPatchRemainAt, t.patchRemain);
     s.fw.cpu.write(kVoiceCountsAt, t.voiceCounts.data(), sizeof t.voiceCounts);
     s.fw.cpu.wr32(kChordMemoryAt, (uint32_t)t.chordMemory);
-    s.fw.cpu.write(kHoldLiftsAt, t.holdLifts.data(), sizeof t.holdLifts);
+    s.fw.cpu.write(kHoldPressesAt, t.holdPresses.data(), sizeof t.holdPresses);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);

@@ -17,9 +17,8 @@
 namespace {
 constexpr uint32_t kNumbersAt = 0x899891e0;                                           // [FW]
 constexpr uint32_t kVirtualAt = 0x14, kAdjustAt = 0x0c, kVtableWordAt = 4;            // [FW] the number object's
-// The check's own: the number objects, their vtable, its virtual, the nodes' bytes
+// The check's own: the number objects, their vtable, its virtual
 constexpr uint32_t kObjectsAt = 0x8C040000, kObjectBytes = 16, kVtableAt = 0x8C041000, kHookAt = 0x8C041100;
-constexpr uint32_t kBytesAt = 0x8C043000;
 constexpr int kNumbers = 128;
 constexpr int32_t kResetAll = 121;
 
@@ -93,10 +92,7 @@ std::string controllerOn(SettingsSides& s, const Vc2CheckRoutine& r, std::initia
         mine(controllers);
         return 0u;
     });
-    for (const SettingsCall& c : s.mine.log) {
-        s.n.byEvent[65] += c.block == kOutTripSet;
-        s.n.byEvent[66] += c.block == kOutTripMove;
-    }
+    settingsCountCalls(s, { { kOutTripSet, 65 }, { kOutTripMove, 66 } });
     if (!what.empty()) return what;
     return vc2RegionsDifference(s.fw, { { kTripsAt, s.trips.data(), sizeof s.trips, "the trip objects" } });
 }
@@ -127,24 +123,11 @@ std::string partControllerEvent(SettingsSides& s, std::mt19937& rng) {
 
 const SettingsEvent kControllerEvents[] = { controllerEvent, partControllerEvent };
 
-// A case: the nodes noise, their lists drawn, each one's word a byte of its own with a part 0…15; the trip objects
-// noise; then the tables' and the events
-std::string controllerCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    Vc2PartNodes& n = s.nodes;
-    settingsNoise(n.nodes.data(), sizeof n.nodes, rng);
-    vc2DrawNodeLists(n, rng);
-    for (uint32_t k = 0; k < (uint32_t)kVc2Nodes; ++k) {
-        n.nodes[k].word8 = kBytesAt + k;
-        s.fw.cpu.wr8(kBytesAt + k, (uint8_t)(rng() % kSettingsParts));
-    }
-    settingsNoise(s.trips.data(), sizeof s.trips, rng);
-    return settingsCaseOf<kControllerEvents, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
-}
-
 constexpr SettingsSaid kControllerSaid[] = { { 63, "controllers" }, { 64, "part controllers" }, { 65, "trip sets" },
                                              { 66, "trip moves" } };
 } // namespace
 
 const SettingsPartRow kControllerPartRow { 14, &SettingsCounts::controllerEvents, &SettingsCounts::controllerCalls,
-                                           controllerCase, nullptr, hookControllers, "controllers", kControllerSaid };
+                                           settingsListsCaseOf<kControllerEvents, false>, nullptr, hookControllers,
+                                           "controllers", kControllerSaid };
 #endif

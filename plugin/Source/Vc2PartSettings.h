@@ -61,9 +61,10 @@ struct Vc2PartRows {
     uint8_t patchRemain = 0;
     std::array<int16_t, 4> voiceCounts {};
     // v299: ChordMemory Switch as last read (0x8993d03c); each channel's byte (0x899893e0) that lets the Hold pedal's
-    // release (below 64) be heard there (0x89393980), 1 after the routing's reset
+    // press (64 and up) be heard there (0x89393980; v299 had it the release, v303 the press), 1 after the routing's
+    // reset and Hold's object made
     int32_t chordMemory = 0;
-    std::array<uint8_t, 16> holdLifts {};
+    std::array<uint8_t, 16> holdPresses {};
 };
 
 // What the vocoder reader hands on (v290): kind 6's Unvoice Level, the part mixer's setters and targets, Auto Note's

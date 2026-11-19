@@ -74,7 +74,7 @@ std::string settingsDifference(SettingsSides& s) {
         { kHeldNoteAt, &t.heldNote, sizeof t.heldNote, "the held note" },
         { kVoiceCountsAt, t.voiceCounts.data(), sizeof t.voiceCounts, "the voices' counts" },
         { kChordMemoryAt, &t.chordMemory, sizeof t.chordMemory, "ChordMemory Switch's last read" },
-        { kHoldLiftsAt, t.holdLifts.data(), sizeof t.holdLifts, "the Hold-release bytes" } });
+        { kHoldPressesAt, t.holdPresses.data(), sizeof t.holdPresses, "the Hold-press bytes" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -138,9 +138,9 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
     for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow,
-                                      &kControllerPartRow })
+                                      &kControllerPartRow, &kNumberPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kNumberPartRow);
+    return different + settingsRunPart(s, run, kHandlerPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

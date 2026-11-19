@@ -17,9 +17,6 @@
 namespace {
 using P = Vc2PartNumbers;
 constexpr uint32_t kInit = 0x89393370;   // [FW]
-// [FW] the number classes' handlers, the check's own list
-constexpr uint32_t kHandlers[] = { 0x893938d0, 0x89393920, 0x89393950, 0x89393980, 0x89393a10, 0x89393a70,
-                                   0x89393ac0, 0x89393ba0, 0x89393c10, 0x89393c80, 0x89393ce0, 0x89393d90 };
 constexpr uint32_t kObjectsBytes = sizeof(Vc2NumberObject) * P::kNumbers, kTableBytes = 4 * P::kNumbers;
 
 SettingsCall handled(Sh4& c) {
@@ -27,8 +24,8 @@ SettingsCall handled(Sh4& c) {
 }
 SettingsCall handledObject(Sh4& c) { return { kOutHandlerObject, 0, 0, 0, (int32_t)c.r[4] }; }
 constexpr auto kHandlerCallees = [] {
-    std::array<SettingsCallee, std::size(kHandlers)> a {};
-    for (size_t k = 0; k < a.size(); ++k) a[k] = { kHandlers[k], handled, nullptr, handledObject };
+    std::array<SettingsCallee, std::size(kNumberHandlers)> a {};
+    for (size_t k = 0; k < a.size(); ++k) a[k] = { kNumberHandlers[k], handled, nullptr, handledObject };
     return a;
 }();
 // [FW] the controller, and the 120 class's maker (the sixth part's hook, which logs v291's All Sound Off)
@@ -43,19 +40,6 @@ void hookNumbers(SettingsSides& s) {
     s.fw.cpu.write(kStateSourceAt, sources.data(), sources.size());
     settingsHookCallees(s, kHandlerCallees, kNumbersOwn);
 }
-
-// The port's handlers' calls, logged as rom.4's hooks log theirs
-class NumberPortParts final : public Vc2NumberParts {
-public:
-    explicit NumberPortParts(std::vector<SettingsCall>& log) : log_(log) {}
-    void handle(uint32_t handler, uint32_t object, int source, int32_t channel, int32_t value) override {
-        log_.push_back({ kOutHandler, source, channel, value, (int32_t)handler });
-        log_.push_back({ kOutHandlerObject, 0, 0, 0, (int32_t)object });
-    }
-
-private:
-    std::vector<SettingsCall>& log_;
-};
 
 // A routine on both sides, the nodes, the number objects, their table, the lists and the part objects into rom.4's
 // memory first; then those and the keys' span compared
@@ -115,9 +99,10 @@ std::string numberEvent(SettingsSides& s, std::mt19937& rng) {
                                                  (uint32_t)value };
     return numbersOn(s, { kController, "the controller on the numbers", nullptr }, args, [&] {
         ControllerPortParts parts { s };
-        NumberPortParts numbers { s.mine.log };
+        // the handler the port's class names, logged as rom.4's hook logs it (v303 runs the port's own instead)
         parts.number = [&](int32_t n, int src, int32_t ch, int32_t v) {
-            s.numbers.changed(n, src, ch, v, numbers);
+            s.mine.log.push_back({ kOutHandler, src, ch, v, (int32_t)s.numbers.handlerOf(n) });
+            s.mine.log.push_back({ kOutHandlerObject, 0, 0, 0, (int32_t)s.numbers.objectOf(n) });
         };
         Vc2PartControllers { s.rows, s.nodes, parts }.controller(source, channel, number, value);
     });
