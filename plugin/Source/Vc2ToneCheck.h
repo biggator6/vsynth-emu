@@ -5,6 +5,7 @@
 #include "Vc2CheckRig.h"
 #include "Vc2FreeLfos.h"
 #include "Vc2Tone.h"
+#include "Vc2ToneLists.h"
 #include "Vc2ToneMix.h"
 #include "Vc2ToneModulators.h"
 #include <array>
@@ -15,17 +16,20 @@ inline constexpr uint32_t kToneOutAt = 0x8C036000;     // the renders' output, i
 inline constexpr uint32_t kToneInputAt = 0x8C050000;   // the note-on's input, in Vc2Fw's RAM
 inline constexpr uint32_t kToneHooksAt = 0x8C042000;   // the hooked routines the tones' words point at, in Vc2Fw's RAM
 inline constexpr uint32_t kToneEndedAt = kToneHooksAt + 0x20;   // the end routine, the tail's word on both sides
+inline constexpr uint32_t kToneTruncatedAt = kToneHooksAt + 0x30;   // the truncation's routine, the tail's +0x1b18 (v273)
 inline constexpr uint32_t kToneBufferAt = 0x89998b20;  // [FW] the renders' three scratch buffers, 0x100 bytes apart
-inline constexpr uint32_t kToneListsAt = 0x89999678;   // [FW] the two +4 lists' heads the note-on searches
 inline constexpr int kToneNone = -1, kToneUnknown = -2;   // a call's part: the tone itself, or no part known
 inline constexpr int kToneOut = 4;
 
 enum ToneKind : int32_t {
-    kBuild, kDestroy, kUnlist, kUpdateOsc, kUpdateCosm,
+    kBuild, kDestroy, kUpdateOsc, kUpdateCosm,
     kTvaOver, kTvaStopped, kUpdateTva, kEnded, kRenderOsc, kRenderCosm, kRenderTva, kCountOsc,
     kCountOscMatched, kTvaHeld, kInstallOsc, kInstallCosm,
     kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc,
-    kSetUpCosm, kStartCosm, kNoteOnTva, kEnlist,
+    kSetUpCosm, kStartCosm, kNoteOnTva,
+    // v273: what the tone's remaining methods call
+    kSettingsOsc, kSettingsLfo, kSettingsEnvelope, kNewBlockCosm, kNewBlockTva, kLegatoOsc, kReleaseLfo,
+    kReleaseEnvelope, kKeyOffOsc, kTruncateTold, kTruncate, kWaitFade, kTruncated, kOscWord168, kOscPosition,
 };
 
 // A call as either side made it: what, on which tone of the pool (−1 none) and which of its parts (Vc2TonePiece × 100
@@ -41,23 +45,34 @@ struct ToneCall {
 struct ToneDraws {
     bool tvaOver = false, tvaStopped = false, tvaHeld = false;
     std::array<uint32_t, 2> installOsc {}, installCosm {};
+    std::array<uint32_t, 2> word168 {}, position {};   // v273: each OSC voice's 0x893aed40 and 0x893aed60
 };
 
-// [FW] an OSC voice's words the tone reads or writes: +0x54, +0xa40, +0x1cc, +0xa80, the byte +0x58, +0x104, and the
-// addresses of its four envelopes and four LFOs at +0xa4c…+0xa68
+// [FW] an OSC voice's words the tone reads or writes: +0x54, +0xa40, +0x1cc, +0xa80, the byte +0x58, +0x104, the
+// addresses of its four envelopes and four LFOs at +0xa4c…+0xa68, and its cost +0xa88 (v273)
 struct ToneOscWords {
     uint32_t kind = 0, flag = 0, value = 0, other = 0, byte = 0, wave = 0;
     std::array<uint32_t, 8> binds {};
+    uint32_t cost = 0;
     bool operator==(const ToneOscWords&) const = default;
 };
 
 // [FW] a tone's hooked parts' words the tone reads or writes: the OSC voices', the TVA's +0x40 and its +0xa4, +0xa8,
-// +0xac and +0xc0 (the envelopes and LFOs are the real ones from v268, Vc2ToneModulators)
+// +0xac and +0xc0, and from v273 the TVA's fade +0x64 and COSM 1's cost +0x14c (the envelopes and LFOs are the real ones
+// from v268, Vc2ToneModulators)
 struct ToneWords {
     std::array<ToneOscWords, 2> osc {};
     uint32_t tvaLevel = 0;
     std::array<uint32_t, 4> tvaBinds {};
+    uint32_t tvaFade = 0, cosmCost = 0;
     bool operator==(const ToneWords&) const = default;
+};
+
+// The truncation's waits (v273): the tone whose TVA fades, and how many waits each side's hook lets pass before its fade
+// is at 0, as the block task's renders would leave it
+struct ToneFadeWait {
+    uint32_t tone = 0;
+    int romLeft = 0, portLeft = 0;
 };
 
 int32_t tonePartCode(Vc2TonePiece piece, int index);   // a part as a call names it
@@ -76,7 +91,8 @@ struct ToneShared {
     std::vector<ToneCall> calls {};
     Vc2TonePool* pool = nullptr;
     std::vector<TonePortParts>* parts = nullptr;
-    std::array<uint32_t, 2> lists {};
+    Vc2ToneLists lists {};                   // the part's two lists of tones (v273)
+    ToneFadeWait fade {};
     float chaos = Vc2ToneLfo::kChaosStart;   // the LFOs' constructors' generator, rom.4's word 0x89999668
     Vc2ToneMixRings rings {};                // the mixes' delay lines (v269)
     Vc2FreeLfos frees {};                    // the free LFOs' manager (v271)
@@ -144,6 +160,25 @@ public:
     void startCosm(int cosm, const uint32_t* block, int which) override;
     void noteOnTva(const uint32_t* block, uint32_t flag) override;
     void enlist() override;
+    void settingsOsc(int osc, const uint32_t* block) override;
+    void settingsLfo(uint32_t lfo, const uint32_t* block) override;
+    void settingsEnvelope(uint32_t envelope, const uint32_t* block) override;
+    void newBlockCosm(int cosm, const uint32_t* block) override;
+    void settingsMix(const uint32_t* block) override;
+    void newBlockTva(const uint32_t* block) override;
+    void legatoOsc(int osc, const uint32_t* ramp) override;
+    void releaseLfo(int lfo) override;
+    void releaseEnvelope(int envelope) override;
+    void keyOffOsc(int osc) override;
+    void truncateTvaTold() override;
+    void truncateTva() override;
+    float tvaFade() override { return std::bit_cast<float>(words.tvaFade); }
+    void waitFade() override;
+    void truncated() override;
+    float oscCost(int osc) override { return std::bit_cast<float>(words.osc[(size_t)osc].cost); }
+    float cosmCost() override { return std::bit_cast<float>(words.cosmCost); }
+    int32_t oscWord168(int osc) override;
+    uint32_t oscPosition(int osc) override;
 
     ToneWords words {};
     Vc2ToneModulators mods {};   // the real envelopes and LFOs
@@ -166,7 +201,7 @@ private:
 class TonePortOwner final : public Vc2ToneOwner {
 public:
     TonePortOwner(ToneShared& shared, std::vector<TonePortParts>& parts) : s_(shared), parts_(parts) {}
-    std::array<uint32_t, 2> lists() override { return s_.lists; }
+    std::array<uint32_t, 2> lists() override { return s_.lists.marks(); }
     Vc2ToneParts& partsOf(int tone) override { return parts_[(size_t)tone]; }
 
 private:
@@ -174,8 +209,8 @@ private:
     std::vector<TonePortParts>& parts_;
 };
 
-// rom.4's side: every part routine hooked to log into `log` and answer from `draws`
-void toneInstallRom(Vc2Fw& fw, const ToneDraws& draws, std::vector<ToneCall>& log);
+// rom.4's side: every part routine hooked to log into `log` and answer from `draws`, the truncation's waits by `fade`
+void toneInstallRom(Vc2Fw& fw, const ToneDraws& draws, std::vector<ToneCall>& log, ToneFadeWait& fade);
 // A tone's part words written to rom.4's memory, and read back; COSM 1's vtable and the DSP routines' pointers too
 void toneWriteRom(Vc2Fw& fw, uint32_t address, const ToneWords& w);
 ToneWords toneReadRom(Vc2Fw& fw, uint32_t address);

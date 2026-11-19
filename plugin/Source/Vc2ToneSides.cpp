@@ -57,11 +57,15 @@ ToneWords drawWords(std::mt19937& rng) {
         o.byte = rng() % 256;
         o.wave = rng() % 16;
         std::ranges::generate(o.binds, [&] { return (uint32_t)rng(); });
+        o.cost = drawBits(rng);
     }
     constexpr uint32_t kZeros[] = { 0x00000000, 0x80000000 };   // the level test's edge, +0 and −0
     const uint32_t pick = rng() % 8;
     w.tvaLevel = pick < 2 ? kZeros[pick] : (pick < 4 ? (uint32_t)rng() : std::bit_cast<uint32_t>(vc2Unit(rng) - 0.5f));
     std::ranges::generate(w.tvaBinds, [&] { return (uint32_t)rng(); });
+    const uint32_t fade = rng() % 4;   // none, its edges or fading
+    w.tvaFade = fade < 2 ? kZeros[fade] : std::bit_cast<uint32_t>(fade == 2 ? -vc2Unit(rng) : vc2Unit(rng));
+    w.cosmCost = drawBits(rng);
     return w;
 }
 
@@ -119,30 +123,25 @@ void drawPrevious(ToneSides& s, std::mt19937& rng) {
     }
 }
 
-// The two lists: up to three tones made, split between the first and the second (either may be empty), each list linked
-// through its tones' +4; now and then one of them with tone i's id
-void buildLists(ToneSides& s, int i, std::mt19937& rng) {
-    std::vector<int> listed = s.live;
-    std::shuffle(listed.begin(), listed.end(), rng);
-    listed.resize(std::min(listed.size(), (size_t)(rng() % (kListed + 1))));
+// The tones the note-on's walk back reaches, up to three (the part's real lists from v273): now and then one of them
+// with tone i's id, and each node's +0x14 itself, now and then 0 (passed over) or another tone
+void drawListedWords(ToneSides& s, int i, std::mt19937& rng) {
+    const std::array<uint32_t, 2> marks = s.shared.lists.marks();
+    std::vector<int> listed;
+    uint32_t node = marks[0] != 0 ? marks[0] : marks[1];
+    for (; node != 0 && s.pool.holds(node) && listed.size() < kListed; node = s.pool.at(node).head.prev) {
+        listed.push_back(s.pool.indexOf(node));
+    }
     if (!listed.empty() && drawFlag(rng)) {
         const int j = listed[rng() % listed.size()];
         toneBothWord(s, j, kToneIdAt, s.pool.tones[(size_t)j].head.id, s.pool.tones[(size_t)i].head.id);
     }
-    const size_t split = listed.empty() ? 0 : rng() % (listed.size() + 1);   // the first list's tones, then the second's
-    for (size_t k = 0; k < listed.size(); ++k) {   // a node's +0x14 itself, now and then 0 (passed over) or another tone
-        const int t = listed[k];
-        const bool last = k + 1 == split || k + 1 == listed.size();
-        const uint32_t next = last ? 0 : s.pool.addressOf(listed[k + 1]);
+    for (int t : listed) {
         const uint32_t pick = rng() % 6;
         const int other = s.live[rng() % s.live.size()];
         const uint32_t self = pick == 0 ? 0 : s.pool.addressOf(pick == 1 ? other : t);
-        toneBothWord(s, t, kToneLinkAt, s.pool.tones[(size_t)t].head.prev, next);
         toneBothWord(s, t, kToneSelfAt, s.pool.tones[(size_t)t].head.self, self);
     }
-    const auto head = [&](size_t k, bool has) { return has ? s.pool.addressOf(listed[k]) : 0u; };
-    s.shared.lists = { head(0, split > 0), head(split, split < listed.size()) };
-    s.fw.cpu.write(kToneListsAt, s.shared.lists.data(), sizeof s.shared.lists);
 }
 } // namespace
 
@@ -157,6 +156,7 @@ std::string toneDifference(ToneSides& s, int only) {
     }
     const auto& in = s.shared.input.words;
     if (what.empty()) what = vc2FirstDifference(s.fw, kToneInputAt, in.data(), sizeof in, "the input");
+    if (what.empty()) what = toneListsDifference(s);
     if (what.empty() && only < 0) what = toneFreeLfosDifference(s);   // the events that can reach the manager
     return what.empty() ? toneCallsDifference(s.rom, s.shared.calls) : what;
 }
@@ -168,6 +168,8 @@ void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     d.tvaHeld = drawFlag(rng);
     std::ranges::generate(d.installOsc, [&] { return (uint32_t)rng(); });
     std::ranges::generate(d.installCosm, [&] { return drawFlag(rng) ? rng() % 2 : (uint32_t)rng(); });
+    std::ranges::generate(d.word168, [&] { return (uint32_t)rng(); });
+    std::ranges::generate(d.position, [&] { return (uint32_t)rng(); });
     s.parts[(size_t)i].words = drawWords(rng);
     toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
     toneDrawModulatorWords(s, i, rng);
@@ -181,6 +183,6 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     drawToneInput(s, rng);
     drawPrevious(s, rng);
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
-    buildLists(s, i, rng);
+    drawListedWords(s, i, rng);
 }
 #endif

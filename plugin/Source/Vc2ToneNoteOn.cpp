@@ -69,7 +69,9 @@ Vc2ToneBinding<N> bindingOf(const uint32_t* block, const Row (&rows)[R], int32_t
 // A tone of the same id on the lists: the first list, or the second when that is empty, each tone's +4 the next
 int sameIdTone(uint32_t id, Vc2TonePool& pool, Vc2ToneOwner& owner) {
     const std::array<uint32_t, 2> heads = owner.lists();
-    for (uint32_t node = heads[0] != 0 ? heads[0] : heads[1]; node != 0; node = pool.at(node).head.prev) {
+    // [FW] the walk back ends at a list's head (v273, Vc2ToneLists.h): its +0x14 and +4 stay 0, so it names no tone
+    for (uint32_t node = heads[0] != 0 ? heads[0] : heads[1]; node != 0 && pool.holds(node);
+         node = pool.at(node).head.prev) {
         const uint32_t tone = pool.at(node).head.self;
         if (tone != 0 && pool.at(tone).head.id == id) return pool.indexOf(tone);
     }

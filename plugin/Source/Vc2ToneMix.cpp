@@ -45,19 +45,51 @@ void startBlend(Vc2MixWords& w, Vc2ToneTail& tail, Vc2ToneMixRings&) {
 
 void startOther(Vc2MixWords&, Vc2ToneTail& tail, Vc2ToneMixRings&) { tail.syncOn = 0; }
 
+// [FW] 0x893add60's cases (v273): a new block's targets during a note, by the type its note-on took; the block's own
+// type at +0 is not read
+using MixSettings = void (*)(Vc2MixWords&, const uint32_t* block, Vc2ToneTail&);
+
+void takeTargets(Vc2MixWords& w, const uint32_t* block, size_t from, size_t count) {
+    std::memcpy(&w.target[from], block + 1 + from, count * sizeof(uint32_t));
+}
+
+void settleFour(Vc2MixWords& w, const uint32_t* block, Vc2ToneTail& tail) {
+    takeTargets(w, block, 0, w.target.size());
+    tail.syncOn = 0;
+}
+
+void settleRing(Vc2MixWords& w, const uint32_t* block, Vc2ToneTail& tail) {
+    w.target[0] = xtf::div(std::bit_cast<float>(block[1]), vc2ToneMixTables().settingsScale);
+    takeTargets(w, block, 1, 2);
+    tail.syncOn = 0;
+}
+
+void settleThree(Vc2MixWords& w, const uint32_t* block, Vc2ToneTail& tail) {
+    takeTargets(w, block, 0, 3);
+    tail.syncOn = 0;
+}
+
+void settleBlend(Vc2MixWords& w, const uint32_t* block, Vc2ToneTail& tail) {
+    tail.syncOn = 1;
+    w.hold = std::bit_cast<float>(block[1]);
+}
+
+void settleNone(Vc2MixWords&, const uint32_t*, Vc2ToneTail&) {}
+
 // [FW] a block's type: its note-on's case (0x893adc86…) and its install's (0x893adeb6…): the pick, and the other pick
-// where the OSC voices' flags are set or, for the last type, where OSC 1 isn't kind 3
+// where the OSC voices' flags are set or, for the last type, where OSC 1 isn't kind 3; its settings' case
 struct MixType {
     MixStart start;
     MixPick pick, other;
     bool byKind;
+    MixSettings settings;
 };
 constexpr MixType kTypes[] = {
-    { startFour, { 0, 0 }, { 0, 0 }, false },     { startRing, { 1, 1 }, { 1, 1 }, false },
-    { startDelay, { 2, 2 }, { 3, 4 }, false },    { startFollow, { 4, 3 }, { 5, 5 }, false },
-    { startBlend, { 6, 6 }, { 7, 7 }, true },
+    { startFour, { 0, 0 }, { 0, 0 }, false, settleFour },     { startRing, { 1, 1 }, { 1, 1 }, false, settleRing },
+    { startDelay, { 2, 2 }, { 3, 4 }, false, settleThree },   { startFollow, { 4, 3 }, { 5, 5 }, false, settleThree },
+    { startBlend, { 6, 6 }, { 7, 7 }, true, settleBlend },
 };
-constexpr MixType kOtherType = { startOther, { 0, kKeepsGain }, { 0, kKeepsGain }, false };
+constexpr MixType kOtherType = { startOther, { 0, kKeepsGain }, { 0, kKeepsGain }, false, settleNone };
 
 const MixType& typeOf(int32_t type) {
     return (uint32_t)type < std::size(kTypes) ? kTypes[(size_t)type] : kOtherType;
@@ -85,6 +117,8 @@ void Vc2ToneMix::noteOn(const uint32_t* block, uint32_t flag1, uint32_t flag2, V
     w.ringB = Vc2ToneMixRings::kBAt + offset;
     typeOf(w.type).start(w, tail, rings);
 }
+
+void Vc2ToneMix::settings(const uint32_t* block, Vc2ToneTail& tail) { typeOf(w.type).settings(w, block, tail); }
 
 void Vc2ToneMix::install(bool kind3, Vc2ToneTail& tail) {
     const MixType& type = typeOf(w.type);
