@@ -4,6 +4,8 @@
 // 16 records), a voice's number past 23 (M's pool holds 24), C's M outside the pool.  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2SetsChildCheck.h"
+#include <cstdio>
+#include <string_view>
 
 namespace {
 constexpr uint32_t kParts = 16, kFewParts = 4, kKinds = 4, kSums = 64;
@@ -103,17 +105,6 @@ uint32_t setsCall(SetSides& s, std::mt19937& rng) {
     return kVc2Args;
 }
 
-void setsPartWordsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all, const SetPartTable& t, SetWordsDraw draw) {
-    for (uint32_t p = 0; p < kParts; ++p)
-        for (uint32_t k = 0; k < kKinds; ++k) {
-            if (!all && rng() % 16) continue;
-            for (uint32_t i = 0; i < t.perKind; ++i) {
-                const std::array<uint16_t, 5> words = draw(rng);
-                fw.cpu.write(t.at + t.part * p + t.kind * k + kSetsPartWordsBytes * i, words.data(), sizeof words);
-            }
-        }
-}
-
 // A sum: 0, small, the ends of a byte's range, wider, any
 void setsSumsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
     for (uint32_t k = 0; k < kSums; ++k) {
@@ -122,6 +113,19 @@ void setsSumsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
                                                   (int16_t)(rng() % 601 - 300), (int16_t)rng() });
         fw.cpu.wr16(kSetsSumsAt + 2 * k, (uint16_t)setsOneOf(sums, rng));
     }
+}
+
+void setsSay(const char* format, std::span<const long> values) {
+    const std::string_view said(format);
+    const std::string_view mark = "%ld";
+    size_t from = 0;
+    for (const long value : values) {
+        const size_t at = said.find(mark, from);
+        if (at == std::string_view::npos) break;
+        std::printf("%.*s%ld", static_cast<int>(at - from), said.data() + from, value);
+        from = at + mark.size();
+    }
+    std::printf("%s", said.data() + from);
 }
 
 void setsHookReaders(SetSides& s, std::span<const uint32_t> readers) {

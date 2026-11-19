@@ -3,6 +3,8 @@
 // both sides, the part's sides and counts, the draws of the parts' words and the Matrix's sums, the readers' hooks, the
 // events by routine, a case and a part.  XT_VC2SETS_MAIN only.
 #include "Vc2SetsCheck.h"
+#include <algorithm>
+#include <cstring>
 #include <memory>
 #include <type_traits>
 
@@ -14,14 +16,56 @@ Vc2SetCall setsCallAt(SetSides& s, uint32_t at);
 std::string setsChildOnBoth(SetSides& s, const Vc2Region& pool, const Vc2CheckRoutine& routine,
                             std::initializer_list<uint32_t> args, const std::function<uint32_t()>& mine);
 
-// The parts' five words for a child drawn in rom.4's memory by `draw`: every kind's of every part (all), or now and then
-// a kind's (v283)
-using SetWordsDraw = std::array<uint16_t, 5> (*)(std::mt19937&);
-void setsPartWordsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all, const SetPartTable& t, SetWordsDraw draw);
+// The parts' N words for a child drawn in rom.4's memory by `draw`: every kind's of the 16 parts' first 4 (all), or now
+// and then a kind's (v283; any N, v284)
+template <size_t N>
+using SetWordsDraw = std::array<uint16_t, N> (*)(std::mt19937&);
+
+template <size_t N>
+void setsPartWordsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all, const SetPartTable& t, SetWordsDraw<N> draw) {
+    constexpr uint32_t kParts = 16, kKinds = 4;
+    for (uint32_t p = 0; p < kParts; ++p)
+        for (uint32_t k = 0; k < kKinds; ++k) {
+            if (!all && rng() % 16) continue;
+            for (uint32_t i = 0; i < t.perKind; ++i) {
+                const std::array<uint16_t, N> words = draw(rng);
+                fw.cpu.write(t.at + t.part * p + t.kind * k + sizeof words * i, words.data(), sizeof words);
+            }
+        }
+}
+// A byte at one of `Edges`, or any (v284)
+template <uint8_t... Edges>
+uint8_t setsByteDrawn(std::mt19937& rng) {
+    return setsOneOf(std::to_array<uint8_t>({ Edges..., (uint8_t)rng() }), rng);
+}
+
+// The part's N words for a child as its object holds them from +6, drawn by `Of` on a whole object (v284)
+template <class Words, size_t N, auto Of>
+std::array<uint16_t, N> setsWordsDrawn(std::mt19937& rng) {
+    constexpr size_t kPartWordsAt = 6;   // [FW] where every child but the common holds them
+    Words w;
+    Of(w, rng);
+    std::array<uint16_t, N> words;
+    std::memcpy(words.data(), reinterpret_cast<const uint8_t*>(&w) + kPartWordsAt, sizeof words);
+    return words;
+}
+
 // The Matrix's sums the readers answer drawn (all, or now and then each)
 void setsSumsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all);
 // The Matrix group's `readers` hooked to log the M they're given and answer the sums
 void setsHookReaders(SetSides& s, std::span<const uint32_t> readers);
+
+// A child's draws before an event (all at a case's first): the sets' part's, the part's N words by `Table` as `Of` draws
+// an object's, the Matrix's sums when it reads them, and now and then each of the pool's objects by `Of` (v284)
+template <class Sides, SetPartTable Table, size_t N, auto Of, bool Sums>
+void setsChildDraw(Sides& x, std::mt19937& rng, bool all) {
+    using Words = std::remove_cvref_t<decltype(x.port.items[0])>;
+    setsDraw(x.s, rng, all);
+    setsPartWordsDrawn(x.s.fw, rng, all, Table, setsWordsDrawn<Words, N, Of>);
+    if constexpr (Sums) setsSumsDrawn(x.s.fw, rng, all);
+    for (Words& w : x.port.items)
+        if (all || rng() % 8 == 0) Of(w, rng);
+}
 
 // A child's part's counts: its events, the calls they made and each kind of event's; a part's own adds its pool's name,
 // kPool (v283)
@@ -149,12 +193,24 @@ std::string setsCopyEvent(Sides& x, std::mt19937& rng) {
     return setsChildCopy<Sides, Block>(x, rng, { Routine, "the copy" }, decltype(x.n)::kPool, mine);
 }
 
-// A child's part's case: noise in the pool, then 400 of `Events()`, each after `Draw` (all at the first), its calls
+// A part's counts said by `format`, each %ld in turn the events, each kind of event's and the calls (v284)
+void setsSay(const char* format, std::span<const long> values);
+
+template <size_t Kinds>
+void setsSayCounts(const char* format, const SetChildCounts<Kinds>& n) {
+    std::array<long, Kinds + 2> values {};
+    values[0] = n.events;
+    std::copy(n.byEvent.begin(), n.byEvent.end(), values.begin() + 1);
+    values[Kinds + 1] = n.calls;
+    setsSay(format, values);
+}
+
+// A child's part's case: noise in the pool, then 400 of `Events`, each after `Draw` (all at the first), its calls
 // counted; what differs, or nothing
-template <auto Draw, auto Events, class Sides>
+template <auto Draw, const auto& Events, class Sides>
 std::string setsChildCase(Sides& x, std::mt19937& rng) {
     setsNoise(x.port.items, rng);
-    const auto events = Events();
+    const std::span events(Events);
     std::string what;
     for (int k = 0; k < 400 && what.empty(); ++k, ++x.n.events) {
         Draw(x, rng, k == 0);
@@ -165,8 +221,9 @@ std::string setsChildCase(Sides& x, std::mt19937& rng) {
 }
 
 // A child's part on the seed `offset` after the run's: the sets' part's hooks on its routines taken off, the Matrix
-// group's `readers` it reaches hooked, its sides, its cases, its counts said by `Say`; how many of its cases differ
-template <class Sides, auto Draw, auto Events, auto Say>
+// group's `readers` it reaches hooked, its sides, its cases of `Events`, its counts said by their kSaid; how many of
+// its cases differ
+template <class Sides, auto Draw, const auto& Events>
 long setsChildPart(SetSides& s, const Vc2Run& run, uint32_t offset, std::span<const uint32_t> routines,
                    std::span<const uint32_t> readers = {}) {
     for (const uint32_t at : routines) s.fw.cpu.unhook(at);
@@ -174,6 +231,6 @@ long setsChildPart(SetSides& s, const Vc2Run& run, uint32_t offset, std::span<co
     const auto x = std::make_unique<Sides>(s);
     const long different = vc2CheckPart(run, offset, { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" }, x->n.events,
                                         [&](std::mt19937& rng) { return setsChildCase<Draw, Events>(*x, rng); });
-    Say(x->n);
+    setsSayCounts(decltype(x->n)::kSaid, x->n);
     return different;
 }

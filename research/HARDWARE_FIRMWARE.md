@@ -1546,6 +1546,67 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's sets' mix (2026-11-19, v284) {#vc2-set-mix}
+
+Step 4.3's twelfth version (VC2_MODE_PLAN.md, step 4.3, item 8's fourth child): C's mix, one a voice. `Vc2SetMixes`
+is bit for bit against rom.4's own in `xt_vc2sets`' fifth part.
+
+**Its words.** There are 24 mixes of 32 bytes from `0x89996c34`, one a voice (`0x8939bd90(32, number)`: 32 × the
+number; it reads no index).
+- +0 holds the note's kind; +1 the voice's key (+0x41) and +2 its +0x43.
+- +6…+0x1b hold the part's eleven words for it, from `0x89e32a60` + 352 × the part + 22 × the kind. As bytes the
+  writer reads five: whether it mixes (+6), the type (+7), a level (+8) and the crossfade's two (+9, +0xa).
+- +0x1c holds the note's M.
+
+**The block.** Each mix converts the mix block of the note's input, W + 0x644. The writer is `0x8939bcc0`:
+- **Off** (+6 is 0): +0 takes 0 and the four gains +4…+0x10 take 0.7 (the pool word `0x8939bcf8`).
+- **On, by the type less 1, unsigned** (a table of four, `0x8939bd08`):
+  - type 1: +0 takes 1, +8 the level table (`0x89541f34`) by the level byte over 32768 (`0x8939bd00`), and +0xc
+    and +4 1.0;
+  - type 2: the same with 2, its divisor the pool word `0x8939bf04`;
+  - type 3: +0 takes 0, and the crossfade's table (`0x89542034`) gives two pairs over 32768: +4 by 127 less the
+    first byte, +8 by the first byte, +0xc and +0x10 the same by the second;
+  - type 4: +0 takes 4 and +4 1.0;
+  - any other: +0 takes 0 and the four gains 0.7 (`0x8939bf08`).
+- **The three tables are one run.** 127 less a byte past 127 reads the level table below the crossfade's, and a
+  byte past 127 reads on into the note values' ticks (`0x89542134`). So the port reads 384 halfwords from
+  `0x89541f34`, the envelopes' level table widened.
+- Types 1 and 3 are reached by branches to `0x8939bbe0` and `0x8939bc40`. Three copies beside them, `0x8939bbc0`
+  (off), `0x8939bc10` (type 2) and `0x8939bcb0` (type 4), have no callers.
+
+**The routines.**
+- **The constructor `0x8939bdb0(mix, call, block, M; the kind on the stack)`** writes the kind and M, the voice's
+  two bytes and the part's words, then the block.
+- **The conversion `0x8939be40`** writes the voice's two bytes again, then the block. **The update `0x8939be60`**
+  writes the part's words again. **The copy `0x8939bec0`** is the writer alone. **The end `0x8939be30`** is a bare
+  return.
+- These are the envelopes' and LFOs' routines but for where the voice's bytes go (+1, not +2) and the words by the
+  kind alone. So the mix is on `Vc2SetChildPool` too, given those two (`Vc2MixWordsOf`), with its own placement.
+- The four pool words join `Vc2SetEnvelopeTables` (loadVc2), which refuses an image where any isn't positive.
+
+**The check.** It is xt_vc2sets' fifth part, on the seed after the LFOs'. Nothing is hooked: the routines call
+nothing, and the sets' part's hooks on them are taken off.
+
+The draws, beyond the sets' part's:
+- the parts' mix words for 16 parts and 4 kinds, and the mixes' own words;
+- on 1, 0 or any; the type 0…5 or any;
+- the three bytes at 0, 1, 126…128, 254, 255 or any, so each table's run either side is read.
+
+Each case is noise in the mixes, then 400 events: the placement, the constructor, the end, the conversion, the
+update, the copy and the writer alone.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the earlier parts' lines as they were.
+- Every line and branch of `Vc2SetMix.cpp` is reached.
+- `mutate_vc2.py --sets`: 284 plants, none missed; the mix's 27, its tables' 5 and the head's mix reader new. Not
+  planted: the off gains for the other type's and the two scales for each other, each pair the same value in rom.4
+  (their addresses are planted), and what Vc2SetMix.h holds, a header.
+
+The children's checks share more now. One draw template (`setsChildDraw`) serves the LFOs and the mix. The part's
+words' draw and the port's reads are templates on the word count. Each part's counts carry their line's format
+(`kSaid`), said by `setsSayCounts`, and the runner takes the events array itself; the earlier lines print as before.
+The three float-to-word helpers are one, `floatWord` in Vc2SetChildHead.h.
+
 ### The VC-2 part's sets' LFOs (2026-11-19, v283) {#vc2-set-lfos}
 
 Step 4.3's eleventh version (VC2_MODE_PLAN.md, step 4.3, item 8's third child): C's five LFOs a voice. `Vc2SetLfos`

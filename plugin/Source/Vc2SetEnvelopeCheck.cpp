@@ -19,6 +19,9 @@ constexpr uint32_t kReaders[] = { 0x893a2550, 0x893a2750, 0x893a2960, 0x893a2aa0
 
 struct EnvelopeCounts : SetChildCounts<8> {
     static constexpr const char* kPool = "the envelopes";
+    static constexpr const char* kSaid = "envelopes: %ld events: %ld placements, %ld constructors, %ld ends, %ld "
+                                         "conversions, %ld updates, %ld copies, %ld releases, %ld block writes (%ld "
+                                         "Matrix sums)\n";
 };
 
 using EnvelopeSides = SetChildSides<Envelopes, EnvelopeCounts>;
@@ -111,18 +114,9 @@ const EnvelopeEvent kEvents[] = {
     setsCopyEvent<EnvelopeSides, &Envelopes::copy, anyEnvelopeBlock, 0x8939a3d0, 7>,
 };
 
-std::span<const EnvelopeEvent> envelopeEvents() { return kEvents; }
-
-void sayEnvelopeCounts(const EnvelopeCounts& n) {
-    const auto& c = n.byEvent;
-    std::printf("envelopes: %ld events: %ld placements, %ld constructors, %ld ends, %ld conversions, %ld updates, %ld "
-                "copies, %ld releases, %ld block writes (%ld Matrix sums)\n", n.events, c[0], c[1], c[2], c[3], c[4],
-                c[5], c[6], c[7], n.calls);
-}
 } // namespace
 
 long vc2SetEnvelopePart(SetSides& s, const Vc2Run& run) {
-    return setsChildPart<EnvelopeSides, envelopeDraw, envelopeEvents, sayEnvelopeCounts>(s, run, 2, kRoutines,
-                                                                                          kReaders);
+    return setsChildPart<EnvelopeSides, envelopeDraw, kEvents>(s, run, 2, kRoutines, kReaders);
 }
 #endif

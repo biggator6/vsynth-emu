@@ -17,6 +17,8 @@ constexpr uint32_t kRoutines[] = { 0x893a1940, 0x893a1960, 0x893a19b0, 0x893a19c
 
 struct CommonCounts : SetChildCounts<7> {
     static constexpr const char* kPool = "the commons";
+    static constexpr const char* kSaid = "common: %ld events: %ld placements, %ld constructors, %ld ends, %ld "
+                                         "conversions, %ld updates, %ld copies and %ld of the twin\n";
 };
 
 using CommonSides = SetChildSides<Commons, CommonCounts>;
@@ -87,16 +89,9 @@ const CommonEvent kEvents[] = {
     setsCopyEvent<CommonSides, &Commons::copy, anyBlock, 0x893a1870, 6>,
 };
 
-std::span<const CommonEvent> commonEvents() { return kEvents; }
-
-void sayCommonCounts(const CommonCounts& n) {
-    const auto& e = n.byEvent;
-    std::printf("common: %ld events: %ld placements, %ld constructors, %ld ends, %ld conversions, %ld updates, %ld "
-                "copies and %ld of the twin\n", n.events, e[0], e[1], e[2], e[3], e[4], e[5], e[6]);
-}
 } // namespace
 
 long vc2SetCommonPart(SetSides& s, const Vc2Run& run) {
-    return setsChildPart<CommonSides, commonDraw, commonEvents, sayCommonCounts>(s, run, 1, kRoutines);
+    return setsChildPart<CommonSides, commonDraw, kEvents>(s, run, 1, kRoutines);
 }
 #endif

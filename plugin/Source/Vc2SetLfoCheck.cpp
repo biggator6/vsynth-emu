@@ -9,7 +9,6 @@
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2SetLfo.h"
 #include "Vc2SetsChildCheck.h"
-#include <cstring>
 
 namespace {
 using Lfos = Vc2SetLfos;
@@ -19,6 +18,8 @@ constexpr uint32_t kReaders[] = { 0x893a26b0, 0x893a28b0, 0x893a2960, 0x893a2aa0
 
 struct LfoCounts : SetChildCounts<7> {
     static constexpr const char* kPool = "the LFOs";
+    static constexpr const char* kSaid = "LFOs: %ld events: %ld placements, %ld constructors, %ld ends, %ld "
+                                         "conversions, %ld updates, %ld copies, %ld block writes (%ld Matrix sums)\n";
 };
 
 using LfoSides = SetChildSides<Lfos, LfoCounts>;
@@ -38,10 +39,8 @@ int16_t lfoRateDrawn(std::mt19937& rng) {
     return setsOneOf(rates, rng);
 }
 
-// A depth's byte at the square's edges or any
-uint8_t lfoDepthDrawn(std::mt19937& rng) {
-    return setsOneOf(std::to_array<uint8_t>({ 0, 1, 64, 126, 127, 128, 255, (uint8_t)rng() }), rng);
-}
+// [FW] a depth's byte at the square's edges or any
+constexpr auto lfoDepthDrawn = setsByteDrawn<0, 1, 64, 126, 127, 128, 255>;
 
 void lfoWordsOf(Vc2LfoWords& w, std::mt19937& rng) {
     setsNoise(w, rng);
@@ -55,22 +54,7 @@ void lfoWordsOf(Vc2LfoWords& w, std::mt19937& rng) {
     w.sync = lfoChoice(rng, 1);
 }
 
-// The part's five words for an LFO, as an LFO holds them
-std::array<uint16_t, 5> lfoWordsDrawn(std::mt19937& rng) {
-    Vc2LfoWords w;
-    lfoWordsOf(w, rng);
-    std::array<uint16_t, 5> words;
-    std::memcpy(words.data(), &w.wave, sizeof words);
-    return words;
-}
-
-void lfoDraw(LfoSides& l, std::mt19937& rng, bool all) {
-    setsDraw(l.s, rng, all);
-    setsPartWordsDrawn(l.s.fw, rng, all, kSetsLfoTable, lfoWordsDrawn);
-    setsSumsDrawn(l.s.fw, rng, all);
-    for (Vc2LfoWords& w : l.port.items)
-        if (all || rng() % 8 == 0) lfoWordsOf(w, rng);
-}
+constexpr auto lfoDraw = setsChildDraw<LfoSides, kSetsLfoTable, 5, lfoWordsOf, true>;
 
 // [FW] the events by routine; the copy and the block writer 0x8939b590 alone, the same work
 const LfoEvent kEvents[] = {
@@ -85,17 +69,9 @@ const LfoEvent kEvents[] = {
     setsCopyEvent<LfoSides, &Lfos::copy, anyLfoBlock, 0x8939b590, 6>,
 };
 
-std::span<const LfoEvent> lfoEvents() { return kEvents; }
-
-void sayLfoCounts(const LfoCounts& n) {
-    const auto& c = n.byEvent;
-    std::printf("LFOs: %ld events: %ld placements, %ld constructors, %ld ends, %ld conversions, %ld updates, %ld "
-                "copies, %ld block writes (%ld Matrix sums)\n", n.events, c[0], c[1], c[2], c[3], c[4], c[5], c[6],
-                n.calls);
-}
 } // namespace
 
 long vc2SetLfoPart(SetSides& s, const Vc2Run& run) {
-    return setsChildPart<LfoSides, lfoDraw, lfoEvents, sayLfoCounts>(s, run, 3, kRoutines, kReaders);
+    return setsChildPart<LfoSides, lfoDraw, kEvents>(s, run, 3, kRoutines, kReaders);
 }
 #endif

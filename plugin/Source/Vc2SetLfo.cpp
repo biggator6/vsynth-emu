@@ -25,8 +25,6 @@ constexpr RateSum kRateSums[] = {
 
 const Vc2SetEnvelopeTables& lfoTables() { return vc2SetEnvelopeTables(); }
 
-uint32_t lfoWord(float f) { return std::bit_cast<uint32_t>(f); }
-
 // 0x8939b450 below a note value (its only caller tests that first): the rate plus the LFO's Matrix sum, held to 0…127
 uint32_t lfoRate(int16_t rate, uint32_t matrix, uint32_t index, Vc2SetReads& reads) {
     int32_t sum = 0;
@@ -48,13 +46,13 @@ uint32_t secondSwitch(uint8_t b) { return b >= 1 && b <= kSecondSwitchMost ? b :
 void Vc2SetLfos::blockOf(const Vc2LfoWords& w, uint32_t* block, Vc2SetReads& reads) {
     const bool note = w.rate >= kNoteFrom;
     block[5] = note ? 1 : 0;
-    block[1] = lfoWord(note ? xtf::flt(lfoTables().notes[w.rate - kNoteFrom])
-                            : lfoTables().rates[lfoRate(w.rate, w.matrix, w.index, reads)]);
+    block[1] = floatWord(note ? xtf::flt(lfoTables().notes[w.rate - kNoteFrom])
+                              : lfoTables().rates[lfoRate(w.rate, w.matrix, w.index, reads)]);
     block[0] = w.wave < kWaves.size() ? kWaves[w.wave] : 1;
     block[6] = firstSwitch(w.byte0a);
-    block[2] = lfoWord(depthOf(w.depthA));
+    block[2] = floatWord(depthOf(w.depthA));
     block[7] = secondSwitch(w.byte0c);
-    block[3] = lfoWord(depthOf(w.depthB));
+    block[3] = floatWord(depthOf(w.depthB));
     block[4] = w.sync != 0;
 }
 

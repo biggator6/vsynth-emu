@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's sets' mix v284 (2026-11-19, on claude/vc2-part-4-3 after v283; HARDWARE_FIRMWARE.md, "The VC-2
+  part's sets' mix"): step 4.3's twelfth version, item 8's fourth child. Vc2SetMixes, rom.4's 24 mixes word for word,
+  the constructor, conversion, update, copy and the block writer: off, 0.7 at the four gains; on, by type, the level
+  table by a byte, the crossfade's two pairs, 1.0, or 0.7. The three tables read as one run of 384 halfwords, as a
+  byte past 127 reads on. On Vc2SetChildPool with the voice's bytes at +1. xt_vc2sets gains a fifth part, nothing
+  hooked: 0 different at seeds 2024, 7 and 31337; mutate_vc2.py --sets 284 planted, 0 missed. The children's
+  checks share the draw, the counts' line and the events. Not in the sound yet.
+
 The VC-2 part's sets' LFOs v283 (2026-11-19, on claude/vc2-part-4-3 after v282; HARDWARE_FIRMWARE.md, "The VC-2
   part's sets' LFOs"): step 4.3's eleventh version, item 8's third child. Vc2SetLfos, rom.4's 120 LFOs word for word,
   the constructor, conversion, update, copy and the block writer: the waveform's code, the rate by a note value's

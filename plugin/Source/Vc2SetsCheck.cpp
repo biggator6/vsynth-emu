@@ -198,18 +198,16 @@ std::array<uint16_t, 3> SetPortParts::commonOf(uint32_t part) {
     return words;
 }
 
-std::array<uint16_t, 5> SetPortParts::partWords(const SetPartTable& t, uint32_t part, uint32_t kind, uint32_t index) {
-    std::array<uint16_t, 5> words;
-    fw_.cpu.read(t.at + t.part * part + t.kind * kind + kSetsPartWordsBytes * index, words.data(), sizeof words);
-    return words;
-}
-
 std::array<uint16_t, 5> SetPortParts::envelopeOf(uint32_t part, uint32_t kind, uint32_t index) {
-    return partWords(kSetsEnvelopeTable, part, kind, index);
+    return partWords<5>(kSetsEnvelopeTable, part, kind, index);
 }
 
 std::array<uint16_t, 5> SetPortParts::lfoOf(uint32_t part, uint32_t kind, uint32_t index) {
-    return partWords(kSetsLfoTable, part, kind, index);
+    return partWords<5>(kSetsLfoTable, part, kind, index);
+}
+
+std::array<uint16_t, 11> SetPortParts::mixOf(uint32_t part, uint32_t kind) {
+    return partWords<11>(kSetsMixTable, part, kind, 0);
 }
 
 Vc2SetClock SetPortParts::clock() {
@@ -227,7 +225,7 @@ int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offse
 }
 
 long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
-    return vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run);
+    return vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run) + vc2SetMixPart(s, run);
 }
 
 uint32_t* setsPortWords(SetSides& s, uint32_t at) {

@@ -24,14 +24,14 @@ inline constexpr uint32_t kSetsCommonsAt = 0x89997090, kSetsCommonBytes = 6;   /
 inline constexpr uint32_t kSetsClockAt = 0x8995cb40;                // [FW] the clock object (v282)
 inline constexpr uint32_t kSetsSumsAt = 0x8C035000;                  // in Vc2Fw's RAM: the Matrix's sums drawn
 
-// [FW] the parts' five words for a child (10 bytes), by part, kind and index: where they start, a part's and a kind's
-// stride, how many a kind has; the envelopes' (v282) and the LFOs' (v283)
+// [FW] the parts' words for a child, by part, kind and index (an index's the words' count apart): where they start, a
+// part's and a kind's stride, how many a kind has; the envelopes' (v282), the LFOs' (v283) and the mix's (v284)
 struct SetPartTable {
     uint32_t at, part, kind, perKind;
 };
-inline constexpr uint32_t kSetsPartWordsBytes = 10;
 inline constexpr SetPartTable kSetsEnvelopeTable { 0x89e2765c, 2080, 130, 13 };
 inline constexpr SetPartTable kSetsLfoTable { 0x89e2f85c, 800, 50, 5 };
+inline constexpr SetPartTable kSetsMixTable { 0x89e32a60, 352, 22, 1 };
 
 // The calls logged: C's children's methods, and a Matrix group's reader (v282, the envelopes' part)
 enum SetMethod : int32_t { kSetAllocate, kSetConstruct, kSetEnd, kSetConvert, kSetUpdate, kSetCopy, kSetRelease,
@@ -67,12 +67,19 @@ public:
     std::array<uint16_t, 3> commonOf(uint32_t part) override;
     std::array<uint16_t, 5> envelopeOf(uint32_t part, uint32_t kind, uint32_t index) override;
     std::array<uint16_t, 5> lfoOf(uint32_t part, uint32_t kind, uint32_t index) override;
+    std::array<uint16_t, 11> mixOf(uint32_t part, uint32_t kind) override;
     Vc2SetClock clock() override;
     int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) override;
 
 private:
     void logged(int32_t kind, uint32_t routine, std::array<uint32_t, 8> args);
-    std::array<uint16_t, 5> partWords(const SetPartTable& t, uint32_t part, uint32_t kind, uint32_t index);
+    // The part's N words for a child by `t`, where the draws wrote them
+    template <size_t N>
+    std::array<uint16_t, N> partWords(const SetPartTable& t, uint32_t part, uint32_t kind, uint32_t index) {
+        std::array<uint16_t, N> words;
+        fw_.cpu.read(t.at + t.part * part + t.kind * kind + sizeof words * index, words.data(), sizeof words);
+        return words;
+    }
     Vc2Fw& fw_;
     std::mt19937& answers_;
     std::vector<SetCall>& log_;
@@ -139,5 +146,7 @@ long vc2SetCommonPart(SetSides& s, const Vc2Run& run);
 // The envelopes' (v282, Vc2SetEnvelopeCheck.cpp), the LFOs' (v283, Vc2SetLfoCheck.cpp)
 long vc2SetEnvelopePart(SetSides& s, const Vc2Run& run);
 long vc2SetLfoPart(SetSides& s, const Vc2Run& run);
+// The mix's (v284, Vc2SetMixCheck.cpp)
+long vc2SetMixPart(SetSides& s, const Vc2Run& run);
 // The further parts in turn
 long vc2SetsFurther(SetSides& s, const Vc2Run& run);

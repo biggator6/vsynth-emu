@@ -39,8 +39,6 @@ constexpr Reader kReaders[] = {
 
 const Vc2SetEnvelopeTables& envelopeTables() { return vc2SetEnvelopeTables(); }
 
-uint32_t floatWord(float f) { return std::bit_cast<uint32_t>(f); }
-
 // 0x89399ff0, 0x8939a130, 0x8939a270 by `stage` (0 attack, 1 decay, 2 release): the value plus the Matrix's sum for
 // the envelope, held to 0…127
 uint32_t matrixTime(uint32_t value, uint32_t matrix, uint32_t index, uint32_t stage, Vc2SetReads& reads) {

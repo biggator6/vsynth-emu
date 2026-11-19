@@ -6,6 +6,9 @@
 # gives under 200 either way), the release's note value scale for the writer's (both 600000).  What the envelopes and
 # LFOs share (vc2setchildhead, Vc2SetChildHead.cpp, v283) and the LFOs (vc2setlfo, Vc2SetLfo.cpp); the pool's
 # conversion, update and copy, a template in Vc2SetChildHead.h, planted at what they call (a header has no port here).
+# The mix (vc2setmix, Vc2SetMix.cpp, v284), not planted: the off gains for the other type's, the two scales for each
+# other (each pair the same value in rom.4; their addresses are planted in the tables), the mix's +1 for the voice's
+# bytes and its placement, in Vc2SetMix.h.
 sets-first-child|kFirstChild = 0x04;|kFirstChild = 0x08;|vc2sets
 sets-osc-stride|kOscStride = In::kOscs[1] - In::kOscs[0],|kOscStride = In::kOscs[1] - In::kOscs[0] + 4,|vc2sets
 sets-cosm-stride|kCosmStride = In::kCosms[1] - In::kCosms[0];|kCosmStride = In::kCosms[1] - In::kCosms[0] + 4;|vc2sets
@@ -214,14 +217,15 @@ tables-depth-top|{ 0x8939b624, &depthTop }|{ 0x8939b628, &depthTop }|vc2setenvta
 tables-depth-scale|{ 0x8939b628, &depthScale }|{ 0x8939b624, &depthScale }|vc2setenvtables
 head-kind|object[kKind] = static_cast<uint8_t>(c.kind);|object[kKind] = static_cast<uint8_t>(c.index);|vc2setchildhead
 head-index|object[kIndex] = static_cast<uint8_t>(c.index);|object[kIndex] = static_cast<uint8_t>(c.kind);|vc2setchildhead
-head-made-voice|    vc2ChildVoice(object, c.call, reads);\n|\n|vc2setchildhead
-head-key|object[kKey] = v.key;|object[kKey] = v.byte42;|vc2setchildhead
-head-velocity|object[kVelocity] = v.byte43;|object[kVelocity] = v.key;|vc2setchildhead
+head-made-voice|    vc2ChildVoice(object + kKey, c.call, reads);\n|\n|vc2setchildhead
+head-key|at[0] = v.key;|at[0] = v.byte42;|vc2setchildhead
+head-velocity|at[1] = v.byte43;|at[1] = v.key;|vc2setchildhead
 head-key-at|kKind = 0, kIndex = 1, kKey = 2,|kKind = 0, kIndex = 1, kKey = 4,|vc2setchildhead
 head-part-at|std::memcpy(object + kPartWords, words.data(), sizeof words);|std::memcpy(object + kPartWords + 1, words.data(), sizeof words - 1);|vc2setchildhead
 head-part-short|std::memcpy(object + kPartWords, words.data(), sizeof words);|std::memcpy(object + kPartWords, words.data(), sizeof words - 2);|vc2setchildhead
 head-part-kind|object[kKind], object[kIndex])|object[kIndex], object[kKind])|vc2setchildhead
-head-part-which|(reads.*of)(reads.firstByte(v.part),|(reads.*of)(0,|vc2setchildhead
+head-part-which|return reads.firstByte(reads.voiceAt(call.channelAt).part);|return 0;|vc2setchildhead
+head-mix-kind|(reads.*of)(callsPart(call, reads), object[kKind]));|(reads.*of)(callsPart(call, reads), object[kIndex]));|vc2setchildhead
 lfo-note-from|kNoteFrom = 128, kTop = 127;|kNoteFrom = 129, kTop = 127;|vc2setlfo
 lfo-top|kNoteFrom = 128, kTop = 127;|kNoteFrom = 128, kTop = 126;|vc2setlfo
 lfo-last-summed|kLastSummed = 4;|kLastSummed = 3;|vc2setlfo
@@ -247,8 +251,8 @@ lfo-depth-order|xtf::mul(xtf::mul(q, q), lfoTables().depthScale)|xtf::mul(q, xtf
 lfo-note-ticks|notes[w.rate - kNoteFrom]|notes[(w.rate - kNoteFrom) ^ 1]|vc2setlfo
 lfo-note-flag|block[5] = note ? 1 : 0;|block[5] = 0;|vc2setlfo
 lfo-rate-table|rates[lfoRate(w.rate, w.matrix, w.index, reads)]|rates[lfoRate(w.rate, w.matrix, w.index, reads) ^ 1]|vc2setlfo
-lfo-block-depth-a|block[2] = lfoWord(depthOf(w.depthA));|block[2] = lfoWord(depthOf(w.depthB));|vc2setlfo
-lfo-block-depth-b|block[3] = lfoWord(depthOf(w.depthB));|block[3] = lfoWord(depthOf(w.depthA));|vc2setlfo
+lfo-block-depth-a|block[2] = floatWord(depthOf(w.depthA));|block[2] = floatWord(depthOf(w.depthB));|vc2setlfo
+lfo-block-depth-b|block[3] = floatWord(depthOf(w.depthB));|block[3] = floatWord(depthOf(w.depthA));|vc2setlfo
 lfo-block-first|block[6] = firstSwitch(w.byte0a);|block[6] = firstSwitch(w.byte0c);|vc2setlfo
 lfo-block-second|block[7] = secondSwitch(w.byte0c);|block[7] = secondSwitch(w.byte0a);|vc2setlfo
 lfo-block-sync|block[4] = w.sync != 0;|block[4] = w.sync;|vc2setlfo
@@ -257,3 +261,35 @@ lfo-make-matrix|    w.matrix = c.matrix;\n|\n|vc2setlfo
 lfo-make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::lfoOf, c.call, reads);\n|\n|vc2setlfo
 lfo-make-words|&Vc2SetReads::lfoOf, c.call|&Vc2SetReads::envelopeOf, c.call|vc2setlfo
 lfo-make-block|c.call, reads);\n    blockOf(w, block, reads);|c.call, reads);|vc2setlfo
+tables-mix-off|{ 0x8939bcf8, &mixOff }|{ 0x8939bcfc, &mixOff }|vc2setenvtables
+tables-mix-other|{ 0x8939bf08, &mixOther }|{ 0x8939bf0c, &mixOther }|vc2setenvtables
+tables-mix-scale|{ 0x8939bd00, &mixScale }|{ 0x8939bd04, &mixScale }|vc2setenvtables
+tables-mix-scale-two|{ 0x8939bf04, &mixScaleTwo }|{ 0x8939bf08, &mixScaleTwo }|vc2setenvtables
+tables-levels-run|image.read(0x89541f34, levels.data(), sizeof levels);|image.read(0x89541f34, levels.data(), sizeof levels / 2);|vc2setenvtables
+mix-cross-at|kCrossfadeAt = 128;|kCrossfadeAt = 127;|vc2setmix
+mix-cross-top|kCrossTop = 127;|kCrossTop = 128;|vc2setmix
+mix-one|kOne = 1.0f;|kOne = 0.5f;|vc2setmix
+mix-run-float|xtf::div(xtf::flt(mixTables().levels[at]), scale)|xtf::mul(xtf::flt(mixTables().levels[at]), scale)|vc2setmix
+mix-even-zero|    block[0] = 0;\n    for (int k = 1;|    block[0] = 1;\n    for (int k = 1;|vc2setmix
+mix-even-count|k <= 4;|k < 4;|vc2setmix
+mix-level-type|    block[0] = w.type;\n    block[2]|    block[0] = 1;\n    block[2]|vc2setmix
+mix-level-byte|runGain(w.level, scale)|runGain(w.first, scale)|vc2setmix
+mix-level-three|    block[3] = floatWord(kOne);\n    block[1]|    block[1]|vc2setmix
+mix-level-one|    block[1] = floatWord(kOne);\n}\n\nvoid typeOne|}\n\nvoid typeOne|vc2setmix
+mix-cross-zero|    block[0] = 0;\n    block[1] = floatWord(runGain(|    block[0] = 3;\n    block[1] = floatWord(runGain(|vc2setmix
+mix-cross-scale|const float scale = mixTables().mixScale;|const float scale = mixTables().mixOff;|vc2setmix
+mix-cross-first|kCrossfadeAt + kCrossTop - w.first, scale|kCrossfadeAt + kCrossTop - w.second, scale|vc2setmix
+mix-cross-pair|block[2] = floatWord(runGain(kCrossfadeAt + w.first, scale));|block[2] = floatWord(runGain(kCrossfadeAt + w.second, scale));|vc2setmix
+mix-cross-second-top|block[3] = floatWord(runGain(kCrossfadeAt + kCrossTop - w.second, scale));|block[3] = floatWord(runGain(kCrossfadeAt + w.second, scale));|vc2setmix
+mix-cross-four|    block[4] = floatWord(runGain(kCrossfadeAt + w.second, scale));\n|\n|vc2setmix
+mix-four-type|    block[0] = w.type;\n    block[1] = floatWord(kOne);|    block[0] = 0;\n    block[1] = floatWord(kOne);|vc2setmix
+mix-four-one|    block[1] = floatWord(kOne);\n}\n\nvoid otherType|}\n\nvoid otherType|vc2setmix
+mix-ways-order|kWays { typeOne, typeTwo, typeThree, typeFour }|kWays { typeOne, typeThree, typeTwo, typeFour }|vc2setmix
+mix-way-less|const uint32_t way = w.type - 1u;|const uint32_t way = w.type;|vc2setmix
+mix-way-test|way < kWays.size() ?|way < kWays.size() - 1 ?|vc2setmix
+mix-off-test|if (w.on == 0) {|if (w.on == 1) {|vc2setmix
+mix-make-kind|w.kind = static_cast<uint8_t>(c.kind);|w.kind = static_cast<uint8_t>(c.index);|vc2setmix
+mix-make-matrix|    w.matrix = c.matrix;\n|\n|vc2setmix
+mix-make-voice|vc2ChildVoice(&w.key, c.call, reads);|vc2ChildVoice(&w.velocity, c.call, reads);|vc2setmix
+mix-make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::mixOf, c.call, reads);\n|\n|vc2setmix
+mix-make-block|c.call, reads);\n    blockOf(w, block, reads);|c.call, reads);|vc2setmix

@@ -13,9 +13,12 @@ struct Read : Vc2SetEnvelopeTables {
         vc2ReadPool(image, std::to_array<Vc2PoolWord>({ { 0x8939a66c, &noteScale }, { 0x8939a8f4, &releaseScale },
                                                           { 0x8939a67c, &levelScale }, { 0x8939ab50, &cents },
                                                           { 0x8939ab58, &unit }, { 0x8939b624, &depthTop },
-                                                          { 0x8939b628, &depthScale } }));
+                                                          { 0x8939b628, &depthScale }, { 0x8939bcf8, &mixOff },
+                                                          { 0x8939bf08, &mixOther }, { 0x8939bd00, &mixScale },
+                                                          { 0x8939bf04, &mixScaleTwo } }));
         const bool scales = noteScale > 0 && releaseScale > 0 && levelScale > 0 && depthTop > 0 && depthScale > 0;
-        return scales && cents > 0 && unit > 0 && times[127] != 0 && rates[127] != 0;
+        const bool mix = mixOff > 0 && mixOther > 0 && mixScale > 0 && mixScaleTwo > 0;
+        return scales && mix && cents > 0 && unit > 0 && times[127] != 0 && rates[127] != 0;
     }
 };
 constinit Vc2RomTables<Read> tables;
