@@ -1546,6 +1546,66 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's nodes (2026-11-19, v293) {#vc2-part-nodes}
+
+Step 4.3's twenty-first version (VC2_MODE_PLAN.md, step 4.3, item 9's eighth part): the nodes' routines, on
+`Vc2PartNodes` (`Vc2PartNodes.cpp`), with `0x893904d0` on `Vc2Keys`, checked by `xt_vc2keys`' second part.
+
+**What they are.** A node (`0x899888d0`, 16 bytes, one a source 1…4 and part, v291's layout) is what puts a part on a
+channel: a source's MIDI message walks the list of its channel (`0x899890d0` + 64 × (source − 1) + 4 × channel, a
+node's +0 the next) and hands it to each node's part object (+4). The part objects are v278's "part nodes": 16 of 16
+bytes at `0x8998246c`, which rom.4's table `0x89535458` points at by the node's +0xe, each one's first byte its
+index and +4 its class's vtable. The byte at `0x899888bd` + index says which class.
+
+**The channel's move** `0x89393100(node, source, channel)` (the source less 1):
+- nothing if the node's channel and source (+0xd, +0xc, signed bytes) are already those;
+- off its old list by its own source: channel −2, every list of the source; −1, none; else its own. rom.4 picks by a
+  two-entry table on channel + 2, which the port keeps as a table (`runOf`). On a list it's unlinked where found, the
+  head or a link; a list it isn't on is left as it is;
+- if the source given isn't its own, its channel becomes −1 and that's all;
+- else its channel is the new one, and it goes onto the new list: −2, at the head of every list of the source, its
+  link the last list's old head (so the lists share a chain from then on); −1, none; else in address order (before
+  the first node above it, unsigned). Where a shared chain leads back to the node itself, rom.4 writes the link before
+  the node's own, and the port does the same.
+
+So an every-list move leaves 16 lists sharing one chain. Moves on them can make a list that never ends: the check met
+it 5 times in 16,000 events at seed 2024, on both sides alike, and draws the lists again there, before the next walk
+would loop. On the XT that would hang the note task; the callers seen give only −1 and 0…15, so it may never happen.
+
+**The class installs** `0x893932c0(node)` (held) and `0x89393310(node)` (plain), one routine over the class:
+- the old object's destructor (`0x893904c0`) is called when +4 isn't 0, and is a bare return;
+- the part object of the node's index is given its class: the base vtable `0x898cd1fc`, then the held class's
+  `0x898cd3b8` or the plain one's `0x898cd184`; its address into the node's +4 (rom.4's table has no 0 among the 16);
+- `0x893904d0(object)`: the part's glides reset, two of each source, at 0x24 × (32 × source + 2 × the object's first
+  byte) and the one after (v276's `0x893923c0`, `Vc2Keys::resetObjectGlides`);
+- the class byte: 1 held, 0 plain.
+
+**The voices' stop** `0x89393360(node)` jumps to `0x89390f70` with the node's +8 (the sounding voices of that word,
+asked by their class and stopped, then all notes off), which goes out through `Vc2NodeParts`.
+
+The init `0x89393370` sets part 0's four nodes (source c, channel −1, index 0, +8 from `0x8950d7a0`, its object made
+the plain class) with the controllers' handlers; it is the front's, item 10.
+
+**The channel states' table** that v292's `Vc2ChannelStates` reads is v276's `Vc2KeysTables` (`sources`, the byte at
+`0x8950d6d9`, and `states`, `0x8950d6e0`): the wiring can answer it from there.
+
+**The check.** `xt_vc2keys`' second part, on the seed after the run's, so the first part's lines are as they were. Each
+case draws the nodes (noise; a source mostly its own row's, a channel −1…15, an index 0…15), makes the lists from them
+in address order with one node in eight left off its own, and draws the part objects (noise, an index 0…15). Then 400
+events on a drawn node: a move (its own source mostly; a channel −1…15, its own now and then, −2 one time in 32), an
+install of either class, a stop, or `0x893904d0` alone on a part object. `0x89390f70` is hooked to log its word; the
+port's `Vc2NodeParts` logs the same. After each, the keys' span, the nodes, lists, class bytes, part objects and the
+calls. Not drawn: a source past 0…3, a channel below −2 or past 15, an index past 15, where rom.4 reads past its lists
+or table.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first part's lines as they were.
+- Every line and branch of `Vc2PartNodes.cpp`, and of `Vc2Keys.cpp`, is reached.
+- `mutate_vc2.py --keys`: 105 plants, none missed; v293's 27 new, among them the link written in rom.4's order (the
+  shared chain that leads back to the node). `--voices` (its third part runs `Vc2Keys.cpp`): 287, none missed.
+  `--settings` (its check's node writes now the
+  nodes' alone): 392, none missed.
+
 ### The VC-2 part's settings by ID: the dispatchers and G's channel word (2026-11-19, v292) {#vc2-part-settings-dispatch}
 
 Step 4.3's twentieth version (VC2_MODE_PLAN.md, step 4.3, item 9's seventh part): the four routines that run the

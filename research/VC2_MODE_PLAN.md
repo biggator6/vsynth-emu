@@ -754,6 +754,11 @@ version against rom.4's routines with what it calls hooked:
         `Vc2ChannelStates`; v247's record now tests flag 0 after its reads too, as rom.4's does; xt_vc2settings' seventh
         part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the dispatchers and G's channel word"). Left: the
         nodes, the Category and budget, the static M and event 0x200.
+      - the nodes done (v293): `Vc2PartNodes`' routines, the channel's move `0x89393100` on the lists at `0x899890d0`,
+        the class installs `0x893932c0` and `0x89393310` on the part objects at `0x8998246c` with the class bytes, the
+        voices' stop `0x89393360` through `Vc2NodeParts`, and `0x893904d0` on `Vc2Keys`; xt_vc2keys' second part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's nodes"). The init `0x89393370` is item 10's. Left: the Category and
+        budget, the static M and event 0x200.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

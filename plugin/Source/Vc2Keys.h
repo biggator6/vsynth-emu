@@ -96,6 +96,9 @@ public:
     void staticInit();                                            // 0x89392190
     void glidesInit();                                            // 0x89392410
     void constructGlides();                                       // 0x89392560
+    // 0x893904d0 (v293, given a part object's first byte, 0…15): the two glides of each source in its channel's
+    // place reset, source by source
+    void resetObjectGlides(uint8_t index);
 
     std::array<Vc2KeyTable, kTables> tables {};   // 0x89982720: source s, channel c at 0x1340 × s + 0x134 × c
     std::array<Vc2KeyGlide, kGlides> glides {};   // 0x89987420: source s, channel c, n at 0x480 × s + 0x48 × c + 0x24 × n

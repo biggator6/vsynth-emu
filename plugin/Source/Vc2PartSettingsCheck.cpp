@@ -65,8 +65,8 @@ std::string settingsDifference(SettingsSides& s) {
         { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" }, { kStepsAt, &t.steps, sizeof t.steps, "step counts" },
         { kRobotAt, &t.robot, sizeof t.robot, "robot human depth" },
         { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" },
-        { kModesAt, &t.modes, sizeof t.modes, "mode rows" }, { kNodesAt, &s.nodes, sizeof s.nodes, "nodes" },
-        { kMatrixAt, &s.g, sizeof s.g, "G" } });
+        { kModesAt, &t.modes, sizeof t.modes, "mode rows" },
+        { kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes, "nodes" }, { kMatrixAt, &s.g, sizeof s.g, "G" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;

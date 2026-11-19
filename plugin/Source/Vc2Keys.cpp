@@ -188,6 +188,12 @@ Vc2KeyGlide& Vc2Keys::glide(uint32_t address) {
     return address == kOwnGlideAt ? ownGlide : glides[(address - kGlidesAt) / kGlideBytes];
 }
 
+void Vc2Keys::resetObjectGlides(uint8_t index) {
+    constexpr int kPerKey = 2;   // [FW]
+    for (int s = 0; s < kSources; ++s)
+        for (int n = 0; n < kPerKey; ++n) glides[(size_t)(kPerKey * (kChannels * s + index) + n)].reset();
+}
+
 void Vc2Keys::staticInit() {
     for (uint32_t c = 0; c < kChannels; ++c)
         for (uint32_t s = 0; s < kSources; ++s) table(tableAt(s, c)).init(s, c);

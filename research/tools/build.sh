@@ -50,6 +50,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    Vc2Notes.cpp "${SH4[@]}" -o "$O/xt_vc2notes" &
 # The part's keys (v276) against rom.4's own routines, the OS clock hooked
 [ -f Vc2KeysCheck.cpp ] && cc -DXT_VC2KEYS_MAIN Vc2KeysCheck.cpp Vc2KeysEvents.cpp Vc2Keys.cpp Vc2KeysTables.cpp \
+   $( [ -f Vc2PartNodesCheck.cpp ] && echo Vc2PartNodes.cpp Vc2PartNodesCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2keys" &
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \

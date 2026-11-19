@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's nodes v293 (2026-11-19, on claude/vc2-part-4-3 after v292; HARDWARE_FIRMWARE.md, "The VC-2 part's
+  nodes"): step 4.3's twenty-first version, item 9's eighth part. On Vc2PartNodes (Vc2PartNodes.cpp): rom.4's channel
+  move 0x89393100 (off the old list, one, every one for −2 or none for −1, by rom.4's table on channel + 2; a source
+  not its own leaving it on none; onto the new one in address order, or the head of every list for −2, so they share
+  a chain), the class installs 0x893932c0 and 0x89393310 on the part objects at 0x8998246c (v278's part nodes) with
+  the class bytes 0x899888bd, and the voices' stop 0x89393360 through Vc2NodeParts; the lists 0x899890d0, the class
+  bytes and the part objects word for word; on Vc2Keys, 0x893904d0 (resetObjectGlides). xt_vc2keys gains a second
+  part (Vc2PartNodesCheck.cpp): 0 different at seeds 2024, 7 and 31337, the first part's lines unchanged; an
+  every-list move can leave a list that never ends, on both sides alike, drawn again by the check; mutate_vc2.py
+  --keys 105 planted, 0 missed; --voices 287 and --settings 392, 0 missed. Not in the sound yet.
+
 The VC-2 part's settings by ID, the dispatchers and G's channel word v292 (2026-11-19, on claude/vc2-part-4-3 after
   v291; HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the dispatchers and G's channel word"): step 4.3's
   twentieth version, item 9's seventh part. On Vc2PartSettings (Vc2PartSettingsDispatch.cpp): rom.4's dispatchers, the

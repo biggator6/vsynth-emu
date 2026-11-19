@@ -272,7 +272,7 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kRobotAt, &t.robot, sizeof t.robot);
     s.fw.cpu.write(kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel);
     s.fw.cpu.write(kModesAt, &t.modes, sizeof t.modes);
-    s.fw.cpu.write(kNodesAt, &s.nodes, sizeof s.nodes);
+    s.fw.cpu.write(kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes);
     s.fw.cpu.write(kMatrixAt, &s.g, sizeof s.g);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {

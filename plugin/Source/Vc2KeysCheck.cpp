@@ -136,6 +136,6 @@ uint32_t keysAnyGlide(std::mt19937& rng) {
 
 int main(int argc, char** argv) {
     const Vc2CheckStart start { "xt_vc2keys", vc2LoadKeys, { "XT_VC2KEYS_FIRST", "XT_VC2KEYS_STOP" } };
-    return vc2CheckMain<KeysSides>(argc, argv, start, keysCase, sayKeyCounts);
+    return vc2CheckMain<KeysSides>(argc, argv, start, keysCase, sayKeyCounts, keysNodesPart);
 }
 #endif

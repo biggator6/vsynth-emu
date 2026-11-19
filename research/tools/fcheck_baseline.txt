@@ -823,6 +823,7 @@ notes: 40 cases, 16000 events: 1964 constructors, 2023 note-ons (1375 with a par
 their calls: 1964 makes, 817 end tests, 1365 unmakes, 1030 truncations (577 at once), 2023 tone note-ons, 2022 starts, 68469 block setters, 1032 key-offs, 947 positions, 940 hooks
 xt_vc2notes: 0 different
 == xt_vc2keys
+nodes: 16000 events: 6334 moves (222 onto every list), 1566 held installs, 1660 plain, 3223 stops, 3217 glides' resets; 5 lists drawn again (3223 calls)
 keys: 40 cases, 16000 events: 682 inits, 663 resets, 1311 note-ons (56 at the most), 1370 note-offs (96 releasing), 673 Holds, 1475 Sostenutos (720 latching or clearing), 689 clears, 632 velocity factors
 queries: 1410 highest in a range (588 found), 695 highest, 709 sets, 641 fills, 677 tests; glides: 654 constructors, 677 resets, 1353 note-ons, 1397 note-offs (485 found); initializers: 94, 96 and 102
 xt_vc2keys: 0 different

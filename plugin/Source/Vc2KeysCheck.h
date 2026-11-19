@@ -38,4 +38,6 @@ std::string keysOnBoth(KeysSides& s, const Vc2CheckRoutine& r, std::initializer_
                        const std::function<uint32_t()>& mine);
 // A key table of the 66 and a glide of the 129, by address
 uint32_t keysAnyTable(std::mt19937& rng);
+// The second part (v293, Vc2PartNodesCheck.cpp): the part's nodes, on the seed after the run's; how many cases differ
+long keysNodesPart(KeysSides& keys, const Vc2Run& run);
 uint32_t keysAnyGlide(std::mt19937& rng);

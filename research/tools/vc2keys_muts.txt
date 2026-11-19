@@ -1,6 +1,7 @@
 # Planted errors in the VC-2 part's keys, for mutate_vc2.py --keys: each must make xt_vc2keys, on rom.4, say something
-# differs.  name|old|new[|port[|seed]]; ports vc2keys (Vc2Keys.cpp, v276) and vc2keystables (Vc2KeysTables.cpp: the
-# tables' addresses, each moved to a neighbour holding another value).
+# differs.  name|old|new[|port[|seed]]; ports vc2keys (Vc2Keys.cpp, v276), vc2keystables (Vc2KeysTables.cpp: the
+# tables' addresses, each moved to a neighbour holding another value) and vc2nodes (Vc2PartNodes.cpp, v293, the second
+# part's; Vc2PartNodes.h's addresses not planted, as Vc2Keys.h's aren't).
 # Not planted: the highest bit's start below 15 (it reads before the bits' table), a table's index by channel and source
 # swapped (past the 64 tables), and Vc2Keys.h's layout (the VC-2 ports' route builds the kept objects from the unplanted
 # sources).
@@ -82,3 +83,30 @@ tables-zero|{ 0x89535958, zero.data(),|{ 0x89535938, zero.data(),|vc2keystables
 tables-sources|{ 0x8950d6d9, sources.data(),|{ 0x8950d6d8, sources.data(),|vc2keystables
 tables-states|{ 0x8950d6e0, states.data(),|{ 0x8950d6e4, states.data(),|vc2keystables
 tables-divisor|constexpr uint32_t kDivisorAt = 0x89392400;|constexpr uint32_t kDivisorAt = 0x89392404;|vc2keystables
+object-glides-pair|constexpr int kPerKey = 2;   // [FW]|constexpr int kPerKey = 1;   // [FW]|vc2keys
+object-glides-second|kPerKey * (kChannels * s + index) + n)].reset();|kPerKey * (kChannels * s + index))].reset();|vc2keys
+object-glides-source|kPerKey * (kChannels * s + index) + n)|kPerKey * index + n)|vc2keys
+nodes-every-run|{ { 0, Vc2PartNodes::kChannels }, { 0, 0 } }|{ { 0, Vc2PartNodes::kChannels - 1 }, { 0, 0 } }|vc2nodes
+nodes-none-run|{ { 0, Vc2PartNodes::kChannels }, { 0, 0 } }|{ { 0, Vc2PartNodes::kChannels }, { 0, 1 } }|vc2nodes
+nodes-same-channel|if (n.channel == channel && n.source == source) return;|if (n.channel == channel) return;|vc2nodes
+nodes-same-source|if (n.channel == channel && n.source == source) return;|if (n.source == source) return;|vc2nodes
+nodes-off-given|unlink(listOf(n.source, c), node);|unlink(listOf(source, c), node);|vc2nodes
+nodes-other-source|    if (n.source != source) {\n        n.channel = kNoChannel;\n        return;\n    }\n||vc2nodes
+nodes-other-kept|        n.channel = kNoChannel;\n        return;|        return;|vc2nodes
+nodes-channel-kept|    n.channel = static_cast<int8_t>(channel);|    n.channel = static_cast<int8_t>(n.channel);|vc2nodes
+nodes-every-order|        n.next = head;\n        head = node;|        head = node;\n        n.next = head;|vc2nodes
+nodes-every-one|        if (on.count != kChannels) {|        if (on.count != 0) {|vc2nodes
+nodes-head-order|    if (head == 0 \|\| head > node) {|    if (head == 0 \|\| head < node) {|vc2nodes
+nodes-walk-order|while (at(before).next != 0 && at(before).next < node)|while (at(before).next != 0 && at(before).next > node)|vc2nodes
+nodes-walk-stop|while (at(before).next != 0 && at(before).next < node)|while (at(before).next != 0)|vc2nodes
+nodes-link-order|    const uint32_t after = at(before).next;\n    at(before).next = node;\n    at(node).next = after;|    at(node).next = at(before).next;\n    at(before).next = node;|vc2nodes
+nodes-unlink-head|        head = at(node).next;\n        return;|        head = 0;\n        return;|vc2nodes
+nodes-unlink-walk|            at(before).next = at(node).next;\n            return;|            at(before).next = 0;\n            return;|vc2nodes
+nodes-unlink-first|    if (head == node) {\n        head = at(node).next;\n        return;\n    }\n||vc2nodes
+nodes-class-vtable|    o.vtable = kVtables[static_cast<size_t>(cls)];|    o.vtable = kVtables[0];|vc2nodes
+nodes-vtables|{ 0x898cd184, 0x898cd3b8 }|{ 0x898cd184, 0x898cd1fc }|vc2nodes
+nodes-object-word|    n.object = kObjectsAt + kObjectBytes * i;|    n.object = kObjectsAt + kObjectBytes * (i + 1u);|vc2nodes
+nodes-glides-index|    keys.resetObjectGlides(o.index);|    keys.resetObjectGlides(i);|vc2nodes
+nodes-no-glides|    keys.resetObjectGlides(o.index);\n||vc2nodes
+nodes-class-byte|    classes[i] = static_cast<uint8_t>(cls);|    classes[i] = 1;|vc2nodes
+nodes-stop-word|parts.stopVoices(at(node).word8);|parts.stopVoices(at(node).object);|vc2nodes
