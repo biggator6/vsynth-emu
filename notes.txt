@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's notes v275 (2026-11-19, on claude/vc2-part-4-3 after vc2-mode's eb3878f with v273 and v274 merged;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's notes"): step 4.3's third version. Vc2Notes is rom.4's 24 notes W of 0x744
+  bytes and the hook word beside them, word for word, the links rom.4's addresses: the placement, the constructor (a
+  pool tone given the note's two routines), the note-on, the end, the start, the block pass, the release, the
+  truncation once, the position, the two routines a tone is given and the hook's initializer; the tone's methods through
+  Vc2NoteParts. New check xt_vc2notes (in fcheck): rom.4's own routines on its own notes, every tone method hooked: 0
+  different at seeds 2024, 7 and 31337. mutate_vc2.py --notes: 55 planted, 0 missed. Found: the settings and update
+  passes are one code twice; 0x89396640 is a copy of the start nothing calls. No tables, so no loader. Not in the sound
+  yet.
+
 rom.4's frame through the unit v274 (2026-11-19, on its own branch after vc2-mode's 8052ad3, not merged;
   HARDWARE_FIRMWARE.md, "rom.4's frame through the unit"; the plan's step 4.4, item 2). XtFxUnit's code split out of
   XtFxControl.cpp into XtFxUnit.cpp as it stood, its plants to the port fxu. XtFxUnit takes an image; its frame's gain

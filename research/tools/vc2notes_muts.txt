@@ -1,0 +1,60 @@
+# Planted errors in the VC-2 part's notes W, for mutate_vc2.py --notes: each must make xt_vc2notes, on rom.4, say
+# something differs.  name|old|new[|port[|seed]]; port vc2notes (Vc2Notes.cpp, v275).
+# Not planted: the block of a setter that takes no number given a number (the setter doesn't read it: the same), the
+# truncation once's test as a signed byte (any byte not 0 is set either way), and Vc2Notes.h's layout and at() (the VC-2
+# ports' route builds the kept objects from the unplanted sources).
+pass-oscset|    rows[0] = { B::oscSet, 0, In::kOscSet };|    rows[0] = { B::oscSet, 0, In::kOscSet + 4 };|vc2notes
+pass-osc1-number|    rows[2] = { B::osc, 1, In::kOscs[1] };|    rows[2] = { B::osc, 0, In::kOscs[1] };|vc2notes
+pass-osc0-block|    rows[1] = { B::osc, 0, In::kOscs[0] };|    rows[1] = { B::osc, 0, In::kOscs[1] };|vc2notes
+pass-mix-setter|    rows[3] = { B::mix, 0, In::kMix };|    rows[3] = { B::tva, 0, In::kMix };|vc2notes
+pass-cosm2-block|    rows[5] = { B::cosm, 1, In::kCosms[1] };|    rows[5] = { B::cosm, 1, In::kCosms[0] };|vc2notes
+pass-cosm-order|    rows[4] = { B::cosm, 0, In::kCosms[0] };|    rows[4] = { B::cosm, 1, In::kCosms[1] };|vc2notes
+pass-first-own|constexpr uint32_t kFirstOwn = 1;|constexpr uint32_t kFirstOwn = 0;|vc2notes
+pass-env-stride|In::kEnvelopes + In::kEnvelopeStride * e }|In::kEnvelopes + In::kEnvelopeStride * (e - 1) }|vc2notes
+pass-env-setter|        rows[k++] = { B::envelope, e,|        rows[k++] = { B::lfo, e,|vc2notes
+pass-lfo-number|rows[k++] = { B::lfo, l, In::kLfos|rows[k++] = { B::lfo, l - 1, In::kLfos|vc2notes
+pass-lfo-stride|In::kLfos + In::kLfoStride * l }|In::kLfos + In::kEnvelopeStride * l }|vc2notes
+pass-lfo-end|l < Vc2Tone::kLfos; ++l)|l < Vc2Tone::kLfos - 1; ++l)|vc2notes
+pass-tva|    rows[k] = { B::tva, 0, In::kTva };|    rows[k] = { B::tva, 0, In::kTvaLfoA };|vc2notes
+pass-tone|parts.setBlock(at(note).tone, row,|parts.setBlock(at(note).partner, row,|vc2notes
+pass-envelopes-first|constexpr size_t kEnvelopesFrom = 6,|constexpr size_t kEnvelopesFrom = 7,|vc2notes
+release-from|subspan(kEnvelopesFrom, kEnvelopeRows)|subspan(kEnvelopesFrom - 1, kEnvelopeRows)|vc2notes
+release-count|subspan(kEnvelopesFrom, kEnvelopeRows)|subspan(kEnvelopesFrom, kEnvelopeRows - 1)|vc2notes
+release-whole|    pass(note, std::span(kPass).subspan(kEnvelopesFrom, kEnvelopeRows), parts);|    pass(note, kPass, parts);|vc2notes
+release-no-key-off|    parts.keyOff(at(note).tone);|    (void)note;|vc2notes
+place-stride|return kNotesAt + (uint32_t)sizeof(Vc2NoteWords) * n; }|return kNotesAt + (uint32_t)sizeof(Vc2NoteWords) * (n % 64); }|vc2notes
+word-address|    return kNotesAt + (uint32_t)(static_cast|    return kNotesAt + 4 + (uint32_t)(static_cast|vc2notes
+init-hook|void Vc2Notes::staticInit() { hook = kNoHook; }|void Vc2Notes::staticInit() { hook = kEndedRoutine; }|vc2notes
+ctor-part-byte|    w.part = (uint8_t)part;|    w.part = (uint8_t)kind;|vc2notes
+ctor-kind-byte|    w.kind = (uint8_t)kind;|    w.kind = (uint8_t)(kind >> 8);|vc2notes
+ctor-id-shift|parts.make(kind << 16 \| part)|parts.make(kind << 8 \| part)|vc2notes
+ctor-id-part-byte|parts.make(kind << 16 \| part)|parts.make(kind << 16 \| (part & 0xff))|vc2notes
+ctor-id-kind-byte|parts.make(kind << 16 \| part)|parts.make((kind & 0xff) << 16 \| part)|vc2notes
+ctor-routines-swapped|parts.giveRoutines(w.tone, kEndedRoutine, kTruncatedRoutine);|parts.giveRoutines(w.tone, kTruncatedRoutine, kEndedRoutine);|vc2notes
+ctor-hook-routine|parts.giveRoutines(w.tone, kEndedRoutine,|parts.giveRoutines(w.tone, kNoHook,|vc2notes
+ctor-partner-kept|    w.partner = 0;\n    w.truncated = 0;|    w.truncated = 0;|vc2notes
+ctor-truncated|    w.partner = 0;\n    w.truncated = 0;|    w.partner = 0;\n    w.truncated = 1;|vc2notes
+on-partner|    w.partner = partner;|    w.partner = note;|vc2notes
+on-byte|    w.onByte = (uint8_t)onByte;|    w.onByte = (uint8_t)(onByte >> 1);|vc2notes
+on-no-serial|: kNoSerial;|: 0;|vc2notes
+on-serial-whose|parts.serial(at(partner).tone)|parts.serial(w.tone)|vc2notes
+on-previous-word|    w.input.at(In::kPrevious) =|    w.input.at(In::kPrevious + 4) =|vc2notes
+on-first-note-none|partner != 0 ? (uint32_t)|partner > kNotesAt ? (uint32_t)|vc2notes
+on-tone-input|    parts.noteOn(w.tone, w);|    parts.noteOn(w.tone, notes[0]);|vc2notes
+on-tone|    parts.noteOn(w.tone, w);|    parts.noteOn(notes[0].tone, w);|vc2notes
+end-none|    if (note == 0) return;\n    const uint32_t tone|    if (note == 0) note = kNotesAt;\n    const uint32_t tone|vc2notes
+end-test-inverted|    if (parts.endTest(tone))|    if (!parts.endTest(tone))|vc2notes
+end-test-object|    if (parts.endTest(tone))|    if (parts.endTest(tone + 4))|vc2notes
+end-at-once-truncates|    if (parts.endTest(tone))\n        parts.unmake(tone);|    if (parts.endTest(tone))\n        parts.truncateAtOnce(tone);|vc2notes
+end-no-wait|        parts.truncateAndWait(tone);|        parts.truncateAtOnce(tone);|vc2notes
+start-none|void Vc2Notes::start(Vc2NoteParts& parts) { parts.start(); }|void Vc2Notes::start(Vc2NoteParts& parts) { (void)parts; }|vc2notes
+once-test|    if (w.truncated != 0) return;|    if (w.truncated == 1) return;|vc2notes
+once-no-test|    if (w.truncated != 0) return;|    (void)0;|vc2notes
+once-set|    w.truncated = 1;|    w.truncated = 2;|vc2notes
+once-not-set|    w.truncated = 1;|    (void)w;|vc2notes
+once-waits|    parts.truncateAtOnce(w.tone);|    parts.truncateAndWait(w.tone);|vc2notes
+position-osc|return parts.position(at(note).tone, osc);|return parts.position(at(note).tone, osc & 1);|vc2notes
+position-tone|return parts.position(at(note).tone, osc);|return parts.position(at(note).partner, osc);|vc2notes
+ended-no-hook|{ parts.call(hook, tone); }|{ parts.call(kNoHook, tone); }|vc2notes
+ended-tone|{ parts.call(hook, tone); }|{ parts.call(hook, tone + 4); }|vc2notes
+truncated-waits|void Vc2Notes::truncated(uint32_t tone, Vc2NoteParts& parts) { parts.unmake(tone); }|void Vc2Notes::truncated(uint32_t tone, Vc2NoteParts& parts) { parts.truncateAndWait(tone); }|vc2notes

@@ -660,6 +660,10 @@ version against rom.4's routines with what it calls hooked:
       `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have yet: open, for C's frame (version 7).
    3. The note W: constructor `0x89396520`, note-on `0x893965e0`, end `0x89396590`, the settings pass `0x89396650`, the
       update pass `0x893967a0`, the release `0x893968b0`, `0x89396910`, `0x89396950`.
+      - done (v275): `Vc2Notes`, with the placement `0x893964f0`, the start `0x89396630`, the two routines a tone is
+        given (`0x893964d0`, `0x893964e0`) and the hook word's initializer `0x89396960`; `xt_vc2notes`
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's notes"). The two passes are one code; `0x89396640` is a copy of the start
+        nothing calls. The notes' task sets the hook word to `0x893901a0` (version 10's).
    4. The key table: `0x89392190`, `0x893920c0`, `0x89391e90`, `0x89391ef0`, `0x89392670` and the held-key queries, held
       to `XtKeys.h` where rom.2's layout matches (step 1b found key assign equal).
    5. The assigner: `0x89396a80`, `0x89396c90`, `0x893969e0`, `0x89390860`, mono's `0x89390b20` and `0x89390b90`, the

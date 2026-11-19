@@ -1546,6 +1546,79 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's notes (2026-11-19, v275) {#vc2-part-notes}
+
+Step 4.3's third version (VC2_MODE_PLAN.md, step 4.3, item 3). A note W is what a voice plays: the tone's input and the
+tone it was given. `Vc2Notes` holds rom.4's 24 notes and the hook word beside them, word for word. Its routines are
+bit for bit against rom.4's own in `xt_vc2notes`.
+
+**The notes.** The 24 notes are at `0x8998a51c`, 0x744 bytes apart. `0x893964f0(size, n)` gives note n's address for
+any n (a `mul.l`, so it wraps) and ignores its size argument; the voice's `+0x3c` virtual (`0x89397130`) calls it with
+the voice's number. A note's words:
+
+| Offset | What |
+|---|---|
+| +0x000…+0x6ff | the tone's input (`Vc2ToneInput`), which the conversion writes and the tone's note-on reads |
+| +0x700…+0x737 | not touched by the note's routines |
+| +0x738 | its tone, by address |
+| +0x73c | the note a legato takes from, 0 none |
+| +0x740 | the note-on's third argument (a byte the assigner gives) |
+| +0x741 | the part node's first byte |
+| +0x742 | the voice's kind (v272's take reads it: kind 0 can be stolen) |
+| +0x743 | 1 once truncated at once |
+
+Beside them, `0x8998a514` is the hook word. Its static initializer `0x89396960` sets it to `0x893964c0`, an empty
+routine, and the notes' task sets it to `0x893901a0` at its start (`0x8938fc28`). The word at `0x8998a518` is a float
+that the file's other static initializer (`0x89396970`) writes, with two more at `0x8999537c` and `0x89995380`. No code
+loads `0x8998a518`'s address to read it, so it is kept as a word and nothing more.
+
+**The routines.**
+- **The constructor `0x89396520(W, part, kind)`.** It stores the two bytes, then takes a tone from the pool:
+  `0x893b2db0(0, kind << 16 | part)`, on the full registers (the caller zero-extends the part's byte; the kind is a
+  stack argument). It gives the tone the note's two routines in its tail: `0x893964d0` at +0x1b14, which jumps to the
+  hook word's routine with the tone, and `0x893964e0` at +0x1b18, which undoes the tone, `0x893b2fc0(tone, 3)`. Then it
+  clears the partner and the truncated byte.
+- **The note-on `0x893965e0(W, partner, byte)`.** It stores both, writes the input's +4 (the partner's tone's serial, its
+  +8, or −1 with no partner), then tail-calls the tone's note-on `0x893b3390(tone, W)`.
+- **The end `0x89396590(W)`.** Nothing for W 0. Otherwise it asks the tone's vtable's +0x60 (`0x893b4040`,
+  `Vc2Tone::held`). If that is not 0, the tone is undone at once (`0x893b2fc0(tone, 3)`); else it is truncated and waits
+  (`0x893b3bc0`). The voices' two destroys call it (`0x893916d0`, `0x893973a0`).
+- **The start `0x89396630`.** It tail-calls the part's lists' start `0x893b1cd0` (v273) and doesn't read W.
+  `0x89396640` is the same code, with no caller.
+- **The block pass `0x89396650` and `0x893967a0`.** These are one code twice: the voice's settings virtual calls the
+  first (`0x8939725e`), its update virtual the second (`0x89397114`). Each makes 27 calls of the tone's block setters, in
+  this order:
+  1. the OSC voices' settings (`0x893b3350`, the input's +0x0c);
+  2. OSC 1 and 2 (`0x893b3110`);
+  3. the mix (`0x893b32d0`);
+  4. COSM 1 and 2 (`0x893b3240`);
+  5. envelopes 1 to 13 (`0x893b31f0`, at +0x124 + 0x38 × n);
+  6. LFOs 1 to 7 (`0x893b31a0`, at +0x24 + 0x20 × n);
+  7. the TVA (`0x893b3310`).
+
+  Envelope 0 and LFO 0 are not the note's.
+- **The release `0x893968b0`.** The 13 envelopes' blocks again, then the tone's key-off `0x893b3ad0`. The voice's
+  key-off virtual (`0x893972ba`) and the base voice's (`0x893916f8`) call it.
+- **The truncation once `0x89396910`.** If +0x743 is 0, it sets it to 1 and tail-calls `0x893b3c20`. `0x89391a50`
+  calls it, a voice routine for item 5.
+- **The position `0x89396950(W, osc)`.** `0x893b3fd0(tone, osc)`. Nothing calls it. `0x89396940` is an empty routine.
+
+**The check.** `xt_vc2notes` runs rom.4's own routines on its own notes and hook word. It hooks every tone method they
+reach, the seven block setters and the hook word's two routines (`0x893964c0`, `0x893901a0`). Each hook logs the argument
+registers its routine reads and answers from a generator per side, both seeded alike before each event. The end test is
+hooked where the tone's real vtable leads. The tones are the pool's 24, with their vtable, serials and the two routines a
+constructor gives them in rom.4's memory; the port's side reads the same words and keeps the routines it gives.
+
+Each case starts from noise, with every note given a pool tone. Then come 400 events: every routine above, both block
+passes, the start and its copy, the placement of any n, and the two routines a tone is given. Before each event a note's
+tail, bytes and input words, the hook word and the serials are drawn now and then. After each, the hook word and the 24
+notes are compared word for word, then the tones' two routines, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2Notes.cpp` is reached, but for the `constexpr` table builder, which runs at compile time.
+- `mutate_vc2.py --notes`: 55 planted, 0 missed.
+
 ### rom.4's frame through the unit (2026-11-19, v274) {#vc2-fx-frame}
 
 Step 4.4's second item (research/VC2_MODE_PLAN.md). `XtFxUnit` takes an image: rom.4's runs rom.4's driver, with the frame

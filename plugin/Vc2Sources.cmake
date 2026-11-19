@@ -92,4 +92,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmDsp.cpp
     Source/Vc2PartVoices.cpp
     Source/Vc2PartVoicesTables.cpp
+    Source/Vc2Notes.cpp
 )

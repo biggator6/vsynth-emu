@@ -815,6 +815,10 @@ xt_vc2libm: 0 different
 == xt_vc2voices
 voices: 40 cases, 16000 events, 701 inits, 2649 takes (2479 from free, 78 stolen, 92 none), 2700 moves, 1318 reserves, 1367 ended scans (6235 end tests), 647 stop alls, 1967 stops, 1992 costs, 2699 budgets; 12863 destroys; 5264 splices, 554 lists dealt
 xt_vc2voices: 0 different
+== xt_vc2notes
+notes: 40 cases, 16000 events: 1964 constructors, 2023 note-ons (1375 with a partner), 993 ends, 983 and 1056 passes, 1032 releases, 1070 truncations once, 1017 starts and 1005 copies', 985 placements, 947 positions, 940 and 1001 of the tone's routines, 984 initializers
+their calls: 1964 makes, 817 end tests, 1365 unmakes, 1030 truncations (577 at once), 2023 tone note-ons, 2022 starts, 68469 block setters, 1032 key-offs, 947 positions, 940 hooks
+xt_vc2notes: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different
