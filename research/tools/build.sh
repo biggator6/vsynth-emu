@@ -36,6 +36,10 @@ rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,x
 rm -f "$O"/xt_vc2tva
 rm -f "$O"/xt_vc2cosm
 rm -f "$O"/xt_vc2libm
+rm -f "$O"/xt_vc2voices
+# The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
+[ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
+   Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp "${SH4[@]}" -o "$O/xt_vc2voices" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
    "${SH4[@]}" -o "$O/xt_vc2libm" &

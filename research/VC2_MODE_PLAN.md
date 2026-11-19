@@ -645,6 +645,11 @@ version against rom.4's routines with what it calls hooked:
    Split by those, bottom-up, each against rom.4's with what it calls hooked:
    1. The voices and their lists: V's words, the init (`0x89391270`, `0x89391ba0`), take and steal, the three moves, the
       reserve (`0x893911b0`), the ended scan (`0x89390ee0`), stop all (`0x89390f40`), the cost sum and budget.
+      - done (v272): `Vc2PartVoices`, with the heads' static initializer `0x89391450`, the budget's setters and getter, a
+        voice's cost and the prepared list's test; `xt_vc2voices` (HARDWARE_FIRMWARE.md, "The VC-2 part's voices and
+        their lists"). Stop all, the two costs and the steal's two parts are out-of-line copies that nothing calls: the
+        assigner's start `0x89390860` holds them inline, with the splice of the prepared list onto the sounding list and
+        the budget's loop, which item 5 ports on these.
    2. The tone's remaining methods: the block setters `0x893b3110…0x893b3350`, key-off `0x893b3ad0`, the two truncations
       `0x893b3bc0` and `0x893b3c20`, the cost `0x893b4020`, the position getters `0x893b3fc0…0x893b4010`, the start
       `0x893b1cd0` with the voice list's three routines.
