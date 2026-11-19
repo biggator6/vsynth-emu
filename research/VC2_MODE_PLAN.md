@@ -704,8 +704,11 @@ version against rom.4's routines with what it calls hooked:
    Split by those:
    1. done (v259): the driver by image: `XtFxImage`, XtFxControl on rom.4, the patch EQ's IDs, against JE-8086's chip and
       against the driver run by hand (HARDWARE_FIRMWARE.md, "rom.4's effect driver").
-   2. The frame's way through on rom.4: the unit, program A's slots for the part mixer's bus frame, its levels and what
-      comes out (DIR goes nowhere; the Reverb's input is a stereo pair).
+   2. done (v274): the frame's way through on rom.4: `XtFxUnit` on an image, rom.4's frame into program A's slots 0x20…0x2e
+      as rom.2's (its truncation `0x89396200` is rom.2's `0x894db2b0`), at a gain of 1 where rom.2's is Out Gain for TG's
+      sixteenth, and out as the mix, DIR going nowhere; against rom.4's truncation and JE-8086's chip
+      (HARDWARE_FIRMWARE.md, "rom.4's frame through the unit"). For step 4.3: the VC-2's tones take rom.4's Out Gain
+      for TG (ID 0x533, −24 dB by default) in the TVA's block, as rom.4 does (`0x893a670c`), since the unit doesn't.
    3. The outside input: what reads External In Type and USB External In Type, the routing, and the words back to the
       SH-4 that the mic path takes.
    4. The Matrix's MFX-PRMs: where rom.4 sends them, then `setMatrix` on rom.4.

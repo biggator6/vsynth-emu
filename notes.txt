@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's frame through the unit v274 (2026-11-19, on its own branch after vc2-mode's 8052ad3, not merged;
+  HARDWARE_FIRMWARE.md, "rom.4's frame through the unit"; the plan's step 4.4, item 2). XtFxUnit's code split out of
+  XtFxControl.cpp into XtFxUnit.cpp as it stood, its plants to the port fxu. XtFxUnit takes an image; its frame's gain
+  is the image's (XtFxImage::frameGain): rom.2's Out Gain sixteenth as before, rom.4's 1, as the VC-2's part mixer adds
+  the mic and the vocoder past its tones' Out Gain. rom.4's truncation is rom.2's routine; DIR goes nowhere. xt_fx
+  <rom.4> vc2 and xt_fx control 0 different at seeds 2024, 7 and 31337, with a new part each, the unit against JE-8086's
+  chip. mutate_fx.py --control 183 of 183, --vc2 58 of 58; fxthreads no races. For step 4.3: the VC-2's tones take
+  rom.4's Out Gain for TG (0x533) in the TVA's block.
+
 The VC-2's free LFOs v271 (2026-11-18, after vc2-mode's merge of v268 to v270; HARDWARE_FIRMWARE.md, "The VC-2's free
   LFOs"): step 4.2's tone parts. Vc2FreeLfos is rom.4's manager at 0x8a0c6d84 word for word, its 384 free objects on
   XtLfoFree's laws; Vc2ToneLfo gains the follow, the attach and the free start. xt_vc2tone runs rom.4's own routines for
