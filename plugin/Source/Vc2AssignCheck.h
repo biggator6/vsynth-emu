@@ -28,10 +28,22 @@ public:
     int8_t onByteOf(uint32_t note) override;
     uint32_t tableOf(uint32_t message) override { return s_.fw.cpu.rd32(message); }
     void waitQueue(uint32_t queue, uint32_t voice) override;
+    void keyOff(uint32_t voice) override;
+    uint8_t partSetting(uint32_t part, uint32_t offset) override;
+    void readParameters(uint32_t part) override;
+    uint8_t firstByte(uint32_t object) override { return s_.fw.cpu.rd8(object); }
+    int32_t clock() override;
+
+    int32_t ms = 0;   // what the OS clock answers, drawn before an event
 
 private:
     VoicesSides& s_;
 };
+
+inline constexpr uint32_t kAssignSettingsAt = 0x89995390, kAssignSettingBytes = 32;    // [FW] the parts' settings
+inline constexpr uint32_t kAssignParametersAt = 0x89996120, kAssignParameterBytes = 24;   // [FW] their messages
+inline constexpr uint32_t kAssignKeyOffEntry = 0x30;                                     // [FW] a voice's slot
+inline constexpr uint32_t kAssignReadAt = 0x8939b050, kAssignClockAt = 0x893018d0;       // [FW] the message, clock
 
 struct AssignCounts {
     long events = 0;
@@ -56,3 +68,8 @@ Vc2AssignCall assignDrawCall(AssignSides& a, std::mt19937& rng);
 
 using AssignEvent = std::string (*)(AssignSides&, std::mt19937&);
 std::span<const AssignEvent> assignEvents();
+// A case's start (the voices noise, the notes drawn, rom.4's three inits; what differs), the second part's draws
+// before an event (all at a case's first), and rom.4's side's hooks
+std::string assignStart(AssignSides& a, std::mt19937& rng);
+void assignSteer(AssignSides& a, std::mt19937& rng, bool all);
+void assignInstallRom(VoicesSides& s);

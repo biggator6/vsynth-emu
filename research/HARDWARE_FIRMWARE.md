@@ -1546,6 +1546,77 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's assigner, its second part (2026-11-19, v278) {#vc2-part-assigner-release}
+
+Step 4.3's sixth version (VC2_MODE_PLAN.md, step 4.3, item 5's second half): the release path and the part node's note
+start and off, on v272's voices and v276's keys. They are bit for bit against rom.4's own routines in `xt_vc2voices`'
+third part.
+
+**A voice's held bits.** A voice's +0x48 holds three bits: 1 for the key, 2 for Hold, 4 for Sostenuto.
+- **A key's release `0x89391760(V, K)`** does nothing unless bit 1 is set. Then:
+  - Hold (K+0x11c) below 64 clears bit 2.
+  - Sostenuto (K+0x11d) below 64, or the voice's key (+0x42) not latched in K+0x120, clears bit 4.
+  - With neither pedal's bit left, the age word's bit 28 is cleared.
+  - Bit 1 is cleared, +0x2f takes K's note-off velocity (K+0xa), and the age word's bit 29 is cleared.
+  - With no bit left, the voice's +0x30 virtual runs (a note's key-off).
+- **The pedals' lifts `0x89391820` (Hold) and `0x89391880` (Sostenuto).** With the pedal's bit set and the key's
+  clear, the bit is cleared, then bit 28 and the key-off as above.
+
+**Over a key table's sounding voices** (those whose +0x34 is the table):
+- **The note-off `0x89390c00(K)`.** It skips a voice whose +0x2e (its key's note-on count when it started) is above
+  K's note-off count for the key. It remembers a voice of kind 1 (the last one). It releases every other voice on the
+  note-off key. Then, if it found a kind-1 voice, no key is held any more and part 0's settings byte +0x18 is 0, it
+  releases that one too.
+- **`0x89390cd0(K)` and `0x89390d10(K)`**: with Hold or Sostenuto below 64, its lift on each voice.
+- **`0x89390d50(K)`**: each voice truncated (v277's) and waited on.
+- **`0x89390da0(K)`**: each voice released but those of kind 1 while part 0's +0x18 is set.
+- **`0x89390e20(K)`**: each voice released.
+
+**The part node's note start `0x89396a80(node, K, message, value; word on the stack)`** (the node class's vtable slot at
+`0x898cd3cc`).
+- It reads the message's first byte as the part and runs the part's parameters' message (`0x8939b050` on
+  `0x89996120` + 24 × part).
+- The key is the part's settings byte +0 (signed; the settings are 32 bytes a part from `0x89995390`) plus the value,
+  held to 0…127.
+- Its two portamento keys are the pair at `0x89987420` + 0x480 × K's source + 0x48 × the node's first byte (its
+  channel). The first takes the note-on (v276, at the OS clock).
+- **When the part's +0x16 is set,** the second key plays a carrier note first: kind 1, key 60, the word 100. With +0x18
+  set, it is built unless one is already sounding. Otherwise the first key's flags decide: with a held mono or poly key,
+  the note below follows (a held mono key goes to the legato path); with neither, the part's kind-1 voices are truncated
+  and the carrier note built.
+- **Then the part's note.** Poly (+1 clear) builds it. Mono with a held mono key and legato (+2) retunes the part's
+  sounding voices (v277's `0x89390b20`) instead. Mono otherwise truncates the part's kind-0 voices, then builds it.
+
+**The part node's note-off `0x89396c90(node, K, message)`.** It runs the first key's note-off (v276).
+- With no key left, it runs the second key's note-off too, unless the part's +0x18 is set.
+- With a key left and the part mono, it runs the parameters' message and retunes the part's voices to that key, moved
+  as at the note start.
+
+**The check.** `xt_vc2voices` gains a third part, on the seed after the assigner's, so the other two parts' lines stay as
+they were. It hooks, beyond the voices' and the assigner's hooks:
+- the +0x30 virtual of both voice classes;
+- the parameters' message;
+- the OS clock, which answers the ms an event draws.
+
+The keys are the port's (v276), written into rom.4's memory before each event and compared after it beside the voices'
+span. `xt_vc2voices` now loads v276's tables as well. Without them its bits table read as zeros: the latched test then
+failed, and the highest-key query would never end.
+
+The draws, beyond the assigner's:
+- the voices' held bits, keys and note-on counts, and some voices put on the three key tables, with a message for their
+  part;
+- the tables' sources, pedals, latched and held keys (all clear one time in three, key 0 alone one in six, where the
+  queries' low bound and the note-off's found key 0 show), note-off keys and counts;
+- every glide aimed at one of the three tables, its flags 0 or 1 and its clock below 2^30;
+- the note-off's glide sounding the table's note-off key half the time;
+- four messages (their first byte a part 0…3) and four nodes (a channel 0…15);
+- the parts' five settings bytes.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2AssignRelease.cpp` and `Vc2AssignNotes.cpp` is reached.
+- `mutate_vc2.py --voices`: the second half's 56 plants with the 135 before them, none missed.
+
 ### The VC-2 part's assigner, its first part (2026-11-19, v277) {#vc2-part-assigner}
 
 Step 4.3's fifth version (VC2_MODE_PLAN.md, step 4.3, item 5's first half): the routines that start the voices prepared

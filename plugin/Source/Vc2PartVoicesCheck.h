@@ -19,10 +19,11 @@ inline constexpr uint32_t kVoicesDestroyEntry = 0x24, kVoicesEndedEntry = 0x60; 
 inline constexpr uint32_t kVoicesCostAt = 0x893b4020;                               // [FW] the tone's cost
 inline constexpr int kVoicesNotes = 24, kVoicesTones = 24;
 
-// The calls logged; from v277 the assigner's besides (its part, Vc2AssignCheck.cpp)
+// The calls logged; from v277 the assigner's besides (its part, Vc2AssignCheck.cpp), from v278 its release path's and
+// note start's (Vc2AssignReleaseCheck.cpp)
 enum VoicesKind : int32_t {
     kVoicesDestroy, kVoicesEnded, kVoicesCost, kVoicesPrepare, kVoicesRetune, kVoicesNoteOn, kVoicesStartNote,
-    kVoicesTruncateOnce, kVoicesWait, kVoicesKinds
+    kVoicesTruncateOnce, kVoicesWait, kVoicesKeyOff, kVoicesParameters, kVoicesClock, kVoicesKinds
 };
 
 // A call as either side made it: what, the routine it reached and the object it was given, and from v277 the arguments
@@ -123,3 +124,6 @@ void voicesDrawNotes(Vc2Fw& fw, std::mt19937& rng);
 // The assigner's part (v277, Vc2AssignCheck.cpp), after the voices' cases on its own generator: its cases' count
 // that differ, its counts said
 long vc2AssignPart(VoicesSides& s, const Vc2Run& run);
+// The release path's and note start's part (v278, Vc2AssignReleaseCheck.cpp), after the assigner's on the seed after
+// its: its cases' count that differ, its counts said
+long vc2AssignReleasePart(VoicesSides& s, const Vc2Run& run);

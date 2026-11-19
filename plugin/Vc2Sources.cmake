@@ -96,4 +96,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Keys.cpp
     Source/Vc2KeysTables.cpp
     Source/Vc2Assigner.cpp
+    Source/Vc2AssignRelease.cpp
+    Source/Vc2AssignNotes.cpp
 )

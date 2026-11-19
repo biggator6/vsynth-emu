@@ -42,6 +42,27 @@ public:
     virtual int8_t onByteOf(uint32_t note) = 0;                                   // the note's +0x740
     virtual uint32_t tableOf(uint32_t message) = 0;                               // a message's +0, its key table
     virtual void waitQueue(uint32_t queue, uint32_t voice) = 0;                   // 0x893951b0
+    // v278: the voice's +0x30 virtual (a note's key-off), a part's settings byte (0x89995390 + 32 × part), the part's
+    // parameters' message 0x8939b050 (0x89996120 + 24 × part), an object's first byte (a message's part, a node's
+    // channel), and the OS clock in ms (0x893018d0)
+    virtual void keyOff(uint32_t voice) = 0;
+    virtual uint8_t partSetting(uint32_t part, uint32_t offset) = 0;
+    virtual void readParameters(uint32_t part) = 0;
+    virtual uint8_t firstByte(uint32_t object) = 0;
+    virtual int32_t clock() = 0;
+};
+
+struct Vc2KeyTable;
+class Vc2Keys;
+
+// What the part node's note start is given beyond the key table: the node, the message, a value its key is moved by,
+// and a word passed on
+struct Vc2NodeNote {
+    uint32_t node = 0;
+    uint32_t table = 0;
+    uint32_t message = 0;
+    int32_t value = 0;
+    uint32_t passed = 0;
 };
 
 // A partner and whether its age word's bit 29 is set
@@ -65,6 +86,22 @@ public:
     void truncateVoice(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts);              // 0x89391a50
     void clearOrders(uint32_t voice, Vc2PartVoices& v);                                       // 0x89391aa0
     void setState(uint32_t voice, uint32_t state, Vc2PartVoices& v);                          // 0x89391a90
+
+    // The second part (v278, Vc2AssignRelease.cpp): a key's release on a voice by its key table, and the pedals' lifts
+    void release(uint32_t voice, const Vc2KeyTable& keys, Vc2PartVoices& v, Vc2AssignParts& parts);   // 0x89391760
+    void liftHold(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts);                          // 0x89391820
+    void liftSostenuto(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts);                     // 0x89391880
+    // and over the sounding voices of a key table, at `table`
+    void noteOff(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);       // 0x89390c00
+    void holdOff(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);       // 0x89390cd0
+    void sostenutoOff(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);  // 0x89390d10
+    void truncateTable(uint32_t table, Vc2PartVoices& v, Vc2AssignParts& parts);                 // 0x89390d50
+    void releaseBut(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);    // 0x89390da0
+    void releaseAll(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);    // 0x89390e20
+    // The part node's note start and off (Vc2AssignNotes.cpp): its portamento keys by its key table's source and its
+    // channel, the part's mode, then the start, a build, a truncation or mono's retune
+    void nodeNoteOn(const Vc2NodeNote& n, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);   // 0x89396a80
+    void nodeNoteOff(const Vc2NodeNote& n, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);  // 0x89396c90
 
 private:
     bool sameNote(uint32_t voice, const Vc2AssignCall& call, Vc2PartVoices& v, Vc2AssignParts& parts);

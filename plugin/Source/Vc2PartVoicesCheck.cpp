@@ -14,6 +14,7 @@
 // XT_VC2VOICES_MAIN only.
 #ifdef XT_VC2VOICES_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2KeysTables.h"
 #include "Vc2PartVoicesCheck.h"
 #include "Vc2PartVoicesTables.h"
 #include <algorithm>
@@ -216,7 +217,7 @@ std::string voicesDifference(VoicesSides& s) {
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2voices", vc2LoadPartVoices);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2voices", vc2LoadAll<vc2LoadPartVoices, vc2LoadKeys>);
     if (!run) return 1;
     Vc2PartVoices port;
     VoicesDraws draws;
@@ -227,7 +228,7 @@ int main(int argc, char** argv) {
     Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
     vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return voicesCase(s, rng); });
     sayVoiceCounts(*run, s.n);
-    const long assigner = vc2AssignPart(s, *run);
+    const long assigner = vc2AssignPart(s, *run) + vc2AssignReleasePart(s, *run);
     std::printf("xt_vc2voices: %ld different\n", tally.different + assigner);
     return 0;
 }

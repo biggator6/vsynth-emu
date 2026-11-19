@@ -29,6 +29,7 @@ uint32_t packLegato(const Vc2Legato& l) { return l.found | (uint32_t)l.marked <<
 VoicesCall called(VoicesKind kind, uint32_t routine, uint32_t object, std::array<uint32_t, 7> more) {
     return { kind, routine, object, more };
 }
+} // namespace
 
 // rom.4's side: the voice's two virtuals of both classes, the note's three routines and the queue's wait
 void assignInstallRom(VoicesSides& s) {
@@ -57,6 +58,7 @@ void assignInstallRom(VoicesSides& s) {
         });
 }
 
+namespace {
 // A call's message, part and kind as drawn: a part 0…2, a kind 0…2 or 0xff, now and then any
 Vc2AssignCall drawTargetNote(std::mt19937& rng) {
     Vc2AssignCall c;
@@ -83,6 +85,7 @@ void aimAtTarget(AssignSides& a, std::mt19937& rng) {
         v.order[0] = rng() % 2 ? v.order[0] | 0x20000000 : v.order[0] & ~0x20000000u;
     }
 }
+} // namespace
 
 // The words the assigner reads beyond the voices' draws: each message's table, the notes' bytes; and the voices' key
 // tables, parts, update bits, queues and queue links (all at a case's first); a target note now and then
@@ -109,12 +112,17 @@ void assignSteer(AssignSides& a, std::mt19937& rng, bool all) {
     if (rng() % 2) aimAtTarget(a, rng);
 }
 
-std::string assignCase(AssignSides& a, std::mt19937& rng) {
+std::string assignStart(AssignSides& a, std::mt19937& rng) {
     std::vector<uint32_t> noise(sizeof a.s.port / 4);
     for (uint32_t& w : noise) w = (uint32_t)rng();
     std::memcpy(&a.s.port, noise.data(), sizeof a.s.port);
     voicesDrawNotes(a.s.fw, rng);
-    std::string what = voicesInits(a.s);
+    return voicesInits(a.s);
+}
+
+namespace {
+std::string assignCase(AssignSides& a, std::mt19937& rng) {
+    std::string what = assignStart(a, rng);
     const std::span<const AssignEvent> events = assignEvents();
     for (int k = 0; k < kSteps && what.empty(); ++k, ++a.n.events) {
         assignSteer(a, rng, k == 0);
@@ -173,6 +181,24 @@ int8_t AssignPortParts::onByteOf(uint32_t note) { return (int8_t)s_.fw.cpu.rd8(n
 
 void AssignPortParts::waitQueue(uint32_t queue, uint32_t voice) {
     s_.mine.push_back(called(kVoicesWait, kRoutinesAt[3], queue, { voice }));
+}
+
+void AssignPortParts::keyOff(uint32_t voice) {
+    const VoicesCall slot = voicesSlotCall(s_.fw, kVoicesKeyOff, voice, s_.port.at(voice).vtable, kAssignKeyOffEntry);
+    s_.mine.push_back(slot);
+}
+
+uint8_t AssignPortParts::partSetting(uint32_t part, uint32_t offset) {
+    return s_.fw.cpu.rd8(kAssignSettingsAt + kAssignSettingBytes * part + offset);
+}
+
+void AssignPortParts::readParameters(uint32_t part) {
+    s_.mine.push_back(called(kVoicesParameters, kAssignReadAt, kAssignParametersAt + kAssignParameterBytes * part, {}));
+}
+
+int32_t AssignPortParts::clock() {
+    s_.mine.push_back(called(kVoicesClock, kAssignClockAt, 0, {}));
+    return ms;
 }
 
 long vc2AssignPart(VoicesSides& s, const Vc2Run& run) {

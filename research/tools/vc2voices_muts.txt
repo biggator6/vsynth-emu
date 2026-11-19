@@ -142,3 +142,63 @@ assign-clear-first|for (uint32_t& order : n.order) order &= kTruncated;|n.order[
 assign-clear-own|if (n.age == voice + kOrderAt \|\| n.age == voice + kOrderAt + kOrderBytes) n.state|if (n.age == voice + kOrderAt) n.state|vc2assign
 assign-clear-state|constexpr uint8_t kTruncatedState = 1;|constexpr uint8_t kTruncatedState = 3;|vc2assign
 assign-set-state|{ v.at(voice).state = (uint8_t)state; }|{ v.at(voice).state = (uint8_t)(state & 3); }|vc2assign
+# The assigner's second part (v278), through xt_vc2voices' third part: the release path (vc2release) and the part node's
+# note start and off (vc2nodenotes).  Not planted: the note-off's count test without the sign extension (both sides
+# extended, the order is a byte's), and the release's key bit cleared before the bit-28 test (that reads the pedals' bits
+# alone: the same).
+rel-bits-swapped|kKeyHeld = 1, kHoldHeld = 2, kSostenutoHeld = 4;|kKeyHeld = 1, kHoldHeld = 4, kSostenutoHeld = 2;|vc2release
+rel-sustain-bit|constexpr uint32_t kSustainCleared = 0xefffffff;|constexpr uint32_t kSustainCleared = 0xf7ffffff;|vc2release
+rel-key-bit|constexpr uint32_t kKeyCleared = 0xdfffffff;|constexpr uint32_t kKeyCleared = 0xbfffffff;|vc2release
+rel-pedal-down|constexpr uint8_t kPedalDown = 64;|constexpr uint8_t kPedalDown = 65;|vc2release
+rel-kind-one|constexpr int8_t kOneOfKind = 1;|constexpr int8_t kOneOfKind = 2;|vc2release
+rel-kind-one-flag|constexpr uint32_t kKindOneHeld = 0x18;|constexpr uint32_t kKindOneHeld = 0x16;|vc2release
+rel-after-held|if ((n.held & kPedalsHeld) == 0) n.order[0] &= kSustainCleared;|if ((n.held & kHoldHeld) == 0) n.order[0] &= kSustainCleared;|vc2release
+rel-lift-key|    if ((n.held & bit) == 0 \|\| (n.held & kKeyHeld) != 0) return;|    if ((n.held & bit) == 0) return;|vc2release
+rel-lift-no-key-off|    afterHeld(n);\n    if ((n.held & kAnyHeld) == 0) parts.keyOff(voice);\n}\n\n// Each|    afterHeld(n);\n}\n\n// Each|vc2release
+rel-each-table|if (v.at(voice).channel == table) each(voice);|if (v.at(voice).channel != 0) each(voice);|vc2release
+rel-pedal-off-test|    if (pedal >= kPedalDown) return;|    if (pedal > kPedalDown) return;|vc2release
+rel-key-up|    if ((n.held & kKeyHeld) == 0) return;\n    if (keys.hold|    if (keys.hold|vc2release
+rel-hold-pedal|if (keys.hold < kPedalDown) n.held &= (uint8_t)~kHoldHeld;|if (keys.sostenuto < kPedalDown) n.held &= (uint8_t)~kHoldHeld;|vc2release
+rel-latched-keys|keys.latched[key >> 4] & vc2KeysTables().bits[key & 15]|keys.held[key >> 4] & vc2KeysTables().bits[key & 15]|vc2release
+rel-sostenuto-and|if (keys.sostenuto < kPedalDown \|\| !latched)|if (keys.sostenuto < kPedalDown && !latched)|vc2release
+rel-velocity|    n.byte2f = keys.offVelocity;|    n.byte2f = keys.onVelocity;|vc2release
+rel-key-order|    n.order[0] &= kKeyCleared;|    n.order[1] &= kKeyCleared;|vc2release
+rel-no-key-off|    n.order[0] &= kKeyCleared;\n    if ((n.held & kAnyHeld) == 0) parts.keyOff(voice);|    n.order[0] &= kKeyCleared;|vc2release
+rel-lift-hold-bit|    lift(voice, kHoldHeld, v, parts);|    lift(voice, kSostenutoHeld, v, parts);|vc2release
+rel-off-count|if ((uint32_t)(int8_t)n.byte2e > (uint32_t)(int8_t)k.offs[offKey]) return;|if ((uint32_t)(int8_t)n.byte2e >= (uint32_t)(int8_t)k.offs[offKey]) return;|vc2release
+rel-off-kind-one|            kindOne = voice;\n            return;|            kindOne = voice;|vc2release
+rel-off-key|if (n.byte42 == offKey) release(voice, k, v, parts);|if (n.byte42 != offKey) release(voice, k, v, parts);|vc2release
+rel-off-held|vc2KeysHighestIn(k.held, 0, kKeysTo) >= 0|vc2KeysHighestIn(k.held, 1, kKeysTo) >= 0|vc2release
+rel-off-flag|if (parts.partSetting(0, kKindOneHeld) == 0) release(kindOne, k, v, parts);|release(kindOne, k, v, parts);|vc2release
+rel-hold-off-pedal|pedalOff(table, keys.table(table).hold, kHoldHeld, v, parts);|pedalOff(table, keys.table(table).sostenuto, kHoldHeld, v, parts);|vc2release
+rel-sost-off-bit|pedalOff(table, keys.table(table).sostenuto, kSostenutoHeld, v, parts);|pedalOff(table, keys.table(table).sostenuto, kHoldHeld, v, parts);|vc2release
+rel-trunc-queue|parts.waitQueue(kQueuesAt + kQueueBytes * v.at(voice).queue, voice);\n    });\n}\n\nvoid Vc2Assigner::releaseBut|parts.waitQueue(kQueuesAt, voice);\n    });\n}\n\nvoid Vc2Assigner::releaseBut|vc2release
+rel-trunc-voice|        truncateVoice(voice, v, parts);\n        parts.waitQueue|        clearOrders(voice, v);\n        parts.waitQueue|vc2release
+rel-but-flag|parts.kindOf(v.at(voice).note) == kOneOfKind && parts.partSetting(0, kKindOneHeld) != 0;|parts.kindOf(v.at(voice).note) == kOneOfKind;|vc2release
+rel-all-but|eachOf(table, v, [&](uint32_t voice) { release(voice, keys.table(table), v, parts); });|releaseBut(table, keys, v, parts);|vc2release
+notes-channel-bytes|kSourceBytes = 0x480, kChannelBytes = 0x48, kGlideBytes = 0x24;|kSourceBytes = 0x480, kChannelBytes = 0x24, kGlideBytes = 0x24;|vc2nodenotes
+notes-carrier-glide|{ first + kGlideBytes, n.message, kCarrierKey,|{ first, n.message, kCarrierKey,|vc2nodenotes
+notes-transpose|kTranspose = 0, kMono = 1, kLegato = 2;|kTranspose = 3, kMono = 1, kLegato = 2;|vc2nodenotes
+notes-legato-byte|kTranspose = 0, kMono = 1, kLegato = 2;|kTranspose = 0, kMono = 1, kLegato = 1;|vc2nodenotes
+notes-carrier-byte|kCarrier = 0x16, kCarrierHeld = 0x18;|kCarrier = 0x17, kCarrierHeld = 0x18;|vc2nodenotes
+notes-carrier-held-byte|kCarrier = 0x16, kCarrierHeld = 0x18;|kCarrier = 0x16, kCarrierHeld = 0x19;|vc2nodenotes
+notes-carrier-key|kCarrierKey = 60,|kCarrierKey = 64,|vc2nodenotes
+notes-carrier-passed|kCarrierPassed = 100,|kCarrierPassed = 127,|vc2nodenotes
+notes-key-signed|std::clamp((int32_t)(int8_t)parts.partSetting(part, kTranspose) + by, 0, kKeyMost)|std::clamp((int32_t)parts.partSetting(part, kTranspose) + by, 0, kKeyMost)|vc2nodenotes
+notes-key-most|constexpr int32_t kKeyMost = 127;|constexpr int32_t kKeyMost = 126;|vc2nodenotes
+notes-glide-node|kChannelBytes * parts.firstByte(n.node)|kChannelBytes * parts.firstByte(n.message)|vc2nodenotes
+notes-no-parameters|    parts.readParameters(part);\n    const int32_t key = movedKey(part, n.value, parts);|    const int32_t key = movedKey(part, n.value, parts);|vc2nodenotes
+notes-clock|glide.noteOn(parts.clock(), keys.table(glide.table));|glide.noteOn(0, keys.table(glide.table));|vc2nodenotes
+notes-carrier-unmatched|if (!matching(carrier, v, parts)) build(carrier, v, parts);|build(carrier, v, parts);|vc2nodenotes
+notes-mono-legato|then = mono ? Then::legato : Then::poly;|then = mono ? Then::fresh : Then::poly;|vc2nodenotes
+notes-poly-held|then = mono ? Then::fresh : Then::poly;|then = mono ? Then::legato : Then::poly;|vc2nodenotes
+notes-carrier-fresh|            truncateSame(carrier, v, parts);\n            build(carrier, v, parts);|            build(carrier, v, parts);|vc2nodenotes
+notes-tail|then = !mono ? Then::poly : glide.prevMonoHeld != 0 ? Then::legato : Then::fresh;|then = !mono ? Then::poly : Then::fresh;|vc2nodenotes
+notes-own-kind|const Vc2AssignCall own { first, n.message, (uint32_t)key, n.passed, 0 };|const Vc2AssignCall own { first, n.message, (uint32_t)key, n.passed, 1 };|vc2nodenotes
+notes-legato-off|if (then == Then::legato && parts.partSetting(part, kLegato) != 0) {|if (then == Then::legato) {|vc2nodenotes
+notes-fresh-kept|    if (then != Then::poly) truncateSame(own, v, parts);|    (void)then;|vc2nodenotes
+noteoff-found|    if (found < 0) {|    if (found <= 0) {|vc2nodenotes
+noteoff-second|if (parts.partSetting(part, kCarrierHeld) == 0) glideOff(first + kGlideBytes, keys);|glideOff(first + kGlideBytes, keys);|vc2nodenotes
+noteoff-mono|    if (parts.partSetting(part, kMono) == 0) return;\n    parts.readParameters(part);\n    retune|    parts.readParameters(part);\n    retune|vc2nodenotes
+noteoff-parameters|    parts.readParameters(part);\n    retune(|    retune(|vc2nodenotes
+noteoff-key|(uint32_t)movedKey(part, found, parts), false, v, parts);|(uint32_t)movedKey(part, 0, parts), false, v, parts);|vc2nodenotes

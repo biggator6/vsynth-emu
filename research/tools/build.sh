@@ -43,6 +43,8 @@ rm -f "$O"/xt_vc2keys
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
    Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp \
    $( [ -f Vc2AssignCheck.cpp ] && echo Vc2AssignCheck.cpp Vc2AssignEvents.cpp Vc2Assigner.cpp ) \
+   $( [ -f Vc2AssignReleaseCheck.cpp ] && echo Vc2AssignReleaseCheck.cpp Vc2AssignReleaseEvents.cpp \
+      Vc2AssignRelease.cpp Vc2AssignNotes.cpp Vc2Keys.cpp Vc2KeysTables.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2voices" &
 # The part's notes W (v275) against rom.4's own routines, every tone method they reach hooked
 [ -f Vc2NotesCheck.cpp ] && cc -DXT_VC2NOTES_MAIN Vc2NotesCheck.cpp Vc2NotesEvents.cpp Vc2NotesFakes.cpp \
