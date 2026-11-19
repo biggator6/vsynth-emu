@@ -8,15 +8,18 @@
 #include <string>
 #include <vector>
 
-// [FW] a tone's own words the check writes on both sides, by offset: its +4 link, state, self, id, the tail's end
-// routine and render flag
-inline constexpr uint32_t kToneLinkAt = 0x4, kToneStateAt = 0xc, kToneSelfAt = 0x14, kToneIdAt = 0x1c;
-inline constexpr uint32_t kToneEndedWordAt = 0x1b14, kToneRendersAt = 0x1b34;
+// [FW] a tone's own words the check writes on both sides, by offset: its state, self, id, the tail's end routine,
+// truncation's routine (v273) and render flag
+inline constexpr uint32_t kToneNextAt = 0x0, kTonePrevAt = 0x4;   // its links in the part's lists (v273)
+inline constexpr uint32_t kToneStateAt = 0xc, kToneSelfAt = 0x14, kToneIdAt = 0x1c;
+inline constexpr uint32_t kToneEndedWordAt = 0x1b14, kToneTruncatedWordAt = 0x1b18, kToneRendersAt = 0x1b34;
 
 struct ToneCounts {
     long events = 0, makes = 0, full = 0, inPlace = 0, unmakes = 0, back = 0, updates = 0, ends = 0, renders = 0;
     long noteOns = 0, takes = 0, fixes = 0;
     long freeTicks = 0, freeClocks = 0;   // v271: the free LFOs' two passes
+    long setters = 0, keyOffs = 0, truncations = 0, waits = 0, costs = 0, getters = 0;   // v273: the remaining methods
+    long starts = 0, started = 0, listMoves = 0, leaves = 0;   // the part's lists: starts, tones started, moves, leaves
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
     std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
@@ -71,11 +74,47 @@ uint32_t toneDrawFollow(std::mt19937& rng);
 std::string toneFreeTickOn(ToneSides& s, std::mt19937& rng);
 std::string toneFreeClockOn(ToneSides& s, std::mt19937& rng);
 
+// The tone's remaining methods and the part's lists (v273, Vc2ToneMethodCheck.cpp): the lists' words against rom.4's;
+// both sides' lists emptied; tone i taken off whichever list holds it by rom.4's own routine, before a use that builds
+// it again (a note-on, a constructor) and after its destructor, as the part keeps a tone on one list at most; and the
+// events: a block setter, key-off, a truncation, the cost, a getter, the start and the lists' routines alone
+std::string toneListsDifference(ToneSides& s);
+void toneEmptyLists(ToneSides& s);
+std::string toneLeaveLists(ToneSides& s, int i);
+void toneDrawLinks(ToneSides& s, int i, std::mt19937& rng);   // a tone on no list: links its constructor must clear
+std::string toneSetterOn(ToneSides& s, std::mt19937& rng);
+std::string toneKeyOffOn(ToneSides& s, std::mt19937& rng);
+std::string toneTruncateOn(ToneSides& s, std::mt19937& rng);
+std::string toneCostOn(ToneSides& s, std::mt19937& rng);
+std::string toneGetterOn(ToneSides& s, std::mt19937& rng);
+std::string toneStartOn(ToneSides& s, std::mt19937& rng);
+std::string toneListOn(ToneSides& s, std::mt19937& rng);
+
+// A live tone drawn and prepared, its number
+inline int toneDrawLive(ToneSides& s, std::mt19937& rng) {
+    const int i = s.live[rng() % s.live.size()];
+    tonePrepare(s, i, rng);
+    return i;
+}
+
+// An event on tone i: rom.4's routine on `args` and the port's `mine()`, then what differs on it
+template <class Mine>
+std::string toneOn(ToneSides& s, int i, uint32_t at, std::initializer_list<uint32_t> args, Mine mine) {
+    return vc2BothOn(s.fw, at, args, "a tone's routine", mine, [&] { return toneDifference(s, i); });
+}
+
 // A word of tone i's own set on both sides: `mine`, the port's, and rom.4's at the tone's `offset`
 template <class Word>
 void toneBothWord(ToneSides& s, int i, uint32_t offset, Word& mine, Word value) {
     mine = value;
     s.fw.cpu.write(s.pool.addressOf(i) + offset, &value, sizeof value);
+}
+
+// A live tone drawn and prepared, sounding but one time in `odds`, its number
+inline int toneDrawSounding(ToneSides& s, std::mt19937& rng, uint32_t odds) {
+    const int i = toneDrawLive(s, rng);
+    if (rng() % odds != 0) toneBothWord(s, i, kToneStateAt, s.pool.tones[(size_t)i].head.state, Vc2Tone::kSounding);
+    return i;
 }
 
 // The events (Vc2ToneEvents.cpp): a make, and the others drawn from the table

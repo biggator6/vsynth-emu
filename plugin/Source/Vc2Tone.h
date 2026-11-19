@@ -31,7 +31,7 @@ struct Vc2ToneTail {
     uint32_t sync = 0;           // +0x1b00: the same
     uint32_t unread[4] {};       // +0x1b04…+0x1b13: not touched by the frame
     uint32_t ended = 0;          // +0x1b14: the routine the update calls when the tone ends
-    uint32_t unread2 = 0;        // +0x1b18
+    uint32_t truncated = 0;      // +0x1b18: the routine 0x893b3bc0 calls once the TVA's fade has ended
     uint32_t zeroed[2] {};       // +0x1b1c, +0x1b20: 0 at construction
     int32_t structure = 0;       // +0x1b24: the note-on's input's +0
     uint32_t render[3] {};       // +0x1b28…+0x1b33: the structure render's member pointer, which nothing calls
@@ -123,6 +123,26 @@ public:
     virtual void startCosm(int cosm, const uint32_t* block, int which) = 0;   // 0x893aa0e0
     virtual void noteOnTva(const uint32_t* block, uint32_t flag) = 0;   // 0x893b2100
     virtual void enlist() = 0;                             // 0x893ada10, given the tone
+    // v273: what the tone's remaining methods call
+    virtual void settingsOsc(int osc, const uint32_t* block) = 0;             // 0x893ae780
+    virtual void settingsLfo(uint32_t lfo, const uint32_t* block) = 0;        // 0x893acff0
+    virtual void settingsEnvelope(uint32_t envelope, const uint32_t* block) = 0;   // 0x893ac110
+    virtual void newBlockCosm(int cosm, const uint32_t* block) = 0;           // 0x893aa5d0
+    virtual void settingsMix(const uint32_t* block) = 0;                      // 0x893add60
+    virtual void newBlockTva(const uint32_t* block) = 0;                      // 0x893b23b0
+    virtual void legatoOsc(int osc, const uint32_t* ramp) = 0;                // 0x893ae9b0
+    virtual void releaseLfo(int lfo) = 0;                  // 0x893ac8c0
+    virtual void releaseEnvelope(int envelope) = 0;        // 0x893ac470
+    virtual void keyOffOsc(int osc) = 0;                   // 0x893b2b60: its vibrato's +0x34 to 0
+    virtual void truncateTvaTold() = 0;                    // 0x893b25a0
+    virtual void truncateTva() = 0;                        // 0x893b25b0
+    virtual float tvaFade() = 0;                           // its +0x64
+    virtual void waitFade() = 0;                           // 0x893017f0(0x1000): the task asleep until the fade is rendered
+    virtual void truncated() = 0;                          // the tail's routine (+0x1b18), given the tone
+    virtual float oscCost(int osc) = 0;                    // its +0xa88
+    virtual float cosmCost() = 0;                          // COSM 1's +0x14c
+    virtual int32_t oscWord168(int osc) = 0;               // 0x893aed40
+    virtual uint32_t oscPosition(int osc) = 0;             // 0x893aed60
 };
 
 class Vc2TonePool;
@@ -158,6 +178,22 @@ public:
     // 0x893b3390 (v229, Vc2ToneNoteOn.cpp): the parts started and bound by the input, the legato's take of the tone
     // of the input's serial in `pool`; it writes the input's fix-up back
     void noteOn(Vc2ToneInput& in, Vc2TonePool& pool, Vc2ToneOwner& owner, Vc2ToneParts& parts);
+    // v273 (Vc2ToneMethods.cpp): the block setters, each a part's (an OSC's or a COSM's by number, 0 or 1, else none)
+    void setOscBlock(uint32_t osc, const uint32_t* block, Vc2ToneParts& parts);         // 0x893b3110
+    void setLfoBlock(uint32_t lfo, const uint32_t* block, Vc2ToneParts& parts);         // 0x893b31a0
+    void setEnvelopeBlock(uint32_t envelope, const uint32_t* block, Vc2ToneParts& parts);   // 0x893b31f0
+    void setCosmBlock(uint32_t cosm, const uint32_t* block, Vc2ToneParts& parts);       // 0x893b3240
+    void setMixBlock(const uint32_t* block, Vc2ToneParts& parts);       // 0x893b32d0
+    void setTvaBlock(const uint32_t* block, Vc2ToneParts& parts);       // 0x893b3310
+    void setLegato(const uint32_t* ramp, Vc2ToneParts& parts);          // 0x893b3350: both OSC voices
+    void keyOff(Vc2ToneParts& parts);                 // 0x893b3ad0: every LFO, envelope and OSC voice, when sounding
+    void truncateAndWait(Vc2ToneParts& parts);        // 0x893b3bc0: the TVA's fade to its end, then the tail's routine
+    void truncateAtOnce(Vc2ToneParts& parts);         // 0x893b3c20
+    float cost(Vc2ToneParts& parts) const;            // 0x893b4020: what it costs the CPU, its OSCs' and COSM 1's
+    // The position getters by an OSC's number, 0 past 1: 0x893b3f80 (as a halfword) and 0x893b3fd0; their first cases,
+    // 0x893b3fc0 and 0x893b4010, are no routines of their own
+    uint32_t oscWord168(uint32_t osc, Vc2ToneParts& parts) const;
+    uint32_t oscPosition(uint32_t osc, Vc2ToneParts& parts) const;
 
     Vc2ToneHead head {};
     Vc2ToneTail tail {};
@@ -177,6 +213,7 @@ public:
     uint32_t end() const { return addressOf(kTones); }   // the sentinel's word (0x8993fb44): the pool's end
     Vc2Tone& at(uint32_t address) { return tones[(address - kBase) / Vc2Tone::kSize]; }
     int indexOf(uint32_t address) const { return (int)((address - kBase) / Vc2Tone::kSize); }
+    bool holds(uint32_t address) const { return address >= kBase && address < end(); }   // a tone's, not a list's head
     int bySerial(int32_t wanted) const;   // the first tone whose +8 is `wanted` (0x893b4340), −1 none
 
     uint32_t head = 0;      // 0x8993fb48: the free list, 0 until the first take

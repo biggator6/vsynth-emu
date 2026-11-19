@@ -39,6 +39,7 @@ public:
     void construct(Vc2ToneTail& tail);
     void noteOn(const uint32_t* block, uint32_t flag1, uint32_t flag2, Vc2ToneTail& tail, Vc2ToneMixRings& rings);
     void install(bool kind3, Vc2ToneTail& tail);
+    void settings(const uint32_t* block, Vc2ToneTail& tail);   // 0x893add60 (v273): a new block's targets by its type
     // The routine the install chose, on 32 stereo frames of a and b into out
     void render(const float* a, const float* b, float* out, Vc2ToneTail& tail, Vc2ToneMixRings& rings);
 

@@ -40,19 +40,6 @@ constexpr TonePlain kPlains[] = {
     { 0x893b4060, [](Vc2Tone& t, Vc2ToneParts& p) { t.install(p); } },
 };
 
-// An event on tone i: rom.4's routine on `args` and the port's `mine()`, then what differs on it
-template <class Mine>
-std::string toneOn(ToneSides& s, int i, uint32_t at, std::initializer_list<uint32_t> args, Mine mine) {
-    return vc2BothOn(s.fw, at, args, "a tone's routine", mine, [&] { return toneDifference(s, i); });
-}
-
-// A live tone drawn and prepared, its number
-int toneDrawLive(ToneSides& s, std::mt19937& rng) {
-    const int i = s.live[rng() % s.live.size()];
-    tonePrepare(s, i, rng);
-    return i;
-}
-
 uint32_t toneDrawId(std::mt19937& rng) { return rng() % 2 == 0 ? rng() % 16 : (uint32_t)rng(); }
 Vc2ToneParts& partsOf(ToneSides& s, int i) { return s.parts[(size_t)i]; }
 
@@ -60,8 +47,10 @@ std::string toneInPlaceOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     const uint32_t id = toneDrawId(rng), at = s.pool.addressOf(i);
     ++s.n.inPlace;
-    std::string what =
-        toneOn(s, i, kMakeAt, { at, id }, [&] { s.pool.tones[(size_t)i].construct(at, id, partsOf(s, i)); });
+    std::string what = toneLeaveLists(s, i);
+    if (!what.empty()) return what;
+    toneDrawLinks(s, i, rng);
+    what = toneOn(s, i, kMakeAt, { at, id }, [&] { s.pool.tones[(size_t)i].construct(at, id, partsOf(s, i)); });
     return what.empty() && s.fw.cpu.r[0] != at ? "the constructor's tone where it stands" : what;
 }
 
@@ -73,15 +62,15 @@ std::string toneUnmakeOn(ToneSides& s, std::mt19937& rng) {
     std::erase(s.live, i);
     ++s.n.unmakes;
     s.n.back += flags & 1;
-    return vc2BothOn(
+    const std::string what = vc2BothOn(
         s.fw, kUnmakeAt, { s.pool.addressOf(i), flags }, "the destructor",
         [&] { s.pool.unmake(tone, (flags & 1) != 0, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
+    return what.empty() ? toneLeaveLists(s, i) : what;   // its state may have named the other list
 }
 
 std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
-    const int i = toneDrawLive(s, rng);
+    const int i = toneDrawSounding(s, rng, 8);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
-    if (rng() % 8 != 0) toneBothWord(s, i, kToneStateAt, tone.head.state, Vc2Tone::kSounding);
     // [FW] 0x893b16c8: the update's caller gives at least 1 tick, so its low half, which the update extends, stays positive
     constexpr uint32_t kPositiveLowHalf = 0xffff7fff;
     const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng() & kPositiveLowHalf;
@@ -147,18 +136,25 @@ std::string tonePlainOn(ToneSides& s, std::mt19937& rng) {
 }
 
 // The tone's own words as a note-on or another use might leave them: its head and tail drawn on both sides, but the end
-// routine and the mix's member pointer and gain, which rom.4 calls and keeps, and the indexes, a delay line's number (the
-// link stays: the free list follows it)
+// and truncation routines and the mix's member pointer and gain, which rom.4 calls and keeps, its links in the part's
+// lists, its own address, which the note-on's walk reads through, and its vtable, which the start calls through (v273),
+// and the indexes, a delay line's number (the pool's link stays: the free list follows it)
 std::string toneScribbleOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     std::array<uint32_t, (sizeof tone.head + sizeof tone.tail) / sizeof(uint32_t)> words {};
     std::ranges::generate(words, [&] { return rng() % 4 == 0 ? rng() % 8 : (uint32_t)rng(); });
     const auto mixWords = std::to_array(tone.tail.unread);
+    const Vc2ToneHead kept = tone.head;
     std::memcpy(&tone.head, words.data(), sizeof tone.head);
     std::memcpy(&tone.tail, words.data() + sizeof tone.head / sizeof(uint32_t), sizeof tone.tail);
     tone.tail.ended = kToneEndedAt;
+    tone.tail.truncated = kToneTruncatedAt;
     std::ranges::copy(mixWords, tone.tail.unread);
+    tone.head.next = kept.next;
+    tone.head.prev = kept.prev;
+    tone.head.vtable = kept.vtable;
+    tone.head.self = kept.self;
     tone.head.index = (int32_t)(rng() % Vc2ToneMixRings::kTones);
     tone.tail.index = (int32_t)(rng() % Vc2ToneMixRings::kTones);
     s.fw.cpu.write(s.pool.addressOf(i), &tone.head, sizeof tone.head);
@@ -170,6 +166,8 @@ std::string toneScribbleOn(ToneSides& s, std::mt19937& rng) {
 std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     if (!toneFreeLfosHaveRoom(s)) return "";
     const int i = s.live[rng() % s.live.size()];
+    const std::string left = toneLeaveLists(s, i);
+    if (!left.empty()) return left;
     tonePrepareNoteOn(s, i, rng);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     ++s.n.noteOns;
@@ -215,7 +213,9 @@ constexpr ToneEvent kEvents[] = { toneUpdateOn,    toneUpdateOn,    toneRenderOn
                                   toneInPlaceOn,   toneClockOn,     toneCountOn,   toneMatchedOn,  toneAskOn,
                                   toneAskOn,       tonePlainOn,     tonePlainOn,   toneScribbleOn, toneNoteOnEvent,
                                   toneNoteOnEvent, toneNoteOnEvent, toneBoundOn,   toneMixPlayOn,  toneMixPlayOn,
-                                  toneFreeTickOn,  toneFreeClockOn };
+                                  toneFreeTickOn,  toneFreeClockOn, toneSetterOn,  toneSetterOn,   toneKeyOffOn,
+                                  toneTruncateOn,  toneCostOn,      toneGetterOn,  toneStartOn,    toneStartOn,
+                                  toneListOn };
 } // namespace
 
 std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {
@@ -223,7 +223,10 @@ std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {
     const int i = std::min((int)((head - Vc2TonePool::kBase) / Vc2Tone::kSize), Vc2TonePool::kTones - 1);
     tonePrepare(s, i, rng);
     Vc2Tone* tone = nullptr;
-    std::string what = vc2BothOn(
+    std::string what = toneLeaveLists(s, i);
+    if (!what.empty()) return what;
+    toneDrawLinks(s, i, rng);
+    what = vc2BothOn(
         s.fw, kMakeAt, { 0, id }, "the constructor", [&] { tone = s.pool.make(id, partsOf(s, i)); },
         [&] { return toneDifference(s, -1); });
     if (what.empty() && s.fw.cpu.r[0] != (tone ? s.pool.addressOf(i) : 0)) what = "the constructor's tone";
@@ -231,6 +234,7 @@ std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {
     if (!what.empty() || !tone) return what;
     s.live.push_back(i);
     toneBothWord(s, i, kToneEndedWordAt, tone->tail.ended, kToneEndedAt);   // the note-on's end routine
+    toneBothWord(s, i, kToneTruncatedWordAt, tone->tail.truncated, kToneTruncatedAt);   // the part's, v273
     return "";
 }
 

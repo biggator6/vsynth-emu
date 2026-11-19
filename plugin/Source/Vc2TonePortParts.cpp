@@ -12,7 +12,10 @@ constexpr uint32_t kNoBuffer = 0xff, kByte = 0xff;
 uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 int32_t oscCode(int osc) { return tonePartCode(static_cast<Piece>((int)Piece::osc1 + osc), 0); }
 int32_t cosmCode(int cosm) { return tonePartCode(static_cast<Piece>((int)Piece::cosm1 + cosm), 0); }
+int32_t lfoCode(int lfo) { return tonePartCode(Piece::lfos, lfo); }
+int32_t envelopeCode(int envelope) { return tonePartCode(Piece::envelopes, envelope); }
 const int32_t kTvaCode = tonePartCode(Piece::tva, 0);
+constexpr uint32_t kFadeEvent = 0x1000;   // [FW] 0x893b3be4: the event the truncation's task waits on
 uint32_t byteOf(int32_t x) { return (uint32_t)x & kByte; }
 } // namespace
 
@@ -29,7 +32,11 @@ void TonePortParts::destroy(Vc2TonePiece piece) {
 }
 
 void TonePortParts::unfollow(int lfo) { s_.frees.release(mods.lfos[(size_t)lfo].w.follow); }
-void TonePortParts::unlist(bool fromOne) { log(kUnlist, kToneNone, { fromOne ? 1u : 0u }); }
+void TonePortParts::unlist(bool fromOne) {
+    const uint32_t self = s_.pool->addressOf(tone_);
+    if (fromOne) s_.lists.unlistNew(self, *s_.pool);
+    else s_.lists.unlistSounding(self, *s_.pool);
+}
 
 void TonePortParts::tickEnvelope(int envelope, int32_t n) { mods.envelopes[(size_t)envelope].tick(n); }
 void TonePortParts::tickLfo(int lfo, int32_t n) { mods.lfos[(size_t)lfo].tick(n); }
@@ -160,7 +167,49 @@ void TonePortParts::noteOnTva(const uint32_t* block, uint32_t flag) {
     log(kNoteOnTva, kTvaCode, { blockOf(block), flag });
 }
 
-void TonePortParts::enlist() { log(kEnlist, kToneNone); }
+void TonePortParts::enlist() { s_.lists.enlist(s_.pool->addressOf(tone_), *s_.pool); }
+
+// v273: the remaining methods' parts, each logged as rom.4's hook reads it but the mix's, which is real
+void TonePortParts::settingsOsc(int osc, const uint32_t* block) { log(kSettingsOsc, oscCode(osc), { blockOf(block) }); }
+
+void TonePortParts::settingsLfo(uint32_t lfo, const uint32_t* block) {
+    log(kSettingsLfo, lfoCode((int)lfo), { blockOf(block) });
+}
+
+void TonePortParts::settingsEnvelope(uint32_t envelope, const uint32_t* block) {
+    log(kSettingsEnvelope, envelopeCode((int)envelope), { blockOf(block) });
+}
+
+void TonePortParts::newBlockCosm(int cosm, const uint32_t* block) {
+    log(kNewBlockCosm, cosmCode(cosm), { blockOf(block) });
+}
+
+void TonePortParts::settingsMix(const uint32_t* block) { mix.settings(block, tail()); }
+void TonePortParts::newBlockTva(const uint32_t* block) { log(kNewBlockTva, kTvaCode, { blockOf(block) }); }
+void TonePortParts::legatoOsc(int osc, const uint32_t* ramp) { log(kLegatoOsc, oscCode(osc), { blockOf(ramp) }); }
+void TonePortParts::releaseLfo(int lfo) { log(kReleaseLfo, lfoCode(lfo)); }
+void TonePortParts::releaseEnvelope(int envelope) { log(kReleaseEnvelope, envelopeCode(envelope)); }
+void TonePortParts::keyOffOsc(int osc) { log(kKeyOffOsc, oscCode(osc)); }
+void TonePortParts::truncateTvaTold() { log(kTruncateTold, kTvaCode); }
+void TonePortParts::truncateTva() { log(kTruncate, kTvaCode); }
+
+// A wait the truncation's task makes; the fade at 0 once the draws' count of them has passed, as rom.4's hook leaves it
+void TonePortParts::waitFade() {
+    log(kWaitFade, kToneNone, { kFadeEvent }, false);
+    if (--s_.fade.portLeft <= 0) words.tvaFade = 0;
+}
+
+void TonePortParts::truncated() { log(kTruncated, kToneNone); }
+
+int32_t TonePortParts::oscWord168(int osc) {
+    log(kOscWord168, oscCode(osc));
+    return (int32_t)s_.draws.word168[(size_t)osc];
+}
+
+uint32_t TonePortParts::oscPosition(int osc) {
+    log(kOscPosition, oscCode(osc));
+    return s_.draws.position[(size_t)osc];
+}
 
 bool TonePortParts::answered(ToneKind kind, bool answer) {
     log(kind, kTvaCode);
