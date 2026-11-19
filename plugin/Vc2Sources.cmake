@@ -111,4 +111,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SetTva.cpp
     Source/Vc2PartSettings.cpp
     Source/Vc2PartSettingsTables.cpp
+    Source/Vc2PartSettingsWords.cpp
+    Source/Vc2PartSettingsOsc.cpp
 )

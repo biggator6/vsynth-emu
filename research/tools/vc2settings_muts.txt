@@ -1,15 +1,18 @@
 # Planted errors in the VC-2 part's settings by ID, for mutate_vc2.py --settings: each must make xt_vc2settings, on
-# rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286).  Not
-# planted: the depth law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within
-# ±32 (the same there), the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what
-# Vc2PartSettings.h holds.
-kinds|kKinds = 16, kEnvelopes = 13, kLfos = 5;|kKinds = 15, kEnvelopes = 13, kLfos = 5;|vc2settings
-envelope-rows|kKinds = 16, kEnvelopes = 13, kLfos = 5;|kKinds = 16, kEnvelopes = 12, kLfos = 5;|vc2settings
-lfo-rows|kKinds = 16, kEnvelopes = 13, kLfos = 5;|kKinds = 16, kEnvelopes = 13, kLfos = 4;|vc2settings
-held-common|kHeldCommon = 0, kHeldKind = 1,|kHeldCommon = 1, kHeldKind = 1,|vc2settings
-held-kind|kHeldCommon = 0, kHeldKind = 1,|kHeldCommon = 0, kHeldKind = 2,|vc2settings
-held-envelope|kHeldEnvelope = 2,|kHeldEnvelope = 3,|vc2settings
-held-lfo|kHeldLfo = 3;|kHeldLfo = 2;|vc2settings
+# rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286),
+# vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp) and vc2settingsosc
+# (Vc2PartSettingsOsc.cpp, v288).  Not planted: the depth law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways
+# give ±100), its byte casts within ±32 (the same there), the curve's test at 7 (7 either way), the products' 32-bit
+# wrap (no read reaches it), what Vc2PartSettings.h and Vc2PartSettingsWords.h hold (the held flags' numbers are
+# planted where each is tested), the OSC header's +1 and +5 one byte wider (what the next store overwrites), the
+# loader's test of the twelve IDs (rom.4's are never 0).
+kinds|    for (int kind = 0; kind < kKinds; ++kind)|    for (int kind = 0; kind < kKinds - 1; ++kind)|vc2settingswords
+envelope-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 12, kLfos = 5;|vc2settings
+lfo-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 13, kLfos = 4;|vc2settings
+held-common|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.commons|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.commons|vc2settings
+held-kind|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.mixes|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.mixes|vc2settings
+held-envelope|    if (p_.held(kHeldEnvelope)) return false;\n    const auto get|    if (p_.held(kHeldLfo)) return false;\n    const auto get|vc2settings
+held-lfo|    if (p_.held(kHeldLfo)) return false;\n    uint8_t* row = t.lfos|    if (p_.held(kHeldEnvelope)) return false;\n    uint8_t* row = t.lfos|vc2settings
 tva-envelope|kTvaEnvelope = 12;|kTvaEnvelope = 11;|vc2settings
 common-bytes|kCommonBytes = 6;|kCommonBytes = 4;|vc2settings
 envelope-part|kEnvelopePart = 2080,|kEnvelopePart = 2070,|vc2settings
@@ -51,9 +54,9 @@ shift-32|kThirtySecondShift = 5;|kThirtySecondShift = 4;|vc2settings
 hundred|kHundred = 100,|kHundred = 99,|vc2settings
 ten|kTen = 10,|kTen = 9,|vc2settings
 depth-edge|kDepthEdge = 32;|kDepthEdge = 31;|vc2settings
-put16-short|std::memcpy(at, &h, sizeof h);|std::memcpy(at, &h, 1);|vc2settings
+put16-short|std::memcpy(at, &h, sizeof h);|std::memcpy(at, &h, 1);|vc2settingswords
 percent-times|vc2ByMagic(times(v, kHundred), kSixtyThird|vc2ByMagic(v, kSixtyThird|vc2settings
-every-stop|            if (!row(kind, i)) return false;|            row(kind, i);|vc2settings
+every-stop|            if (!row(kind, i)) return false;|            row(kind, i);|vc2settingswords
 curve-top|code > 6 ? 7 : code|code > 5 ? 7 : code|vc2settings
 curve-less|static_cast<uint32_t>(x) - 1u;|static_cast<uint32_t>(x) - 0u;|vc2settings
 depth-low-sign|return -(kHundred + vc2ByMagic(|return -(kHundred - vc2ByMagic(|vc2settings
@@ -135,10 +138,78 @@ cosm-run-at|put16(row + kCosmIdsAt + 2 * k,|put8(row + kCosmIdsAt + 2 * k,|vc2se
 cosm-run-sub|p_.cosmValue(part, kind, cosm, static_cast<int16_t>(id))|p_.cosmValue(part, kind, 0, static_cast<int16_t>(id))|vc2settings
 velocity-cosm-test|static_cast<uint32_t>(cosm) >= kCosms|static_cast<uint32_t>(cosm) > kCosms|vc2settings
 velocity-cosm-held|if (p_.held(kHeldEnvelope) \|\| static_cast<uint32_t>(cosm) >= kCosms) return false;|if (static_cast<uint32_t>(cosm) >= kCosms) return false;|vc2settings
-velocity-cosm-curve-at|put8(row + 2 + 4 * k, vc2CurveOf(|put8(row + 1 + 4 * k, vc2CurveOf(|vc2settings
+velocity-cosm-curve-at|velocityPair(row + 2 + 4 * k,|velocityPair(row + 1 + 4 * k,|vc2settings
 velocity-cosm-depth|static_cast<int16_t>(b + 1))));|static_cast<int16_t>(b + 2))));|vc2settings
 velocity-cosm-block|p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b))|p_.value(Block::kKindA, part, kind, static_cast<int16_t>(b))|vc2settings
-velocity-cosm-after|    }\n    return !p_.held(kHeldEnvelope);\n}\n\nbool Vc2PartSettings::cosms|    }\n    return true;\n}\n\nbool Vc2PartSettings::cosms|vc2settings
+velocity-cosm-after|kCosmEnvelopes[cosm][k]);\n    return !p_.held(kHeldEnvelope);|kCosmEnvelopes[cosm][k]);\n    return true;|vc2settings
 cosms-and|cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm)|cosmRow(t, part, kind, cosm) \|\| cosmVelocityRow(t, part, kind, cosm)|vc2settings
 cosms-order|cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm)|cosmVelocityRow(t, part, kind, cosm) && cosmRow(t, part, kind, cosm)|vc2settings
 tables-cosm-runs|image.read(0x8953fb40,|image.read(0x8953fb44,|vc2settingstables
+put8-or|*at = static_cast<uint8_t>(v);|*at = static_cast<uint8_t>(v \| 1);|vc2settingswords
+times-sum|static_cast<uint32_t>(v) * static_cast<uint32_t>(by)|static_cast<uint32_t>(v) + static_cast<uint32_t>(by)|vc2settingswords
+tables-osc-ids|image.read(0x8954012c,|image.read(0x8954012e,|vc2settingstables
+osc-kinds|kOscs = 2;|kOscs = 1;|vc2settingsosc
+osc-part|kOscPart = 0x1020,|kOscPart = 0x1000,|vc2settingsosc
+osc-blocks-at|kBlocksAt = 32,|kBlocksAt = 30,|vc2settingsosc
+osc-kind|kOscKind = 0x100,|kOscKind = 0xf0,|vc2settingsosc
+osc-bytes|kOscBytes = 0x80;|kOscBytes = 0x40;|vc2settingsosc
+osc-trailer-at|kTrailerAt = 0x10200,|kTrailerAt = 0x101fc,|vc2settingsosc
+osc-calibration-at|kCalibrationAt = 0x10204;|kCalibrationAt = 0x10208;|vc2settingsosc
+osc-header-octave-id|{ 0x12f, 0x12d,|{ 0x12e, 0x12d,|vc2settingsosc
+osc-header-order|{ 0x12f, 0x12d, 0x12e,|{ 0x12f, 0x12e, 0x12d,|vc2settingsosc
+osc-header-switch-id|0x130, 0x133 }|0x131, 0x133 }|vc2settingsosc
+osc-header-five-id|0x130, 0x133 }|0x130, 0x134 }|vc2settingsosc
+osc-twelve-on|kTwelveOn = 0x151,|kTwelveOn = 0x150,|vc2settingsosc
+osc-header-last|kHeaderLast = 0x193;|kHeaderLast = 0x192;|vc2settingsosc
+osc-twelve-at|kTwelveAt = 6,|kTwelveAt = 8,|vc2settingsosc
+osc-header-last-at|kHeaderLastAt = 0x1e;|kHeaderLastAt = 0x1f;|vc2settingsosc
+osc-octave|kOctave = 12,|kOctave = 11,|vc2settingsosc
+osc-ten|kTen = 10;|kTen = 9;|vc2settingsosc
+osc-header-part|p_.value(Block::kPart, part, 0, id)|p_.value(Block::kPart, 0, 0, id)|vc2settingsosc
+osc-header-one|put8(row + 1, get(kHeaderIds[1]));|put8(row + 1, get(kHeaderIds[0]));|vc2settingsosc
+osc-header-tens|put16(row + 2, times(get(kHeaderIds[2]), kTen));|put16(row + 2, get(kHeaderIds[2]));|vc2settingsosc
+osc-header-two-byte|put16(row + 2,|put8(row + 2,|vc2settingsosc
+osc-header-zero|get(kHeaderIds[3]) == 0 ? 1 : 0|get(kHeaderIds[3]) != 0 ? 1 : 0|vc2settingsosc
+osc-header-five-at|put8(row + 5, get(kHeaderIds[4]));|put8(row + 0x1f, get(kHeaderIds[4]));|vc2settingsosc
+osc-twelve-switch|const bool twelve = get(kTwelveOn) != 0;|const bool twelve = get(kTwelveOn) == 0;|vc2settingsosc
+osc-twelve-off|twelve ? times(get(ids[k]), kTen) : 0)|twelve ? times(get(ids[k]), kTen) : 1)|vc2settingsosc
+osc-twelve-reads|twelve ? times(get(ids[k]), kTen) : 0)|times(get(ids[k]), kTen) * twelve)|vc2settingsosc
+osc-twelve-count|for (size_t k = 0; k < ids.size(); ++k)|for (size_t k = 0; k + 1 < ids.size(); ++k)|vc2settingsosc
+osc-twelve-tens|times(get(ids[k]), kTen) : 0)|get(ids[k]) : 0)|vc2settingsosc
+osc-before|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.oscs|    uint8_t* row = t.oscs|vc2settingsosc
+osc-after|    oscHeader(row, part);\n    if (p_.held(kHeldCommon)) return false;\n|    oscHeader(row, part);\n|vc2settingsosc
+osc-row-part|t.oscs.data() + kOscPart * part;|t.oscs.data() + kOscPart * (part & 7);|vc2settingsosc
+osc-block-stop|return p_.oscBlock(part, kind, osc) &&|return (p_.oscBlock(part, kind, osc) \|\| true) &&|vc2settingsosc
+osc-block-args|p_.oscBlock(part, kind, osc)|p_.oscBlock(part, osc, kind)|vc2settingsosc
+osc-block-after|p_.oscBlock(part, kind, osc) && oscVelocityRow(block, part, kind, osc)|oscVelocityRow(block, part, kind, osc) && p_.oscBlock(part, kind, osc)|vc2settingsosc
+osc-velocity-before|    if (p_.held(kHeldEnvelope)) return false;\n    for (size_t k|    for (size_t k|vc2settingsosc
+osc-velocity-flag|    if (p_.held(kHeldEnvelope)) return false;\n    for (size_t k|    if (p_.held(kHeldKind)) return false;\n    for (size_t k|vc2settingsosc
+osc-velocity-after|    return !p_.held(kHeldEnvelope);|    return true;|vc2settingsosc
+osc-velocity-envelopes|{ 1, 2, 3, 2, 3, 4 }|{ 1, 2, 3, 2, 3, 5 }|vc2settingsosc
+osc-velocity-first|{ 1, 2, 3, 2, 3, 4 }|{ 2, 2, 3, 2, 3, 4 }|vc2settingsosc
+osc-envelope-step|kOscEnvelopeStep = 4;|kOscEnvelopeStep = 5;|vc2settingsosc
+osc-curve-at|{ 0xa, 0x28,|{ 0xb, 0x28,|vc2settingsosc
+osc-curve-last|0x54, 0x19 }|0x54, 0x18 }|vc2settingsosc
+osc-depth-at|{ 0xc, 0x2a,|{ 0xe, 0x2a,|vc2settingsosc
+osc-depth-last|0x56, 0x1a }|0x56, 0x1c }|vc2settingsosc
+osc-trailer-block|put16(u, p_.value(Block::kSystemB,|put16(u, p_.value(Block::kSystem,|vc2settingsosc
+osc-trailer-ids|{ 62, 63, 122 }|{ 62, 63, 121 }|vc2settingsosc
+osc-trailer-order|{ 62, 63, 122 }|{ 63, 62, 122 }|vc2settingsosc
+osc-trailer-wide|put16(u, p_.value|put8(u, p_.value|vc2settingsosc
+osc-trailer-three|put8(u + 3,|put8(u + 1,|vc2settingsosc
+osc-calibration-block|p_.value(Block::kSystemC, 0, 0,|p_.value(Block::kSystemB, 0, 0,|vc2settingsosc
+osc-calibration-clear|    u[0] = 0;|    u[0] = 1;|vc2settingsosc
+osc-calibration-order|{ 1, 3, 2, 4, 5 }|{ 1, 2, 3, 4, 5 }|vc2settingsosc
+osc-calibration-ids|kCalibrationIds = 0x534,|kCalibrationIds = 0x535,|vc2settingsosc
+osc-halfword-ids|kHalfwordIds = 0x53a,|kHalfwordIds = 0x53b,|vc2settingsosc
+osc-halfword-narrow|put16(u + 8, get(kHalfwordIds + 1));|put8(u + 8, get(kHalfwordIds + 1));|vc2settingsosc
+osc-groups-on-id|kGroupsOn = 0x53c,|kGroupsOn = 0x53b,|vc2settingsosc
+osc-group-ids|kGroupIds = 0x53d;|kGroupIds = 0x53e;|vc2settingsosc
+osc-groups-switch|const bool on = get(kGroupsOn) != 0;|const bool on = get(kGroupsOn) == 0;|vc2settingsosc
+osc-groups-reads|on ? get(kGroupIds + kGroupLength * g + k) : kGroupOff[g]|on ? get(kGroupIds + kGroupLength * g + k) : get(kGroupIds) * 0 + kGroupOff[g]|vc2settingsosc
+osc-group-at|{ 0xa, 0xc, 0xb, 0xd }|{ 0xa, 0xb, 0xc, 0xd }|vc2settingsosc
+osc-group-off-first|{ 60, 0, 0, 127 }|{ 64, 0, 0, 127 }|vc2settingsosc
+osc-group-off-middle|{ 60, 0, 0, 127 }|{ 60, 0, 1, 127 }|vc2settingsosc
+osc-group-off-last|{ 60, 0, 0, 127 }|{ 60, 0, 0, 126 }|vc2settingsosc
+osc-group-length|kGroupLength = 11,|kGroupLength = 10,|vc2settingsosc
+osc-group-stride|kGroupStride = 4;|kGroupStride = 3;|vc2settingsosc

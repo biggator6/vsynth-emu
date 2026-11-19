@@ -64,6 +64,8 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # The part's settings by ID (v286) against rom.4's own readers, the read objects and the getter hooked
 [ -f Vc2PartSettingsCheck.cpp ] && cc -DXT_VC2SETTINGS_MAIN Vc2PartSettingsCheck.cpp Vc2PartSettings.cpp \
    Vc2SetChildHead.cpp $( [ -f Vc2PartSettingsTables.cpp ] && echo Vc2PartSettingsTables.cpp ) \
+   $( [ -f Vc2PartSettingsOsc.cpp ] && echo Vc2PartSettingsWords.cpp Vc2PartSettingsOsc.cpp \
+      Vc2PartSettingsOscCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

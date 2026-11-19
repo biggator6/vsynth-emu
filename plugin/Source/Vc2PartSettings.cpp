@@ -2,13 +2,14 @@
 // order.
 #include "Vc2PartSettings.h"
 #include "Vc2PartSettingsTables.h"
+#include "Vc2PartSettingsWords.h"
 #include "Vc2SetChildHead.h"
-#include <cstring>
+
+using namespace Vc2PartWords;
 
 namespace {
 using Block = Vc2ParamBlock;
-constexpr int kKinds = 16, kEnvelopes = 13, kLfos = 5;            // [FW] a part's note kinds, a kind's rows
-constexpr int kHeldCommon = 0, kHeldKind = 1, kHeldEnvelope = 2, kHeldLfo = 3;   // [FW] the flags each tests
+constexpr int kEnvelopes = 13, kLfos = 5;                         // [FW] a kind's rows
 constexpr int kTvaEnvelope = 12;                                  // [FW] the envelope whose on flag the part sets
 constexpr uint32_t kCommonBytes = 6;                              // [FW] the tables' strides
 constexpr uint32_t kEnvelopePart = 2080, kEnvelopeKind = 130, kEnvelopeBytes = 10;
@@ -35,29 +36,8 @@ constexpr uint32_t kBytesPart = 16, kCosmPart = 0x540, kCosmKind = 84, kCosmByte
 constexpr int16_t kBytesId = 0x2d3, kCosmFirst = 0x462, kCosmTypeId = 0x463, kVelocityIds = 0x389;
 constexpr int kCosmEnvelopes[kCosms][2] = { { 9, 10 }, { 11, 12 } };
 
-void put8(uint8_t* at, int32_t v) { *at = static_cast<uint8_t>(v); }
-
-void put16(uint8_t* at, int32_t v) {
-    const uint16_t h = static_cast<uint16_t>(v);
-    std::memcpy(at, &h, sizeof h);
-}
-
-// A product in 32 bits, as mul.l keeps it
-int32_t times(int32_t v, int32_t by) {
-    return static_cast<int32_t>(static_cast<uint32_t>(v) * static_cast<uint32_t>(by));
-}
-
 // A value × 100 / 63, as rom.4 divides
 int32_t percentOf63(int32_t v) { return vc2ByMagic(times(v, kHundred), kSixtyThird, kSixtyThirdShift); }
-
-// Each kind's rows in turn, the first that gives up stopping the rest
-template <class Row>
-bool everyRow(int rows, Row row) {
-    for (int kind = 0; kind < kKinds; ++kind)
-        for (int i = 0; i < rows; ++i)
-            if (!row(kind, i)) return false;
-    return true;
-}
 } // namespace
 
 uint8_t vc2CurveOf(int32_t x) {
@@ -206,15 +186,19 @@ bool Vc2PartSettings::cosmRow(Vc2PartRows& t, int part, int kind, int cosm) {
     return !p_.held(kHeldCosm);
 }
 
+// An envelope's velocity curve (a byte, by the curve's law) and depth (a halfword, by the depth's) from the kind's
+// second block, the curve's ID 0x389 + 13 × the envelope and the depth's the next (v288: the OSC blocks' too)
+void Vc2PartSettings::velocityPair(uint8_t* curve, uint8_t* depth, int part, int kind, int envelope) {
+    const int b = kVelocityIds + kEnvelopeStride * envelope;
+    put8(curve, vc2CurveOf(p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b))));
+    put16(depth, vc2DepthOf(p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b + 1))));
+}
+
 // Two envelopes' velocity curve and depth, by the laws, into +2…+9; a COSM past the two answers false
 bool Vc2PartSettings::cosmVelocityRow(Vc2PartRows& t, int part, int kind, int cosm) {
     if (p_.held(kHeldEnvelope) || static_cast<uint32_t>(cosm) >= kCosms) return false;
     uint8_t* row = t.cosms.data() + kCosmPart * part + kCosmKind * kind + kCosmBytes * cosm;
-    for (int k = 0; k < 2; ++k) {
-        const int b = kVelocityIds + kEnvelopeStride * kCosmEnvelopes[cosm][k];
-        put8(row + 2 + 4 * k, vc2CurveOf(p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b))));
-        put16(row + 4 + 4 * k, vc2DepthOf(p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b + 1))));
-    }
+    for (int k = 0; k < 2; ++k) velocityPair(row + 2 + 4 * k, row + 4 + 4 * k, part, kind, kCosmEnvelopes[cosm][k]);
     return !p_.held(kHeldEnvelope);
 }
 

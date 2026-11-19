@@ -837,6 +837,7 @@ children: 61610 allocations, 54034 constructors, 19721 ends, 30796 conversions, 
 xt_vc2sets: 0 different
 == xt_vc2settings
 COSM inputs: 16000 events: bytes 3269, 3112 rows; COSM inputs 3189, 3187 rows, 3243 velocity rows (1275673 reads)
+OSC table: 16000 events: 5355 trailers, 5363 calibrations, 5282 parts (2024457 reads)
 settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
 xt_vc2settings: 0 different
 == xt_tone msm

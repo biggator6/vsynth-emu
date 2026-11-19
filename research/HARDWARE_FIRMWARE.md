@@ -1546,6 +1546,56 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the OSC table (2026-11-19, v288) {#vc2-part-settings-osc}
+
+Step 4.3's sixteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's third part): the OSC table's readers, on
+`Vc2PartSettings` (`Vc2PartSettingsOsc.cpp`) and checked by `xt_vc2settings`' third part. The part's reader calls the
+OSC block's own reader, `0x893a04e0`, for each block. That reader is over 900 instructions and is v289's; here it is
+behind `Vc2PartParams::oscBlock`.
+
+**The table** (`0x89e371e0`, `Vc2PartRows::oscs`): 0x1020 bytes a part (a 32-byte header, then 0x100 a kind, 0x80 an
+OSC), then the systems' bytes from +0x10200.
+- **The trailer** (`0x893a1000`, the second system block): the halfword +0x10200 from ID 62, the bytes +0x10202 and
+  +0x10203 from IDs 63 and 122. It answers 1.
+- **The calibration** (`0x893a1060`, the third system block), at u = +0x10204:
+  - u+0 is cleared;
+  - u+1…u+5 each come from ID 0x534 + its place, read in the order +1, +3, +2, +4, +5;
+  - the halfwords u+6 and u+8 come from IDs 0x53a and 0x53b;
+  - ID 0x53c switches four groups of eleven bytes, four apart, at u+0xa, u+0xc, u+0xb and u+0xd. They are read in
+    that order from ID 0x53d on, consecutively. Off, the groups take 60, 0, 0 and 127, and nothing is read.
+
+  It answers 1.
+- **A part's row** (`0x893a1410`, flag 0 tested before and after the header). The header comes from the part's block:
+  - +0 = 12 × ID 0x12f; +1 = ID 0x12d; the halfword +2 = 10 × ID 0x12e;
+  - +4 = 1 when ID 0x130 is 0, else 0; +5 = ID 0x133;
+  - ID 0x151 switches twelve halfwords from +6, each 10 × an ID from rom.4's table `0x8954012c` (0x153…0x169, every
+    other one; read by `Vc2PartSettingsTables`). Off, they are 0 and nothing is read;
+  - +0x1e = ID 0x193.
+- **Each block.** Then, for each kind and each of its two OSCs, the block at +32 + 0x100 × the kind + 0x80 × the OSC:
+  - first `0x893a04e0(table, part, kind, osc)`, whose 0 stops the reader;
+  - then (flag 2, tested before and after) six envelopes' velocity curves and depths from the kind's second block,
+    by v286's laws. Envelopes 1, 2, 3, 2, 3, 4 (OSC 2's 5, 6, 7, 6, 7, 8) go into +0xa/+0xc, +0x28/+0x2a,
+    +0x32/+0x34, +0x4a/+0x4c, +0x54/+0x56 and +0x19/+0x1a.
+
+  A pair is the COSM inputs' read (v287): the curve's ID is 0x389 + 13 × the envelope, the depth's the next. The
+  port reads both through one routine, `velocityPair`.
+
+The system's dispatchers call the first two (`0x8939b0d0` the trailer, `0x8939b140` the calibration), item 9's later
+part. The readers' byte and halfword stores, the product and the loop over the kinds moved to `Vc2PartSettingsWords`.
+
+**The check.** It is `xt_vc2settings`' third part, on the seed two after the run's, so the first two parts' draws and
+lines are as they were. It hooks `0x893a04e0` to log its part, kind and OSC among the reads and to answer from the
+store: mostly 1, 0 one time in 64 (a stop), and now and then any other word. The flip may follow it as it follows a
+read. Each case is noise in every table, then 400 events: the trailer, the calibration and a part's reader. The OSC
+table (0x1023c bytes) is compared word for word after every event, in all three parts. The event templates, the case
+and the tables' addresses moved to `Vc2PartSettingsCheck.h`, and the part is in `Vc2PartSettingsOscCheck.cpp`.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first two parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsOsc.cpp` and `Vc2PartSettingsWords.cpp` is reached.
+- `mutate_vc2.py --settings`: 207 plants, none missed; v288's 68 new. The plants on the held flags' numbers, which
+  moved into a header with the split, are now planted where each flag is tested.
+
 ### The VC-2 part's settings by ID: the part's bytes and the COSM inputs (2026-11-19, v287) {#vc2-part-settings-cosm}
 
 Step 4.3's fifteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's second part): two more of the part's readers, on

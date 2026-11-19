@@ -23,6 +23,9 @@ public:
     virtual int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) = 0;
     // The typed getter on a COSM's block, by the part, kind and COSM (v287)
     virtual int32_t cosmValue(int part, int kind, int cosm, int16_t id) = 0;
+    // The OSC block's own reader 0x893a04e0 (its table's block of the part, kind and OSC), until its port (v288's
+    // part reader calls it; v289 ports it)
+    virtual bool oscBlock(int part, int kind, int osc) = 0;
     // rom.4's flag byte 0x8993d0c0 + `flag`, a task's hold on the tables
     virtual bool held(int flag) = 0;
 };
@@ -37,6 +40,8 @@ struct Vc2PartRows {
     uint8_t controls = 0;                       // 0x89997fcc: the part's CC 7 and 11 on the TVA's level
     std::array<uint8_t, 256> bytes {};          // 0x89998a14: the part's byte by kind, 16 a part (v287)
     std::array<uint8_t, 0x5400> cosms {};       // 0x89e2003c: 0x540 a part, 84 a kind, 42 a COSM input (v287)
+    // 0x89e371e0: 0x1020 a part (a 32-byte header, then 0x100 a kind, 0x80 an OSC), then the systems' (v288)
+    std::array<uint8_t, 0x1023c> oscs {};
 };
 
 class Vc2PartSettings {
@@ -61,8 +66,15 @@ public:
     bool cosms(Vc2PartRows& t, int part);                           // 0x89399ed0
     bool cosmRow(Vc2PartRows& t, int part, int kind, int cosm);     // 0x89399c90: its type and the type's IDs
     bool cosmVelocityRow(Vc2PartRows& t, int part, int kind, int cosm);   // 0x89399d60: two envelopes' velocity
+    // v288, Vc2PartSettingsOsc.cpp: the OSC table's systems' and part reader
+    void oscTrailer(Vc2PartRows& t);                                // 0x893a1000
+    void oscCalibration(Vc2PartRows& t);                            // 0x893a1060
+    bool oscs(Vc2PartRows& t, int part);                            // 0x893a1410
 
 private:
+    void velocityPair(uint8_t* curve, uint8_t* depth, int part, int kind, int envelope);
+    void oscHeader(uint8_t* row, int part);
+    bool oscVelocityRow(uint8_t* block, int part, int kind, int osc);
     Vc2PartParams& p_;
 };
 

@@ -10,14 +10,11 @@
 namespace {
 using Settings = Vc2PartSettings;
 using Block = Vc2ParamBlock;
-constexpr uint32_t kCommonsAt = 0x89997090, kEnvelopesAt = 0x89e2765c, kLfosAt = 0x89e2f85c;   // [FW] the tables
-constexpr uint32_t kMixesAt = 0x89e32a60, kTvasAt = 0x89e4987c, kControlsAt = 0x89997fcc;
 constexpr uint32_t kHeldAt = 0x8993d0c0, kGetter = 0x89324350, kTypedGetter = 0x89324370;    // [FW]
-constexpr uint32_t kBytesAt = 0x89998a14, kCosmsAt = 0x89e2003c;                               // [FW] v287's tables
+constexpr uint32_t kOscBlock = 0x893a04e0;                   // [FW] the OSC block's reader, hooked (v288)
 constexpr int16_t kCosmTypeId = 0x463;                       // [FW] a COSM input's type, 0…16 (the run table's)
 constexpr uint32_t kLfoWords = 0x3200, kTvaWords = 0x1804;   // the tables' words; the bytes past them by hand
 constexpr uint32_t kHandle = 0x01000000;                     // a handle: block << 16, part << 8, kind << 2, COSM
-constexpr int kParts = 16, kKinds = 16, kEvents = 400;
 
 // [FW] the read objects' set-ups, by block
 struct SetUp {
@@ -62,56 +59,11 @@ std::string settingsDifference(SettingsSides& s) {
     const std::string words = vc2RegionsDifference(s.fw, { { kCommonsAt, &t.commons, sizeof t.commons, "commons" },
         { kEnvelopesAt, &t.envelopes, sizeof t.envelopes, "envelopes" }, { kLfosAt, &t.lfos, kLfoWords, "LFOs" },
         { kMixesAt, &t.mixes, sizeof t.mixes, "mix" }, { kTvasAt, &t.tvas, kTvaWords, "TVAs" },
-        { kBytesAt, &t.bytes, sizeof t.bytes, "bytes" }, { kCosmsAt, &t.cosms, sizeof t.cosms, "COSM inputs" } });
+        { kBytesAt, &t.bytes, sizeof t.bytes, "bytes" }, { kCosmsAt, &t.cosms, sizeof t.cosms, "COSM inputs" },
+        { kOscsAt, &t.oscs, sizeof t.oscs, "OSCs" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
-}
-
-// The draws before an event: the store's seed, now and then a held flag, now and then one of the first `flipped`
-// flags set after a read (the first part's four, the second's all five)
-void settingsDraw(SettingsSides& s, std::mt19937& rng, uint32_t flipped) {
-    s.rom.store.seed = (uint32_t)rng();
-    s.rom.flags = {};
-    if (rng() % 4 == 0) s.rom.flags[rng() % s.rom.flags.size()] = rng() % 2 ? 1 : (uint8_t)(1 + rng() % 255);
-    const auto spans = std::to_array<uint32_t>({ 16, 48, 2400 });
-    s.rom.flipAt = rng() % 4 == 0 ? (int)(1 + rng() % spans[rng() % spans.size()]) : 0;
-    s.rom.flipFlag = (int)(rng() % flipped);
-}
-
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string partEvent(SettingsSides& s, std::mt19937& rng) {
-    const int part = (int)(rng() % kParts);
-    ++s.n.byEvent[Counted];
-    return settingsOnBoth(s, { Routine, "a part's reader", vc2R0 }, { TableAt, (uint32_t)part },
-                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part); });
-}
-
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string kindEvent(SettingsSides& s, std::mt19937& rng) {
-    const int part = (int)(rng() % kParts), kind = (int)(rng() % kKinds);
-    ++s.n.byEvent[Counted];
-    return settingsOnBoth(s, { Routine, "a kind's row", vc2R0 }, { TableAt, (uint32_t)part, (uint32_t)kind },
-                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part, kind); });
-}
-
-template <auto Member, uint32_t Routine, uint32_t TableAt, int Rows, size_t Counted>
-std::string rowEvent(SettingsSides& s, std::mt19937& rng) {
-    const int part = (int)(rng() % kParts), kind = (int)(rng() % kKinds), i = (int)(rng() % Rows);
-    ++s.n.byEvent[Counted];
-    const Vc2CheckRoutine r { Routine, "a row", vc2R0 };
-    return settingsOnBoth(s, r, { TableAt, (uint32_t)part, (uint32_t)kind, (uint32_t)i },
-                          [&] { return (uint32_t)(s.settings.*Member)(s.rows, part, kind, i); });
-}
-
-// A system's reader: rom.4's answers 1 (0x893a71d0 reads no table: the word it's given unread)
-template <auto Member, uint32_t Routine, uint32_t TableAt, size_t Counted>
-std::string systemEvent(SettingsSides& s, std::mt19937&) {
-    ++s.n.byEvent[Counted];
-    return settingsOnBoth(s, { Routine, "a system's reader", vc2R0 }, { TableAt }, [&] {
-        (s.settings.*Member)(s.rows);
-        return 1u;
-    });
 }
 
 template <auto Law, uint32_t Routine, size_t Counted>
@@ -121,7 +73,6 @@ std::string lawEvent(SettingsSides& s, std::mt19937& rng) {
     return settingsOnBoth(s, { Routine, "a law", vc2R0 }, { (uint32_t)x }, [&] { return (uint32_t)Law(x); });
 }
 
-using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
 // [FW] the events by routine
 const SettingsEvent kSettingsEvents[] = {
     partEvent<&Settings::common, 0x893a1be0, kCommonsAt, 0>,
@@ -151,44 +102,26 @@ const SettingsEvent kCosmEvents[] = {
     rowEvent<&Settings::cosmVelocityRow, 0x89399d60, kCosmsAt, 3, 20>,
 };
 
-// A case: noise in the tables up to `Noised` bytes in (the first part's v286 tables alone, as it drew them), then 400
-// of `Events` with `Flipped` flags to set, counted in `events` and `calls`
-template <const auto& Events, size_t Noised, uint32_t Flipped>
-std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    auto* rows = reinterpret_cast<uint8_t*>(&s.rows);
-    for (uint8_t* b = rows; b != rows + Noised; ++b) *b = (uint8_t)rng();
-    const Vc2PartRows& t = s.rows;
-    s.fw.cpu.write(kCommonsAt, &t.commons, sizeof t.commons);
-    s.fw.cpu.write(kEnvelopesAt, &t.envelopes, sizeof t.envelopes);
-    s.fw.cpu.write(kLfosAt, &t.lfos, sizeof t.lfos);
-    s.fw.cpu.write(kMixesAt, &t.mixes, sizeof t.mixes);
-    s.fw.cpu.write(kTvasAt, &t.tvas, sizeof t.tvas);
-    s.fw.cpu.wr8(kControlsAt, t.controls);
-    s.fw.cpu.write(kBytesAt, &t.bytes, sizeof t.bytes);
-    s.fw.cpu.write(kCosmsAt, &t.cosms, sizeof t.cosms);
-    std::string what;
-    for (int k = 0; k < kEvents && what.empty(); ++k, ++events) {
-        settingsDraw(s, rng, Flipped);
-        what = Events[rng() % std::size(Events)](s, rng);
-        calls += (long)s.mine.log.size();
-    }
-    return what;
-}
-
 std::string settingsCase(SettingsSides& s, std::mt19937& rng) {
     return settingsCaseOf<kSettingsEvents, offsetof(Vc2PartRows, bytes), 4>(s, rng, s.n.events, s.n.calls);
 }
 
-// The second part (v287), on the seed after the run's: the part's bytes and the COSM inputs', every table noise
+// The second part (v287), on the seed after the run's: the part's bytes and the COSM inputs', v287's tables noise
 long settingsCosmPart(SettingsSides& s, const Vc2Run& run) {
     SettingsCounts& n = s.n;
     const long different = vc2CheckPart(run, 1, { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" }, n.moreEvents,
-        [&](std::mt19937& rng) { return settingsCaseOf<kCosmEvents, sizeof(Vc2PartRows), 5>(s, rng, n.moreEvents,
-                                                                                         n.moreCalls); });
+        [&](std::mt19937& rng) { return settingsCaseOf<kCosmEvents, offsetof(Vc2PartRows, oscs), 5>(s, rng,
+                                                                       n.moreEvents, n.moreCalls); });
     const auto& e = n.byEvent;
     std::printf("COSM inputs: %ld events: bytes %ld, %ld rows; COSM inputs %ld, %ld rows, %ld velocity rows (%ld "
                 "reads)\n", n.moreEvents, e[16], e[17], e[18], e[19], e[20], n.moreCalls);
     return different;
+}
+
+// The further parts, in turn on the seeds after the run's
+long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
+    const long cosms = settingsCosmPart(s, run);
+    return cosms + settingsOscPart(s, run);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -202,6 +135,15 @@ void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long differen
 
 } // namespace
 
+void settingsDraw(SettingsSides& s, std::mt19937& rng, uint32_t flipped) {
+    s.rom.store.seed = (uint32_t)rng();
+    s.rom.flags = {};
+    if (rng() % 4 == 0) s.rom.flags[rng() % s.rom.flags.size()] = rng() % 2 ? 1 : (uint8_t)(1 + rng() % 255);
+    const auto spans = std::to_array<uint32_t>({ 16, 48, 2400 });
+    s.rom.flipAt = rng() % 4 == 0 ? (int)(1 + rng() % spans[rng() % spans.size()]) : 0;
+    s.rom.flipFlag = (int)(rng() % flipped);
+}
+
 int32_t SettingsStore::value(const SettingsCall& c) const {
     uint32_t h = seed ^ (uint32_t)c.block * 0x9e3779b9u ^ (uint32_t)c.part * 0x85ebca6bu;
     h ^= (uint32_t)c.kind * 0xc2b2ae35u ^ (uint32_t)(uint16_t)c.id * 0x27d4eb2fu;
@@ -211,6 +153,7 @@ int32_t SettingsStore::value(const SettingsCall& c) const {
     h *= 0x297a2d39u;
     h ^= h >> 15;
     const uint32_t pick = h & 7, v = h >> 3;
+    if (c.block == kOscBlockCall) return v % 64 == 0 ? 0 : pick < 6 ? 1 : (int32_t)(h | 0x100);
     if (c.id == kCosmTypeId) return (int32_t)(v % Vc2PartSettingsTables::kCosmTypes);
     if (pick < 4) return (int32_t)(v % 128);
     if (pick < 6) return (int32_t)(v % 129) - 64;
@@ -223,6 +166,12 @@ int32_t SettingsReads::read(const SettingsCall& c) {
     return store.value(c);
 }
 
+uint32_t SettingsSides::romRead(Sh4& c, const SettingsCall& call) {
+    const int32_t v = rom.read(call);
+    if (rom.reads == rom.flipAt) c.wr8(kHeldAt + rom.flipFlag, 1);
+    return (uint32_t)v;
+}
+
 SettingsSides::SettingsSides(Vc2Fw& rig) : fw(rig) {
     for (const SetUp& u : kSetUps)
         fw.cpu.hook(u.routine, [u](Sh4& c) {
@@ -233,16 +182,17 @@ SettingsSides::SettingsSides(Vc2Fw& rig) : fw(rig) {
             c.wr32(c.r[4] + 4, kHandle | (uint32_t)u.block << 16 | part | kind | cosm);
             c.ret(0);
         });
-    // Both getters (the typed one's type, r6, is the store's to know): the handle's read, logged, the flag set
+    // Both getters (the typed one's type, r6, is the store's to know): the handle's read
     for (const uint32_t getter : { kGetter, kTypedGetter })
         fw.cpu.hook(getter, [this](Sh4& c) {
             const uint32_t h = c.r[4];
-            const SettingsCall call { (int32_t)(h >> 16 & 0xff), (int32_t)(h >> 8 & 0xff), (int32_t)(h >> 2 & 0x3f),
-                                      (int32_t)(h & 3), (int16_t)c.r[5] };
-            const int32_t v = rom.read(call);
-            if (rom.reads == rom.flipAt) c.wr8(kHeldAt + rom.flipFlag, 1);
-            c.ret((uint32_t)v);
+            c.ret(romRead(c, { (int32_t)(h >> 16 & 0xff), (int32_t)(h >> 8 & 0xff), (int32_t)(h >> 2 & 0x3f),
+                               (int32_t)(h & 3), (int16_t)c.r[5] }));
         });
+    // The OSC block's reader (v288): its part, kind and OSC, the table's address unread
+    fw.cpu.hook(kOscBlock, [this](Sh4& c) {
+        c.ret(romRead(c, { kOscBlockCall, (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7], 0 }));
+    });
 }
 
 std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std::initializer_list<uint32_t> args,
@@ -258,6 +208,6 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 int main(int argc, char** argv) {
     const Vc2CheckStart start { "xt_vc2settings", vc2LoadPartSettings,
                                 { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" } };
-    return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts, settingsCosmPart);
+    return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts, settingsMoreParts);
 }
 #endif

@@ -9,11 +9,12 @@ struct Read : Vc2PartSettingsTables {
     // The runs; usable when each type's is in order and fits its row
     bool read(Sh4& image) {
         image.read(0x8953fb40, cosmRuns.data(), sizeof cosmRuns);
+        image.read(0x8954012c, oscIds.data(), sizeof oscIds);
         for (int t = 0; t < kCosmTypes; ++t) {
             const int first = cosmRuns[2 * t], last = cosmRuns[2 * t + 1];
             if (last < first || last - first >= kMostIds) return false;
         }
-        return true;
+        return oscIds[0] != 0;
     }
 };
 constinit Vc2RomTables<Read> tables;
