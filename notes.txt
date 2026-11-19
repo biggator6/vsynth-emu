@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's controller numbers and init v302 (2026-11-19, on claude/vc2-part-4-3 after v301; HARDWARE_FIRMWARE.md,
+  "The VC-2 part's controller numbers and init"): step 4.3's thirtieth version, item 10's seventh part.
+  Vc2PartNumbers (Vc2PartNumbers.h, .cpp): rom.4's 128 controller-number objects of 8 bytes at 0x89988cd0 (the number,
+  its class's vtable) and their table 0x899891e0, each made by its class (twelve classes as rows, the init's switch as
+  rows of a number and its class; Hold's maker sets the Hold-release bytes), the controller's virtual by the object's
+  class through Vc2NumberParts, and the part's init 0x89393370 (part 0's four nodes on part object 0, the keys' and
+  glides' static initializers, every list cleared, the numbers); v301's numberChanged given the value 0x89392f90 leaves
+  in r7 (v301 left it out); the nodes' word read by Vc2PartSettingsTables. xt_vc2settings gains a sixteenth part
+  (Vc2PartNumbersCheck.cpp): 0 different at seeds 2024, 7 and 31337, the first fifteen parts' lines unchanged;
+  mutate_vc2.py --settings 653 planted, 0 missed; mutate_panel.py rom4-no-partsettings caught. Not in the sound yet.
+
 The VC-2 part's controllers v301 (2026-11-19, on claude/vc2-part-4-3 after v300; HARDWARE_FIRMWARE.md, "The VC-2
   part's controllers"): step 4.3's twenty-ninth version, item 10's sixth part. Vc2PartControllers (Vc2PartControllers.h,
   .cpp): rom.4's controller 0x89392f90 (its source counting from 1: the number's object's virtual, then each node on

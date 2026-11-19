@@ -21,6 +21,8 @@ struct Vc2PartSettingsTables {
     // The reload objects' file's three floats (v300): 0x899962a0, +4, +8, from 0x8939b350's pool (0x8939b390,
     // 0x8939b380, 0x8939b388)
     std::array<float, 3> reloadFloats {};
+    // The word the part's init gives part 0's nodes (v302): 0x8950d7a0's
+    uint32_t nodeWord = 0;
 };
 
 [[nodiscard]] bool vc2LoadPartSettings(const char* path);

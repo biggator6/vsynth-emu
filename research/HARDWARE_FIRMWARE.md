@@ -1546,6 +1546,68 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's controller numbers and init (2026-11-19, v302) {#vc2-part-numbers-init}
+
+Step 4.3's thirtieth version (VC2_MODE_PLAN.md, step 4.3, item 10's seventh part): the objects the controller (v301)
+calls by number, and the part's init that makes them, on a new `Vc2PartNumbers` (`Vc2PartNumbers.h/.cpp`), checked by
+`xt_vc2settings`' sixteenth part.
+
+**A correction to v301.** `0x89392f90` leaves the controller's value in r7 when it calls the number's virtual, and
+the handlers read it (Hold's tests it against 64): the virtual is given the source, the channel and the value. v301's
+`Vc2ControllerParts::numberChanged` left the value out and its check didn't log r7; both now carry it, and the
+fifteenth part's line is as it was (it compares the value now).
+
+**The number objects.** 128 of 8 bytes from `0x89988cd0`, one a controller number: the number (+0) and its class's
+vtable (+4); their table `0x899891e0` holds each one's address (the lists `0x899890d0` follow it). Each class's handler
+is its vtable's +0x14 (+0xc, the adjustment, is 0 in all):
+
+| Numbers | Maker | Vtable | Handler |
+|---|---|---|---|
+| 1, and any not below | `0x89393910` (the base) | `0x898cd220` | `0x893938d0` |
+| 7, 10, 11, 91, 93 | `0x89393930` | `0x898cd250` | `0x89393920` (the base's) |
+| 5, 65, 68, 71…74 | `0x89393960` | `0x898cd268` | `0x89393950` (the base's) |
+| 64 | `0x893939e0` | `0x898cd238` | `0x89393980` |
+| 66 | `0x89393a60` | `0x898cd280` | `0x89393a10` |
+| 84 | `0x89393ab0` | `0x898cd298` | `0x89393a70` |
+| 121 | `0x89393b40` | `0x898cd2b0` | `0x89393ac0` |
+| 120 | `0x89393c00` | `0x898cd2c8` | `0x89393ba0` |
+| 126 | `0x89393c70` | `0x898cd2e0` | `0x89393c10` |
+| 127 | `0x89393cd0` | `0x898cd2f8` | `0x89393c80` |
+| 123, 124, 125 | `0x89393d80` | `0x898cd310` | `0x89393ce0` |
+| 6, 38 | `0x89393da0` (its third argument, 1 for 6, unread) | `0x898cd328` | `0x89393d90` (the base's) |
+
+Each maker writes the number and the base's vtable, then its own; Hold's maker also sets each channel's Hold-release
+byte (`0x899893e0`, v299's) to 1. The base handler gives the channel's state (the sources' rows at `0x8950d6d8` and
+`0x8950d6e0`, v292's; nothing for channel −1) to `0x89390ea0`, which runs the virtual of each listener on the list at
+`[0x899826e0]` whose +0x34 names that state; the others work the key tables' pedals and the notes before or instead
+(v303's).
+
+**The part's init** `0x89393370`: for each source, part 0's node on part object 0 (rom.4's table `0x89535458`'s first
+word; its plain class's vtable written, the base's first), its glides reset by the object's index (`0x893904d0`, v293's,
+before the index is set to 0), its object index 0, its source, no channel, the held note's word 0, the word at
+`0x8950d7a0` (`0x89960b7c`); then the keys' and the glides' static initializers (`0x89392190`, `0x89392410`, v276's),
+every list cleared, and the 128 number objects made in order with their table. The glides' reset in the loop leaves no
+trace: the glides' static initializer writes every glide again.
+
+The controller's virtual dispatches by the object's vtable to its class's handler, through `Vc2NumberParts` until the
+handlers are ported; the word at `0x8950d7a0` is read by `Vc2PartSettingsTables` (`nodeWord`).
+
+**The check.** `xt_vc2settings`' sixteenth part, on the seed fifteen after the run's: rom.4's own init and its own
+number objects through the controller, the twelve handlers hooked to log their source, channel, value and address,
+then their object (`SettingsCallee::more`); the earlier parts' hooks on the controller and the 120 class's maker taken
+off; the sources' rows of channel states written back as the image holds them (earlier parts draw the first). Each
+case gives every table, the nodes, the lists, the part objects (an index 0…15) and the keys noise. Events: the init
+(one in four, and in place of a controller while a list is not empty), or the controller (a source 1…4, a channel
+0…15, a number 0…127, a value), one in four after an object's class drawn as another object's and its number byte
+noise, now and then a table word pointing at another object. After each, the tables, the nodes, the number objects,
+their table, the lists, the part objects, the keys' span and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first fifteen parts' lines as they were.
+- Every line and branch of `Vc2PartNumbers.cpp` is reached.
+- `mutate_vc2.py --settings`: 653 plants, none missed; v302's 30 new (29 in the numbers, one in the word's read) and
+  `ctl-number-value` for v301's value. `mutate_panel.py rom4-no-partsettings` caught.
+
 ### The VC-2 part's controllers (2026-11-19, v301) {#vc2-part-controllers}
 
 Step 4.3's twenty-ninth version (VC2_MODE_PLAN.md, step 4.3, item 10's sixth part): the controller the Category
@@ -1555,8 +1617,9 @@ fifteenth part.
 
 **The controller** `0x89392f90(source, channel, number, value)`, its source counting from 1 (so v294's and v298's
 `controller(3, …)` are source 3's, the receive channel's the source whose node changed): first the number's object
-(`[0x899891e0 + 4 × number]`, 128 of them, made by the part's init `0x89393370`, item 10's next) is given the source and
-channel through its virtual (the object's vtable at +4, the function at the vtable's +0x14, `this` moved by its +0xc);
+(`[0x899891e0 + 4 × number]`, 128 of them, made by the part's init `0x89393370`, item 10's next) is given the source,
+the channel and (in r7, left as it came; found in v302) the value through its virtual (the object's vtable at +4, the
+function at the vtable's +0x14, `this` moved by its +0xc);
 then each node on the list of the source (less 1) and channel (`0x899890d0`, v293's; a channel of −1 reads the list
 before, the last channel's of the source before) gives the first byte of its word (+8) as a part to the part's
 controller with the number and value.

@@ -19,7 +19,9 @@
 # nothing looks at the state then, nor the OS base's vtable, which the object's overwrites, nor the request's test of
 # its posted word: posted, the switch after it ends as the test's way does, asked with the remove held once if it was
 # reading and nothing posted again) and vc2partcontrollers (Vc2PartControllers.cpp, v301; not the Y way's set with the
-# trip stopped given its Y field for the value, which it has just stored).  Not planted: the depth
+# trip stopped given its Y field for the value, which it has just stored) and vc2partnumbers (Vc2PartNumbers.cpp, v302;
+# not the init's glides' reset in the nodes' loop, whose every word the glides' static initializer after it writes
+# again).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -620,8 +622,9 @@ reload-message-reading|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2
 reload-message-past|s < std::size(kWays) ? kWays[s] : kWays[kAsked]|s < std::size(kWays) ? kWays[s] : kWays[kIdle]|vc2partreloads
 tables-reload-float|{ 0x8939b390, &reloadFloats[0] }|{ 0x8939b394, &reloadFloats[0] }|vc2settingstables
 tables-reload-order|{ 0x8939b380, &reloadFloats[1] }, { 0x8939b388, &reloadFloats[2] }|{ 0x8939b388, &reloadFloats[1] }, { 0x8939b380, &reloadFloats[2] }|vc2settingstables
-ctl-no-number|    parts_.numberChanged(number, source, channel);\n|\n|vc2partcontrollers
-ctl-number-args|parts_.numberChanged(number, source, channel);|parts_.numberChanged(number, channel, source);|vc2partcontrollers
+ctl-no-number|    parts_.numberChanged(number, source, channel, value);\n|\n|vc2partcontrollers
+ctl-number-args|parts_.numberChanged(number, source, channel, value);|parts_.numberChanged(number, channel, source, value);|vc2partcontrollers
+ctl-number-value|parts_.numberChanged(number, source, channel, value);|parts_.numberChanged(number, source, channel, 0);|vc2partcontrollers
 ctl-list|Vc2PartNodes::kChannels * (source - 1) + channel;|Vc2PartNodes::kChannels * (source - 1) + (channel & 7);|vc2partcontrollers
 ctl-list-walk|at != 0; at = nodes_.node(at).next)|at != 0; at = 0)|vc2partcontrollers
 ctl-part-byte|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8) & 7, number, value);|vc2partcontrollers
@@ -650,3 +653,32 @@ ctl-match-x|{ rows_.tripAssigns[0], rows_.tripAssigns[1], kResetAll }|{ rows_.tr
 ctl-ways|{ &Vc2PartControllers::padX, &Vc2PartControllers::padY, &Vc2PartControllers::rest }|{ &Vc2PartControllers::padY, &Vc2PartControllers::padX, &Vc2PartControllers::rest }|vc2partcontrollers
 ctl-ways-count|for (size_t k = 0; k < std::size(kWays); ++k)|for (size_t k = 0; k + 1 < std::size(kWays); ++k)|vc2partcontrollers
 ctl-first-match|if (number == matches[k]) (this->*kWays[k])(part, value);|if (number == matches[k]) {\n            (this->*kWays[k])(part, value);\n            break;\n        }|vc2partcontrollers
+num-class-vtable|{ 0x898cd250, 0x89393920, false },|{ 0x898cd268, 0x89393920, false },|vc2partnumbers
+num-class-handler|{ 0x898cd268, 0x89393950, false },|{ 0x898cd268, 0x89393920, false },|vc2partnumbers
+num-hold-lifts|{ 0x898cd238, 0x89393980, true },|{ 0x898cd238, 0x89393980, false },|vc2partnumbers
+num-hold-class|{ 64, 3 },|{ 64, 4 },|vc2partnumbers
+num-switch-5|{ 5, 2 },|{ 5, 1 },|vc2partnumbers
+num-switch-6|{ 6, 11 },|{ 6, 0 },|vc2partnumbers
+num-default|row == std::end(kNumberClasses) ? 0 : row->second|row == std::end(kNumberClasses) ? 1 : row->second|vc2partnumbers
+num-number|o.number = static_cast<uint8_t>(n);|o.number = 0;|vc2partnumbers
+num-table|table[static_cast<size_t>(n)] = kObjectsAt + kObjectBytes * static_cast<uint32_t>(n);|table[static_cast<size_t>(n)] = kObjectsAt;|vc2partnumbers
+num-lifts-value|if (c.holdLifts) t.holdLifts.fill(1);|if (c.holdLifts) t.holdLifts.fill(2);|vc2partnumbers
+num-changed-table|const uint32_t at = table[static_cast<size_t>(number)];|const uint32_t at = kObjectsAt + kObjectBytes * static_cast<uint32_t>(number);|vc2partnumbers
+num-changed-object|parts.handle(c->handler, at, source, channel, value);|parts.handle(c->handler, kObjectsAt, source, channel, value);|vc2partnumbers
+num-changed-value|parts.handle(c->handler, at, source, channel, value);|parts.handle(c->handler, at, source, channel, 0);|vc2partnumbers
+init-plain|constexpr uint32_t kPlainClass = 0x898cd184;|constexpr uint32_t kPlainClass = 0x898cd1fc;|vc2partnumbers
+init-vtable|        object.vtable = kPlainClass;\n|\n|vc2partnumbers
+init-object|n.object = Vc2PartNodes::kObjectsAt;|n.object = 0;|vc2partnumbers
+init-byte-e|        n.byteE = 0;|        n.byteE = 1;|vc2partnumbers
+init-source|n.source = static_cast<int8_t>(s);|n.source = 0;|vc2partnumbers
+init-channel|constexpr int8_t kNoChannel = -1;|constexpr int8_t kNoChannel = -2;|vc2partnumbers
+init-held|        w.t.heldNote = 0;|        w.t.heldNote = 1;|vc2partnumbers
+init-word|n.word8 = vc2PartSettingsTables().nodeWord;|n.word8 = 0;|vc2partnumbers
+init-index|        object.index = 0;|        object.index = 1;|vc2partnumbers
+init-sources|for (int s = 0; s < Vc2PartNodes::kSources; ++s) {|for (int s = 0; s < Vc2PartNodes::kSources - 1; ++s) {|vc2partnumbers
+init-node|w.nodes.nodes[static_cast<size_t>(Vc2PartNodes::kParts * s)]|w.nodes.nodes[static_cast<size_t>(Vc2PartNodes::kParts * s + 1)]|vc2partnumbers
+init-static|    w.keys.staticInit();\n|\n|vc2partnumbers
+init-glides-init|    w.keys.glidesInit();\n|\n|vc2partnumbers
+init-lists|w.nodes.lists.fill(0);|w.nodes.lists.fill(1);|vc2partnumbers
+init-numbers|    w.numbers.make(w.t);\n|\n|vc2partnumbers
+tables-node-word|nodeWord = image.rd32(0x8950d7a0);|nodeWord = image.rd32(0x8950d7a4);|vc2settingstables

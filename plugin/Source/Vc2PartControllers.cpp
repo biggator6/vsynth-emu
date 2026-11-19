@@ -12,7 +12,7 @@ constexpr int32_t kStop = 0, kStart = 1;    // [FW] 0x893b0610's second argument
 } // namespace
 
 void Vc2PartControllers::controller(int source, int32_t channel, int32_t number, int32_t value) {
-    parts_.numberChanged(number, source, channel);
+    parts_.numberChanged(number, source, channel, value);
     const int32_t list = Vc2PartNodes::kChannels * (source - 1) + channel;
     for (uint32_t at = nodes_.lists[static_cast<size_t>(list)]; at != 0; at = nodes_.node(at).next)
         partController(parts_.firstByte(nodes_.node(at).word8), number, value);

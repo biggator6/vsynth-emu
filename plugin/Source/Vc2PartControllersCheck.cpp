@@ -11,22 +11,21 @@
 // the trip objects and the calls.  Not drawn: a controller's number past 0…127 (rom.4 reads past its table).
 // XT_VC2SETTINGS_MAIN only.
 #ifdef XT_VC2SETTINGS_MAIN
+#include "Vc2PartControllersCheck.h"
 #include "Vc2PartNodesDraws.h"
-#include "Vc2PartSettingsCheck.h"
 
 namespace {
-constexpr uint32_t kController = 0x89392f90, kPartController = 0x89394440;            // [FW]
-constexpr uint32_t kNumbersAt = 0x899891e0, kPartTableAt = 0x8993d040;                // [FW]
-constexpr uint32_t kTripSetAt = 0x893b0610, kTripMoveAt = 0x893b0460;                 // [FW]
+constexpr uint32_t kNumbersAt = 0x899891e0;                                           // [FW]
 constexpr uint32_t kVirtualAt = 0x14, kAdjustAt = 0x0c, kVtableWordAt = 4;            // [FW] the number object's
-// The check's own: the number objects, their vtable, its virtual, the trip objects, the nodes' bytes
+// The check's own: the number objects, their vtable, its virtual, the nodes' bytes
 constexpr uint32_t kObjectsAt = 0x8C040000, kObjectBytes = 16, kVtableAt = 0x8C041000, kHookAt = 0x8C041100;
-constexpr uint32_t kTripsAt = 0x8C042000, kBytesAt = 0x8C043000;
+constexpr uint32_t kBytesAt = 0x8C043000;
 constexpr int kNumbers = 128;
 constexpr int32_t kResetAll = 121;
 
 SettingsCall numberCalled(Sh4& c) {
-    return { kOutNumber, (int32_t)c.r[5], (int32_t)c.r[6], 0, (int32_t)((c.r[4] - kObjectsAt) / kObjectBytes) };
+    const auto number = (int32_t)((c.r[4] - kObjectsAt) / kObjectBytes);
+    return { kOutNumber, (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7], number };
 }
 SettingsCall setCalled(Sh4& c) {
     return { kOutTripSet, (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7], (int32_t)c.r[4] };
@@ -49,28 +48,6 @@ void hookControllers(SettingsSides& s) {
     for (uint32_t p = 0; p < kSettingsParts; ++p) cpu.wr32(kPartTableAt + 4 * p, kTripsAt + sizeof(Vc2TripFront) * p);
     settingsHookCallees(s, kControllerCallees, kControllerOwn);
 }
-
-// The port's: logged as rom.4's hooks log theirs; a word's byte and the part table read where rom.4 reads them
-class ControllerPortParts final : public Vc2ControllerParts {
-public:
-    explicit ControllerPortParts(SettingsSides& s) : s_(s) {}
-    void numberChanged(int32_t number, int source, int32_t channel) override {
-        s_.mine.log.push_back({ kOutNumber, source, channel, 0, number });
-    }
-    uint8_t firstByte(uint32_t word) override { return s_.fw.cpu.rd8(word); }
-    uint32_t tripAt(uint8_t part) override { return s_.fw.cpu.rd32(kPartTableAt + 4u * part); }
-    Vc2TripFront& trip(uint32_t address) override { return s_.trips[(address - kTripsAt) / sizeof(Vc2TripFront)]; }
-    void tripSet(uint32_t trip, int32_t on, int8_t x, int8_t y) override {
-        s_.mine.log.push_back({ kOutTripSet, on, x, y, (int32_t)trip });
-    }
-    uint8_t tripMove(uint32_t trip, int8_t x, int8_t y) override {
-        s_.mine.log.push_back({ kOutTripMove, 0, x, y, (int32_t)trip });
-        return s_.tripAnswer;
-    }
-
-private:
-    SettingsSides& s_;
-};
 
 // Time Trip Assign X and Y (0…127, 121 or −1, now and then the same), a part's trip object now and then, the answer
 void drawControllerWords(SettingsSides& s, std::mt19937& rng) {

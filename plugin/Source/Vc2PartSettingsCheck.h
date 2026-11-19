@@ -11,6 +11,7 @@
 #include "Vc2KeysTables.h"
 #include "Vc2MatrixTables.h"
 #include "Vc2PartControllers.h"
+#include "Vc2PartNumbers.h"
 #include "Vc2PartSettingsCalls.h"
 #include "Vc2PartSettingsTables.h"
 #include <span>
@@ -119,9 +120,10 @@ struct SettingsCounts {
     long routingEvents = 0, routingCalls = 0;                                   // the thirteenth's (v299)
     long reloadEvents = 0, reloadCalls = 0;                                     // the fourteenth's (v300)
     long controllerEvents = 0, controllerCalls = 0;                             // the fifteenth's (v301)
+    long numberEvents = 0, numberCalls = 0;                                     // the sixteenth's (v302)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
-    // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66
-    std::array<long, 67> byEvent {};
+    // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69
+    std::array<long, 70> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -143,6 +145,7 @@ struct SettingsSides {
     Vc2PartReloads reloads { mine.flags, outs };   // v300
     std::array<Vc2TripFront, kSettingsParts> trips {};   // v301: the parts' trip objects, the port's
     uint8_t tripAnswer = 0;                              // v301: the trip's move's answer, drawn for both sides
+    Vc2PartNumbers numbers {};                           // v302
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -161,6 +164,7 @@ struct SettingsCallee {
     uint32_t at;
     SettingsCall (*called)(Sh4&);
     uint32_t (*answer)(SettingsSides&) = nullptr;   // v297: its answer, else 0
+    SettingsCall (*more)(Sh4&) = nullptr;           // v302: a second entry it logs
 };
 // (v298) `own`: routines an earlier part hooked that run as rom.4's own from this part on, their hooks taken off
 void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees, std::span<const uint32_t> own = {});
@@ -222,6 +226,8 @@ extern const SettingsPartRow kRoutingPartRow;
 extern const SettingsPartRow kReloadPartRow;
 // The fifteenth (v301): the controllers (Vc2PartControllersCheck.cpp)
 extern const SettingsPartRow kControllerPartRow;
+// The sixteenth (v302): the controller numbers and the part's init (Vc2PartNumbersCheck.cpp)
+extern const SettingsPartRow kNumberPartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words

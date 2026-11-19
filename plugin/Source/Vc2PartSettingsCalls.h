@@ -45,6 +45,9 @@ inline constexpr int32_t kOutPost = 36, kOutUnpost = 37, kOutReadPart = 38;
 // The controllers' (v301): the number's object's virtual (its source and channel as the part and kind, the number as
 // the ID), the trip object's set (its flag, X and Y as the part, kind and COSM, the object as the ID) and move (X, Y)
 inline constexpr int32_t kOutNumber = 39, kOutTripSet = 40, kOutTripMove = 41;
+// The number classes' handlers (v302): the handler's source, channel and value as the part, kind and COSM, its address
+// as the ID; then its object as the ID
+inline constexpr int32_t kOutHandler = 42, kOutHandlerObject = 43;
 // The held flags as a log carries them
 inline SettingsCall settingsUnposted(const uint8_t* held, uint32_t object) {
     const auto low = (int32_t)(held[0] | held[1] << 8 | held[2] << 16 | (uint32_t)held[3] << 24);

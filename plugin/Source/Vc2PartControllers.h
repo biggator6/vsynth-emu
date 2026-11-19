@@ -24,12 +24,13 @@ struct Vc2TripFront {
 };
 static_assert(offsetof(Vc2TripFront, x) == 0x20 && sizeof(Vc2TripFront) == 0x28, "rom.4's layout");
 
-// What the controllers reach: the number's object's virtual (its vtable's +0x14, given the source and channel), a
-// node's word's first byte (its part), a part's trip object by the part table, and the trip object's two routines
+// What the controllers reach: the number's object's virtual (its vtable's +0x14, given the source, the channel and,
+// from v302, the value, which 0x89392f90 leaves in r7 for it; v301 left it out), a node's word's first byte (its part),
+// a part's trip object by the part table, and the trip object's two routines
 class Vc2ControllerParts {
 public:
     virtual ~Vc2ControllerParts() = default;
-    virtual void numberChanged(int32_t number, int source, int32_t channel) = 0;   // [0x899891e0 + 4 number]
+    virtual void numberChanged(int32_t number, int source, int32_t channel, int32_t value) = 0;   // [0x899891e0 + 4n]
     virtual uint8_t firstByte(uint32_t word) = 0;
     virtual uint32_t tripAt(uint8_t part) = 0;                                    // [0x8993d040 + 4 part]
     virtual Vc2TripFront& trip(uint32_t address) = 0;

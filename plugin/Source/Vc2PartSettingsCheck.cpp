@@ -137,9 +137,10 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
-    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow })
+    for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow,
+                                      &kControllerPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kControllerPartRow);
+    return different + settingsRunPart(s, run, kNumberPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -207,6 +208,7 @@ void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> calle
     for (const SettingsCallee& k : callees)
         s.fw.cpu.hook(k.at, [&s, k](Sh4& c) {
             s.rom.log.push_back(k.called(c));
+            if (k.more != nullptr) s.rom.log.push_back(k.more(c));
             c.ret(k.answer != nullptr ? k.answer(s) : 0);
         });
 }

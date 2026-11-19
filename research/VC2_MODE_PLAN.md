@@ -810,6 +810,14 @@ version against rom.4's routines with what it calls hooked:
          `Vc2ControllerParts`; xt_vc2settings' fifteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's controllers").
          Next: the part's init (`0x89393370`, which makes the 128 number objects, and `0x8939b200`), the Time Trip
          object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
+       - the controller numbers and the part's init done (v302): `Vc2PartNumbers`, the 128 number objects at
+         `0x89988cd0` and their table `0x899891e0`, made by class (twelve, as rows), the controller's virtual by the
+         object's class through `Vc2NumberParts`, and the init `0x89393370` (part 0's nodes, the keys' and glides'
+         static initializers, the lists cleared, the numbers); v301's call out given the value it left out;
+         xt_vc2settings' sixteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's controller numbers and init"). Next:
+         the classes' handlers (`0x893938d0` with the listeners' `0x89390ea0`, Hold `0x89393980`, `0x89393a10`,
+         `0x89393a70`, `0x89393ac0`, `0x89393ba0`, `0x89393c10`, `0x89393c80`, `0x89393ce0`), then `0x8939b200`, the
+         Time Trip object and the MIDI dispatcher.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
