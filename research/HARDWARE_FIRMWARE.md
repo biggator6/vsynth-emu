@@ -1546,6 +1546,54 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's tone: its remaining methods (2026-11-19, v273) {#vc2-tone-methods}
+
+Step 4.3's second version: what the part calls on a tone beyond the frame (v228) and the note-on (v229), and the part's two lists of tones. `Vc2Tone` gains the methods (`Vc2ToneMethods.cpp`), `Vc2ToneLists` holds the lists, and `Vc2ToneMix` gains its settings update.
+
+**The part's lists of tones.** Two lists, each headed by an object of 0x1c bytes that the static initializer at `0x893b1fb0` builds: list node words 0 (`0x893ad920`), state 4 at +0x0c and vtable `0x898cd4f0` at +0x18. A tone is linked through its +0 (next) and +4 (previous), the first tone's previous being the head. Two marks sit beside the heads.
+
+| Address | Word |
+|---|---|
+| `0x899996d0` | the sounding list's head |
+| `0x899996ec` | the new list's head |
+| `0x89999678` | the tone listed new last |
+| `0x8999967c` | the last tone joined onto the sounding list |
+
+| Routine | What it does |
+|---|---|
+| `0x893ada10` | lists a tone new, at the end, and marks it (the note-on's last step) |
+| `0x893ada30` | takes a tone off the new list: found from the head on, the mark stepping back to the tone before it, 0 at the head; answers the tone, or 0 if it isn't there |
+| `0x893ad9a0` | the same on the sounding list and its mark |
+| `0x893ada90` | the join: the new list onto the sounding list's end; if it had any, the sounding mark takes the new one and the new list empties |
+| `0x893b1cd0` | the start, under the OS's lock: the join, then each tone on the sounding list still built (state 1) started through its vtable's +0x6c |
+
+Every list is walked to its end, as nothing keeps a tail. The note-on's search for a tone of its id walks back from a mark through the +4s, reading each tone's +0x14. At the head it finds 0 in both, as nothing writes them, so the walk ends there: `Vc2TonePool::holds` in the port. `0x893ad940` (onto the sounding list), `0x893ad960` and `0x893ad980` (the marks and the head), `0x893ada00` and `0x893adad0` (each list emptied) have no caller.
+
+**The block setters,** each forwarding a block to a part. A number past 1 (unsigned) reaches no OSC or COSM; an LFO's or an envelope's number is not checked.
+
+| Routine | Part, routine |
+|---|---|
+| `0x893b3110(tone, osc, block)` | the OSC voice's settings `0x893ae780` |
+| `0x893b31a0(tone, lfo, block)` | the LFO's settings `0x893acff0` |
+| `0x893b31f0(tone, envelope, block)` | the envelope's settings `0x893ac110` |
+| `0x893b3240(tone, cosm, block)` | the COSM's new block `0x893aa5d0` |
+| `0x893b32d0(tone, block)` | the mix's settings `0x893add60` |
+| `0x893b3310(tone, block)` | the TVA's new block `0x893b23b0` |
+| `0x893b3350(tone, ramp)` | both OSC voices' legato `0x893ae9b0` |
+
+**The others.**
+- Key-off `0x893b3ad0`, only while sounding (state 2): all eight LFOs' release `0x893ac8c0`, LFO 0 too, though the update ticks only 1 to 7. Then all 14 envelopes' release `0x893ac470`, then each OSC voice's `0x893b2b60`, which sets its vibrato's +0x34 to 0.
+- The truncation `0x893b3bc0`: the TVA's `0x893b25a0`; then, while the TVA's fade (+0x64) is above 0, the OS's wait on event 0x1000 (`0x893017f0`); then the routine at the tone's +0x1b18, given the tone. The notes' task sleeps here until the block task has rendered the fade.
+- The truncation at once `0x893b3c20`: the TVA's `0x893b25b0`.
+- The cost `0x893b4020`: OSC 1's +0xa88 plus OSC 2's, then COSM 1's +0x14c.
+- The position getters, by an OSC's number, 0 past 1: `0x893b3f80`, the OSC voice's `0x893aed40` as a halfword, and `0x893b3fd0`, its `0x893aed60`. The plan's `0x893b3fc0` and `0x893b4010` are no routines: they are the getters' first cases. `0x893b3fc0` pops a return address it never pushed and returns to 0 when called alone. Only `0x893b3fd0` has a caller (`0x89396952`). Two more of the same shape, `0x893b3ee0` (`0x893aecc0`) and `0x893b3f30` (`0x893aecf0`), have none and are not ported.
+
+**The mix's settings update `0x893add60(mix, block)`,** by the type its note-on took (the mix's +0): type 0 the four targets from the block; type 1 its first over 2^31 (its own word, `0x893adea8`) and the next two; types 2 and 3 three targets; all four of those clear the sync switch. Type 4 sets the sync switch and takes the hold from the block. Any other type changes nothing. The block's own type is not read.
+
+**Left hooked, with no port yet:** the envelopes' and LFOs' settings and release (`0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have, and the vibrato's key-off `0x893b2b60`.
+
+**The check.** `xt_vc2tone` no longer hooks `0x893ad9a0`, `0x893ada10` or `0x893ada30`. rom.4's own lists run on their words, compared after every event. A tone leaves its list by rom.4's own routine before anything builds it again (a note-on, a constructor) and after its destructor, as the part keeps a tone on one list at most. The scribble keeps a tone's links, its own address and its vtable. Events of their own run the setters on drawn numbers and the mix's block, key-off, both truncations with one to three waits, the cost, the getters, the start and the lists' routines alone. The new routines' callees are hooked, and the OSCs' costs, the TVA's fade and COSM 1's cost are drawn. 0 different at seed 2024 (40 cases) and at seeds 7 and 31337 (400 cases each). Every line and region of the new port code runs. `mutate_vc2.py --tone`: 610 planted, 65 new, 0 missed. The first run missed v228's two plants on the constructor's clearing of the links: with every tone off its list before it is built, the links were already 0, so the check now gives a tone on no list stale links half the time. v228's plant on the destructor's order of the unlist and its parts' teardown is gone, as no log orders real list work against the parts' calls.
+
 ### The VC-2's free LFOs (2026-11-18, v271) {#vc2-free-lfos}
 
 Step 4.2's tone parts. A key-unsynced LFO starts from another sounding tone's LFO of the same number, or, with none sounding, from a free object kept for its tone id and LFO number. The manager is one static object at `0x8a0c6d84`, 0x8448 bytes, built by the static initializer at `0x893b2010`. `Vc2FreeLfos` holds it word for word, the links as rom.4's addresses. A free object's laws are rom.2's `XtLfoFree`, run on rom.4's words.

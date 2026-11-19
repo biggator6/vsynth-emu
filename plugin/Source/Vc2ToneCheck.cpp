@@ -35,6 +35,7 @@ void toneFreshPools(ToneSides& s) {
         p.mods = {};
         p.mix = {};
     }
+    toneEmptyLists(s);
     s.live.clear();
 }
 
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
     TonePortOwner owner(shared, parts);
     std::vector<ToneCall> rom;
     ToneSides s { fw, pool, shared, parts, owner, rom };
-    toneInstallRom(fw, shared.draws, rom);
+    toneInstallRom(fw, shared.draws, rom, shared.fade);
     Vc2Tally tally { "XT_VC2TONE_FIRST", "XT_VC2TONE_STOP" };
     vc2RunCases(*run, tally, toneDifference(s, -1), s.n.events,
                 [&](std::mt19937& rng, bool) { return vc2ToneCase(s, rng); });
@@ -94,6 +95,10 @@ int main(int argc, char** argv) {
     std::printf("mix: %ld plays, blocks by routine:", n.mixPlays);
     for (long blocks : n.mixBlocks) std::printf(" %ld", blocks);
     std::printf("\n");
+    std::printf("methods: %ld setters, %ld key-offs, %ld truncations (%ld waits), %ld costs, %ld getters\n", n.setters,
+                n.keyOffs, n.truncations, n.waits, n.costs, n.getters);
+    std::printf("lists: %ld starts (%ld tones started), %ld moves alone, %ld left before a rebuild\n", n.starts,
+                n.started, n.listMoves, n.leaves);
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

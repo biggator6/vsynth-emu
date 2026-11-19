@@ -107,6 +107,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
       Vc2ToneModCheck.cpp XtEnvelope.cpp XtLfo.cpp ) \
    $( [ -f Vc2ToneMix.cpp ] && echo Vc2ToneMix.cpp Vc2ToneMixRender.cpp Vc2ToneMixTables.cpp Vc2ToneMixCheck.cpp ) \
    $( [ -f Vc2FreeLfos.cpp ] && echo Vc2FreeLfos.cpp Vc2FreeLfoCheck.cpp ) \
+   $( [ -f Vc2ToneLists.cpp ] && echo Vc2ToneLists.cpp Vc2ToneMethods.cpp Vc2ToneMethodCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tone" &
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked; its ramps (v236) its own
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \

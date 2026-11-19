@@ -438,8 +438,8 @@ version against rom.4's routines with what it calls hooked:
    - done (v269): the tone's OSC mix, `Vc2ToneMix`: rom.4's object at the tone's +0x1ab8, its constructor, note-on, install,
      empty update and eight renders, and the delay lines `Vc2ToneMixRings`, against rom.4's own routines in xt_vc2tone
      (HARDWARE_FIRMWARE.md, "The VC-2's OSC mix").
-   - open: the mix's settings update `0x893add60(mix, block)`, which the tone calls at `0x893b32e6`: new targets during a
-     note, by type. Nothing in `Vc2ToneParts` reaches it yet.
+   - done (v273, step 4.3's second version): the mix's settings update `0x893add60(mix, block)`, which the tone calls at
+     `0x893b32e6`: new targets during a note, by type.
    - done (v233, beside v232's OSC note-on): the TVA, `Vc2Tva`, whole in one version (about 400 instructions; no split):
      rom.4's 0xc8-byte object at the tone's +0x19f0 word for word, the constructor, the note-on, the new block, the
      update, the end tests, the two truncations, silent, the render on one stereo pair (its shortened step kept, its
@@ -634,7 +634,7 @@ version against rom.4's routines with what it calls hooked:
 
      | Interface | Has a port | No port yet |
      |---|---|---|
-     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269) | the voice list `0x893ad9a0`, `0x893ada10`, `0x893ada30`; the mix's settings update `0x893add60`; the free LFOs' manager (v271): `0x893ace60`, `0x893acf10`, `0x893acfc0`, `0x893ad640`, `0x893ad720`, `0x893ad780`, `0x893ad800` |
+     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269), the free LFOs' manager (v271), the part's lists of tones and the mix's settings update (v273) | the envelopes' and LFOs' settings and release `0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`; the vibrato's key-off `0x893b2b60` (its +0x34 to 0) |
      | `Vc2OscParts` | carrier and kind 6 on the voice (v266), the vibrato (v267), players' installs, seeks | kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by address (`vc2Kind5Update` and `Vc2Kind6::set` are their ports, for the part's wiring) |
      | `Vc2TvaParts` | the TVA itself | the fade's step, the word at `0x8993eb08`, which the TVA's converter writes (`0x893a67a2`, with a twin from `0x893a6eba`): version 8's; the event is the task's |
      | `Vc2MixerParts` | all nine | none |
@@ -645,9 +645,14 @@ version against rom.4's routines with what it calls hooked:
    Split by those, bottom-up, each against rom.4's with what it calls hooked:
    1. The voices and their lists: V's words, the init (`0x89391270`, `0x89391ba0`), take and steal, the three moves, the
       reserve (`0x893911b0`), the ended scan (`0x89390ee0`), stop all (`0x89390f40`), the cost sum and budget.
-   2. The tone's remaining methods: the block setters `0x893b3110…0x893b3350`, key-off `0x893b3ad0`, the two truncations
-      `0x893b3bc0` and `0x893b3c20`, the cost `0x893b4020`, the position getters `0x893b3fc0…0x893b4010`, the start
-      `0x893b1cd0` with the voice list's three routines.
+   2. done (v273): the tone's remaining methods: the block setters `0x893b3110…0x893b3350`, key-off `0x893b3ad0`, the
+      two truncations `0x893b3bc0` and `0x893b3c20`, the cost `0x893b4020`, the position getters (`0x893b3f80` and
+      `0x893b3fd0`: `0x893b3fc0` and `0x893b4010` are their first cases), the start `0x893b1cd0` with the part's two lists
+      of tones (`Vc2ToneLists`: `0x893ada10`, `0x893ada30`, `0x893ad9a0` and the join `0x893ada90`), and the mix's
+      settings update `0x893add60`, against rom.4's own in xt_vc2tone (HARDWARE_FIRMWARE.md, "The VC-2's tone: its
+      remaining methods"). What they call stays hooked: the OSC voice's settings, legato and key-off, the COSM's and the
+      TVA's new blocks and truncations, and the envelopes' and LFOs' settings and release (`0x893ac110`, `0x893acff0`,
+      `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have yet: open, for C's frame (version 7).
    3. The note W: constructor `0x89396520`, note-on `0x893965e0`, end `0x89396590`, the settings pass `0x89396650`, the
       update pass `0x893967a0`, the release `0x893968b0`, `0x89396910`, `0x89396950`.
    4. The key table: `0x89392190`, `0x893920c0`, `0x89391e90`, `0x89391ef0`, `0x89392670` and the held-key queries, held
