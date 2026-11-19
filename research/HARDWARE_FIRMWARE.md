@@ -1546,6 +1546,65 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's receive channel (2026-11-19, v298) {#vc2-part-receive-channel}
+
+Step 4.3's twenty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's third part): the routine the system's
+parameters' message (kind 4, v297) runs for part 0, on `Vc2PartSettings` (`Vc2PartSettingsReceive.cpp`), checked by
+`xt_vc2settings`' twelfth part.
+
+**A part's receive channel** `0x89393fd0(…, part)` (its first argument unread):
+- Part n's Receive Switch and Channel, IDs 71 + 2n and 72 + 2n on system B's read object (`0x89320760`, the store
+  object's second word); with the switch 0 the channel is −1 and isn't read.
+- The store's record: IDs 0, 1, 2 and 52 (Part 1's Bank Select MSB, LSB and Program Number, and Sampling Template) on
+  the system's fourth read object (`0x893206f0`, the store object's first word; `Vc2ParamBlock::kSystemD`), read by
+  `0x89320700(…, 0)` into four bytes, then parsed by `0x89318a20` (MSB 87, the user bank: LSB 0 a number of 1…64, else
+  `(LSB − 1) × 128 + 64 + PC + 1`, held to the bank's count, `0x893273c0(1)`'s halfword at `0x899613ec`) and asked by
+  `0x89318a90`, which answers 2 when the parsed record's first byte is set, and then the part's node of source 1 is
+  given the plain class (`0x89393310`). But `0x89318a20` writes that byte 0 on every way, so `0x89318a90` answers 0
+  and the install is never reached: only the four reads are kept.
+- Part 0's node of source 3's channel is taken before anything moves.
+- For each source s (0…3): the part's node of s moved (v293's `0x89393100`) onto the channel, or −1 when it is 16 or
+  more (a negative channel is moved onto as it is); then the part's two glides of s (`0x89987420 + 0x480 s + 0x48 part`,
+  v276's P) aimed at a key table: for sources 1 to 3 the table of s and the channel when it is 0…15, else the spare table
+  `0x89988620`; for source 4 its channel 0's table whatever the channel (the code for s = 3 is unrolled with the
+  channel 0).
+- For part 0 alone, if source 3's node's channel changed: with the old channel not −1, three controllers from source
+  index 3 on the old channel (`0x89392f90`: 121 Reset All Controllers with 0, 123 All Notes Off with −1, 120 All
+  Sound Off with 0); then with the new channel not −1, the held note's word (`0x899891d0`, v294's) picks: 0, all notes
+  off (`0x89391e30`, the notes' task's event 0x80); else the held note's event `0x89391e50` (event 0x200 to the notes'
+  task, `0x8994fec8`, whose way sounds key 60 at 127 by `0x89392da0` on source 4's channel when `0x89981904` is 0).
+- It answers 1 on every way.
+
+**Part 0's** `0x89393fb0`: the routine above for part 0, its answer as a truth value: 1 always, so the system's
+message always reads Patch Remain after it.
+
+The held note's event goes out through `Vc2SettingsParts::heldNoteOn`. The messages still reach the receive channel
+through `Vc2SettingsParts::receive` (v297's), which the wiring gives the port's `Vc2PartSettings::receive`.
+
+**The check.** `xt_vc2settings`' twelfth part, on the seed eleven after the run's. Each case gives every table, G,
+v276's keys, the part objects and the class bytes noise, the nodes noise with their sources, channels (−1…15) and
+lists drawn as `xt_vc2keys`' second part draws them (`vc2DrawNodeLists`, now in `Vc2PartNodesDraws.h`), and G's
+channel word's sources drawn; before each event the held note's word 0 half the time, else 1 or any. The store gives
+each part's Receive Switch 0 or 1 half the time and its Receive Channel −1…17 always: both sides of 0…15, while a
+channel below −2 would read past rom.4's lists and −2's every-list moves are `xt_vc2keys`' (they can make a list
+loop). `0x893206f0` is hooked as the other read objects' set-ups, leaving a handle; the controller, all notes off,
+the held note's event and a node's voices' stop are hooked to log; the eleventh part's hook on `0x89393fb0` is taken
+off (`settingsHookCallees`' `own`). Events: a part's receive channel (part 0 half the time), part 0's, and the system's
+message (kind 4, its second byte 0 half the time) running rom.4's own receive channel against the port's
+(`SettingsPortOuts::receiving`). After each, the tables, the nodes, the lists, the keys' span, the part objects, the
+class bytes and the calls, and the receive routines' answer.
+
+The check's shared parts moved for it: the world routine and its case (`settingsWorldOn`, `settingsWorldCaseOf`,
+`Vc2PartSettingsWorld.h`, the eleventh part's, which now writes and compares the lists too, unchanged where nothing
+moves), the controller's, all notes off's and a node's stop's callees (`Vc2PartSettingsCheck.h`), and a part's line
+by its counts alone from its row (`SettingsSaid`, the tenth's and eleventh's lines as they were).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first eleven parts' lines, and `xt_vc2keys`', as
+  they were.
+- Every line and branch of `Vc2PartSettingsReceive.cpp` is reached.
+- `mutate_vc2.py --settings`: 534 plants, none missed; v298's 36 new. `mutate_vc2.py --keys`: 105, none missed.
+
 ### The VC-2 part's parameters' messages (2026-11-19, v297) {#vc2-part-parameter-messages}
 
 Step 4.3's twenty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's second part): the two routines the notes'

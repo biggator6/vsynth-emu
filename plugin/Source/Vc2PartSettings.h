@@ -18,8 +18,11 @@
 // The read objects a reader sets up, each a block of parameters the getter 0x89324350 reads by ID: the part's
 // (0x893207b0), the system's three (0x89320790, 0x89320760, 0x89320f60) and a note kind's three (0x89320a50,
 // 0x89320ad0, 0x89320b70); and a COSM's (0x89320c10, v287), which the typed getter 0x89324370 reads; and (v291) one
-// never set up, Auto Note's switch's second with flag 0 held: rom.4 reads through the stack's leftover word
-enum class Vc2ParamBlock : uint8_t { kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC, kCosm, kLeftover };
+// never set up, Auto Note's switch's second with flag 0 held: rom.4 reads through the stack's leftover word; and (v298)
+// the system's fourth (0x893206f0, the store object's first word, where system B's is its second)
+enum class Vc2ParamBlock : uint8_t {
+    kPart, kSystem, kSystemB, kSystemC, kKindA, kKindB, kKindC, kCosm, kLeftover, kSystemD
+};
 
 class Vc2PartParams {
 public:
@@ -86,13 +89,16 @@ public:
     virtual void reserve(int32_t count, int32_t offset) = 0;                                   // 0x893911b0
     virtual void setPowerOffset(int32_t power) = 0;                                            // 0x89391260
     // v297, the parameters' messages': the reload task's request and run for a part (by its object at 0x89996120 + 24
-    // × part), part 0's receive channel and the routing's reset (each answering whether it changed anything), and
-    // every sounding voice truncated
+    // × part), part 0's receive channel and the routing's reset (each answering whether it changed anything; the
+    // receive channel's always 1, v298's `Vc2PartSettings::receive`, which the wiring gives here), and every sounding
+    // voice truncated
     virtual void reloadRequest(int part) = 0;                                                  // 0x8939af40
     virtual void reloadRun(int part) = 0;                                                      // 0x8939af10
     virtual bool receive() = 0;                                                                // 0x89393fb0
     virtual bool routing(bool on) = 0;                                                         // 0x89393e30
     virtual void truncateAll() = 0;                                                            // 0x89391120
+    // v298, the receive channel's: the held note's event 0x200 to the notes' task (its key 60 at 127 on source 4)
+    virtual void heldNoteOn() = 0;                                                             // 0x89391e50
 };
 
 // G's channel word's two sources (v292): the word at 0x8999738c, with Part 1 Receive Switch off; and with it on, the
@@ -177,6 +183,10 @@ public:
     void heldNoteSwitch(Vc2PartRows& t, bool on, Vc2SettingsParts& out);   // 0x89391500
     void clearSteps(Vc2PartRows& t);                                      // 0x89392750, part 0
     void nodeClass(Vc2PartWorld& w, int part, int32_t plain);             // 0x89394370
+    // v298, Vc2PartSettingsReceive.cpp: a part's receive channel (its four sources' nodes onto its Receive Channel,
+    // their glides on the key tables; part 0's source 3 channel's change heard) and part 0's, each answering 1
+    bool receiveChannel(Vc2PartWorld& w, int part);                       // 0x89393fd0
+    bool receive(Vc2PartWorld& w);                                        // 0x89393fb0
 
 private:
     void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)

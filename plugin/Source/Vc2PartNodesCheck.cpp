@@ -11,14 +11,14 @@
 // drawn again, on both sides, before rom.4 or the port could loop on it.  XT_VC2KEYS_MAIN only.
 #ifdef XT_VC2KEYS_MAIN
 #include "Vc2KeysCheck.h"
-#include "Vc2PartNodes.h"
+#include "Vc2PartNodesDraws.h"
 
 namespace {
 using N = Vc2PartNodes;
 constexpr uint32_t kStopVoices = 0x89390f70;                         // [FW]
 constexpr uint32_t kMove = 0x89393100, kHeld = 0x893932c0, kPlain = 0x89393310, kStop = 0x89393360;
 constexpr uint32_t kResetGlides = 0x893904d0;
-constexpr int kNodes = N::kSources * N::kParts, kLists = N::kSources * N::kChannels, kNodesEvents = 400;
+constexpr int kNodesEvents = 400;
 
 struct NodesCounts {
     long events = 0, calls = 0, moves = 0, every = 0, held = 0, plain = 0, stops = 0, resets = 0, redrawn = 0;
@@ -49,25 +49,6 @@ struct NodesSides {
     NodesCounts n {};
 };
 
-uint32_t nodeAt(int k) { return N::kNodesAt + 16u * (uint32_t)k; }
-
-// The nodes' sources and channels and their lists drawn: each list in address order, one node in eight left off its own
-void drawLists(NodesSides& s, std::mt19937& rng) {
-    std::array<uint32_t, kLists> tails {};
-    s.port.lists = {};
-    for (int k = 0; k < kNodes; ++k) {
-        Vc2PartNode& n = s.port.nodes[(size_t)k];
-        n.source = (int8_t)(rng() % 4 == 0 ? rng() % N::kSources : (uint32_t)k / N::kParts);
-        n.channel = (int8_t)(rng() % 4 == 0 ? -1 : (int)(rng() % N::kChannels));
-        n.next = (uint32_t)rng();
-        if (n.channel < 0 || rng() % 8 == 0) continue;
-        const auto list = (size_t)(N::kChannels * n.source + n.channel);
-        n.next = 0;
-        (tails[list] == 0 ? s.port.lists[list] : s.port.nodes[(tails[list] - N::kNodesAt) / 16].next) = nodeAt(k);
-        tails[list] = nodeAt(k);
-    }
-}
-
 void drawNodes(NodesSides& s, std::mt19937& rng) {
     for (Vc2PartNode& n : s.port.nodes) {
         n.object = (uint32_t)rng();
@@ -82,17 +63,7 @@ void drawNodes(NodesSides& s, std::mt19937& rng) {
         for (uint8_t& b : o.unread1) b = (uint8_t)rng();
         for (uint32_t& w : o.unread8) w = (uint32_t)rng();
     }
-    drawLists(s, rng);
-}
-
-// Whether every list ends within the nodes' count of links
-bool listsEnd(const Vc2PartNodes& p) {
-    for (uint32_t head : p.lists) {
-        int links = 0;
-        for (uint32_t at = head; at != 0 && links <= kNodes; ++links) at = p.nodes[(at - N::kNodesAt) / 16].next;
-        if (links > kNodes) return false;
-    }
-    return true;
+    vc2DrawNodeLists(s.port, rng);
 }
 
 std::string nodesOnBoth(NodesSides& s, const Vc2CheckRoutine& r, std::initializer_list<uint32_t> args,
@@ -159,11 +130,11 @@ std::string nodesCase(NodesSides& s, std::mt19937& rng) {
     drawNodes(s, rng);
     std::string what;
     for (int k = 0; k < kNodesEvents && what.empty(); ++k, ++s.n.events) {
-        if (!listsEnd(s.port)) {
-            drawLists(s, rng);
+        if (!vc2NodeListsEnd(s.port)) {
+            vc2DrawNodeLists(s.port, rng);
             ++s.n.redrawn;
         }
-        what = kNodesEventsOf[rng() % std::size(kNodesEventsOf)](s, rng, nodeAt((int)(rng() % kNodes)));
+        what = kNodesEventsOf[rng() % std::size(kNodesEventsOf)](s, rng, vc2NodeAt((int)(rng() % kVc2Nodes)));
     }
     return what;
 }

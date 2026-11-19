@@ -32,6 +32,11 @@ inline constexpr uint32_t kTripAssignsAt = 0x89989404, kPatchRemainAt = 0x899826
 inline constexpr uint32_t kSettingsHandle = 0x01000000;
 inline constexpr int32_t kLeftoverCall = 9;
 inline constexpr uint32_t kLeftoverHandle = kSettingsHandle | (uint32_t)kLeftoverCall << 16;
+// A block's code in the log and the handle: its own but for the leftover's and (v298) the system's fourth's
+inline int32_t settingsBlockCall(Vc2ParamBlock block) {
+    if (block == Vc2ParamBlock::kLeftover) return kLeftoverCall;
+    return block == Vc2ParamBlock::kSystemD ? kSystemDCall : (int32_t)block;
+}
 inline constexpr int kSettingsParts = 16, kSettingsKinds = 16, kEventsACase = 400;
 // [FW] The OSC block's reader, hooked in the first three parts (v288), and its call as the log has it then, a block
 // past the read objects'
@@ -68,8 +73,7 @@ class SettingsPortParams final : public Vc2PartParams {
 public:
     explicit SettingsPortParams(SettingsReads& reads) : reads_(reads) {}
     int32_t value(Vc2ParamBlock block, int part, int kind, int16_t id) override {
-        const int32_t code = block == Vc2ParamBlock::kLeftover ? kLeftoverCall : (int32_t)block;
-        return reads_.read({ code, part, kind, 0, id });
+        return reads_.read({ settingsBlockCall(block), part, kind, 0, id });
     }
     int32_t cosmValue(int part, int kind, int cosm, int16_t id) override {
         return reads_.read({ (int32_t)Vc2ParamBlock::kCosm, part, kind, cosm, id });
@@ -106,7 +110,8 @@ struct SettingsCounts {
     long staticEvents = 0, staticCalls = 0;                                     // the ninth's (v295)
     long systemEvents = 0, systemCalls = 0;                                     // the tenth's (v296)
     long messageEvents = 0, messageCalls = 0;                                   // the eleventh's (v297)
-    std::array<long, 47> byEvent {};
+    long receiveEvents = 0, receiveCalls = 0;                                   // the twelfth's (v298)
+    std::array<long, 52> byEvent {};   // from v298 the twelfth's controllers and held notes heard at 50 and 51
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -144,9 +149,25 @@ struct SettingsCallee {
     SettingsCall (*called)(Sh4&);
     uint32_t (*answer)(SettingsSides&) = nullptr;   // v297: its answer, else 0
 };
-void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees);
+// (v298) `own`: routines an earlier part hooked that run as rom.4's own from this part on, their hooks taken off
+void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees, std::span<const uint32_t> own = {});
+// [FW] the callees more than one part hooks (v298; the Category's and the messages' until then): a controller (its
+// source, channel, number and value), all notes off, a node's voices stopped (its word)
+inline SettingsCall settingsControlled(Sh4& c) {
+    return { kOutController, (int32_t)c.r[4], (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7] };
+}
+inline SettingsCall settingsNotesOff(Sh4&) { return { kOutNotesOff, 0, 0, 0, 0 }; }
+inline SettingsCall settingsStopped(Sh4& c) { return { kOutStopVoices, 0, 0, 0, (int32_t)c.r[4] }; }
+inline constexpr SettingsCallee kSettingsControllerCallee { 0x89392f90, settingsControlled };
+inline constexpr SettingsCallee kSettingsNotesOffCallee { 0x89391e30, settingsNotesOff };
+inline constexpr SettingsCallee kSettingsStopCallee { 0x89390f70, settingsStopped };
+// A count in a part's line said by its counts alone (v298): its event's index in byEvent, what it counts
+struct SettingsSaid {
+    int event;
+    const char* what;
+};
 // A further part (v289): its seed's offset from the run's, its counts, a case of its events, its line, and what it
-// does first
+// does first; from v298, a line of its events alone by its name and counts, with no `say`
 struct SettingsPartRow {
     uint32_t offset;
     long SettingsCounts::*events;
@@ -154,6 +175,8 @@ struct SettingsPartRow {
     std::string (*oneCase)(SettingsSides&, std::mt19937&, long&, long&);
     void (*say)(const SettingsCounts&);
     void (*start)(SettingsSides&) = nullptr;
+    const char* name = nullptr;
+    std::span<const SettingsSaid> said {};
 };
 // Its cases, its line, how many differ
 long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow& p);
@@ -173,6 +196,8 @@ extern const SettingsPartRow kStaticPartRow;
 extern const SettingsPartRow kSystemPartRow;
 // The eleventh (v297): the parameters' messages (Vc2PartSettingsMessagesCheck.cpp)
 extern const SettingsPartRow kMessagePartRow;
+// The twelfth (v298): the receive channel (Vc2PartSettingsReceiveCheck.cpp)
+extern const SettingsPartRow kReceivePartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words

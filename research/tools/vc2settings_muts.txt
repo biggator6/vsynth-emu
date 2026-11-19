@@ -10,7 +10,10 @@
 # not planted: 10 and 11 are known either way), vc2staticmatrix (Vc2StaticMatrix.cpp, v295; the order of its
 # stores isn't planted, as no store reads another) and vc2settingssystem (Vc2PartSettingsSystem.cpp, v296; the sum's
 # 32-bit wrap isn't planted: the holds keep both below 25; nor its test at 24 by one: at a sum of 24, 24 − offset is the
-# count itself) and vc2settingsmessages (Vc2PartSettingsMessages.cpp, v297).  Not planted: the depth
+# count itself) and vc2settingsmessages (Vc2PartSettingsMessages.cpp, v297) and vc2settingsreceive
+# (Vc2PartSettingsReceive.cpp, v298; its test of part 0 isn't planted: another part's moves leave part 0's node of
+# source 3 as it was, so the test of a change after them says none either way; nor the glides' table by the channel
+# moved onto, which past 15 is −1, the spare table either way).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -516,3 +519,39 @@ messages-held-word|if (t.heldNote == 0 && on) out.truncateAll();|if (on) out.tru
 messages-held-flag|if (t.heldNote == 0 && on) out.truncateAll();|if (t.heldNote == 0) out.truncateAll();|vc2settingsmessages
 messages-steps|t.steps.fill(0);|t.steps.fill(1);|vc2settingsmessages
 messages-class-flag|plain == 0 ? Vc2NodeClass::kHeld : Vc2NodeClass::kPlain|plain != 0 ? Vc2NodeClass::kHeld : Vc2NodeClass::kPlain|vc2settingsmessages
+receive-switch-id|kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;|kSwitchId = 73, kChannelId = 72, kIdsAPart = 2;|vc2settingsreceive
+receive-channel-id|kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;|kSwitchId = 71, kChannelId = 74, kIdsAPart = 2;|vc2settingsreceive
+receive-ids-a-part|kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;|kSwitchId = 71, kChannelId = 72, kIdsAPart = 1;|vc2settingsreceive
+receive-record-id|kRecordIds[] = { 0, 1, 2, 52 };|kRecordIds[] = { 0, 1, 2, 53 };|vc2settingsreceive
+receive-record-order|kRecordIds[] = { 0, 1, 2, 52 };|kRecordIds[] = { 1, 0, 2, 52 };|vc2settingsreceive
+receive-record-block|p_.value(Block::kSystemD, 0, 0, record);|p_.value(Block::kSystemB, 0, 0, record);|vc2settingsreceive
+receive-switch-block|if (p_.value(Block::kSystemB, 0, 0, id(kSwitchId)) != 0)|if (p_.value(Block::kSystem, 0, 0, id(kSwitchId)) != 0)|vc2settingsreceive
+receive-channel-block|channel = p_.value(Block::kSystemB, 0, 0, id(kChannelId));|channel = p_.value(Block::kSystemC, 0, 0, id(kChannelId));|vc2settingsreceive
+receive-switch-test|id(kSwitchId)) != 0) channel|id(kSwitchId)) > 0) channel|vc2settingsreceive
+receive-switch-always|id(kSwitchId)) != 0) channel|id(kSwitchId)) != 0 \|\| part >= 0) channel|vc2settingsreceive
+receive-switch-off|    int32_t channel = kNoChannel;|    int32_t channel = 0;|vc2settingsreceive
+receive-heard-source|kPartZero = 0, kHeardSource = 3, kControlSource = 3;|kPartZero = 0, kHeardSource = 4, kControlSource = 3;|vc2settingsreceive
+receive-control-source|kPartZero = 0, kHeardSource = 3, kControlSource = 3;|kPartZero = 0, kHeardSource = 3, kControlSource = 2;|vc2settingsreceive
+receive-onto-past|channel >= Vc2Keys::kChannels ? kNoChannel : channel;|channel > Vc2Keys::kChannels ? kNoChannel : channel;|vc2settingsreceive
+receive-onto-early|channel >= Vc2Keys::kChannels ? kNoChannel : channel;|channel >= Vc2Keys::kChannels - 1 ? kNoChannel : channel;|vc2settingsreceive
+receive-sources|for (int s = 0; s < Vc2PartNodes::kSources; ++s) {|for (int s = 0; s < Vc2PartNodes::kSources - 1; ++s) {|vc2settingsreceive
+receive-move-part|w.nodes.move(Vc2PartNodes::addressOf(s + 1, part), s, onto);|w.nodes.move(Vc2PartNodes::addressOf(s + 1, 0), s, onto);|vc2settingsreceive
+receive-move-onto|w.nodes.move(Vc2PartNodes::addressOf(s + 1, part), s, onto);|w.nodes.move(Vc2PartNodes::addressOf(s + 1, part), s, kNoChannel);|vc2settingsreceive
+receive-last-table|if (source == kLastSource) return Vc2Keys::tableAt(static_cast<uint32_t>(source), 0);|if (source == kLastSource) return Vc2Keys::tableAt(static_cast<uint32_t>(source), 1);|vc2settingsreceive
+receive-last-source|constexpr int kLastSource = Vc2PartNodes::kSources - 1;|constexpr int kLastSource = Vc2PartNodes::kSources - 2;|vc2settingsreceive
+receive-table-below|if (channel < 0 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|if (channel < -1 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|vc2settingsreceive
+receive-table-past|if (channel < 0 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|if (channel < 0 \|\| channel > Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|vc2settingsreceive
+receive-table-spare|channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|channel >= Vc2Keys::kChannels) return Vc2Keys::kOwnAt;|vc2settingsreceive
+receive-glides-one|for (int n = 0; n < kGlidesAPart; ++n) keys|for (int n = 0; n < kGlidesAPart - 1; ++n) keys|vc2settingsreceive
+receive-glides-source|kGlidesASource = kGlidesAPart * Vc2Keys::kChannels;|kGlidesASource = kGlidesAPart * Vc2Keys::kSources;|vc2settingsreceive
+receive-glides-part|kGlidesASource * source + kGlidesAPart * part + n|kGlidesASource * source + part + n|vc2settingsreceive
+receive-unchanged|    if (after == before) return true;|    if (after == before && after == kNoChannel) return true;|vc2settingsreceive
+receive-before-none|    if (before != kNoChannel)|    if (before != 0)|vc2settingsreceive
+receive-controls-order|{ { 121, 0 }, { 123, -1 }, { 120, 0 } }|{ { 123, -1 }, { 121, 0 }, { 120, 0 } }|vc2settingsreceive
+receive-controls-value|{ { 121, 0 }, { 123, -1 }, { 120, 0 } }|{ { 121, 0 }, { 123, 0 }, { 120, 0 } }|vc2settingsreceive
+receive-controls-number|{ { 121, 0 }, { 123, -1 }, { 120, 0 } }|{ { 121, 0 }, { 123, -1 }, { 121, 0 } }|vc2settingsreceive
+receive-controls-old|w.out.controller(kControlSource, before, number, value);|w.out.controller(kControlSource, after, number, value);|vc2settingsreceive
+receive-after-none|    if (after == kNoChannel) return true;|    if (after == 0) return true;|vc2settingsreceive
+receive-held-test|    if (w.t.heldNote == 0) {|    if (w.t.heldNote != 1) {|vc2settingsreceive
+receive-held-on|    w.out.heldNoteOn();\n    return true;|    w.out.allNotesOff();\n    return true;|vc2settingsreceive
+receive-part-zero|{ return receiveChannel(w, kPartZero); }|{ return receiveChannel(w, 1); }|vc2settingsreceive

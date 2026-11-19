@@ -26,7 +26,8 @@ struct SetUp {
 constexpr SetUp kSetUps[] = { { 0x893207b0, Block::kPart }, { 0x89320790, Block::kSystem },
                               { 0x89320760, Block::kSystemB }, { 0x89320f60, Block::kSystemC },
                               { 0x89320a50, Block::kKindA }, { 0x89320ad0, Block::kKindB },
-                              { 0x89320b70, Block::kKindC }, { 0x89320c10, Block::kCosm } };
+                              { 0x89320b70, Block::kKindC }, { 0x89320c10, Block::kCosm },
+                              { 0x893206f0, Block::kSystemD } };
 
 // Values at the laws' edges and the stores' widths
 constexpr int32_t kEdges[] = { 0, 1, -1, 2, 7, 8, 31, 32, 33, -32, -33, 63, 64, -63, -64, 127, 128, 255, 256, 287,
@@ -134,7 +135,8 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow, &kCategoryPartRow,
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kMessagePartRow);
+    different += settingsRunPart(s, run, kMessagePartRow);
+    return different + settingsRunPart(s, run, kReceivePartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -186,11 +188,19 @@ long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow&
     if (p.start) p.start(s);
     const long different = vc2CheckPart(run, p.offset, { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" }, n.*p.events,
         [&](std::mt19937& rng) { return p.oneCase(s, rng, n.*p.events, n.*p.calls); });
-    p.say(n);
+    if (p.say != nullptr) {
+        p.say(n);
+        return different;
+    }
+    std::printf("%s: %ld events: ", p.name, n.*p.events);
+    for (size_t k = 0; k < p.said.size(); ++k)
+        std::printf("%s%ld %s", k == 0 ? "" : ", ", n.byEvent[(size_t)p.said[k].event], p.said[k].what);
+    std::printf(" (%ld calls)\n", n.*p.calls);
     return different;
 }
 
-void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees) {
+void settingsHookCallees(SettingsSides& s, std::span<const SettingsCallee> callees, std::span<const uint32_t> own) {
+    for (const uint32_t at : own) s.fw.cpu.unhook(at);
     for (const SettingsCallee& k : callees)
         s.fw.cpu.hook(k.at, [&s, k](Sh4& c) {
             s.rom.log.push_back(k.called(c));
@@ -218,11 +228,12 @@ uint32_t SettingsSides::romRead(Sh4& c, const SettingsCall& call) {
 SettingsSides::SettingsSides(Vc2Fw& rig) : fw(rig) {
     for (const SetUp& u : kSetUps)
         fw.cpu.hook(u.routine, [u](Sh4& c) {
-            const bool byPart = u.block == Block::kPart || u.block >= Block::kKindA;
-            const uint32_t part = byPart ? (c.r[5] & 0xff) << 8 : 0;
-            const uint32_t kind = u.block >= Block::kKindA ? (c.r[6] & 0x3f) << 2 : 0;
+            const bool byKind = u.block >= Block::kKindA && u.block <= Block::kCosm;
+            const uint32_t part = u.block == Block::kPart || byKind ? (c.r[5] & 0xff) << 8 : 0;
+            const uint32_t kind = byKind ? (c.r[6] & 0x3f) << 2 : 0;
             const uint32_t cosm = u.block == Block::kCosm ? c.r[7] & 3 : 0;
-            c.wr32(c.r[4] + 4, kSettingsHandle | (uint32_t)u.block << 16 | part | kind | cosm);
+            const auto code = (uint32_t)settingsBlockCall(u.block);
+            c.wr32(c.r[4] + 4, kSettingsHandle | code << 16 | part | kind | cosm);
             c.ret(0);
         });
     // Both getters (the typed one's type, r6, is the store's to know): the handle's read

@@ -7,6 +7,7 @@
 #include <array>
 #include <bit>
 #include <cstring>
+#include <functional>
 #include <vector>
 
 struct SettingsCall {
@@ -34,6 +35,9 @@ inline constexpr int32_t kOutReserve = 26, kOutPowerOffset = 27;
 // routing's reset (its flag as the ID), every voice truncated, a node's voices stopped (its word as the ID)
 inline constexpr int32_t kOutReloadRequest = 28, kOutReloadRun = 29, kOutReceive = 30, kOutRouting = 31;
 inline constexpr int32_t kOutTruncateAll = 32, kOutStopVoices = 33;
+// The receive channel's (v298): the held note's event; and the system's fourth block's reads, a block past the calls
+// out's
+inline constexpr int32_t kOutHeldNoteOn = 34, kSystemDCall = 35;
 inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
@@ -46,12 +50,15 @@ public:
     explicit SettingsPortOuts(std::vector<SettingsCall>& log) : log_(log) {}
     float unvoiceLevel = 0.0f;
     std::array<bool, 2> answers {};   // v297: the receive channel's and the routing reset's, drawn for both sides
+    std::function<bool()> receiving {};   // v298: the port's own receive channel, where rom.4's runs its own
     void reloadRequest(int part) override { logOut(log_, kOutReloadRequest, (uint32_t)part); }
     void reloadRun(int part) override { logOut(log_, kOutReloadRun, (uint32_t)part); }
     bool receive() override {
+        if (receiving) return receiving();
         logOut(log_, kOutReceive, 0);
         return answers[0];
     }
+    void heldNoteOn() override { logOut(log_, kOutHeldNoteOn, 0); }
     bool routing(bool on) override {
         logOut(log_, kOutRouting, on ? 1u : 0u);
         return answers[1];

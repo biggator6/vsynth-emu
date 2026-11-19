@@ -63,14 +63,11 @@ const SettingsEvent kSystemEvents[] = { readerEvent<kTrip, 39, &Vc2PartSettings:
                                         readerEvent<kRemain, 40, &Vc2PartSettings::patchRemain>, countsEvent,
                                         budgetEvent };
 
-void saySystemPart(const SettingsCounts& n) {
-    const auto& e = n.byEvent;
-    std::printf("system readers: %ld events: %ld Time Trip assigns, %ld Patch Remains, %ld voices' counts, %ld budgets "
-                "(%ld calls)\n", n.systemEvents, e[39], e[40], e[41], e[42], n.systemCalls);
-}
+constexpr SettingsSaid kSystemSaid[] = { { 39, "Time Trip assigns" }, { 40, "Patch Remains" },
+                                         { 41, "voices' counts" }, { 42, "budgets" } };
 } // namespace
 
 const SettingsPartRow kSystemPartRow { 9, &SettingsCounts::systemEvents, &SettingsCounts::systemCalls,
-                                       settingsCaseOf<kSystemEvents, sizeof(Vc2PartRows), 5>, saySystemPart,
-                                       hookSystem };
+                                       settingsCaseOf<kSystemEvents, sizeof(Vc2PartRows), 5>, nullptr, hookSystem,
+                                       "system readers", kSystemSaid };
 #endif

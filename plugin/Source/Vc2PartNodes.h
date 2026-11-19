@@ -51,8 +51,11 @@ struct Vc2PartNodes {
     std::array<uint8_t, kObjects> classes {};              // 0x899888bd: by object index, 1 the held class
     std::array<Vc2PartObject, kObjects> objects {};        // 0x8998246c
 
-    // The node of `source` (1…4) and `part`
+    // The node of `source` (1…4) and `part`; and (v298) its address
     const Vc2PartNode& of(int source, int part) const { return nodes[kParts * (source - 1) + part]; }
+    static uint32_t addressOf(int source, int part) {
+        return kNodesAt + static_cast<uint32_t>(sizeof(Vc2PartNode) * (kParts * (source - 1) + part));
+    }
     // 0x89393100: the node at `node` onto `channel`'s list of `source` (less 1), or none
     void move(uint32_t node, int32_t source, int32_t channel);
     // 0x893932c0 and 0x89393310: the node's part object given its class, the part's glides reset

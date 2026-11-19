@@ -18,12 +18,9 @@ constexpr SettingsNarrow kCategoryNarrow[] = { { 0x12c, 14, kHalfTheTime } };   
 
 // [FW] the callees and their calls as the log has them
 SettingsCall budget(Sh4& c) { return { kOutBudget, 0, 0, 0, (int32_t)c.r[4] }; }
-SettingsCall control(Sh4& c) { return { kOutController, (int32_t)c.r[4], (int32_t)c.r[5], (int32_t)c.r[6],
-                                        (int32_t)c.r[7] }; }
 SettingsCall truncated(Sh4& c) { return { kOutTruncate, 0, 0, 0, (int32_t)c.r[4] }; }
-SettingsCall notesOff(Sh4&) { return { kOutNotesOff, 0, 0, 0, 0 }; }
-constexpr SettingsCallee kCategoryCallees[] = { { 0x89391240, budget }, { 0x89392f90, control },
-                                                { 0x89390fd0, truncated }, { 0x89391e30, notesOff } };
+constexpr SettingsCallee kCategoryCallees[] = { { 0x89391240, budget }, kSettingsControllerCallee,
+                                                { 0x89390fd0, truncated }, kSettingsNotesOffCallee };
 
 void hookCategory(SettingsSides& s) {
     s.rom.store.narrow = kCategoryNarrow;

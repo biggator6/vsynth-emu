@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's receive channel v298 (2026-11-19, on claude/vc2-part-4-3 after v297; HARDWARE_FIRMWARE.md, "The VC-2
+  part's receive channel"): step 4.3's twenty-sixth version, item 10's third part. On Vc2PartSettings
+  (Vc2PartSettingsReceive.cpp): rom.4's 0x89393fd0 for a part (its Receive Switch and Channel on system B's block; the
+  store's record, IDs 0, 1, 2 and 52 on the system's fourth, Vc2ParamBlock::kSystemD, read and parsed to no effect;
+  its four sources' nodes moved onto the channel, −1 from 16; their glides aimed at the key table for it, the spare
+  table off 0…15, source 4's at its channel 0's; for part 0, source 3's channel's change heard by controllers 121, 123
+  and 120 on the old channel, then all notes off or the held note's event 0x89391e50, through
+  Vc2SettingsParts::heldNoteOn) and part 0's 0x89393fb0, each answering 1. xt_vc2settings gains a twelfth part
+  (Vc2PartSettingsReceiveCheck.cpp), the nodes drawn as xt_vc2keys' second part draws them (Vc2PartNodesDraws.h), the
+  world routine and case shared (Vc2PartSettingsWorld.h), a part's line by its counts from its row (SettingsSaid): 0
+  different at seeds 2024, 7 and 31337, the first eleven parts' and xt_vc2keys' lines unchanged; mutate_vc2.py
+  --settings 534 planted, 0 missed, --keys 105, 0 missed. Not in the sound yet.
+
 The VC-2 part's parameters' messages v297 (2026-11-19, on claude/vc2-part-4-3 after v296; HARDWARE_FIRMWARE.md, "The
   VC-2 part's parameters' messages"): step 4.3's twenty-fifth version, item 10's second part. On Vc2PartSettings
   (Vc2PartSettingsMessages.cpp): rom.4's 0x89392890 by the message's kind as a table of ways (0: the Matrix's settings
