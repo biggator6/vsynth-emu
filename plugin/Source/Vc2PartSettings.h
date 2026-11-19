@@ -51,6 +51,7 @@ struct Vc2PartRows {
     // 0x89995390: the parts' settings, 32 a part (v278's): the key's offset, mono, Legato, Patch Tempo, the zones'
     // upper keys, Vocoder Sw, Split Point, Modulator Key Mode (v291)
     std::array<uint8_t, 512> modes {};
+    uint32_t heldNote = 0;   // 0x899891d0: 1 with a patch of Category 10 or 11, a note held for the carrier (v294)
 };
 
 // What the vocoder reader hands on (v290): kind 6's Unvoice Level, the part mixer's setters and targets, Auto Note's
@@ -70,6 +71,12 @@ public:
     // v291, the mode row's: All Sound Off to `source`'s `channel`, a message 120 made (0x89393c00) and handed on
     // (0x89393ba0, its last argument 0)
     virtual void allSoundOff(int source, int32_t channel) = 0;
+    // v294, the Category's: the budget's setter, a controller to a source's channel, the sounding voices of a node's
+    // word truncated and queued, all notes off (event 0x80 to the notes' task)
+    virtual void setBudget(int32_t power) = 0;                                                 // 0x89391240
+    virtual void controller(int source, int32_t channel, int32_t number, int32_t value) = 0;   // 0x89392f90
+    virtual void truncateVoices(uint32_t word) = 0;                                            // 0x89390fd0
+    virtual void allNotesOff() = 0;                                                            // 0x89391e30
 };
 
 // G's channel word's two sources (v292): the word at 0x8999738c, with Part 1 Receive Switch off; and with it on, the
@@ -127,6 +134,8 @@ public:
     void readAssigns(Vc2PartRows& t, Vc2MatrixSettings& g, Vc2MatrixSetup& setup);    // 0x8939b110
     void readCalibration(Vc2PartRows& t);                                             // 0x8939b140
     void matrixChannel(Vc2MatrixSettings& g, Vc2ChannelStates& states);               // 0x893a5050
+    // v294, Vc2PartSettingsCategory.cpp: the Category and budget, given the node of source 1 and `part`
+    void category(Vc2PartRows& t, const Vc2PartNodes& nodes, int part, Vc2SettingsParts& out);   // 0x89392c60
 
 private:
     void zoneUppers(uint8_t* at, int part);                         // 0x89320870 (v291)

@@ -105,6 +105,10 @@ inline constexpr int32_t kOutLegato = 15, kOutMode = 16, kOutSettings = 17;
 // The mode row's (v291): a message made, its number as the ID; one handed on, its source, channel and last word as
 // the part, kind and COSM; All Sound Off's number
 inline constexpr int32_t kOutMessage = 18, kOutSoundOff = 19, kSoundOffNumber = 120;
+// The Category's (v294): the budget's power, a controller (its source, channel, number and value as the part, kind,
+// COSM and ID), the voices truncated by a word, all notes off
+inline constexpr int32_t kOutBudget = 20, kOutController = 21, kOutTruncate = 22, kOutNotesOff = 23;
+inline constexpr uint32_t kHeldNoteAt = 0x899891d0;   // [FW] the held note's word
 inline constexpr int kSettingsWords = 15, kStereoIndex = 15;
 void logOut(std::vector<SettingsCall>& log, int32_t what, uint32_t value);
 void logSettingsWords(std::vector<SettingsCall>& log, const uint32_t* words, int32_t stereo);
@@ -133,6 +137,12 @@ public:
         logOut(log_, kOutMessage, kSoundOffNumber);
         log_.push_back({ kOutSoundOff, source, channel, 0, 0 });
     }
+    void setBudget(int32_t power) override { logOut(log_, kOutBudget, (uint32_t)power); }
+    void controller(int source, int32_t channel, int32_t number, int32_t value) override {
+        log_.push_back({ kOutController, source, channel, number, value });
+    }
+    void truncateVoices(uint32_t word) override { logOut(log_, kOutTruncate, word); }
+    void allNotesOff() override { logOut(log_, kOutNotesOff, 0); }
 
 private:
     std::vector<SettingsCall>& log_;
@@ -146,7 +156,8 @@ struct SettingsCounts {
     long vocoderEvents = 0, vocoderCalls = 0, extin = 0, offsets = 0;   // the fifth's (v290)
     long modeEvents = 0, modeCalls = 0, soundOffs = 0, leftovers = 0;   // the sixth's (v291)
     long dispatchEvents = 0, dispatchCalls = 0, wholeParts = 0, received = 0;   // the seventh's (v292)
-    std::array<long, 36> byEvent {};
+    long categoryEvents = 0, categoryCalls = 0, heldNotes = 0, notesOff = 0;    // the eighth's (v294)
+    std::array<long, 37> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -202,6 +213,10 @@ extern const SettingsPartRow kVocoderPartRow;
 extern const SettingsPartRow kModePartRow;
 // The seventh (v292): the dispatchers and G's channel word (Vc2PartSettingsDispatchCheck.cpp)
 extern const SettingsPartRow kDispatchPartRow;
+// The eighth (v294): the Category and budget (Vc2PartSettingsCategoryCheck.cpp)
+extern const SettingsPartRow kCategoryPartRow;
+// v291's to v293's parts' noise stops before v294's word
+inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // Noise in `bytes` bytes at `at` (a part's case's own objects, v291's nodes and v292's G)
 inline void settingsNoise(void* at, size_t bytes, std::mt19937& rng) {
     auto* b = static_cast<uint8_t*>(at);
@@ -274,6 +289,7 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.write(kModesAt, &t.modes, sizeof t.modes);
     s.fw.cpu.write(kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes);
     s.fw.cpu.write(kMatrixAt, &s.g, sizeof s.g);
+    s.fw.cpu.wr32(kHeldNoteAt, t.heldNote);
     std::string what;
     for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);

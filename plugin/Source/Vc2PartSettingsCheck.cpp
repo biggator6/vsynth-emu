@@ -66,7 +66,8 @@ std::string settingsDifference(SettingsSides& s) {
         { kRobotAt, &t.robot, sizeof t.robot, "robot human depth" },
         { kUnvoiceLevelAt, &s.outs.unvoiceLevel, sizeof s.outs.unvoiceLevel, "Unvoice Level" },
         { kModesAt, &t.modes, sizeof t.modes, "mode rows" },
-        { kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes, "nodes" }, { kMatrixAt, &s.g, sizeof s.g, "G" } });
+        { kNodesAt, s.nodes.nodes.data(), sizeof s.nodes.nodes, "nodes" }, { kMatrixAt, &s.g, sizeof s.g, "G" },
+        { kHeldNoteAt, &t.heldNote, sizeof t.heldNote, "the held note" } });
     if (!words.empty()) return words;
     const std::string tails = settingsTails(s);
     return tails.empty() ? vc2CallsDifference(s.rom.log, s.mine.log, saidRead) : tails;
@@ -126,8 +127,9 @@ const SettingsPartRow kCosmPart { 1, &SettingsCounts::moreEvents, &SettingsCount
 long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     long different = settingsRunPart(s, run, kCosmPart);
     for (const SettingsPartRow& p : kOscPartRows) different += settingsRunPart(s, run, p);
-    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow }) different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kDispatchPartRow);
+    for (const SettingsPartRow* p : { &kVocoderPartRow, &kModePartRow, &kDispatchPartRow })
+        different += settingsRunPart(s, run, *p);
+    return different + settingsRunPart(s, run, kCategoryPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

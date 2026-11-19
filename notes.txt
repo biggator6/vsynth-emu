@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's settings by ID, the Category and budget v294 (2026-11-19, on claude/vc2-part-4-3 after v293;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the Category and budget"): step 4.3's twenty-second version,
+  item 9's ninth part. On Vc2PartSettings (Vc2PartSettingsCategory.cpp): rom.4's 0x89392c60, Patch Category read twice
+  on part 0's block and CPU Power Max for TG on the system's third, the budget less 400 for every Category 0…11 but 6
+  (0x89391240), the held note's word 0x899891d0 (Vc2PartRows::heldNote) 1 for 10 and 11, All Notes Off to part 0's
+  node of source 4's channel (0x89392f90), the given node's word's voices truncated (0x89390fd0), v291's Auto Note
+  switch, all notes off (0x89391e30) with no note held, through Vc2SettingsParts. xt_vc2settings gains an eighth part
+  (Vc2PartSettingsCategoryCheck.cpp): 0 different at seeds 2024, 7 and 31337, the first seven parts' lines unchanged;
+  mutate_vc2.py --settings 419 planted, 0 missed. Not in the sound yet.
+
 The VC-2 part's nodes v293 (2026-11-19, on claude/vc2-part-4-3 after v292; HARDWARE_FIRMWARE.md, "The VC-2 part's
   nodes"): step 4.3's twenty-first version, item 9's eighth part. On Vc2PartNodes (Vc2PartNodes.cpp): rom.4's channel
   move 0x89393100 (off the old list, one, every one for −2 or none for −1, by rom.4's table on channel + 2; a source

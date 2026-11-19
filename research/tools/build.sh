@@ -72,6 +72,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2PartSettingsModes.cpp ] && echo Vc2PartSettingsModes.cpp Vc2PartSettingsModesCheck.cpp ) \
    $( [ -f Vc2PartSettingsDispatch.cpp ] && echo Vc2PartSettingsDispatch.cpp Vc2PartSettingsDispatchCheck.cpp \
       Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp ) \
+   $( [ -f Vc2PartSettingsCategory.cpp ] && echo Vc2PartSettingsCategory.cpp Vc2PartSettingsCategoryCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

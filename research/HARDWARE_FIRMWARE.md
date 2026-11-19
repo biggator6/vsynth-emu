@@ -1546,6 +1546,41 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's settings by ID: the Category and budget (2026-11-19, v294) {#vc2-part-settings-category}
+
+Step 4.3's twenty-second version (VC2_MODE_PLAN.md, step 4.3, item 9's ninth part): `0x89392c60(node)`, which the
+part's handler `0x89392830` calls with the node of source 1 and the part, after the reload task's request and before
+the step counts' clear. It is on `Vc2PartSettings` (`Vc2PartSettingsCategory.cpp`), checked by `xt_vc2settings`'
+eighth part; its calls out go through `Vc2SettingsParts`.
+
+**The routine** tests no held flag. In rom.4's order:
+- Patch Category (ID 0x12c) on part 0's block; the word `0x899891d0` set to 1 if it is 10 or more, then Patch
+  Category again through a second read object, and CPU Power Max for TG (0x530) on the system's third read object;
+- a switch on the second Category: 0…5 and 7…9 take 400 off the power and clear the word; 6 clears it alone; 10 and
+  11 take 400 off and set it to 1; past 11 (unsigned) it is cleared. As a law: every Category 0…11 but 6 costs 400
+  µs, 10 and 11 hold a note (the plan's event 0x200: the notes' task plays C4 from source 3 while the word is set);
+- the power to the budget's setter (`0x89391240`, v272's `setBudget`);
+- `0x89392f90(3, channel, 123, −1)`: All Notes Off from source 3, on the channel of part 0's node of source 4
+  (`0x899888d0` + 0x30d, a signed byte);
+- `0x89390fd0` with the given node's +8: the sounding voices whose +0x3c is that word get +0x2d cleared and +0x30's
+  bit 0 set, are truncated (v277's `0x89391a50`) and queued (v279's `0x893951b0`);
+- Auto Note's switch (`0x89396f90`, v291's);
+- then the word read again, and with it 0, all notes off: event 0x80 to the notes' task (`0x89391e30`).
+
+**The check.** `xt_vc2settings`' eighth part, on the seed seven after the run's. Each case is noise in every table,
+the word and the nodes, then 400 events of the routine on a drawn part's node. The four callees are hooked to log
+among the reads, and Auto Note's setters keep v290's hooks; the port's calls out log the same. Patch Category is drawn
+0…13 half the time. Auto Note's switch runs inside this routine 20 bytes deeper than v291's check calls it alone, so
+its leftover word is given the same handle at that depth (on the XT that word is the saved r14 of `0x89390fd0`, which
+here is the getter's address). The word is compared as memory in every part, and the earlier parts' noise stops before
+it.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first seven parts' lines as they were. At seed
+  2024, 1,236 events held a note and 14,764 sent all notes off.
+- Every line and branch of `Vc2PartSettingsCategory.cpp` is reached.
+- `mutate_vc2.py --settings`: 419 plants, none missed; v294's 27 new.
+
 ### The VC-2 part's nodes (2026-11-19, v293) {#vc2-part-nodes}
 
 Step 4.3's twenty-first version (VC2_MODE_PLAN.md, step 4.3, item 9's eighth part): the nodes' routines, on

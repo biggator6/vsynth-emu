@@ -759,6 +759,11 @@ version against rom.4's routines with what it calls hooked:
         voices' stop `0x89393360` through `Vc2NodeParts`, and `0x893904d0` on `Vc2Keys`; xt_vc2keys' second part
         (HARDWARE_FIRMWARE.md, "The VC-2 part's nodes"). The init `0x89393370` is item 10's. Left: the Category and
         budget, the static M and event 0x200.
+      - the Category and budget done (v294): `0x89392c60`, the budget less 400 for every Category 0…11 but 6, the held
+        note's word `0x899891d0` for 10 and 11, All Notes Off to part 0's node of source 4's channel, the node's word's
+        voices truncated, Auto Note's switch, all notes off with no note held, through `Vc2SettingsParts`;
+        xt_vc2settings' eighth part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the Category and budget").
+        Left: the static M's initializers and event 0x200 (the notes' task's: item 10).
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.

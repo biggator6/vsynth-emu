@@ -6,7 +6,8 @@
 # planted at its call, by the source and part it's given), vc2settingsdispatch (Vc2PartSettingsDispatch.cpp, v292) and
 # vc2settingsmatrix (Vc2MatrixSetup.cpp's flag tests, v292, which xt_vc2settings' flips reach and xt_vc2cosm's
 # don't; the dispatcher's part given to the Matrix's set-up is not planted: the check gives part 0 alone, as rom.4's
-# handler does).  Not planted: the depth
+# handler does) and vc2settingscategory (Vc2PartSettingsCategory.cpp, v294; the held Categories' test of `known` is
+# not planted: 10 and 11 are known either way).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -406,3 +407,30 @@ channel-block|p_.value(Block::kSystemB, 0, 0, kReceiveSwitch)|p_.value(Block::kS
 channel-falls-on|        return;\n    }\n    g.channel = states.receiving|    }\n    g.channel = states.receiving|vc2settingsdispatch
 matrix-held-end|    return !params_.held();\n}|    return true;\n}|vc2settingsmatrix
 matrix-held-start|    if (params_.held()) return false;\n|\n|vc2settingsmatrix
+category-id|kCategory = 0x12c,|kCategory = 0x12d,|vc2settingscategory
+category-power-id|kPower = 0x530;|kPower = 0x531;|vc2settingscategory
+category-count-fewer|kCategories = 12;|kCategories = 11;|vc2settingscategory
+category-count-more|kCategories = 12;|kCategories = 13;|vc2settingscategory
+category-free|kFreeCategory = 6,|kFreeCategory = 5,|vc2settingscategory
+category-held|kHeldCategories[] = { 10, 11 };|kHeldCategories[] = { 9, 11 };|vc2settingscategory
+category-held-last|kHeldCategories[] = { 10, 11 };|kHeldCategories[] = { 10, 10 };|vc2settingscategory
+category-less|kLess = 400;|kLess = 300;|vc2settingscategory
+category-control-source|kControlSource = 3,|kControlSource = 2,|vc2settingscategory
+category-node-source|kNodeSource = 4,|kNodeSource = 3,|vc2settingscategory
+category-given-source|kGivenSource = 1,|kGivenSource = 2,|vc2settingscategory
+category-part-zero|kPartZero = 0;|kPartZero = 1;|vc2settingscategory
+category-notes-off-number|kAllNotesOff = 123,|kAllNotesOff = 120,|vc2settingscategory
+category-no-value|kNoValue = -1;|kNoValue = 0;|vc2settingscategory
+category-first-read|    get(kCategory);   // read, and stored in 0x899891d0 as Category ≥ 10, which the switch writes again\n||vc2settingscategory
+category-power-block|p_.value(Block::kSystemC, 0, 0, kPower)|p_.value(Block::kSystemB, 0, 0, kPower)|vc2settingscategory
+category-less-past|    if (known && category != kFreeCategory) power -= kLess;|    if (category != kFreeCategory) power -= kLess;|vc2settingscategory
+category-less-free|    if (known && category != kFreeCategory) power -= kLess;|    if (known) power -= kLess;|vc2settingscategory
+category-no-less|    if (known && category != kFreeCategory) power -= kLess;\n||vc2settingscategory
+category-held-word|    t.heldNote = held ? 1 : 0;|    t.heldNote = 0;|vc2settingscategory
+category-control-part|nodes.of(kNodeSource, kPartZero).channel|nodes.of(kNodeSource, part).channel|vc2settingscategory
+category-truncate-word|nodes.of(kGivenSource, part).word8|nodes.of(kGivenSource, part).object|vc2settingscategory
+category-truncate-part|nodes.of(kGivenSource, part).word8|nodes.of(kGivenSource, kPartZero).word8|vc2settingscategory
+category-no-autonote|    autoNoteSwitch(out);\n    if (t.heldNote|    if (t.heldNote|vc2settingscategory
+category-notes-off-test|    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote != 0) out.allNotesOff();|vc2settingscategory
+category-notes-off-first|    autoNoteSwitch(out);\n    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote == 0) out.allNotesOff();\n    autoNoteSwitch(out);|vc2settingscategory
+category-control-first|    out.setBudget(static_cast<int32_t>(power));\n    out.controller(|    out.controller(|vc2settingscategory

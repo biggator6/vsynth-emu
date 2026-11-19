@@ -115,7 +115,7 @@ std::string dispatchCase(SettingsSides& s, std::mt19937& rng, long& events, long
     settingsNoise(&s.g, sizeof s.g, rng);
     s.fw.cpu.wr8(kStateSourceAt, (uint8_t)(rng() % kSources));
     s.fw.cpu.wr32(kUnreceivedAt, (uint32_t)rng());
-    return settingsCaseOf<kDispatchEvents, sizeof(Vc2PartRows), kHeldFlags>(s, rng, events, calls);
+    return settingsCaseOf<kDispatchEvents, kV293Rows, kHeldFlags>(s, rng, events, calls);
 }
 
 void sayDispatchPart(const SettingsCounts& n) {

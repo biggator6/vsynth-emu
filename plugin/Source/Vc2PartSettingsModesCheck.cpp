@@ -72,7 +72,7 @@ const SettingsEvent kModeEvents[] = { modeEvent<kModeWrapper, 27>, modeEvent<kMo
 // A case: the nodes noise, then the tables' and the events
 std::string modeCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
     settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
-    return settingsCaseOf<kModeEvents, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
+    return settingsCaseOf<kModeEvents, kV293Rows, 5>(s, rng, events, calls);
 }
 
 void sayModePart(const SettingsCounts& n) {
