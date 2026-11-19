@@ -1,6 +1,7 @@
 // The VC-2 part's conversion sets' common: see Vc2SetCommon.h (v281).  Each routine's reads and writes in rom.4's order.
 #include "Vc2SetCommon.h"
 #include <bit>
+#include <cstring>
 
 namespace {
 constexpr int32_t kMagic = static_cast<int32_t>(0x82061029u);   // [FW] rom.4's reciprocal of 127² = 16129
@@ -47,11 +48,7 @@ void Vc2SetCommons::fromVoice(Vc2CommonWords& w, const Vc2SetCall& call, Vc2SetR
 void Vc2SetCommons::fromPart(Vc2CommonWords& w, const Vc2SetCall& call, Vc2SetReads& reads) {
     const Vc2SetVoice v = reads.voiceAt(call.channelAt);
     const std::array<uint16_t, 3> words = reads.commonOf(reads.firstByte(v.part));
-    w.firstSwitch = static_cast<uint8_t>(words[0]);
-    w.secondSwitch = static_cast<uint8_t>(words[0] >> 8);
-    w.level = static_cast<uint8_t>(words[1]);
-    w.unread07 = static_cast<uint8_t>(words[1] >> 8);
-    w.sens = static_cast<int16_t>(words[2]);
+    std::memcpy(&w.firstSwitch, words.data(), sizeof words);   // +4…+9, as rom.4 writes the three halfwords
 }
 
 void Vc2SetCommons::construct(uint32_t common, const Vc2SetCall& call, uint32_t* block, Vc2SetReads& reads) {

@@ -701,6 +701,10 @@ version against rom.4's routines with what it calls hooked:
       - the common's done (v281): `Vc2SetCommons`, its 24 words, constructor, conversion, update, copy and its twin
         `0x893a1870` (the block at W+0xc); xt_vc2sets' second part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets'
         common").
+      - the envelopes' done (v282): `Vc2SetEnvelopes`, the 312 words, constructor (the tempo), conversion, update,
+        copy, release and the block writer `0x8939a3d0` with the Matrix's sums, the time curve, its quarter and the
+        key's factor; their tables `Vc2SetEnvelopeTables`; xt_vc2sets' third part (HARDWARE_FIRMWARE.md, "The VC-2
+        part's sets' envelopes").
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

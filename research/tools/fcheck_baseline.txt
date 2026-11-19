@@ -828,6 +828,7 @@ queries: 1410 highest in a range (588 found), 695 highest, 709 sets, 641 fills, 
 xt_vc2keys: 0 different
 == xt_vc2sets
 common: 16000 events: 1738 placements, 3557 constructors, 1758 ends, 3486 conversions, 1784 updates, 1909 copies and 1768 of the twin
+envelopes: 16000 events: 1502 placements, 2821 constructors, 1497 ends, 3026 conversions, 1458 updates, 1431 copies, 2855 releases, 1410 block writes (18537 Matrix sums)
 sets: 40 cases, 16000 events: 1176 placements, 2516 makes (1290 with no common), 1213 ends, 1244 conversions, 1257 releases, 1326 updates, 1236 copies, 1175 refreshes; M: 1215 placements, 2379 constructors, 1263 updates
 children: 61610 allocations, 54034 constructors, 19721 ends, 30796 conversions, 32775 updates, 30568 copies, 12351 releases, 1520 refreshes
 xt_vc2sets: 0 different

@@ -23,16 +23,6 @@ struct Vc2SetChild {
     uint32_t noteStride;
 };
 
-// What a child's constructor is given: the object, C's call, its block in W, the note's M, the kind and the index
-struct Vc2SetChildCall {
-    uint32_t object;
-    Vc2SetCall call;
-    uint32_t noteAt;
-    uint32_t matrix;
-    uint32_t kind;
-    uint32_t index;
-};
-
 // The children's routines, each given its kind's row, and what C reads
 class Vc2SetParts : public Vc2SetReads {
 public:

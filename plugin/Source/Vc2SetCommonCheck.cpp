@@ -11,44 +11,29 @@
 
 namespace {
 using Commons = Vc2SetCommons;
-constexpr int kSteps = 400, kParts = 16;
-constexpr uint32_t kEnded = 3;   // [FW] what an end is given beside its object
+constexpr int kParts = 16;
 // [FW] the common's routines, which the sets' part hooks
 constexpr uint32_t kRoutines[] = { 0x893a1940, 0x893a1960, 0x893a19b0, 0x893a19c0, 0x893a19e0, 0x893a1a10 };
 
 struct CommonCounts {
-    long events = 0;
+    static constexpr const char* kPool = "the commons";
+    long events = 0, calls = 0;
     std::array<long, 7> byEvent {};
 };
 
-struct CommonSides {
-    explicit CommonSides(SetSides& sides) : s(sides) {}
-    SetSides& s;
-    Commons port {};
-    CommonCounts n {};
-};
-
+using CommonSides = SetChildSides<Commons, CommonCounts>;
 using CommonEvent = std::string (*)(CommonSides&, std::mt19937&);
-
-uint32_t anyCommon(std::mt19937& rng) { return Commons::kAt + Commons::kBytes * (uint32_t)(rng() % Commons::kCount); }
 
 uint32_t anyBlock(std::mt19937& rng) { return setsNote(rng) + Vc2ToneInput::kOscSet; }
 
-// Where a block of rom.4's memory is in the port's notes
-uint32_t* portBlock(CommonSides& c, uint32_t block) {
-    auto* notes = reinterpret_cast<uint8_t*>(c.s.notes.notes.data());
-    return reinterpret_cast<uint32_t*>(notes + (block - Vc2Notes::kNotesAt));
-}
-
 // A level as the square meets it (0, 1 alone, the top, past it) or any; a depth at its edges or any
 uint8_t commonLevel(std::mt19937& rng) {
-    const uint8_t levels[9] = { 0, 1, 2, 64, 126, 127, 128, 255, (uint8_t)rng() };
-    return levels[rng() % 9];
+    return setsOneOf(std::to_array<uint8_t>({ 0, 1, 2, 64, 126, 127, 128, 255, (uint8_t)rng() }), rng);
 }
 
 int16_t commonSens(std::mt19937& rng) {
-    const int16_t depths[11] = { 0, 1, -1, 63, -63, 127, -127, 32767, -32768, -32767, (int16_t)rng() };
-    return depths[rng() % 11];
+    const auto depths = std::to_array<int16_t>({ 0, 1, -1, 63, -63, 127, -127, 32767, -32768, -32767, (int16_t)rng() });
+    return setsOneOf(depths, rng);
 }
 
 uint8_t commonSwitch(std::mt19937& rng) { return rng() % 3 ? (uint8_t)(rng() % 2) : (uint8_t)rng(); }
@@ -72,98 +57,39 @@ void commonDraw(CommonSides& c, std::mt19937& rng, bool all) {
     }
 }
 
-std::string commonOnBoth(CommonSides& c, const Vc2CheckRoutine& r, std::initializer_list<uint32_t> args,
-                         const std::function<uint32_t()>& mine) {
-    Vc2Fw& fw = c.s.fw;
-    fw.cpu.write(Commons::kAt, &c.port.items, sizeof c.port.items);
-    fw.cpu.write(Vc2Notes::kNotesAt, &c.s.notes.notes, sizeof c.s.notes.notes);
-    const std::string what = vc2BothAnswer(fw, r, args, mine, [&] {
-        return vc2RegionsDifference(fw, { { Commons::kAt, &c.port.items, sizeof c.port.items, "the commons" },
-                                          { Vc2Notes::kNotesAt, &c.s.notes.notes, sizeof c.s.notes.notes, "W" } });
-    });
-    return what.empty() ? what : std::string(r.name) + ": " + what;
-}
-
-// The call struct as rom.4 is given it and the port
-Vc2SetCall commonCall(CommonSides& c, std::mt19937& rng, uint32_t& at) {
-    at = setsCall(c.s, rng);
-    Vc2SetCall call;
-    c.s.fw.cpu.read(at, &call, sizeof call);
-    return call;
-}
-
 std::string commonPlaceEvent(CommonSides& c, std::mt19937& rng) {
     const uint32_t n = rng() % 256;
     ++c.n.byEvent[0];
-    return commonOnBoth(c, { 0x893a1940, "the common's placement", vc2R0 }, { 10, n },
-                        [&] { return c.port.addressOf(n); });
+    return setsChildOnBoth(c.s, c.region(CommonCounts::kPool), { 0x893a1940, "the common's placement", vc2R0 },
+                           { 10, n }, [&] { return c.port.addressOf(n); });
 }
 
 std::string commonMakeEvent(CommonSides& c, std::mt19937& rng) {
-    uint32_t at = 0;
-    const Vc2SetCall call = commonCall(c, rng, at);
-    const uint32_t common = anyCommon(rng), block = anyBlock(rng);
+    const uint32_t at = setsCall(c.s, rng);
+    const Vc2SetCall call = setsCallAt(c.s, at);
+    const uint32_t common = c.any(rng), block = anyBlock(rng);
     ++c.n.byEvent[1];
-    return commonOnBoth(c, { 0x893a1960, "the common's constructor", vc2R0 }, { common, at, block }, [&] {
-        c.port.construct(common, call, portBlock(c, block), c.s.parts);
+    const Vc2CheckRoutine r { 0x893a1960, "the common's constructor", vc2R0 };
+    return setsChildOnBoth(c.s, c.region(CommonCounts::kPool), r, { common, at, block }, [&] {
+        c.port.construct(common, call, setsPortWords(c.s, block), c.s.parts);
         return common;
     });
 }
 
-std::string commonEndEvent(CommonSides& c, std::mt19937& rng) {
-    const uint32_t common = anyCommon(rng);
-    ++c.n.byEvent[2];
-    return commonOnBoth(c, { 0x893a19b0, "the common's end" }, { common, kEnded }, [] { return 0u; });
-}
-
-std::string commonConvertEvent(CommonSides& c, std::mt19937& rng) {
-    uint32_t at = 0;
-    const Vc2SetCall call = commonCall(c, rng, at);
-    const uint32_t common = anyCommon(rng), block = anyBlock(rng);
-    ++c.n.byEvent[3];
-    return commonOnBoth(c, { 0x893a19c0, "the common's conversion" }, { common, at, block }, [&] {
-        c.port.convert(common, call, portBlock(c, block), c.s.parts);
-        return 0u;
-    });
-}
-
-std::string commonUpdateEvent(CommonSides& c, std::mt19937& rng) {
-    uint32_t at = 0;
-    const Vc2SetCall call = commonCall(c, rng, at);
-    const uint32_t common = anyCommon(rng);
-    ++c.n.byEvent[4];
-    return commonOnBoth(c, { 0x893a19e0, "the common's update" }, { common, at }, [&] {
-        c.port.update(common, call, c.s.parts);
-        return 0u;
-    });
-}
-
-// The copy and its twin, the same code
-template <size_t I>
-std::string commonCopyEvent(CommonSides& c, std::mt19937& rng) {
-    const uint32_t common = anyCommon(rng), block = anyBlock(rng);
-    ++c.n.byEvent[5 + I];
-    const Vc2CheckRoutine r { I == 0 ? 0x893a1a10u : 0x893a1870u, I == 0 ? "the common's copy" : "its twin" };
-    return commonOnBoth(c, r, { common, block }, [&] {
-        c.port.copy(common, portBlock(c, block));
-        return 0u;
-    });
-}
-
+// [FW] the events by routine; the copy and its twin 0x893a1870, the same code
 const CommonEvent kEvents[] = {
-    commonPlaceEvent, commonMakeEvent, commonMakeEvent, commonEndEvent, commonConvertEvent, commonConvertEvent,
-    commonUpdateEvent, commonCopyEvent<0>, commonCopyEvent<1>,
+    commonPlaceEvent,
+    commonMakeEvent,
+    commonMakeEvent,
+    setsEndEvent<CommonSides, 0x893a19b0, 2>,
+    setsConvertEvent<CommonSides, &Commons::convert, anyBlock, 0x893a19c0, 3>,
+    setsConvertEvent<CommonSides, &Commons::convert, anyBlock, 0x893a19c0, 3>,
+    setsUpdateEvent<CommonSides, &Commons::update, 0x893a19e0, 4>,
+    setsCopyEvent<CommonSides, &Commons::copy, anyBlock, 0x893a1a10, 5>,
+    setsCopyEvent<CommonSides, &Commons::copy, anyBlock, 0x893a1870, 6>,
 };
 
-std::string commonCase(CommonSides& c, std::mt19937& rng) {
-    setsNoise(c.port.items, rng);
-    std::string what;
-    for (int k = 0; k < kSteps && what.empty(); ++k, ++c.n.events) {
-        commonDraw(c, rng, k == 0);
-        what = kEvents[rng() % std::size(kEvents)](c, rng);
-    }
-    return what;
-}
+std::span<const CommonEvent> commonEvents() { return kEvents; }
 
 void sayCommonCounts(const CommonCounts& n) {
     const auto& e = n.byEvent;
@@ -173,11 +99,6 @@ void sayCommonCounts(const CommonCounts& n) {
 } // namespace
 
 long vc2SetCommonPart(SetSides& s, const Vc2Run& run) {
-    for (const uint32_t at : kRoutines) s.fw.cpu.unhook(at);
-    const auto c = std::make_unique<CommonSides>(s);
-    const long different = vc2CheckPart(run, 1, { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" }, c->n.events,
-                                        [&](std::mt19937& rng) { return commonCase(*c, rng); });
-    sayCommonCounts(c->n);
-    return different;
+    return setsChildPart<CommonSides, commonDraw, commonEvents, sayCommonCounts>(s, run, 1, kRoutines);
 }
 #endif

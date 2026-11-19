@@ -17,6 +17,16 @@ struct Vc2SetCall {
     uint32_t word = 0;
 };
 
+// What a child's constructor is given: the object, C's call, its block in W, the note's M, the kind and the index
+struct Vc2SetChildCall {
+    uint32_t object;
+    Vc2SetCall call;
+    uint32_t noteAt;
+    uint32_t matrix;
+    uint32_t kind;
+    uint32_t index;
+};
+
 // The voice's 16 bytes a call's first word points at, its +0x34…+0x43 (Vc2VoiceNode)
 struct Vc2SetVoice {
     uint32_t keys = 0;     // +0x34: its key table K
@@ -28,9 +38,20 @@ struct Vc2SetVoice {
     uint8_t byte43 = 0;    // +0x43: the velocity or word the voice took
 };
 
+// The clock object's words a tempo is made of (rom.4's 0x8995cb40, v282): its source (+0x40, 0 internal), the internal
+// tempo's two words (+0x10, +0x14) and the outside clock's period (+0x48)
+struct Vc2SetClock {
+    uint8_t external = 0;
+    int32_t numerator = 0;
+    int32_t denominator = 0;
+    uint16_t period = 0;
+};
+
 // What C, M and C's children read past their own words: the voice by a call, an object's first byte, K's channel state,
 // the channel's bend and controllers (its +0x84 + number), the part's byte by kind (rom.4's 0x89998a14 + 16 × part +
-// kind), the part's three words the common takes (0x89997090 + 6 × part, v281)
+// kind), the part's three words the common takes (0x89997090 + 6 × part, v281); the part's five words an envelope
+// takes by kind and index (0x89e2765c + 2080 × part + 130 × kind + 10 × index), the clock, and the halfword at
+// `offset` of the sums a Matrix group's reader (by rom.4's address) gives for M (v282)
 class Vc2SetReads {
 public:
     virtual ~Vc2SetReads() = default;
@@ -41,6 +62,9 @@ public:
     virtual uint8_t controlOf(uint32_t channel, uint32_t number) = 0;
     virtual uint8_t modeOf(uint32_t part, uint32_t kind) = 0;
     virtual std::array<uint16_t, 3> commonOf(uint32_t part) = 0;
+    virtual std::array<uint16_t, 5> envelopeOf(uint32_t part, uint32_t kind, uint32_t index) = 0;
+    virtual Vc2SetClock clock() = 0;
+    virtual int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) = 0;
 };
 
 struct Vc2NoteMatrixWords {

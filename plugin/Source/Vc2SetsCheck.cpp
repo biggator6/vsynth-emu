@@ -9,6 +9,8 @@
 // each the draws (Vc2SetsDraws.cpp); after each C, M, W, the part's M, the calls and the answer.  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2LibMathTables.h"
+#include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetsCheck.h"
 #include <algorithm>
 #include <cstring>
@@ -56,11 +58,12 @@ constexpr RomArgs kRomArgs[kSetMethods] = {
     [](Sh4& c, uint32_t) -> Args { return { c.r[4], c.r[5] }; },
     [](Sh4& c, uint32_t) -> Args { return { c.r[4], c.r[5], c.r[6] }; },
     [](Sh4& c, uint32_t) { return structArgs(c, 0); },
+    [](Sh4& c, uint32_t) -> Args { return { c.r[4] }; },
 };
 
 uint32_t methodRoutine(const Vc2SetChild& r, int32_t method) {
     const uint32_t routines[kSetMethods] = { r.allocate, r.construct, r.end, r.convert, r.update, r.copy, r.release,
-                                             r.refresh };
+                                             r.refresh, 0 };
     return routines[method];
 }
 
@@ -195,6 +198,54 @@ std::array<uint16_t, 3> SetPortParts::commonOf(uint32_t part) {
     return words;
 }
 
+std::array<uint16_t, 5> SetPortParts::envelopeOf(uint32_t part, uint32_t kind, uint32_t index) {
+    std::array<uint16_t, 5> words;
+    const uint32_t at = kSetsEnvelopePart * part + kSetsEnvelopeKind * kind + kSetsEnvelopeIndex * index;
+    fw_.cpu.read(kSetsEnvelopesAt + at, words.data(), sizeof words);
+    return words;
+}
+
+Vc2SetClock SetPortParts::clock() {
+    Vc2SetClock c;
+    c.external = fw_.cpu.rd8(kSetsClockAt + 0x40);
+    c.numerator = (int32_t)fw_.cpu.rd32(kSetsClockAt + 0x10);
+    c.denominator = (int32_t)fw_.cpu.rd32(kSetsClockAt + 0x14);
+    c.period = fw_.cpu.rd16(kSetsClockAt + 0x48);
+    return c;
+}
+
+int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) {
+    logged(kSetMatrixSum, reader, { matrix });
+    return (int16_t)fw_.cpu.rd16(kSetsSumsAt + offset);
+}
+
+long vc2SetsFurther(SetSides& s, const Vc2Run& run) { return vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run); }
+
+uint32_t* setsPortWords(SetSides& s, uint32_t at) {
+    auto* notes = reinterpret_cast<uint8_t*>(s.notes.notes.data());
+    return reinterpret_cast<uint32_t*>(notes + (at - Vc2Notes::kNotesAt));
+}
+
+Vc2SetCall setsCallAt(SetSides& s, uint32_t at) {
+    Vc2SetCall call;
+    s.fw.cpu.read(at, &call, sizeof call);
+    return call;
+}
+
+std::string setsChildOnBoth(SetSides& s, const Vc2Region& pool, const Vc2CheckRoutine& routine,
+                            std::initializer_list<uint32_t> args, const std::function<uint32_t()>& mine) {
+    s.fw.cpu.write(pool.at, pool.mine, pool.bytes);
+    s.fw.cpu.write(Vc2Notes::kNotesAt, &s.notes.notes, sizeof s.notes.notes);
+    s.rom.clear();
+    s.mine.clear();
+    const std::string what = vc2BothAnswer(s.fw, routine, args, mine, [&] {
+        const Vc2Region notes { Vc2Notes::kNotesAt, &s.notes.notes, sizeof s.notes.notes, "W" };
+        const std::string words = vc2RegionsDifference(s.fw, { pool, notes });
+        return words.empty() ? vc2CallsDifference(s.rom, s.mine, saidCall) : words;
+    });
+    return what.empty() ? what : std::string(routine.name) + ": " + what;
+}
+
 std::string setsOnBoth(SetSides& s, const Vc2CheckRoutine& routine, std::initializer_list<uint32_t> args,
                        const std::function<uint32_t()>& mine) {
     s.fw.cpu.write(Vc2Sets::kAt, &s.port.items, sizeof s.port.items);
@@ -212,7 +263,8 @@ std::string setsOnBoth(SetSides& s, const Vc2CheckRoutine& routine, std::initial
 }
 
 int main(int argc, char** argv) {
-    const Vc2CheckStart start { "xt_vc2sets", vc2LoadAll<vc2LoadMatrix>, { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" } };
-    return vc2CheckMain<SetSides>(argc, argv, start, setsCase, saySetCounts, vc2SetCommonPart);
+    const Vc2CheckStart start { "xt_vc2sets", vc2LoadAll<vc2LoadMatrix, vc2LoadLibMath, vc2LoadSetEnvelopes>,
+                                { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" } };
+    return vc2CheckMain<SetSides>(argc, argv, start, setsCase, saySetCounts, vc2SetsFurther);
 }
 #endif

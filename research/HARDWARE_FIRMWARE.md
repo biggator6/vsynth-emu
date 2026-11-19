@@ -1546,6 +1546,88 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's sets' envelopes (2026-11-19, v282) {#vc2-set-envelopes}
+
+Step 4.3's tenth version (VC2_MODE_PLAN.md, step 4.3, item 8's second child): C's 13 envelopes a voice.
+`Vc2SetEnvelopes` is bit for bit against rom.4's own in `xt_vc2sets`' third part.
+
+**Its words.** There are 312 envelopes of 0x1c bytes from `0x89e2543c`, 13 a voice (`0x8939a620`: 0x16c × the
+number + 0x1c × the index).
+- +0 holds the note's kind and +1 the index; +2 the voice's key (+0x41) and +3 its +0x43.
+- +6…+0xf hold the part's five words for it, from `0x89e2765c` + 2080 × the part + 130 × the kind + 10 × the index.
+  As bytes they are: whether it runs, the attack, decay, sustain and release, the three times' velocity depths, and a
+  key follow (signed, +0xe).
+- +0x10 holds the key's time factor (16.16), +0x14 the tempo, +0x16 the release's velocity (64 until a release
+  gives it), +0x18 the note's M.
+
+**The block.** Each envelope converts an envelope block of the note's input, W+0x15c + 0x38 × the index (the input's
+blocks 2…14). The writer is `0x8939a3d0`; the copy `0x8939a800` is it alone.
+- +0 takes 2 for envelope 3 and those past 6, else 0. +4 takes 1.0, +8 0, and +0xc and +0x10 take 0x124f80.
+- The key's factor comes first: 65536 × 2^((key − 60) × −follow / 1200) by rom.4's powf (v257), converted unsigned
+  (past 2^31 less 2^32).
+- An envelope that doesn't run gets 0.0 times and 1.0 at +0x28…+0x30. One that runs gets:
+  - +0x14, the attack;
+  - +0x1c, the decay;
+  - +0x20, the release;
+  - +0x30, the sustain: the level table `0x89541f34` by its byte, over 32768;
+  - 0.0 at +0x18, +0x24 and +0x34, and 1.0 at +0x28 and +0x2c.
+- **A time from 128 on is a note value:** its ticks (`0x89542134`) over 24 × the tempo, × 600000.
+- **Otherwise it takes a Matrix sum, held to 0…127.** The sum is the envelope's attack, decay or release sum
+  (`0x89399ff0`, `0x8939a130`, `0x8939a270`, one routine by the stage). Envelopes 0…3 read the group reader
+  `0x893a2550`, 4…7 `0x893a2750`, 8 and 9 the first COSM's `0x893a2960`, 10 and 11 the second's `0x893a2aa0`, and 12
+  `0x893a2bf0`. Each envelope's three sums are 2 bytes apart and the next envelope's 6 on, the COSM groups' from +4;
+  an index past 12 has none.
+- **Then the time curve `0x8939aa40`** reads the table `0x8953fc90` by the value; 0 stays 0.
+  - With a depth d, it subtracts (d × 40) × (velocity − 64) / 256; d × 40 is rom.4's division of d × 256000 by
+    6400, by the magic `0x51eb851f`. Nothing at or below 0 is left, and it is held to 12000.
+  - Then the key's factor: at 1 as it is; below 1 the product's high half; past it held to 12000. At least 1.
+  - The attack takes the factor as 1, and the release takes the release's velocity.
+- **The decay of a type-0 envelope** is the table's value a quarter (`0x8939ab10`), with no depth or factor.
+
+**The routines.**
+- **The constructor `0x8939a690(env, call, block, M; the kind and index on the stack)`.** It writes the kind, index
+  and M, the voice's two bytes, 64 at +0x16, the part's words and the tempo, then the block.
+  - The tempo comes from the clock object at `0x8995cb40`. When its +0x40 is 0 it is 30000 × +0x10 / +0x14; otherwise
+    150000 / +0x48. Both are the library's signed division `0x89505db8`.
+  - Below 200 it becomes 20, and above 2500 250: two thresholds and two values that read as in different units, but
+    rom.4's.
+- **The conversion `0x8939a790`** writes the voice's two bytes again, then the block.
+- **The update `0x8939a7b0`** writes the part's words again.
+- **The release `0x8939a810(env, velocity, block)`** writes the velocity at +0x16, then the block's release time
+  again: 0.0 when it doesn't run, its note value's scale the pool word `0x8939a8f4`, 600000 as the writer's.
+- **The end `0x8939a780`** is a bare return.
+- The four tables and the five pool words are read from rom.4 by `Vc2SetEnvelopeTables` (loadVc2).
+
+**The check.** It is xt_vc2sets' third part, on the seed after the common's. It hooks the Matrix group's five
+readers, which log the M they're given and answer one run of drawn sums. powf, the helpers and the curves run on
+rom.4's own side, and the sets' part's hooks on the envelope's routines are taken off.
+
+The draws, beyond the sets' part's:
+- the parts' envelope words for 16 parts, 4 kinds and 13 indices: times at their ends, a note value now and then, the
+  depths at their edges, the key follows 0, ±100, ±1200, 32767, −32768 or any;
+- the clock: internal or not, its words over a wide span;
+- the sums: 0, small, ±127, ±300 or any;
+- the envelopes' own words, the index past 12 one time in four.
+
+Not drawn: a clock divisor of 0; an envelope's tempo of 0, where the note value's 0 / 0 would be a NaN whose payload
+is the host's. Not planted: the release's note value scale swapped for the writer's, both 600000.
+
+Each case is noise in the envelopes, then 400 events: the placement, the constructor, the end, the conversion, the
+update, the copy, the release and the writer alone.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2SetEnvelope.cpp` is reached.
+- `mutate_vc2.py --sets`: 210 plants, the envelopes' 87 and their tables' 8 among them, none missed;
+  `mutate_panel.py rom4-no-setenvelopes` caught once the ROM test asks for these tables.
+- The first plant run missed ten. The tempo's seven showed the clock's draw met the holds' thresholds almost never,
+  so half the draws now aim a tempo at them. Two constants changed by one were near-equivalent at these sizes and are
+  planted otherwise. One, the curve's hold, can't be reached from the table.
+
+The children's parts share their sides, case loop, runner and events: `SetChildSides`, `setsChildCase`,
+`setsChildPart` and the event templates in Vc2SetsCheck.h. The common's part was rewritten on them, its line as it
+was. The part's words now go into the common's object as rom.4 writes them, halfwords copied in place.
+
 ### The VC-2 part's sets' common (2026-11-19, v281) {#vc2-set-common}
 
 Step 4.3's ninth version (VC2_MODE_PLAN.md, step 4.3, item 8's first child): C's common, which only a kind-0 note
