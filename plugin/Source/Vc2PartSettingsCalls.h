@@ -58,6 +58,9 @@ inline constexpr int32_t kOutTripStep = 47;
 // and COSM, the object as the ID), then its routine (the velocity as the part, the routine as the ID); v278's note-off
 // over a key table (the table as the ID)
 inline constexpr int32_t kOutObjectNote = 48, kOutObjectRoutine = 49, kOutReleaseTable = 50;
+// The MIDI dispatcher's (v308): a handler's arguments past r4 as the part, kind and COSM, r4 as the ID (a parameters'
+// routine its word as the part), then the routine as the ID
+inline constexpr int32_t kOutMidi = 51, kOutMidiRoutine = 52;
 // The held flags as a log carries them
 inline SettingsCall settingsUnposted(const uint8_t* held, uint32_t object) {
     const auto low = (int32_t)(held[0] | held[1] << 8 | held[2] << 16 | (uint32_t)held[3] << 24);

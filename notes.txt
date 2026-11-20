@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's MIDI dispatcher v308 (2026-11-19, on claude/vc2-part-4-3 after v307; HARDWARE_FIRMWARE.md, "The VC-2
+  part's MIDI dispatcher"): step 4.3's thirty-sixth version, item 10's thirteenth part. Vc2MidiDispatch
+  (Vc2MidiDispatch.cpp): rom.4's 0x8938fed0, the notes' task's virtual, a message by its status's class (0x8938fe50):
+  the channel messages to their handlers (a note-on of velocity 0 the note-off at 64, none while 0x89981904 is set),
+  0x40 and 0x41 the parameters' messages (a kind-3 word's Out DC cut for TG, 0x532, into 0x893955e0 first; then
+  v297's parameters or partParameters), 0x70 the reset 0x89390340 (120, 123, 121 on each channel and all notes off, or
+  121 alone with a note held); the calls through Vc2MidiParts, the channel handlers one virtual by Vc2MidiHandler.
+  xt_vc2settings gains a twenty-first part (Vc2MidiDispatchCheck.cpp): 0 different at seeds 2024, 7 and 31337, the
+  first twenty parts' lines unchanged; mutate_vc2.py --settings 837 planted, 0 missed. Not in the sound yet.
+
 The VC-2 part's channel messages v307 (2026-11-19, on claude/vc2-part-4-3 after v306; HARDWARE_FIRMWARE.md, "The VC-2
   part's channel messages"): step 4.3's thirty-fifth version, item 10's twelfth part. Vc2PartChannel
   (Vc2PartChannel.cpp): rom.4's note-on 0x89392da0 and note-off 0x89392e70 (Auto Note's source 4 on source 3's tables

@@ -59,3 +59,5 @@ extern const SettingsPartRow kStartPartRow;
 extern const SettingsPartRow kTripPartRow;
 // The twentieth (v307): the channel messages (Vc2PartChannelCheck.cpp)
 extern const SettingsPartRow kChannelPartRow;
+// The twenty-first (v308): the MIDI dispatcher (Vc2MidiDispatchCheck.cpp)
+extern const SettingsPartRow kMidiPartRow;

@@ -88,6 +88,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
       Vc2PartVoicesTables.cpp ) \
    $( [ -f Vc2TimeTrip.cpp ] && echo Vc2TimeTrip.cpp Vc2TimeTripCheck.cpp ) \
    $( [ -f Vc2PartChannel.cpp ] && echo Vc2PartChannel.cpp Vc2PartChannelCheck.cpp ) \
+   $( [ -f Vc2MidiDispatch.cpp ] && echo Vc2MidiDispatch.cpp Vc2MidiDispatchCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

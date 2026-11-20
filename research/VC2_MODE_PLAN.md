@@ -850,6 +850,13 @@ version against rom.4's routines with what it calls hooked:
          key table, channel state and node walk shared; xt_vc2settings' twentieth part (HARDWARE_FIRMWARE.md, "The VC-2
          part's channel messages"). Next: the dispatcher `0x8938fed0` (the status classes `0x8938fe50`, the parameters'
          message `0x89390230`, the 0x41 messages, 0x70), the mailbox and the three tasks, then Vc2Synth.
+       - the MIDI dispatcher done (v308): `vc2MidiDispatch`, rom.4's `0x8938fed0` by the status's class `0x8938fe50`:
+         the channel messages to their handlers (a note-on of velocity 0 the note-off at 64, none while `0x89981904`
+         is set), the parameters' messages 0x40 and 0x41 (a kind-3 word's Out DC cut for TG into `0x893955e0` first,
+         then v297's routines) and 0x70's reset `0x89390340`; the calls out through `Vc2MidiParts`; xt_vc2settings'
+         twenty-first part (HARDWARE_FIRMWARE.md, "The VC-2 part's MIDI dispatcher"). Next: the mailbox and the three
+         tasks (to be read: the routines before the dispatcher, `0x8938fc00`…`0x8938fec4`, which set event flags at
+         `0x8994fec8` through `0x89301830`), then Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

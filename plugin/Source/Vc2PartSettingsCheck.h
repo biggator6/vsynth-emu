@@ -13,6 +13,7 @@
 #include "Vc2PartControllers.h"
 #include "Vc2PartNumbers.h"
 #include "Vc2PartChannel.h"
+#include "Vc2MidiDispatch.h"
 #include "Vc2PartSettingsCalls.h"
 #include "Vc2PartStartUp.h"
 #include "Vc2PartVoicesTables.h"
@@ -129,10 +130,11 @@ struct SettingsCounts {
     long startEvents = 0, startCalls = 0;                                       // the eighteenth's (v304)
     long tripEvents = 0, tripCalls = 0;                                         // the nineteenth's (v306)
     long channelEvents = 0, channelCalls = 0;                                   // the twentieth's (v307)
+    long midiEvents = 0, midiCalls = 0;                                         // the twenty-first's (v308)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
     // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69,
-    // v303's at 70…72, v304's at 73, v306's at 74…81, v307's at 82…86
-    std::array<long, 87> byEvent {};
+    // v303's at 70…72, v304's at 73, v306's at 74…81, v307's at 82…86, v308's at 87…90
+    std::array<long, 91> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -160,6 +162,7 @@ struct SettingsSides {
     Vc2TripRecords tripRecords {};                       // v306: the parts' Time Trip records and the steps' scratch
     Vc2PitchSource pitch {};                             // v307: 0x89989748
     int32_t autoNoteSwitch = 0;                          // v307: Auto Note's On Switch, 0x8993fe50
+    uint32_t noteGate = 0;                               // v308: 0x89981904, no note-on while set
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);

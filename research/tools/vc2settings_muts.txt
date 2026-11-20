@@ -24,7 +24,8 @@
 # again) and vc2partstartup (Vc2PartStartUp.cpp, v304) and vc2timetrip (Vc2TimeTrip.cpp, v306; not the steps' distance taken the other way, as the fold
 # that follows gives a turn and its negative the same) and vc2partchannel (Vc2PartChannel.cpp, v307,
 # v303's shared code's plants among them; not the count's rise before Auto Note's release, which leaves the count
-# alone, nor the floor's test at 0 by one, at 0 the same).  Not planted: the depth
+# alone, nor the floor's test at 0 by one, at 0 the same) and vc2mididispatch (Vc2MidiDispatch.cpp,
+# v308; not the class's bounds by one, 0x80 being its own class and 0xf0 none either way).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -843,3 +844,29 @@ ch-off-auto|        p.note = -1;\n        return;|        return;|vc2partchannel
 ch-off-auto-count|        p.note = -1;\n        return;|        p.note = -1;|vc2partchannel
 ch-off-floor|p.others = left > 0 ? left : 0;|p.others = left;|vc2partchannel
 ch-heard-state|w.parts.notify(vc2ChannelStateOf(source, channel));|w.parts.notify(vc2ChannelStateOf(source, 0));|vc2partchannel
+md-class-low|return status >= kChannelFirst && status < kSystemFirst|return status >= 0x40 && status < kSystemFirst|vc2mididispatch
+md-class-mask|kClassBits = 0xf0, kChannelBits|kClassBits = 0xe0, kChannelBits|vc2mididispatch
+md-channel|kChannelBits = 0x0f;|kChannelBits = 0x07;|vc2mididispatch
+md-off-velocity|constexpr uint32_t kOffVelocity = 64;|constexpr uint32_t kOffVelocity = 63;|vc2mididispatch
+md-gate|    if (c.w.noteGate == 0) handled(c, h);|    handled(c, h);|vc2mididispatch
+md-zero|    if (c.data2 == 0) {|    if (c.data2 == 1) {|vc2mididispatch
+md-zero-key|c.w.parts.channelMessage(H::kNoteOff, c.source, c.channel, c.data1, kOffVelocity);|c.w.parts.channelMessage(H::kNoteOff, c.source, c.channel, c.data2, kOffVelocity);|vc2mididispatch
+md-kind|constexpr uint32_t kSystemKind = 3, kKindBits = 0xff;|constexpr uint32_t kSystemKind = 2, kKindBits = 0xff;|vc2mididispatch
+md-kind-bits|constexpr uint32_t kSystemKind = 3, kKindBits = 0xff;|constexpr uint32_t kSystemKind = 3, kKindBits = 0x7f;|vc2mididispatch
+md-dccut-id|constexpr int16_t kDcCut = 0x532;|constexpr int16_t kDcCut = 0x533;|vc2mididispatch
+md-dccut-block|Vc2ParamBlock::kSystemC, 0, 0, kDcCut|Vc2ParamBlock::kSystem, 0, 0, kDcCut|vc2mididispatch
+md-params-first|    dcCutFirst(c);\n    c.w.parts.parameters(c.word);|    c.w.parts.parameters(c.word);|vc2mididispatch
+md-part-params-first|    dcCutFirst(c);\n    c.w.parts.partParameters(c.word);|    c.w.parts.partParameters(c.word);|vc2mididispatch
+md-params-swap|{ 0x40, parameters, H::kNoteOff },  { 0x41, partParameters, H::kNoteOff },|{ 0x40, partParameters, H::kNoteOff },  { 0x41, parameters, H::kNoteOff },|vc2mididispatch
+md-reset-held|const bool held = c.w.rows.heldNote != 0;|const bool held = false;|vc2mididispatch
+md-reset-sound|        if (!held) p.channelMessage(H::kController, c.source, channel, kSoundOff, 0);|        if (held) p.channelMessage(H::kController, c.source, channel, kSoundOff, 0);|vc2mididispatch
+md-reset-order|kSoundOff = 120, kResetAll = 121, kNotesOff = 123;|kSoundOff = 123, kResetAll = 121, kNotesOff = 120;|vc2mididispatch
+md-reset-all|kResetAll = 121, kNotesOff|kResetAll = 122, kNotesOff|vc2mididispatch
+md-reset-channels|constexpr int32_t kChannels = 16;|constexpr int32_t kChannels = 15;|vc2mididispatch
+md-reset-notes-off|    if (!held) p.allNotesOff();\n|\n|vc2mididispatch
+md-reset-source|p.channelMessage(H::kController, c.source, channel, kResetAll, 0);|p.channelMessage(H::kController, 1, channel, kResetAll, 0);|vc2mididispatch
+md-row-poly|{ 0xa0, handled, H::kPolyPressure }|{ 0xa0, handled, H::kBend }|vc2mididispatch
+md-row-program|{ 0xc0, handled, H::kProgram }|{ 0xc0, handled, H::kPressure }|vc2mididispatch
+md-row-noteon|{ 0x90, noteOn, H::kNoteOn }|{ 0x90, handled, H::kNoteOn }|vc2mididispatch
+md-row-reset|{ 0x70, reset, H::kNoteOff },|{ 0x71, reset, H::kNoteOff },|vc2mididispatch
+md-data|const MidiCall c { w, m.source, m.status & kChannelBits, m.data1, m.data2, word };|const MidiCall c { w, m.source, m.status & kChannelBits, m.data2, m.data1, word };|vc2mididispatch

@@ -1546,6 +1546,41 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's MIDI dispatcher (2026-11-19, v308) {#vc2-part-midi-dispatcher}
+
+Step 4.3's thirty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's thirteenth part): `0x8938fed0`, a virtual of
+the notes' task object (in its vtables at `0x898cd168` and `0x898cd180`), given each message its mailbox holds, now the
+port's own (`Vc2MidiDispatch.cpp`). A message is four bytes (the status, two data bytes, the source: 1…3 the inputs, 4
+Auto Note) and a word; the task object is unread. By the status's class (`0x8938fe50`: a status of 0x80…0xef less its
+channel, any other the status itself), in rom.4's order of tests:
+- **0x80…0xe0**, the channel messages, to their handlers given the source, the channel and the data (v307's note-off,
+  note-on and the three that tell the listeners, v301's controller, the program change; the program change and the
+  pressure given the first data byte alone). A note-on of velocity 0 is the note-off at 64; any other, none while the
+  word at `0x89981904` is set.
+- **0x40** and **0x41**, the parameters' messages: their word's first byte its kind; of kind 3, Out DC cut for TG (ID
+  0x532, on the system's third block, `0x89320f60`) read into `0x893955e0` first (the DC-cut flag of the tone
+  generator's object, `0x8998a480 + 0x24`, set under the interrupts' mask; 0x40's by `0x89390230`, 0x41's inline); then
+  v297's `parameters` (`0x89392890`) or `partParameters` (`0x89392830`) on the part (`0x899888ac`), given the word.
+- **0x70**, the reset `0x89390340`: with a note held (`0x899891d0`, v294's) each of the source's 16 channels given
+  controller 121 alone; else 120, 123 and 121 on each, then all notes off (`0x89391e30`).
+- Any other class, nothing.
+
+The handlers, the parameters' two routines, the DC cut and all notes off go out through `Vc2MidiParts`, the channel
+handlers one virtual by `Vc2MidiHandler`; the ways a table by class (`kWays`).
+
+**The check.** `xt_vc2settings`' twenty-first part (`Vc2MidiDispatchCheck.cpp`), on the seed twenty after the run's:
+rom.4's own dispatcher with its class, the 0x40's builder and the reset; its callees hooked to log their arguments and
+routine, the system's read of 0x532 by the read objects' hooks as the first part's. Each event a message: a status of
+any channel class half the time, else 0x40, 0x41, 0x70 or any byte; the data bytes below 128 three times in four (a
+note-on's velocity 0 one time in four); a source 1…4 three times in four; the word's kind 0…4 or any; before each, the
+note-on gate 0, 1 or any and the held note's word 0, 1 or any. After each, the tables, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first twenty parts' lines as they were.
+- Every line and branch of `Vc2MidiDispatch.cpp` is reached.
+- `mutate_vc2.py --settings`: 837 plants, none missed; v308's 26 new (not planted: the class's bounds by one, 0x80
+  being its own class and 0xf0 none either way).
+
 ### The VC-2 part's channel messages (2026-11-19, v307) {#vc2-part-channel-messages}
 
 Step 4.3's thirty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's twelfth part): what the MIDI dispatcher
