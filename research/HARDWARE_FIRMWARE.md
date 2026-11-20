@@ -1546,6 +1546,30 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's listeners' run (2026-11-19, v305) {#vc2-part-listeners}
+
+Step 4.3's thirty-third version (VC2_MODE_PLAN.md, step 4.3, item 10's tenth part): `0x89390ea0(state)`, which the
+number classes' base handler (v303) gives the channel's state, now the port's own as `Vc2Assigner::notify`
+(`Vc2AssignRelease.cpp`): each voice on the sounding list (`[0x899826e0]`), its next link read after the call, whose key
+table (its +0x34) holds `state` as its first word (the table's channel state, v276's `Vc2KeyTable::channel`), its
+vtable's +0x48 virtual called with its +0x3c (its part); the answer unread. The entry's offset is 0 in both voice
+classes: the note's voice's (`0x898cd3dc`) is v279's change test `0x893972d0`, the plain voice's (`0x898cd1a8`)
+`0x89391720`, which answers 0. The virtual goes out through `Vc2AssignParts::changed`. The release path's walk over a
+key table's voices is now one routine over a test, `eachWhere`, which the listeners' run shares.
+
+**The check.** `xt_vc2voices`' fifth part (`Vc2AssignListenersCheck.cpp`), on the seed after the voice class's: the
+release part's sides, start and draws, and beyond them the +0x48 virtual of both classes hooked to log the voice and its
++0x3c (`assignHookSlot`, the retune's and key-off's hooks made one routine with it). Before each event every voice the
+draws left on no key table put on one of the three, and each table's channel state one of two words or any; the state
+given a table's half the time, else either word or any. After each, the voices' span, the keys' span and the calls. Not
+drawn: a sounding voice on no key table (rom.4 reads the word at any address, the port a table's).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first four parts' lines as they were.
+- Every line and branch of `Vc2AssignRelease.cpp` is reached.
+- `mutate_vc2.py --voices`: 295 plants, none missed; v305's eight new (and the walk's table test moved to its new
+  text).
+
 ### The VC-2 part's start-up (2026-11-19, v304) {#vc2-part-start-up}
 
 Step 4.3's thirty-second version (VC2_MODE_PLAN.md, step 4.3, item 10's ninth part): `0x89392ab0`, the first thing

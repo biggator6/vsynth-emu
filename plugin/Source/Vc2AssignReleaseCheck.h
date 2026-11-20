@@ -13,6 +13,7 @@ struct ReleaseCounts {
     long events = 0;
     std::array<long, 11> byEvent {};
     long keyOffs = 0, builds = 0, retunes = 0;
+    long changes = 0;   // the fifth part's change tests (v305)
 };
 
 // The third part's sides: the assigner's, the port's keys, the counts

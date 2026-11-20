@@ -50,6 +50,9 @@ public:
     virtual void readParameters(uint32_t part) = 0;
     virtual uint8_t firstByte(uint32_t object) = 0;
     virtual int32_t clock() = 0;
+    // v305: the voice's +0x48 virtual (a note's change test 0x893972d0, the plain voice's 0x89391720 answering 0),
+    // given its +0x3c; its answer unread
+    virtual void changed(uint32_t voice, uint32_t part) = 0;
 };
 
 struct Vc2KeyTable;
@@ -102,6 +105,9 @@ public:
     // channel, the part's mode, then the start, a build, a truncation or mono's retune
     void nodeNoteOn(const Vc2NodeNote& n, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);   // 0x89396a80
     void nodeNoteOff(const Vc2NodeNote& n, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);  // 0x89396c90
+    // The listeners' run (v305, Vc2AssignRelease.cpp): each sounding voice whose key table's channel state is
+    // `state`, its +0x48 virtual
+    void notify(uint32_t state, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);   // 0x89390ea0
 
 private:
     bool sameNote(uint32_t voice, const Vc2AssignCall& call, Vc2PartVoices& v, Vc2AssignParts& parts);

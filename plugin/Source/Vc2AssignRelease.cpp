@@ -29,12 +29,18 @@ void lift(uint32_t voice, uint8_t bit, Vc2PartVoices& v, Vc2AssignParts& parts) 
     if ((n.held & kAnyHeld) == 0) parts.keyOff(voice);
 }
 
+// Each sounding voice that passes `test`, given to `each`, its next link read after (v305; eachOf's loop until then)
+template <class Test, class Each>
+void eachWhere(Vc2PartVoices& v, Test test, Each each) {
+    const uint32_t sounding = v.g.lists[V::kSounding];
+    for (uint32_t voice = v.at(sounding).next; voice != sounding; voice = v.at(voice).next)
+        if (test(v.at(voice))) each(voice);
+}
+
 // Each sounding voice of the key table at `table`, given to `each`
 template <class Each>
 void eachOf(uint32_t table, Vc2PartVoices& v, Each each) {
-    const uint32_t sounding = v.g.lists[V::kSounding];
-    for (uint32_t voice = v.at(sounding).next; voice != sounding; voice = v.at(voice).next)
-        if (v.at(voice).channel == table) each(voice);
+    eachWhere(v, [table](const Vc2VoiceNode& n) { return n.channel == table; }, each);
 }
 
 // A pedal below 64: its lift on each voice of the table
@@ -107,4 +113,9 @@ void Vc2Assigner::releaseBut(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc
 
 void Vc2Assigner::releaseAll(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts) {
     eachOf(table, v, [&](uint32_t voice) { release(voice, keys.table(table), v, parts); });
+}
+
+void Vc2Assigner::notify(uint32_t state, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts) {
+    const auto onState = [&](const Vc2VoiceNode& n) { return keys.table(n.channel).channel == state; };
+    eachWhere(v, onState, [&](uint32_t voice) { parts.changed(voice, v.at(voice).part); });
 }

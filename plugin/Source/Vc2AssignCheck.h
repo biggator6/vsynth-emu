@@ -35,16 +35,24 @@ public:
     void readParameters(uint32_t part) override;
     uint8_t firstByte(uint32_t object) override { return s_.fw.cpu.rd8(object); }
     int32_t clock() override;
+    void changed(uint32_t voice, uint32_t part) override;
 
     int32_t ms = 0;   // what the OS clock answers, drawn before an event
 
 private:
+    // A virtual of the voice's class at its vtable's `entry`, logged with `more` (v305; retune's and key-off's own
+    // until then)
+    void slotCalled(VoicesKind kind, uint32_t voice, uint32_t entry, std::array<uint32_t, 7> more);
     VoicesSides& s_;
 };
 
+// rom.4's side: the virtual at `entry` of both classes hooked to log its object and the `registers` past r4, answering
+// 0 (v305; the retune's and the key-off's own until then)
+void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers);
+
 inline constexpr uint32_t kAssignSettingsAt = 0x89995390, kAssignSettingBytes = 32;    // [FW] the parts' settings
 inline constexpr uint32_t kAssignParametersAt = 0x89996120, kAssignParameterBytes = 24;   // [FW] their messages
-inline constexpr uint32_t kAssignKeyOffEntry = 0x30;                                     // [FW] a voice's slot
+inline constexpr uint32_t kAssignKeyOffEntry = 0x30, kAssignChangeEntry = 0x48;          // [FW] a voice's slots
 inline constexpr uint32_t kAssignReadAt = 0x8939b050, kAssignClockAt = 0x893018d0;       // [FW] the message, clock
 
 struct AssignCounts {

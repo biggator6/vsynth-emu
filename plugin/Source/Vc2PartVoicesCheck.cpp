@@ -228,7 +228,8 @@ int main(int argc, char** argv) {
     Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
     vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return voicesCase(s, rng); });
     sayVoiceCounts(*run, s.n);
-    const long assigner = vc2AssignPart(s, *run) + vc2AssignReleasePart(s, *run) + vc2VoiceClassPart(s, *run);
+    const long assigner = vc2AssignPart(s, *run) + vc2AssignReleasePart(s, *run) + vc2VoiceClassPart(s, *run) +
+                          vc2AssignListenersPart(s, *run);
     std::printf("xt_vc2voices: %ld different\n", tally.different + assigner);
     return 0;
 }

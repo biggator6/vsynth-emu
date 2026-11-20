@@ -70,7 +70,7 @@ VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
 VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes
            Vc2Assigner Vc2AssignCheck Vc2AssignEvents Vc2AssignRelease Vc2AssignNotes Vc2AssignReleaseCheck
            Vc2AssignReleaseEvents Vc2Keys Vc2KeysTables Vc2VoiceClass Vc2VoiceQueue Vc2VoiceClassCheck
-           Vc2VoiceClassEvents)
+           Vc2VoiceClassEvents Vc2AssignListenersCheck)
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws

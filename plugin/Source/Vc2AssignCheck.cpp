@@ -30,6 +30,23 @@ VoicesCall called(VoicesKind kind, uint32_t routine, uint32_t object, std::array
 }
 } // namespace
 
+void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers) {
+    for (const uint32_t vtable : { V::kVoiceVtable, kVoicesNoteClass }) {
+        const VoicesCall slot = voicesSlotCall(s.fw, kind, 0, vtable, entry);
+        s.fw.cpu.hook(slot.routine, [&s, kind, registers, slot](Sh4& c) {
+            std::array<uint32_t, 7> more {};
+            for (int n = 0; n < registers; ++n) more[(size_t)n] = c.r[5 + n];
+            s.rom.push_back(called(kind, slot.routine, c.r[4], more));
+            c.ret(0);
+        });
+    }
+}
+
+void AssignPortParts::slotCalled(VoicesKind kind, uint32_t voice, uint32_t entry, std::array<uint32_t, 7> more) {
+    const VoicesCall slot = voicesSlotCall(s_.fw, kind, voice, s_.port.at(voice).vtable, entry);
+    s_.mine.push_back(called(kind, slot.routine, slot.object, more));
+}
+
 // rom.4's side: the voice's two virtuals of both classes, the note's three routines and the queue's wait
 void assignInstallRom(AssignSides& a) {
     VoicesSides& s = a.s;
@@ -43,12 +60,8 @@ void assignInstallRom(AssignSides& a) {
             c.wr32(c.r[4] - prepare.object + 0x4c, assignNoteOf(s.draws.next(s.draws.rom)));
             c.ret(0);
         });
-        const VoicesCall retune = voicesSlotCall(s.fw, kVoicesRetune, 0, vtable, kAssignRetuneEntry);
-        s.fw.cpu.hook(retune.routine, [&s, retune](Sh4& c) {
-            s.rom.push_back(called(kVoicesRetune, retune.routine, c.r[4], { c.r[5], c.r[6], c.r[7] }));
-            c.ret(0);
-        });
     }
+    assignHookSlot(s, kVoicesRetune, kAssignRetuneEntry, 3);
     for (size_t k = 0; k < std::size(kRoutinesAt); ++k)
         s.fw.cpu.hook(kRoutinesAt[k], [&s, k](Sh4& c) {
             std::array<uint32_t, 7> more {};
@@ -155,8 +168,7 @@ void AssignPortParts::prepare(uint32_t voice, const Vc2AssignCall& call, const V
 }
 
 void AssignPortParts::retune(uint32_t voice, uint32_t message, uint32_t part, uint32_t value) {
-    const VoicesCall slot = voicesSlotCall(s_.fw, kVoicesRetune, voice, s_.port.at(voice).vtable, kAssignRetuneEntry);
-    s_.mine.push_back(called(kVoicesRetune, slot.routine, slot.object, { message, part, value }));
+    slotCalled(kVoicesRetune, voice, kAssignRetuneEntry, { message, part, value });
 }
 
 void AssignPortParts::noteOn(uint32_t note, uint32_t partner, int32_t onByte) {
@@ -177,9 +189,10 @@ void AssignPortParts::waitQueue(uint32_t queue, uint32_t voice) {
     s_.mine.push_back(called(kVoicesWait, kRoutinesAt[3], queue, { voice }));
 }
 
-void AssignPortParts::keyOff(uint32_t voice) {
-    const VoicesCall slot = voicesSlotCall(s_.fw, kVoicesKeyOff, voice, s_.port.at(voice).vtable, kAssignKeyOffEntry);
-    s_.mine.push_back(slot);
+void AssignPortParts::keyOff(uint32_t voice) { slotCalled(kVoicesKeyOff, voice, kAssignKeyOffEntry, {}); }
+
+void AssignPortParts::changed(uint32_t voice, uint32_t part) {
+    slotCalled(kVoicesChanged, voice, kAssignChangeEntry, { part });
 }
 
 uint8_t AssignPortParts::partSetting(uint32_t part, uint32_t offset) {

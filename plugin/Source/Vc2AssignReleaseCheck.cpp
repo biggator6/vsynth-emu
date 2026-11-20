@@ -22,13 +22,7 @@ uint32_t tableNumber(std::mt19937& rng) { return rng() % kReleaseTables; }
 // rom.4's side: the key-off virtual of both classes, the parameters' message and the clock
 void releaseInstallRom(ReleaseSides& r) {
     VoicesSides& s = r.a.s;
-    for (const uint32_t vtable : { V::kVoiceVtable, kVoicesNoteClass }) {
-        const VoicesCall slot = voicesSlotCall(s.fw, kVoicesKeyOff, 0, vtable, kAssignKeyOffEntry);
-        s.fw.cpu.hook(slot.routine, [&s, slot](Sh4& c) {
-            s.rom.push_back({ kVoicesKeyOff, slot.routine, c.r[4] });
-            c.ret(0);
-        });
-    }
+    assignHookSlot(s, kVoicesKeyOff, kAssignKeyOffEntry, 0);
     s.fw.cpu.hook(kAssignReadAt, [&s](Sh4& c) {
         s.rom.push_back({ kVoicesParameters, kAssignReadAt, c.r[4] });
         c.ret(0);

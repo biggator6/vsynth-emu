@@ -155,7 +155,7 @@ rel-kind-one-flag|constexpr uint32_t kKindOneHeld = 0x18;|constexpr uint32_t kKi
 rel-after-held|if ((n.held & kPedalsHeld) == 0) n.order[0] &= kSustainCleared;|if ((n.held & kHoldHeld) == 0) n.order[0] &= kSustainCleared;|vc2release
 rel-lift-key|    if ((n.held & bit) == 0 \|\| (n.held & kKeyHeld) != 0) return;|    if ((n.held & bit) == 0) return;|vc2release
 rel-lift-no-key-off|    afterHeld(n);\n    if ((n.held & kAnyHeld) == 0) parts.keyOff(voice);\n}\n\n// Each|    afterHeld(n);\n}\n\n// Each|vc2release
-rel-each-table|if (v.at(voice).channel == table) each(voice);|if (v.at(voice).channel != 0) each(voice);|vc2release
+rel-each-table|return n.channel == table; }|return n.channel != 0; }|vc2release
 rel-pedal-off-test|    if (pedal >= kPedalDown) return;|    if (pedal > kPedalDown) return;|vc2release
 rel-key-up|    if ((n.held & kKeyHeld) == 0) return;\n    if (keys.hold|    if (keys.hold|vc2release
 rel-hold-pedal|if (keys.hold < kPedalDown) n.held &= (uint8_t)~kHoldHeld;|if (keys.sostenuto < kPedalDown) n.held &= (uint8_t)~kHoldHeld;|vc2release
@@ -303,3 +303,11 @@ moveto-advance|    advance(node, v);\n    unlink(node, v);\n    link(|    unlink
 moveto-unlink|    unlink(node, v);\n    link(node, kHeadAt|    link(node, kHeadAt|vc2queue
 moveto-queue|    v.at(node).queue = (uint8_t)queue;\n}|}|vc2queue
 keyoff-note|parts.releaseSet(w.set, w.node.byte2f, w.node.note);|parts.releaseSet(w.set, w.node.byte2f, w.set);|vc2class
+rel-where-test|        if (test(v.at(voice))) each(voice);|        each(voice);|vc2release
+rel-where-from|    for (uint32_t voice = v.at(sounding).next; voice != sounding; voice = v.at(voice).next)|    for (uint32_t voice = v.at(sounding).prev; voice != sounding; voice = v.at(voice).prev)|vc2release
+rel-where-list|    const uint32_t sounding = v.g.lists[V::kSounding];|    const uint32_t sounding = v.g.lists[V::kPrepared];|vc2release
+notify-state|keys.table(n.channel).channel == state;|keys.table(n.channel).channel != state;|vc2release
+notify-table|keys.table(n.channel).channel == state;|n.channel == state;|vc2release
+notify-word|keys.table(n.channel).channel == state;|keys.table(n.channel).source == state;|vc2release
+notify-part|parts.changed(voice, v.at(voice).part);|parts.changed(voice, v.at(voice).source);|vc2release
+notify-voice|parts.changed(voice, v.at(voice).part);|parts.changed(v.at(voice).next, v.at(voice).part);|vc2release
