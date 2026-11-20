@@ -1546,6 +1546,94 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's kinds 5 and 6 updates on the voice (2026-11-20, v321) {#vc2-osc-kind-updates}
+
+Step 4.3's forty-ninth version, item 11's first part (VC2_MODE_PLAN.md, step 4.3): the OSC kinds' routines the voice
+still reaches by rom.4's address come into the port before Vc2Synth holds the 24 tone hosts (the user's choice,
+2026-11-20). The first two are kinds 5's and 6's updates, which `0x893ae1c0` calls after the kind's ramps:
+- `0x893afff0`, the VOCODER OSC's (kind 5), was ported in v222 as `vc2Kind5Update` on a `Vc2Kind5Voice` of drawn
+  words. Its law is in "The VOCODER OSC's converter and kind 5's update";
+- `0x893b0150`, the mic's pitch shifter's (kind 6), had no port.
+
+Both now run in the voice as the port's own (`Vc2OscVoice::updateCarrier` and `updateKind6`, `Vc2OscNoteOn.cpp`).
+Each is a row's way, `Vc2OscUpdate::carrier` and `kind6` (`Vc2OscVoiceKinds.cpp`), as the analog's update became one
+in v248.
+
+**Kind 5's.** The voice fills `Vc2Kind5Voice` from its own words where `0x893afff0` reads them:
+- the cents +0x5c, bound envelope 0's output (+0x4c) times the depth +0x70, and the vibrato's pitch output times +0xfc;
+- the pitch ramp's value (+0x90c's `0x893b1160`), the tail's offset (+0xa70);
+- the ratio's scale +0x60 and the tail's rate ratio (+0xa6c);
+- the gain: the vibrato's level times +0x100, then +0x88, +0xb0 and the pitch ramp's factor (+0x960);
+- the growl's envelope 1 and LFO 5, and the balance's envelope 2 and LFO 6, each bound object's output (an LFO's
+  +0x38).
+
+`vc2Kind5Update` writes P (+0x104) back and gives the carrier its update with the input stage's peak (`0x899d9a5c`).
+The voice asks its parts for that peak, `Vc2OscParts::inputPeak`. The tone host's link passes the question to the
+deriving class (`Vc2ToneOscLink::inputPeak`), as it does the mic ring and the unvoiced decision: in the part it is
+the input stage's, which Vc2Synth will hold.
+
+**Kind 6's, `0x893b0150(voice)`.** The row's first routine, `0x893c6260`, runs before the ramps (the EXT IN player's
+update, still by its address: item 11's next part). Then, after ramps 0 and 1:
+- P+0 = the ratio, 2^(the cents' sum / 1200) × +0x60 × the rate's ratio. Its bounds are its own pool's
+  (`0x893b0254…0x893b0268`: ±6000 cents, 1/1200, ±32), as the targets' `ratioOn` takes a pool. Those are the same
+  values as the kinds' note-on's pool (`0x893af35c…`) and the ratios' (`0x893afdc8…`);
+- P+4 = the formant (`0x893afeb0`), P+8 = the gain (`0x893aff30`), P+0xc = kind 6's level (+0x6c);
+- kind 6's set `0x893ec790` on P (`Vc2Kind6::set`).
+
+The object's pitch (+0x1cc) keeps what the note-on wrote.
+
+**The checks.** xt_vc2osc no longer hooks `0x893afff0` and `0x893b0150`: rom.4's own run in the voice against the
+port's, with the voice compared whole after every event, P and the carrier among it. What they read is drawn as a note
+gives it:
+- the input stage's peak before every event, 0 one time in four, else a level, into rom.4's word and the port's
+  answer;
+- on a kind-5 or kind-6 voice, P's growl and balance terms (+0x134 within 0…1, +0x148 within 0…2) and their
+  envelope's and LFO's depths (±1), and the carrier's Dynamics Threshold and Sensitivity (+0x128, +0x12c), beside
+  v266's levels.
+
+Two of those words lie over the block's record pointers, +0x128 the header's and +0x134 the +0xe0 record's, which a
+player's note-on reads. When the kinds' note-on makes a kind-5 voice a player, LITE's note-on read through a level as
+an address and faulted (case 0 at 40 cases, rom.4's side), so that event draws the records again
+(`oscDrawRecordWords`).
+
+The pitch ramp's factor is 1 once its phase has run to 65536, a few ticks after a case's start. So the first run
+missed a gain without it. Half the time an update on a kind-5 voice now draws the factor's phase within 0…32768 with a
+depth, and a count of 0…3, so the factor is short of its end when the update reads it. In the part that factor is
+always 1: only the restart `0x893b11a0`, which nothing calls, gives it a depth.
+
+The new draws moved both runs, and three older plants lost the rare cases they were caught by, so three draws keep
+them:
+- xt_vc2osc's `sub-plain-phase` (v244), the sub oscillator's end at HQ and NOISE holding a negative phase to 0, needs
+  a kind-3 note with the sub on, one of those three codes and a negative phase. With the sub on, one time in three the
+  code is now HQ-SQUARE, HQ-SAW or NOISE.
+- xt_vc2tone's `methods-position-bound` (v273), the position getter given a number past the OSCs', needs the voice
+  the number would wrongly name to have a position. In xt_vc2tone the players' renders are hooked and write none, so a
+  LITE's or VariPhrase voice kept its note-on's, mostly 0. Before a getter, half the time, such a voice's positions
+  (+0x194, +0x24c, +0x270) are now drawn on both sides, as v319 drew its +0x168.
+- xt_vc2tone's `host-new-block-cosm-sound` (v318), a COSM's new block not given to its sound, shows only in a render
+  before the next update converts again: about twice in 40 cases (11 times in 200), and this run none. Half the time
+  a COSM's new block now goes on into a render of the same tone (`toneRenderOf`, the render event on a given tone):
+  six times in 40 cases.
+
+xt_vc2tone's OSC voices run the same, rom.4's in its tone against the host's. Its hooks' answers (the clock, the
+peak, a render's answer, a seek's flags, the event lookup's positions) come from the same routine as xt_vc2osc's,
+`oscDrawAnswers` (`Vc2OscPartDraws.cpp`); the two checks' copies of it are now one.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400). Their count lines moved with
+  the new draws; xt_vc2osc's ramp, Vari off and vibrato parts are unchanged.
+- Every line and branch of the two updates and the voice's new switch reached, but kind 5's least ratio, −32. It needs
+  a negative factor, and a note's are positive (2^x, +0x60, the rate's ratio). xt_vc2carrier's second part reaches it
+  on drawn words (its second ratio now and then below 0).
+- `mutate_vc2.py --osc`: 51 new plants (kind 5's wiring and its offsets, kind 6's, its pool's addresses, the rows and
+  the voice's switch) and 8 rewritten on the new code (five row plants, the update's two, k5-pitch). The first run
+  missed three. Two were taken out as equivalent: kind 6's update on the kinds' note-on's pool or the ratios' bounds,
+  whose words are its own pool's. The third was kind 5's gain without the ramp's factor, which the factor's draw now
+  reaches. The whole list, 1,255, and `--tone`, 752 with the link's new plant, all caught.
+
+**Next.** Item 11's second part: the EXT IN player (`0x893c6260`, `0x893c62e0`, `0x893c61e0`), kinds 4 and 7 and kind
+6's first routine.
+
 ### The VC-2's shared routines for the plugin (2026-11-20, v320) {#vc2-tone-math}
 
 Step 4.3's forty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-fifth part). The VC-2's ports take four
@@ -4530,7 +4618,7 @@ Step 4.2's OSC voice. The VOCODER OSC's carrier (`Vc2Carrier`, v221) and the mic
 
 **What they read from outside the voice** comes through `Vc2OscParts`: the OS's millisecond word (`0x893018d0`, where a carrier's phase starts), the mic ring (`0x8a0f31cc`) and the input stage's unvoiced decision for the block (`0x899d99dc`, by `0x893ed500`). rom.4 has one ring, which every voice reads.
 
-**Not connected yet.** Kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by their addresses through `Vc2OscParts`. The first reaches the carrier's update, which reads the input stage's peak (`0x899d9a5c`); the second ends in kind 6's setter `0x893ec790`. So in xt_vc2osc a carrier's growl stays 0 and its targets stay as the note-on left them. xt_vc2carrier and xt_vc2kind6 still check those paths on their own.
+**Not connected yet.** Kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by their addresses through `Vc2OscParts`. The first reaches the carrier's update, which reads the input stage's peak (`0x899d9a5c`); the second ends in kind 6's setter `0x893ec790`. So in xt_vc2osc a carrier's growl stays 0 and its targets stay as the note-on left them. xt_vc2carrier and xt_vc2kind6 still check those paths on their own. **Connected (v321, "The VC-2's kinds 5 and 6 updates on the voice"):** both are the voice's own, and the input stage's peak comes through `Vc2OscParts`.
 
 **Check.** xt_vc2osc no longer hooks the five routines. rom.4's own run on the voices in its RAM, and after every event the carrier's and kind 6's words and the ring's start word are compared with the port's, as the render's output already was. The carriers' rate setter `0x893ec6a0` and kind 6's globals' setter `0x893ecef0` run once at the start. Each case resets the ring, writes all 128 blocks of it, then starts both voices' carrier and pitch shifter; a kind 6 render writes one more block first, with a drawn period and unvoiced decision.
 

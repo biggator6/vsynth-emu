@@ -151,7 +151,12 @@ std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
         const uint32_t* settings = s.shared.osc.settings.data();
         return toneOn(s, i, set.at, { tone, n, kOscSettingsAt }, [&] { t.setOscBlock(n, settings, parts); });
     }
-    return toneOn(s, i, set.at, { tone, n, block }, [&] { (t.*set.numbered)(n, in.block(offset), parts); });
+    const std::string what =
+        toneOn(s, i, set.at, { tone, n, block }, [&] { (t.*set.numbered)(n, in.block(offset), parts); });
+    // v321: half the time a COSM's new block goes on into a render of the tone, before an update converts again: only
+    // there does the sound's own new block show, which 40 cases reached about twice
+    if (what.empty() && set.numbered == &Vc2Tone::setCosmBlock && rng() % 2) return toneRenderOf(s, i, rng);
+    return what;
 }
 
 std::string toneKeyOffOn(ToneSides& s, std::mt19937& rng) {
@@ -189,7 +194,7 @@ std::string toneCostOn(ToneSides& s, std::mt19937& rng) {
 std::string toneGetterOn(ToneSides& s, std::mt19937& rng) {
     const ToneGetter& get = kGetters[rng() % std::size(kGetters)];
     const int i = toneDrawLive(s, rng);
-    toneDrawOscHalves(s, i, rng);   // v319
+    toneDrawOscReads(s, i, rng);   // v319, v321
     const uint32_t n = drawPartNumber(rng, 2), tone = s.pool.addressOf(i);
     const Vc2Tone& t = s.pool.tones[(size_t)i];
     Vc2ToneParts& parts = s.parts[(size_t)i];

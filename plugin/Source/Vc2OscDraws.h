@@ -83,6 +83,11 @@ struct OscRingSides {
     std::span<float> unvoiced;
     int32_t& clock;
 };
+// The hooks' answers before an event, xt_vc2osc's and xt_vc2tone's (v321, the two checks' copies made one): the OS's
+// clock, the input stage's peak (kind 5's update's Dynamics: 0 now and then, else a level, into rom.4's word
+// 0x899d9a5c too), what a render answers, the flags a seek leaves, the event lookup's positions and its second word;
+// none taken yet on either side, and the port's log of calls cleared
+void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng);
 std::string oscRingSetUp(const OscRingSides& r);
 std::string oscRingCase(const OscRingSides& r, std::mt19937& rng);
 std::string oscRingBlock(const OscRingSides& r, std::mt19937& rng);

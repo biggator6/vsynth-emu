@@ -80,6 +80,7 @@ public:
     virtual int32_t osClock() = 0;
     virtual Vc2MicRing& micRing() = 0;
     virtual const float* unvoiced() = 0;
+    virtual float inputPeak() = 0;   // v321: the input stage's peak (0x899d9a5c), kind 5's update's Dynamics
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
     // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
     // player's routine on the object; 0x893cc0d0(the object, event, &position, &…), an event's position ×16
@@ -118,6 +119,10 @@ public:
     void installAnalog();
     void updateAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void settingsAnalog(const uint32_t* from);
+    // v321 (Vc2OscNoteOn.cpp): kind 5's update 0x893afff0 (P at +0x104 and the carrier) and kind 6's 0x893b0150 (P,
+    // then kind 6's set)
+    void updateCarrier(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void updateKind6(Vc2OscParts& parts, const Vc2ToneShared& shared);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0

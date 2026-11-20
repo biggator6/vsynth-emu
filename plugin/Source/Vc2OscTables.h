@@ -40,6 +40,7 @@ struct Vc2OscTables {
     Vc2OscTargetPool ratio;     // 0x893afdc0…0x893afdd8: the ratios' (0x893afb40, 0x893afb80, 0x893afd10)
     Vc2OscTargetPool noteOn;    // 0x893af35c…0x893af370: the kinds' note-on's own
     float kind6Least = 0;       // 0x893af530: −32, kind 6's ratio's lower bound there
+    Vc2OscTargetPool kind6Update;   // 0x893b0254…0x893b0268: kind 6's update's own (v321)
     Vc2OscBounds walkTarget;    // 0x893afddc, 0x893afde0: ±5 (0x893afc30)
     Vc2OscBounds walk;          // 0x893affd4, 0x893affd8: ±5 (0x893afdf0)
     float formantTargetLeast = 0;   // 0x893afde4: 0.5 (0x893afca0)

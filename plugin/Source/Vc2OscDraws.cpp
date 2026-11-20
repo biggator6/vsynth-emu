@@ -33,8 +33,13 @@ constexpr uint32_t kAnalog = 3, kCarrierKind = 5, kKind6Kind = 6;   // [FW]
 // kind 6's level, the formant's base and its envelope's and LFO's depths
 constexpr uint32_t kRatioScale = 0x60, kLevel = 0x88, kGain = 0xb0, kLevelDepth = 0x100, kKind6Level = 0x6c;
 constexpr uint32_t kFormantBase = 0x68, kFormantEnvelope = 0x80, kFormantLfo = 0xa0;
-// [FW] P's levels the carrier's init and settings take: Saw Wave LPF and Level, Noise LPF, HPF and Level
-constexpr std::array<uint32_t, 5> kCarrierLevels { 0x110, 0x114, 0x118, 0x11c, 0x120 };
+// [FW] P's levels the carrier's init and settings take: Saw Wave LPF and Level, Noise LPF, HPF and Level; from v321,
+// as kind 5's update reads them, Dynamics Threshold and Sensitivity
+constexpr std::array<uint32_t, 7> kCarrierLevels { 0x110, 0x114, 0x118, 0x11c, 0x120, 0x128, 0x12c };
+// [FW] v321: P's terms kind 5's update reads, as its converter gives them: Growl Level (0…1) and Saw-Noise Mix Balance
+// (0…2), each with its envelope's and LFO's depths
+constexpr uint32_t kGrowl = 0x134, kBalance = 0x148;
+constexpr std::array<uint32_t, 4> kTermDepths { 0x138, 0x13c, 0x14c, 0x150 };
 constexpr uint32_t kSettingsWordsBelow = 0x54;   // [FW] a voice's word lies this far above its place in the settings
 constexpr float kFormantDepth = 0.001f;          // with an output of up to ±1000, an octave of the formant
 
@@ -67,6 +72,9 @@ void drawNoteWords(Put put, std::mt19937& rng) {
     put(kFormantEnvelope, oscWithin(rng,-kFormantDepth, kFormantDepth));
     put(kFormantLfo, oscWithin(rng,-kFormantDepth, kFormantDepth));
     for (uint32_t at : kCarrierLevels) put(at, vc2DrawLevel(rng));
+    put(kGrowl, vc2Unit(rng));
+    put(kBalance, 2.0f * vc2Unit(rng));
+    for (uint32_t at : kTermDepths) put(at, oscWithin(rng, -1.0f, 1.0f));
 }
 } // namespace
 

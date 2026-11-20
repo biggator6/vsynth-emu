@@ -76,7 +76,7 @@ update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTable
 update-wait-no-return|vc2OscTables().waitLevel) return;|vc2OscTables().waitLevel) {}|vc2osc
 update-no-reseek|        reseek(parts);\n||vc2osc
 update-first-after|    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);\n    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }|    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }\n    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);|vc2osc
-update-no-update|    else if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
+update-no-update|    if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
 reseek-no-hold|setU8(kFlags, (uint8_t)(was \| kHeld));|setU8(kFlags, was);|vc2osc
 reseek-at-unsigned|(int32_t)u32(kSeekAt) >> kSeekShift|(int32_t)(u32(kSeekAt) >> kSeekShift)|vc2osc
 reseek-bit-inverted|const uint32_t routine = bit ? seek.set : seek.clear;|const uint32_t routine = bit ? seek.clear : seek.set;|vc2osc
@@ -222,16 +222,16 @@ k4-ticks|.render = 0x893c62e0, .installed = 4, .ticks = kR0,|.render = 0x893c62e
 k4-update|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893c6260|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893afff0|vc2osckinds
 k4-flag|.update = 0x893c6260, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|.update = 0x893c6260,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|vc2osckinds
 k5-installed|{ .installed = 5|{ .installed = 6|vc2osckinds
-k5-update|.update = 0x893afff0|.update = 0x893c6260|vc2osckinds
-k5-ramp|.update = 0x893afff0, .ramp = true,|.update = 0x893afff0,|vc2osckinds
+k5-update|.updates = Vc2OscUpdate::carrier|.updates = Vc2OscUpdate::routine|vc2osckinds
+k5-ramp|.updates = Vc2OscUpdate::carrier, .ramp = true,|.updates = Vc2OscUpdate::carrier,|vc2osckinds
 k5-carrier|.ramp = true, .carrier = true,|.ramp = true,|vc2osckinds
 k5-renders|.renders = Render::carrier|.renders = Render::kind6|vc2osckinds
-k5-pitch|Render::carrier,\n      .pitch = Pitch::bounded|Render::carrier,\n      .pitch = Pitch::none|vc2osckinds
+k5-pitch|.renders = Render::carrier, .pitch = Pitch::bounded|.renders = Render::carrier, .pitch = Pitch::none|vc2osckinds
 k6-installed|{ .installed = 6|{ .installed = 5|vc2osckinds
 k6-first|.updateFirst = 0x893c6260, ||vc2osckinds
-k6-ticks|.ticks = kR0 \| kR1, .update = 0x893b0150|.ticks = kR0, .update = 0x893b0150|vc2osckinds
-k6-update|.update = 0x893b0150|.update = 0x893c6260|vc2osckinds
-k6-ramp|.update = 0x893b0150, .ramp = true,|.update = 0x893b0150,|vc2osckinds
+k6-ticks|.ticks = kR0 \| kR1, .updates = Vc2OscUpdate::kind6|.ticks = kR0, .updates = Vc2OscUpdate::kind6|vc2osckinds
+k6-update|.updates = Vc2OscUpdate::kind6|.updates = Vc2OscUpdate::routine|vc2osckinds
+k6-ramp|.updates = Vc2OscUpdate::kind6, .ramp = true,|.updates = Vc2OscUpdate::kind6,|vc2osckinds
 k6-renders|.renders = Render::kind6|.renders = Render::carrier|vc2osckinds
 k6-pitch|.renders = Render::kind6, .pitch = Pitch::bounded|.renders = Render::kind6, .pitch = Pitch::tuned|vc2osckinds
 k7-render|.render = 0x893c61e0|.render = 0x893c62e0|vc2osckinds
@@ -1017,7 +1017,7 @@ upd-install-row|0x893c5810, 0x893c2230, 0x893c4fa0,|0x893c5810, 0x893c2230, 0x89
 upd-install-sub-row|0x893c2230, 0x893c50d0, 0x893c4db0|0x893c2230, 0x893c4db0, 0x893c4db0|vc2oscanalogupdate
 upd-settings-copied|0x20, 0x30, 0x38, 0x3c, 0x40 }|0x20, 0x34, 0x38, 0x3c, 0x40 }|vc2oscanalogupdate
 upd-settings-at|setU32(kCode + at, from[at / 4]);|setU32(kCode + at, from[at / 4 + 1]);|vc2oscanalogupdate
-upd-way-update|if (row.updates == Vc2OscUpdate::analog) updateAnalog(parts, shared);   // v248\n    else if (row.update|if (row.update|vc2osc
+upd-way-update|case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;|case Vc2OscUpdate::analog: break;|vc2osc
 upd-way-install|        case Vc2OscInstall::analog: installAnalog(); return;   // v248\n||vc2osc
 upd-way-settings|if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248\n    else if (row.settings|if (row.settings|vc2oscget
 upd-pool-fat-move|0x893c2e74, 0x893c2e78, 0x893c2e7c,|0x893c2e74, 0x893c2e74, 0x893c2e7c,|vc2osctables
@@ -1248,3 +1248,60 @@ vib-wire-settings|vibrato.settings(rates);|vibrato.noteOn(rates);|vc2oscget
 vib-wire-note-on|vibrato.noteOn(paramsOf<Vc2VibratoBlock>(*this, kVibratoBlock));|vibrato.settings(paramsOf<Vc2VibratoBlock>(*this, kVibratoBlock));|vc2oscnoteon
 vib-wire-pitch|mul(v.vibrato.w.pitch, v.f32(kVibratoDepth))|mul(v.vibrato.w.level, v.f32(kVibratoDepth))|vc2osctargets
 vib-wire-level|mul(v_.vibrato.w.level, v_.f32(kLevelDepth))|mul(v_.vibrato.w.pitch, v_.f32(kLevelDepth))|vc2osctargets
+# v321: kinds 5's and 6's updates ported, 0x893afff0 and 0x893b0150 (vc2oscnoteon), their rows (vc2osckinds: v321
+# rewrote k5-update, k5-ramp, k6-ticks, k6-update and k6-ramp on the rows' new way, `.updates`), the voice's switch
+# (vc2osc) and kind 6's pool (vc2osctables); v321 rewrote update-no-update and upd-way-update on the update's switch,
+# and k5-pitch on the row's one line.  The update's law itself, vc2Kind5Update, is v222's, planted in
+# vc2car_muts.txt (vc2vocosc).  Not planted, as nothing can show them: kind 6's update on the kinds' note-on's pool or
+# the ratios' bounds in its place (0x893af35c…, 0x893afdc8…), whose words are its own pool's (±6000 cents, 1/1200, ±32)
+k5-wire-cents|{ f32(kCents), bound(|{ f32(kRatioScale), bound(|vc2oscnoteon
+k5-wire-pitch-env|bound(kPitchEnvelope, kEnvelopeOut)|bound(kGrowlEnvelope, kEnvelopeOut)|vc2oscnoteon
+k5-wire-pitch-depth|f32(kPitchDepth), vibrato.w.pitch|f32(kPitchModDepth), vibrato.w.pitch|vc2oscnoteon
+k5-wire-vib-pitch|f32(kPitchDepth), vibrato.w.pitch,|f32(kPitchDepth), vibrato.w.level,|vc2oscnoteon
+k5-wire-mod-depth|f32(kPitchModDepth), pitch.value()|f32(kGainModDepth), pitch.value()|vc2oscnoteon
+k5-wire-ramp-value|pitch.value(), tail.offset|pitch.factor(), tail.offset|vc2oscnoteon
+k5-wire-offset|pitch.value(), tail.offset,|pitch.value(), tail.detune,|vc2oscnoteon
+k5-wire-ratio-scale|tail.offset, f32(kRatioScale), tail.rateRatio|tail.offset, f32(kGainFirst), tail.rateRatio|vc2oscnoteon
+k5-wire-rate-ratio|f32(kRatioScale), tail.rateRatio,|f32(kRatioScale), tail.formantFactor,|vc2oscnoteon
+k5-wire-vib-level|vibrato.w.level, f32(kGainModDepth)|vibrato.w.pitch, f32(kGainModDepth)|vc2oscnoteon
+k5-wire-gain-depth|vibrato.w.level, f32(kGainModDepth)|vibrato.w.level, f32(kPitchModDepth)|vc2oscnoteon
+k5-wire-gain-first|{ f32(kGainFirst), f32(kGainSecond)|{ f32(kGainSecond), f32(kGainSecond)|vc2oscnoteon
+k5-wire-gain-second|f32(kGainFirst), f32(kGainSecond), pitch.factor()|f32(kGainFirst), f32(kGainFirst), pitch.factor()|vc2oscnoteon
+k5-wire-factor|f32(kGainSecond), pitch.factor() }|f32(kGainSecond), 1.0f }|vc2oscnoteon
+k5-wire-ramp|const Vc2PitchRamp& pitch = ramps[kPitchRamp];|const Vc2PitchRamp& pitch = ramps[kFormantRamp];|vc2oscnoteon
+k5-wire-growl-env|bound(kGrowlEnvelope, kEnvelopeOut), bound(kGrowlLfo|bound(kBalanceEnvelope, kEnvelopeOut), bound(kGrowlLfo|vc2oscnoteon
+k5-wire-growl-lfo|bound(kGrowlLfo, kLfoOut)|bound(kBalanceLfo, kLfoOut)|vc2oscnoteon
+k5-wire-balance-env|bound(kBalanceEnvelope, kEnvelopeOut), bound(kBalanceLfo|bound(kGrowlEnvelope, kEnvelopeOut), bound(kBalanceLfo|vc2oscnoteon
+k5-wire-balance-lfo|bound(kBalanceLfo, kLfoOut) }|bound(kGrowlLfo, kLfoOut) }|vc2oscnoteon
+k5-wire-bound-word|return parts.boundFloat(tail.binds[which], word); };|return parts.boundFloat(tail.binds[which], word + 4); };|vc2oscnoteon
+k5-wire-peak|vc2Kind5Update(v, shared, p, carrier, parts.inputPeak());|vc2Kind5Update(v, shared, p, carrier, 0.0f);|vc2oscnoteon
+k5-wire-no-write-back|    std::memcpy(own.data() + (kP - kOwn), &p, sizeof p);\n}|}|vc2oscnoteon
+k5-const-cents|kCents = 0x5c|kCents = 0x58|vc2oscnoteon
+k5-const-pitch-depth|kPitchDepth = 0x70|kPitchDepth = 0x74|vc2oscnoteon
+k5-const-mod-depth|kPitchModDepth = 0xfc|kPitchModDepth = 0xf8|vc2oscnoteon
+k5-const-ratio-scale|kRatioScale = 0x60|kRatioScale = 0x64|vc2oscnoteon
+k5-const-gain-depth|kGainModDepth = 0x100|kGainModDepth = 0x104|vc2oscnoteon
+k5-const-gain-first|kGainFirst = 0x88|kGainFirst = 0x8c|vc2oscnoteon
+k5-const-gain-second|kGainSecond = 0xb0|kGainSecond = 0xb4|vc2oscnoteon
+k5-const-pitch-env|kPitchEnvelope = 0,|kPitchEnvelope = 1,|vc2oscnoteon
+k5-const-growl-env|kGrowlEnvelope = 1,|kGrowlEnvelope = 2,|vc2oscnoteon
+k5-const-balance-env|kBalanceEnvelope = 2,|kBalanceEnvelope = 3,|vc2oscnoteon
+k5-const-growl-lfo|kGrowlLfo = 5,|kGrowlLfo = 4,|vc2oscnoteon
+k5-const-balance-lfo|kBalanceLfo = 6;|kBalanceLfo = 7;|vc2oscnoteon
+k5-const-envelope-out|kEnvelopeOut = 0x4c|kEnvelopeOut = 0x48|vc2oscnoteon
+k5-const-lfo-out|kLfoOut = 0x38|kLfoOut = 0x3c|vc2oscnoteon
+k6-wire-ratio|setF32(kP, targets.ratioOn(pool, pool.ratio));\n    setF32(kP4|setF32(kP, targets.formant());\n    setF32(kP4|vc2oscnoteon
+k6-wire-formant|    setF32(kP4, targets.formant());\n    setF32(kP8, targets.gain());\n    setF32(kPc, f32(kKind6Level));\n    const|    setF32(kP4, targets.gain());\n    setF32(kP8, targets.gain());\n    setF32(kPc, f32(kKind6Level));\n    const|vc2oscnoteon
+k6-wire-gain|    setF32(kP8, targets.gain());\n    setF32(kPc, f32(kKind6Level));\n    const|    setF32(kP8, targets.formant());\n    setF32(kPc, f32(kKind6Level));\n    const|vc2oscnoteon
+k6-wire-level|    setF32(kPc, f32(kKind6Level));\n    const|    setF32(kPc, f32(kGainFirst));\n    const|vc2oscnoteon
+k6-wire-no-set|    const Vc2Kind6Params p = paramsOf<Vc2Kind6Params>(*this);\n    kind6.set(&p);\n}|}|vc2oscnoteon
+k6-table-cents-most|{ 0x893b0254, &t.kind6Update.cents.most }|{ 0x893b0258, &t.kind6Update.cents.most }|vc2osctables
+k6-table-cents-least|{ 0x893b0258, &t.kind6Update.cents.least }|{ 0x893b0254, &t.kind6Update.cents.least }|vc2osctables
+k6-table-per-octave|{ 0x893b025c, &t.kind6Update.perOctave }|{ 0x893b0260, &t.kind6Update.perOctave }|vc2osctables
+k6-table-ratio-most|{ 0x893b0264, &t.kind6Update.ratio.most }|{ 0x893b0268, &t.kind6Update.ratio.most }|vc2osctables
+k6-table-ratio-least|{ 0x893b0268, &t.kind6Update.ratio.least }|{ 0x893b0264, &t.kind6Update.ratio.least }|vc2osctables
+k5-updates-kind6|.updates = Vc2OscUpdate::carrier|.updates = Vc2OscUpdate::kind6|vc2osckinds
+k6-updates-carrier|.updates = Vc2OscUpdate::kind6|.updates = Vc2OscUpdate::carrier|vc2osckinds
+voice-update-no-carrier|case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;|case Vc2OscUpdate::carrier: return;|vc2osc
+voice-update-no-kind6|case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;|case Vc2OscUpdate::kind6: return;|vc2osc
+voice-update-swapped|case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;|case Vc2OscUpdate::carrier: updateKind6(parts, shared); return;|vc2osc

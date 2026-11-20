@@ -16,8 +16,8 @@ enum class Vc2OscNoteOn : uint8_t { none, one, extIn, carrier, kind6, vari, lite
 // kind's own install by its address)
 enum class Vc2OscInstall : uint8_t { frame, lite, vari, analog };
 // 0x893ae1c0's and 0x893ae780's last steps (v248): the kind's update and settings by their addresses, or the analog's
-// ported
-enum class Vc2OscUpdate : uint8_t { routine, analog };
+// ported; from v321 kinds 5's and 6's updates ported too
+enum class Vc2OscUpdate : uint8_t { routine, analog, carrier, kind6 };
 enum class Vc2OscSettings : uint8_t { routine, analog };
 
 struct Vc2OscKindRow {

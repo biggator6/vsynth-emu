@@ -935,6 +935,39 @@ version against rom.4's routines with what it calls hooked:
          (rom.2's ports of rom.4's `0x893a7fb0` and `0x893a8340`, equal over what the part gives) and Vc2LibMath's
          logf and powf; xt_vc2libm's second part (HARDWARE_FIRMWARE.md, "The VC-2's shared routines for the plugin").
          The checks keep rom.4's own (`RomShared`). Next: Vc2Synth's 24 hosts on it.
+   11. The OSC kinds' routines the voice still reaches by rom.4's address (the user's choice, 2026-11-20: these before
+       Vc2Synth holds the 24 tone hosts, so that each kind sounds once the hosts are in). The voice calls them through
+       `Vc2OscParts` (`kindCall`, `kindSettings`, `renderBy`, `seek`, `objectCall`, `eventPosition`); xt_vc2osc hooks them
+       (`Vc2OscFakes.cpp`'s table, 59 rows at v320). Each joins the voice as v238…v248 joined the installs and note-ons: a row's
+       way in `Vc2OscVoiceKinds.cpp`, its hook out of the table, rom.4's own running in xt_vc2osc and xt_vc2tone. By
+       what each stands on (VC2_VOCAL_DESIGNER.md, "The VariPhrase players and key assign in rom.4"):
+       1. Kinds 5's and 6's updates, `0x893afff0` and `0x893b0150`: the first ported as `vc2Kind5Update` (v222, on the
+          input stage's peak at `0x899d9a5c`, which `Vc2OscParts` doesn't give yet), the second the note-on's kind-6
+          laws ending in `Vc2Kind6::set`. With them kinds 5 and 6 are whole but for kind 6's first routine, below.
+       2. The EXT IN player, kinds 4 and 7 and kind 6's first update: `0x893c6260` (update), `0x893c62e0` and
+          `0x893c61e0` (renders), on the effect chip's returned words, against rom.2's (`0x895097d0`, v203's
+          `XtOscVoice::extIn`).
+       3. Vari off's renders joined (`0x893c63c0`, `0x893c66e0`, v261's ports), with the wave's samples through the
+          voice's parts.
+       4. LITE: its update `0x893c8280` and settings `0x893c8390`, its object routine `0x893cbf40`, its heads' renders
+          `0x893c6e80`/`0x893c6e8c` on `XtLitePlayer` (rom.4's backward reads the right way up: a switch), kind 1's mode 1
+          (`0x893c9f60`, its set-up `0x893cc760`), its seeks `0x893c6360`, `0x893cc830`, `0x893c6de0`.
+       5. VariPhrase: its update `0x893c88b0` and the routine after it `0x893c8670`, its settings `0x893b0280`, the event
+          lookup `0x893cc0d0`, its seeks `0x893cc630`, `0x893cd090`, `0x893cd440`; the players' renders on rom.2's ports
+          given rom.4's object layout (the insert at +0x94): BACKING `0x893cadc0` and ENSEMBLE `0x893ca1f0` on
+          `XtMbPlayer`, SOLO `0x893c9450` on `XtSoloVoice` (Robot Voice rom.4's own, open), the period-jump player
+          `0x893ca8b0`.
+       6. The analog OSC's 19 renders, its installs' (`0x893c2ad0`, `0x893c3e60`), against rom.2's `XtAnalog`.
+       Then Vc2Synth's 24 hosts, what is left beyond the tone (the OS's clock, the wave's records, the mic ring, the
+       unvoiced decision, the input stage's peak, the chip's words) the part's.
+       - Kinds 5's and 6's updates (v321): `0x893afff0` by v222's `vc2Kind5Update` on the voice's own words, the
+         input stage's peak through `Vc2OscParts::inputPeak` (the tone host's link the deriving class's), and
+         `0x893b0150` (the ratio on its own pool, the formant, the gain and kind 6's level into P, then
+         `Vc2Kind6::set`), rows `Vc2OscUpdate::carrier` and `kind6`; their hooks out of xt_vc2osc, which now draws
+         the peak and P's growl, balance and Dynamics words as a note gives them (HARDWARE_FIRMWARE.md, "The VC-2's
+         kinds 5 and 6 updates on the voice"). Found: those words lie over the block's record pointers a player's
+         note-on reads; the pitch ramp's gain factor is 1 in the part, nothing calling the restart that gives it a
+         depth. Next: the EXT IN player.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

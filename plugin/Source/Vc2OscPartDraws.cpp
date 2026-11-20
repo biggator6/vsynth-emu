@@ -104,6 +104,21 @@ Vc2RampSettings oscDrawRampSettings(std::mt19937& rng) {
     return s;
 }
 
+void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng) {
+    constexpr uint32_t kPeakAt = 0x899d9a5c;   // [FW] the input stage's peak
+    OscDraws& d = shared.draws;
+    d.clock = (int32_t)rng();
+    d.peak = rng() % 4 == 0 ? 0.0f : vc2DrawLevel(rng);
+    fw.cpu.wr32(kPeakAt, std::bit_cast<uint32_t>(d.peak));
+    d.rendered = (uint32_t)rng();
+    d.seekFlags = (uint8_t)rng();
+    for (int32_t& p : d.positions) p = (int32_t)rng();   // v238: the event lookup's, each side from the first
+    d.aside = (uint32_t)rng();
+    d.romTaken = 0;
+    shared.positionsTaken = 0;
+    shared.calls.clear();
+}
+
 std::string oscRingWordsDifference(const OscRingSides& r) {
     return vc2RegionsDifference(r.fw, { { kOscRingAt, &r.ring.w, sizeof r.ring.w, "the mic ring" },
                                         { kUnvoiceLevelAt, &r.ring.g, sizeof r.ring.g, "kind 6's globals" } });

@@ -33,6 +33,8 @@ std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int voice);   // 0x8
 // The players' own draws (v238): kind 1 or 2, the wave's type 0…9 and, three times in four, the block's Vari off;
 // VariPhrase's path is a kind, a type and a bit at once, too rare among the other draws (the same file)
 void oscSteerPlayers(OscSides& s, std::mt19937& rng, int voice);
+// The block's three record pointers on a voice, each a record's (Vc2OscCheck.cpp)
+void oscDrawRecordWords(Vc2OscVoice& o, std::mt19937& rng);
 // The voices' own words and tails against rom.4's memory, then the calls; empty when nothing differs
 std::string oscDifference(OscSides& s);
 // v266 (Vc2OscKindsCheck.cpp): the carrier and kind 6 on the voice.  Once, the static initializers; a case's start, the

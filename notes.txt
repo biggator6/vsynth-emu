@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's kinds 5 and 6 updates on the voice v321 (2026-11-20, on claude/vc2-part-4-3 after v320; HARDWARE_FIRMWARE.md,
+  "The VC-2's kinds 5 and 6 updates on the voice"): step 4.3's forty-ninth version, item 11's first part (the OSC
+  kinds' routines still by rom.4's address, before Vc2Synth's 24 hosts: the user's choice). Kind 5's update
+  0x893afff0 by v222's vc2Kind5Update on the voice's own words and kind 6's 0x893b0150 (the ratio on its own pool, the
+  formant, the gain and kind 6's level into P, then Vc2Kind6::set) are the voice's (Vc2OscNoteOn.cpp), rows
+  Vc2OscUpdate::carrier and kind6; the input stage's peak comes through Vc2OscParts::inputPeak, the tone host's link
+  the deriving class's. xt_vc2osc no longer hooks them; it draws the peak and P's growl, balance and Dynamics words as
+  a note gives them, the block's record pointers again when the kinds' note-on makes a voice a player (those words lie
+  over them), and the pitch ramp's factor short of its end before a kind-5 update (in the part it is always 1). The two
+  checks' copies of the hooks' answers' draws one routine, oscDrawAnswers. Three draws keep older plants their cases:
+  with the sub oscillator on, HQ or NOISE one time in three (xt_vc2osc); a LITE's or VariPhrase voice's positions
+  before a getter (xt_vc2tone, whose players' renders write none); a COSM's new block going on into a render of its
+  tone half the time (xt_vc2tone). 0 different at seeds 2024, 7 and 31337.
+  Not in the sound yet.
+
 The VC-2's shared routines for the plugin v320 (2026-11-20, on claude/vc2-part-4-3 after v319; HARDWARE_FIRMWARE.md,
   "The VC-2's shared routines for the plugin"): step 4.3's forty-eighth version, item 10's twenty-fifth part.
   Vc2ToneMath, a Vc2ToneShared without the interpreter: XtOsc's velocity curve and exp2 (rom.2's ports of rom.4's

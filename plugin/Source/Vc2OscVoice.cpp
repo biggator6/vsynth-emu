@@ -79,8 +79,13 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
         if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
-    if (row.updates == Vc2OscUpdate::analog) updateAnalog(parts, shared);   // v248
-    else if (row.update != 0) parts.kindCall(row.update);
+    switch (row.updates) {   // the port's (v248, v321), or the kind's by its address
+        case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;
+        case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;
+        case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;
+        case Vc2OscUpdate::routine: break;
+    }
+    if (row.update != 0) parts.kindCall(row.update);
 }
 
 void Vc2OscVoice::reseek(Vc2OscParts& parts) {

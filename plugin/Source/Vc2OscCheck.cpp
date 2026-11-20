@@ -48,6 +48,20 @@ float drawLevel(std::mt19937& rng) {
 
 uint32_t maybeZero(std::mt19937& rng) { return rng() % 2 ? 0 : (uint32_t)rng(); }
 
+} // namespace
+
+// v238: the block's record pointers VariPhrase's note-on reads through (the header's, the loop record's, the +0xe0
+// record's), drawn before every event: kind 5's settings copy 88 bytes over them (its P), and a kind then steered to 2
+// would take its note-on through them, which the tone never does without a block of its own.  From v321 drawn again
+// when the kinds' note-on makes a voice a player: kinds 5's and 6's words lie over them (Vc2OscDraws.cpp)
+void oscDrawRecordWords(Vc2OscVoice& o, std::mt19937& rng) {
+    const std::array<std::pair<uint32_t, uint32_t (*)(int)>, 3> records { { { kHeaderAt, oscHeaderAt },
+                                                                           { kLoopAt, oscLoopAt },
+                                                                           { kPairAt, oscPairAt } } };
+    for (const auto& [at, where] : records) o.setU32(at, where((int)(rng() % kOscRecords)));
+}
+
+namespace {
 // The words the routines decide by, each drawn one time in four (all of them at a case's start)
 void steer(Vc2OscVoice& o, std::mt19937& rng, bool all) {
     const auto now = [&] { return all || rng() % 4 == 0; };
@@ -87,13 +101,7 @@ void steer(Vc2OscVoice& o, std::mt19937& rng, bool all) {
         const int k = (int)(rng() % kOscRecords);
         if (now()) o.tail.binds[b] = b < kEnvelopeBinds ? oscEnvelopeAt(k) : oscLfoAt(k);
     }
-    // v238: the block's record pointers VariPhrase's note-on reads through (the header's, the loop record's, the
-    // +0xe0 record's), drawn before every event: kind 5's settings copy 88 bytes over them (its P), and a kind then
-    // steered to 2 would take its note-on through them, which the tone never does without a block of its own
-    const std::array<std::pair<uint32_t, uint32_t (*)(int)>, 3> records { { { kHeaderAt, oscHeaderAt },
-                                                                           { kLoopAt, oscLoopAt },
-                                                                           { kPairAt, oscPairAt } } };
-    for (const auto& [at, where] : records) o.setU32(at, where((int)(rng() % kOscRecords)));
+    oscDrawRecordWords(o, rng);
 }
 
 // The vibrato's outputs as the targets find them, wider than its own update leaves them: the pitch's moderate, as it
@@ -108,14 +116,7 @@ void steerVibrato(Vc2OscVoice& o, std::mt19937& rng) {
 // The draws before an event, written on both sides: the answers, the records, the steered words, each voice's own
 // words, vibrato and tail into rom.4's memory
 void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
-    OscDraws& d = s.shared.draws;
-    d.clock = (int32_t)rng();
-    d.rendered = (uint32_t)rng();
-    d.seekFlags = (uint8_t)rng();
-    for (int32_t& p : d.positions) p = (int32_t)rng();   // v238: the event lookup's, each side from the first
-    d.aside = (uint32_t)rng();
-    d.romTaken = 0;
-    s.shared.positionsTaken = 0;
+    oscDrawAnswers(s.fw, s.shared, rng);
     oscDrawRecords(s.shared.records, rng);
     oscWriteRecords(s.fw, s.shared.records);
     for (Vc2OscVoice& o : s.voices) {
@@ -125,7 +126,6 @@ void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     }
     for (int v = 0; v < kOscVoices; ++v) oscWriteVoice(s, v);
     s.rom.clear();
-    s.shared.calls.clear();
 }
 
 // A case: both voices the same noise, their ramps as glides leave them (each of its built type: the voice restarts the

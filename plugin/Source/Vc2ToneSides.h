@@ -141,9 +141,10 @@ void toneMakeOscAnalog(ToneSides& s, int i, int osc, uint32_t code, std::mt19937
 void toneOscBeforeNoteOn(ToneSides& s, int i, std::mt19937& rng);
 void toneHoldOscVibratos(ToneSides& s, int i, int32_t n);
 std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng);
-// Before a getter: a VariPhrase voice's +0x168, which its player's routines write (hooked here, writing none), drawn on
-// both sides, so that the getter tells the voices apart
-void toneDrawOscHalves(ToneSides& s, int i, std::mt19937& rng);
+// Before a getter: a VariPhrase voice's +0x168, and from v321 half the time a LITE's or VariPhrase voice's positions
+// (+0x194, +0x24c, +0x270), which their players' routines write (hooked here, writing none), drawn on both sides, so
+// that the getters tell the voices apart
+void toneDrawOscReads(ToneSides& s, int i, std::mt19937& rng);
 void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng);
 void toneDrawOscRamp(Vc2ToneInput& in, std::mt19937& rng);
 std::string toneOscSetUp(ToneSides& s);
@@ -179,6 +180,8 @@ void toneEmptyLists(ToneSides& s);
 std::string toneLeaveLists(ToneSides& s, int i);
 void toneDrawLinks(ToneSides& s, int i, std::mt19937& rng);   // a tone on no list: links its constructor must clear
 std::string toneSetterOn(ToneSides& s, std::mt19937& rng);
+// The render event on tone i, already prepared (Vc2ToneEvents.cpp; v321: a COSM's new block's setter runs it too)
+std::string toneRenderOf(ToneSides& s, int i, std::mt19937& rng);
 std::string toneKeyOffOn(ToneSides& s, std::mt19937& rng);
 std::string toneTruncateOn(ToneSides& s, std::mt19937& rng);
 std::string toneCostOn(ToneSides& s, std::mt19937& rng);

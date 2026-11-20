@@ -124,6 +124,7 @@ void oscSteerPlayers(OscSides& s, std::mt19937& rng, int v) {
     if (rng() % 4) o.setU8(kFlagsByte, (uint8_t)(o.u8(kFlagsByte) | kVariOff));
     o.tail.flag = rng() % 2;   // v240: the installs' stereo rows, which only a note-on's header gave before
     steerWalkZero(o, rng);
+    oscDrawRecordWords(o, rng);   // v321: a kind 5's or 6's words may lie over them
     oscWriteVoice(s, v);
 }
 

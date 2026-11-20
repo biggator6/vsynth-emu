@@ -74,6 +74,7 @@ struct OscDraws {
     uint32_t aside = 0;          // what the lookup leaves in its second word, which its caller drops
     mutable size_t romTaken = 0;
     int32_t clock = 0;           // the OS's millisecond word a carrier's init reads (v266)
+    float peak = 0.0f;           // the input stage's peak (0x899d9a5c), which kind 5's update reads (v321)
 };
 
 // What the port's parts share: the answers, the records, the blocks' words, the output and the calls; the mic ring and
@@ -104,6 +105,7 @@ public:
     int32_t osClock() override { return s_.draws.clock; }
     Vc2MicRing& micRing() override { return s_.ring; }
     const float* unvoiced() override { return s_.unvoiced.data(); }
+    float inputPeak() override { return s_.draws.peak; }
     float boundFloat(uint32_t part, uint32_t offset) override;
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;

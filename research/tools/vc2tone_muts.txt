@@ -801,3 +801,5 @@ link-object-call|{ outside().objectCall(routine); }|{ outside().objectCall(routi
 link-event-position|{ return outside().eventPosition(event); }|{ return outside().eventPosition(event + 1); }|vc2tonehostosc
 link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHeader(at + 4); }|vc2tonehostosc
 link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc
+# v321: the input stage's peak, which kind 5's update (ported in the voice) asks of the link (vc2tonehostosc)
+link-input-peak|{ return outside().inputPeak(); }|{ return 0.0f; }|vc2tonehostosc

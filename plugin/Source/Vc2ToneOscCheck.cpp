@@ -132,16 +132,8 @@ void toneDrawOscs(ToneSides& s, std::mt19937& rng) {
     for (const OscCall& c : s.oscRom) {   // the last event's, before its log goes
         if ((size_t)c.kind < s.n.oscCalls.size()) ++s.n.oscCalls[(size_t)c.kind];
     }
-    OscDraws& d = s.shared.osc.draws;
-    d.clock = (int32_t)rng();
-    d.rendered = (uint32_t)rng();
-    d.seekFlags = (uint8_t)rng();
-    for (int32_t& p : d.positions) p = (int32_t)rng();
-    d.aside = (uint32_t)rng();
-    d.romTaken = 0;
-    s.shared.osc.positionsTaken = 0;
+    oscDrawAnswers(s.fw, s.shared.osc, rng);   // v321: the input stage's peak among them
     s.oscRom.clear();
-    s.shared.osc.calls.clear();
 }
 
 void toneDrawOscRamp(In& in, std::mt19937& rng) {
@@ -229,13 +221,22 @@ void toneHoldOscVibratos(ToneSides& s, int i, int32_t n) {
     }
 }
 
-void toneDrawOscHalves(ToneSides& s, int i, std::mt19937& rng) {
-    constexpr uint32_t kHalf = 0x168, kVariPhrase = 2;   // [FW] the word 0x893aed40 reads, as a halfword, on kind 2
+void toneDrawOscReads(ToneSides& s, int i, std::mt19937& rng) {
+    // [FW] the word 0x893aed40 reads, as a halfword, on kind 2; the positions 0x893aed60 reads: kind 2's and type 1's
+    // samples ×16, type 0's, type 2's float (v321: renders advance them; a getter of a number past the OSCs' told the
+    // voices apart only by chance)
+    constexpr uint32_t kHalf = 0x168, kLite = 1, kVariPhrase = 2;
+    constexpr uint32_t kPosition = 0x194, kPositionLite = 0x24c, kPositionFloat = 0x270;
     for (int osc = 0; osc < 2; ++osc) {
         Vc2OscVoice& v = oscOfTone(s, i, osc);
-        if (v.kind() != kVariPhrase) continue;
-        v.setU32(kHalf, (uint32_t)rng());
-        s.fw.cpu.wr32(toneOscAt(s.pool.addressOf(i), osc) + kHalf, v.u32(kHalf));
+        if (v.kind() != kLite && v.kind() != kVariPhrase) continue;
+        if (v.kind() == kVariPhrase) v.setU32(kHalf, (uint32_t)rng());
+        if (rng() % 2) {
+            v.setU32(kPosition, (uint32_t)rng());
+            v.setU32(kPositionLite, (uint32_t)rng());
+            v.setF32(kPositionFloat, oscDrawPosition(rng));
+        }
+        writeToneOsc(s, i, osc);
     }
 }
 

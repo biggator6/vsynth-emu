@@ -87,8 +87,10 @@ std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
     return what;
 }
 
-std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
-    const int i = toneDrawLive(s, rng);
+std::string toneRenderOn(ToneSides& s, std::mt19937& rng) { return toneRenderOf(s, toneDrawLive(s, rng), rng); }
+} // namespace
+
+std::string toneRenderOf(ToneSides& s, int i, std::mt19937& rng) {
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     toneBothWord(s, i, kToneRendersAt, tone.tail.renders, rng() % 4 == 0 ? 0 : 1);
     s.n.renders += tone.tail.renders != 0;
@@ -112,6 +114,7 @@ std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
     return what.empty() ? toneOutDifference(s) : what;
 }
 
+namespace {
 std::string toneClockOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     const float x = 4.0f * vc2Unit(rng) - 2.0f;

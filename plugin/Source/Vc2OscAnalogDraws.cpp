@@ -46,6 +46,9 @@ void steerSub(Vc2OscVoice& o, std::mt19937& rng) {
     constexpr uint32_t kSubOn = 0x138, kCode = 0x104, kImpact = 0x130, kPhase = 0x260, kHqLast = 1, kNoise = 8;
     if (std::trunc(o.f32(kSubOn)) == 0.0f) return;
     if (rng() % 2 == 0) steerHighWave(o, rng);
+    // v321: one time in three HQ-SQUARE, HQ-SAW or NOISE: a negative phase at their end (the chain of a kind-3 note,
+    // the sub on, one of these codes and the phase) came up too rarely at 40 cases once v321's draws moved the run
+    if (rng() % 3 == 0) o.setU32(kCode, rng() % 3 == 0 ? kNoise : (uint32_t)rng() % (kHqLast + 1));
     const uint32_t code = o.u32(kCode);
     if ((code <= kHqLast || code == kNoise) && rng() % 2 == 0) {
         o.setF32(kImpact, -vc2Unit(rng));

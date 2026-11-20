@@ -782,25 +782,25 @@ mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 
 voices' update and schedule: 16000 events
 xt_vc2mixer: 0 different
 == xt_vc2tone
-tone: 40 cases, 16000 events, 955 made, 2221 none, 421 built in place, 441 unmade (382 back), 814 updates, 178 ended, 610 renders, 0 different
-note-on: 1235 note-ons, 222 players taken, 1989 LFOs following, 2380 free LFOs, 214 inputs fixed
-free LFOs: 373 ticks, 377 clocks
-modulators: 442 reads of their bound words
-mix: 799 plays, blocks by routine: 2164 640 138 569 205 634 319 393
-methods: 777 setters, 386 key-offs, 431 truncations (319 waits), 423 costs, 436 getters
-lists: 858 starts (755 tones started), 401 moves alone, 849 left before a rebuild
-settings and release: 30 envelopes' settings in sustain, 545 LFOs' fades started, 374 released envelopes ticked
-tva: 53 renders whose told fade ended
-cosm: 670 slots taken, 295 freed before a note-on, 368 stale named none, 188 modes kept, 225 whole renders through COSM 1 (56 a stereo Side Band Filter)
-osc: note-ons by kind 310 171 198 397 792 193 193 216 (341 OSC 1s steady for a COSM 1 of its pitch), 85 settings, 90 mic blocks; calls beyond the tone: 1223 kinds' routines, 8 settings, 458 renders, 206 seeks, 230 object setups, 78 event lookups
+tone: 40 cases, 16000 events, 879 made, 1369 none, 433 built in place, 442 unmade (385 back), 832 updates, 174 ended, 753 renders, 0 different
+note-on: 1332 note-ons, 225 players taken, 2036 LFOs following, 2735 free LFOs, 197 inputs fixed
+free LFOs: 434 ticks, 446 clocks
+modulators: 425 reads of their bound words
+mix: 898 plays, blocks by routine: 2447 940 158 611 159 590 446 414
+methods: 908 setters, 431 key-offs, 460 truncations (295 waits), 434 costs, 464 getters
+lists: 875 starts (794 tones started), 435 moves alone, 916 left before a rebuild
+settings and release: 44 envelopes' settings in sustain, 610 LFOs' fades started, 424 released envelopes ticked
+tva: 58 renders whose told fade ended
+cosm: 688 slots taken, 320 freed before a note-on, 305 stale named none, 210 modes kept, 273 whole renders through COSM 1 (62 a stereo Side Band Filter)
+osc: note-ons by kind 321 212 204 446 851 216 186 228 (352 OSC 1s steady for a COSM 1 of its pitch), 96 settings, 85 mic blocks; calls beyond the tone: 1135 kinds' routines, 11 settings, 578 renders, 240 seeks, 296 object setups, 66 event lookups
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values
 vari off: 40 cases, 2400 blocks (1201 mono, 1199 stereo, 361 of them folded; 254 silent, 807 loops, 1339 turning; 714 with the loop past the last sample)
 vibrato: 40 cases, 12000 events, 8280 updates (4378 falling, 4099 with a pitch)
-osc: 40 cases, 16000 events, 2548 note-ons (397 with a sample, 1265 without), 1668 updates, 1672 renders, 828 settings, 829 takes, 3413 getters
-kinds 5 and 6: 219 carriers started, 174 carrier blocks, 92 carrier settings, 226 kind 6 starts, 181 kind 6 blocks; 352 of the blocks sounding, 0 not finite
-calls: 331 seeks, 1733 kinds' routines, 135 event lookups, 413 object setups; 2633 ramps gliding after an event
+osc: 40 cases, 16000 events, 2546 note-ons (407 with a sample, 1276 without), 1683 updates, 1738 renders, 841 settings, 842 takes, 3389 getters
+kinds 5 and 6: 214 carriers started, 167 carrier blocks, 80 carrier settings, 204 kind 6 starts, 187 kind 6 blocks; 351 of the blocks sounding, 0 not finite
+calls: 332 seeks, 1415 kinds' routines, 126 event lookups, 399 object setups; 2966 ramps gliding after an event
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

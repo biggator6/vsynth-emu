@@ -44,14 +44,27 @@ std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
     });
 }
 
+// v321: kind 5's gain takes the pitch ramp's factor (+0x54), which is 1 once its phase has run to its end, a few ticks
+// after the case's start: half the time on a kind-5 voice the factor's phase 0…32768 with a depth, and a count of 0…3,
+// so that the tick before the update leaves it short of its end (its step at most 10000)
+uint32_t steerFactor(Vc2OscVoice& o, std::mt19937& rng, uint32_t n) {
+    constexpr uint32_t kCarrierKind = 5;   // [FW]
+    if (o.kind() != kCarrierKind || rng() % 2) return n;
+    Vc2RampWords& w = o.ramps[Vc2OscVoice::kPitchRamp].w;
+    w.factorPhase = 32768.0f * vc2Unit(rng);
+    w.factorDepth = rng() % 2 ? 1.0f : 2.0f * vc2Unit(rng);
+    return rng() % 4;
+}
+
 std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     // now and then high bits, which it drops; its low half never negative (v236: the ramps' tick reads past the factor's
     // table on a negative count, which the tone never gives)
-    const uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() & ~kCountSign : rng() % 64;
+    uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() & ~kCountSign : rng() % 64;
     // v248: one time in four the analog (its own update); a kind-3 voice's words drawn as its converter could give
     // them, as a note-on's are (noise there could be NaNs, whose FTRC and difference the interpreter takes otherwise)
     if (rng() % 4 == 0) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);
+    n = steerFactor(s.voices[(size_t)v], rng, n);
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
     oscWriteVoice(s, v);
     ++s.n.updates;
