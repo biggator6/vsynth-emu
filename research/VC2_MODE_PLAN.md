@@ -908,9 +908,12 @@ version against rom.4's routines with what it calls hooked:
        - The envelopes' and LFOs' settings and release done (v315): `0x893ac110`, `0x893ac470`, `0x893acff0` and
          `0x893ac8c0`, rom.2's word for word, as `Vc2ToneEnvelope::settings` and `release` and `Vc2ToneLfo::settings`
          and `release` on XtEnvelope's and XtLfo's laws, their hooks out of xt_vc2tone (HARDWARE_FIRMWARE.md, "The
-         VC-2's envelopes' and LFOs' settings and release"). The tone's parts' host needed them. Next: that host, a
-         port class joining a tone's real parts (the envelopes, LFOs, mix, lists and free LFOs, which xt_vc2tone's
-         port side joins today, then the TVA, the COSMs and the OSC voices one at a time), which Vc2Synth holds 24 of.
+         VC-2's envelopes' and LFOs' settings and release"). The tone's parts' host needed them.
+       - The tones' parts' host done (v316): `Vc2ToneHost`, `Vc2ToneParts` for the parts the port has whole (a tone's
+         envelopes, LFOs and mix, the free LFOs, the lists, the bindings' flags) on what every tone shares
+         (`Vc2ToneCommon`), the code xt_vc2tone's port side joined them with, moved into the plugin; the parts not
+         joined yet a deriving class's (HARDWARE_FIRMWARE.md, "The VC-2 tone's parts' host"). Next: the TVA joined,
+         then the COSMs, then the OSC voices; with the three the host is whole and Vc2Synth holds 24.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

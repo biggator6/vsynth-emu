@@ -1546,6 +1546,45 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 tone's parts' host (2026-11-20, v316) {#vc2-tone-host}
+
+Step 4.3's forty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-first part). Vc2Synth needs a tone's
+parts as port objects behind the tone's interface, `Vc2ToneParts`. Until now the only code that joined the ported
+parts to that interface was xt_vc2tone's port side, a check. `Vc2ToneHost` (Vc2ToneHost.h, Vc2ToneHost.cpp) is that
+code moved into the plugin, not copied.
+
+**What it joins.** Each tone's 14 envelopes and 8 LFOs (`Vc2ToneModulators`) and its OSC mix (`Vc2ToneMix`), held by
+the host at the tone's +0x1b38, +0x2158 and +0x1ab8. And what every tone shares, `Vc2ToneCommon`, each rom.4's at
+its own address:
+- the pool (0x8999f524);
+- the part's two lists of tones (0x89999678…);
+- the mixes' delay lines (0x8a0af984, 0x8a0bb384);
+- the free LFOs (0x8a0c6d84);
+- the LFOs' constructors' generator (0x89999668).
+
+Every call the tone makes on those parts goes through it: build and destroy, the ticks, the clock, the note-ons, the
+follow and the free objects, the lists, the settings and release (v315), and the flags a binding leaves on the bound
+envelopes and LFOs (`bindFlags`).
+
+**What it leaves to a deriving class.**
+- The parts not joined yet: the OSC voices, the COSMs and the TVA (`buildPart` and `destroyPart` for their
+  construction).
+- Another tone's host, which a key-unsynced LFO follows (`hostOf`).
+- The tail's two routines (the note's) and the OS's wait.
+
+xt_vc2tone's `TonePortParts` is now that class: its fakes and its counts of follows and takes, over the host.
+
+**The check.** xt_vc2tone's lines are v315's, every one, at seed 2024. 0 different at seeds 7 and 31337 (400). Every
+line, branch and region of `Vc2ToneHost.cpp` is reached. The five one-line queries (an LFO's follow word, its note
+value's switch, the envelopes' and LFOs' on words) are in the .cpp, not the header, so plants reach them. 35 planted
+errors (`vc2tonehost`), 0 missed, and the whole `--tone` list. Not planted: the free object's value the tone reads,
+which `startFree`, its one caller, drops; the port's LFO reads the free object's phase itself.
+
+**Next.** The TVA joins the host. rom.4's own TVA runs in xt_vc2tone. The TVA's envelope and LFOs are read through
+the tone's real modulators (`Vc2ToneModulators::tvaEnvelope`, `lfoOut`, v268's). The fade's step is rom.4's word at
+0x8993eb08, C's TVA step (v285). Then the COSMs, then the OSC voices. With all three joined the host is whole, and
+Vc2Synth holds 24.
+
 ### The VC-2's envelopes' and LFOs' settings and release (2026-11-20, v315) {#vc2-modulators-settings-release}
 
 Step 4.3's forty-third version (VC2_MODE_PLAN.md, step 4.3, item 10's twentieth part). The tone's parts need a host

@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 tone's parts' host v316 (2026-11-20, on claude/vc2-part-4-3 after v315; HARDWARE_FIRMWARE.md, "The VC-2
+  tone's parts' host"): step 4.3's forty-fourth version, item 10's twenty-first part. Vc2ToneHost (Vc2ToneHost.h/.cpp,
+  in Vc2Sources.cmake): Vc2ToneParts for the parts the port has whole (a tone's envelopes, LFOs and mix, the free LFOs,
+  the part's lists of tones, the bindings' flags) on what every tone shares (Vc2ToneCommon), the code xt_vc2tone's port
+  side joined them with, moved into the plugin; the parts not joined yet (OSC voices, COSMs, TVA), the tail's routines
+  and the OS's wait a deriving class's. xt_vc2tone's TonePortParts derives from it: its lines v315's, every one; 0
+  different at seeds 7 and 31337; the host's lines, branches and regions all reached; 35 planted (vc2tonehost), 0
+  missed, and the whole --tone list. Not in the sound yet.
+
 The VC-2's envelopes' and LFOs' settings and release v315 (2026-11-20, on claude/vc2-part-4-3 after v314;
   HARDWARE_FIRMWARE.md, "The VC-2's envelopes' and LFOs' settings and release"): step 4.3's forty-third version, item
   10's twentieth part. rom.4's 0x893ac110, 0x893ac470, 0x893acff0 and 0x893ac8c0, rom.2's word for word, as

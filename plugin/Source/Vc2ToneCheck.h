@@ -5,6 +5,7 @@
 #include "Vc2CheckRig.h"
 #include "Vc2FreeLfos.h"
 #include "Vc2Tone.h"
+#include "Vc2ToneHost.h"
 #include "Vc2ToneLists.h"
 #include "Vc2ToneMix.h"
 #include "Vc2ToneModulators.h"
@@ -99,22 +100,14 @@ struct ToneShared {
     long follows = 0, takes = 0;             // the LFOs that followed another tone's, took a free object
 };
 
-// A tone's port parts: answers from the shared draws and its words, the calls logged as its tone's
-class TonePortParts final : public Vc2ToneParts {
+// A tone's port parts: the host's (v316) for the parts the port has whole, fakes for the rest, answering from the shared
+// draws and its words, the calls logged as its tone's
+class TonePortParts final : public Vc2ToneHost {
 public:
-    TonePortParts(int tone, ToneShared& shared) : tone_(tone), s_(shared) {}
-    void build(Vc2TonePiece piece) override;
-    void destroy(Vc2TonePiece piece) override;
-    bool lfoFollows(int lfo) override { return mods.lfos[(size_t)lfo].w.follow != 0; }
-    void unfollow(int lfo) override;
-    void unlist(bool fromOne) override;
-    bool envelopeOn(int envelope) override { return mods.envelopes[(size_t)envelope].w.on != 0; }
-    void tickEnvelope(int envelope, int32_t n) override;
-    bool lfoOn(int lfo) override { return mods.lfos[(size_t)lfo].w.on != 0; }
-    void tickLfo(int lfo, int32_t n) override;
-    void clockLfo(int lfo, float x) override;
+    TonePortParts(int tone, ToneShared& shared);
+    void followLfo(int lfo, int tone, const uint32_t* block) override;   // counted, then the host's
+    uint32_t freeLfo(uint32_t id, int lfo) override;                     // the same
     void updateOsc(int osc, int32_t n) override;
-    void updateMix() override {}   // [FW] 0x893ade40 returns at once
     float oscValue(int osc) override { return std::bit_cast<float>(words.osc[(size_t)osc].value); }
     void updateCosm(int cosm, float x) override;
     bool tvaOver() override { return answered(kTvaOver, s_.draws.tvaOver); }
@@ -122,7 +115,6 @@ public:
     void updateTva() override;
     void ended() override;   // logged with the tone's state as the end routine finds it
     void renderOsc(int osc, float* buffer) override;
-    void renderMix(const float* a, const float* b, float* c) override;
     void renderCosm(int cosm, float* buffer) override;
     void renderTva(const float* in, float* out) override;
     void countOsc(int osc, uint32_t x) override;
@@ -132,20 +124,7 @@ public:
     uint32_t installOsc(int osc) override;
     int32_t oscKind(int osc) override { return (int32_t)words.osc[(size_t)osc].kind; }
     uint32_t oscFlag(int osc) override { return words.osc[(size_t)osc].flag; }
-    void installMix(bool kind3) override;
     uint32_t installCosm(int cosm, uint32_t flag) override;
-    void noteOnEnvelope(int envelope, const uint32_t* block) override;
-    void noteOnLfo(int lfo, const uint32_t* block, float x) override;
-    void followLfo(int lfo, int tone, const uint32_t* block) override;
-    uint32_t freeLfo(uint32_t id, int lfo) override;
-    void attachFree(int lfo, uint32_t free) override;
-    float freeValue(uint32_t free) override;
-    void startFree(int lfo, const uint32_t* block, float value, float x) override;
-    bool lfoListed(int lfo) override { return mods.lfos[(size_t)lfo].w.sync != 0; }
-    uint32_t lfoFollow(int lfo) override { return mods.lfos[(size_t)lfo].w.follow; }
-    void relist(uint32_t follow, uint32_t id, int lfo) override;
-    void list(uint32_t id, int lfo) override;
-    void markFree(uint32_t free, uint32_t id, int lfo) override;
     void bindOsc(int osc, const Vc2ToneBinding<4>& b) override;
     void bindCosm(int cosm, const Vc2ToneBinding<2>& b) override;
     void bindTva(int envelope, int lfoA, int lfoB, int32_t serial) override;
@@ -154,21 +133,14 @@ public:
     void noteOnOsc(int osc, const uint32_t* block, bool legato) override;
     void takePlayer(int osc, int tone) override;
     void setOsc(int osc, const uint32_t* block) override;
-    void noteOnMix(const uint32_t* block, uint32_t flag1, uint32_t flag2) override;
     Vc2ToneCosmSetUp cosmSetUp(int osc) override;
     void setUpCosm(int cosm, const Vc2ToneCosmSetUp& s, uint32_t flag) override;
     void startCosm(int cosm, const uint32_t* block, int which) override;
     void noteOnTva(const uint32_t* block, uint32_t flag) override;
-    void enlist() override;
     void settingsOsc(int osc, const uint32_t* block) override;
-    void settingsLfo(uint32_t lfo, const uint32_t* block) override;
-    void settingsEnvelope(uint32_t envelope, const uint32_t* block) override;
     void newBlockCosm(int cosm, const uint32_t* block) override;
-    void settingsMix(const uint32_t* block) override;
     void newBlockTva(const uint32_t* block) override;
     void legatoOsc(int osc, const uint32_t* ramp) override;
-    void releaseLfo(int lfo) override;
-    void releaseEnvelope(int envelope) override;
     void keyOffOsc(int osc) override;
     void truncateTvaTold() override;
     void truncateTva() override;
@@ -181,19 +153,19 @@ public:
     uint32_t oscPosition(int osc) override;
 
     ToneWords words {};
-    Vc2ToneModulators mods {};   // the real envelopes and LFOs
-    Vc2ToneMix mix {};           // the real OSC mix (v269)
+
+protected:
+    void buildPart(Vc2TonePiece piece) override;     // logged
+    void destroyPart(Vc2TonePiece piece) override;
+    const Vc2ToneHost& hostOf(int tone) override;
 
 private:
-    Vc2ToneTail& tail() { return s_.pool->tones[(size_t)tone_].tail; }
     void log(ToneKind kind, int32_t part, std::array<uint32_t, 4> args = {}, bool onTone = true) {
-        s_.calls.push_back({ kind, onTone ? tone_ : kToneNone, part, args[0], args[1], args[2], args[3] });
+        s_.calls.push_back({ kind, onTone ? tone() : kToneNone, part, args[0], args[1], args[2], args[3] });
     }
     bool answered(ToneKind kind, bool answer);
     uint32_t bufferOf(const float* p) const;
     uint32_t blockOf(const uint32_t* p) const;
-    void setFlags(std::span<const int32_t> envelopes, std::span<const int32_t> lfos);
-    int tone_;
     ToneShared& s_;
 };
 

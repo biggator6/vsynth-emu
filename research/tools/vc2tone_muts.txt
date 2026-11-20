@@ -664,3 +664,40 @@ lfo-release-always|    if (w.active == 0) return;\n||vc2tonelfo
 lfo-release-stays-active|    w.active = 0;\n    if (w.mode|    if (w.mode|vc2tonelfo
 lfo-release-block-mode|if (w.mode - (uint32_t)kFirstOffMode|if ((uint32_t)w.fadeMode - (uint32_t)kFirstOffMode|vc2tonelfo
 lfo-release-no-fade|    l.fadeStart();   // rom.4's through the vtable's +0x0c, 0x893ac580 (rom.2's 0x894f04d0)\n||vc2tonelfo
+# v316: the tones' parts' host (vc2tonehost, Vc2ToneHost.cpp), what xt_vc2tone's port side joined until v316.  Not
+# planted: freeValue's word (startFree, its one caller, reads the free object's phase itself and drops the value).
+host-build-envelopes|if (piece == Piece::envelopes) mods.buildEnvelopes();|if (piece == Piece::envelopes) buildPart(piece);|vc2tonehost
+host-build-lfos|else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);|else if (piece == Piece::lfos) buildPart(piece);|vc2tonehost
+host-build-mix|else if (piece == Piece::mix) mix.construct(tail());|else if (piece == Piece::mix) buildPart(piece);|vc2tonehost
+host-destroy-lfos|if (piece == Piece::lfos) mods.destroyLfos();|if (piece == Piece::lfos) destroyPart(piece);|vc2tonehost
+host-lfo-follows|return mods.lfos[(size_t)lfo].w.follow != 0; }|return mods.lfos[(size_t)lfo].w.on != 0; }|vc2tonehost
+host-lfo-follow|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[(size_t)lfo].w.follow; }|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[0].w.follow; }|vc2tonehost
+host-lfo-listed|return mods.lfos[(size_t)lfo].w.sync != 0; }|return mods.lfos[(size_t)lfo].w.keySync != 0; }|vc2tonehost
+host-envelope-on|return mods.envelopes[(size_t)envelope].w.on != 0; }|return mods.envelopes[(size_t)envelope].w.on == 0; }|vc2tonehost
+host-lfo-on|bool Vc2ToneHost::lfoOn(int lfo) { return mods.lfos[(size_t)lfo].w.on != 0; }|bool Vc2ToneHost::lfoOn(int lfo) { return mods.lfos[(size_t)lfo].w.on == 0; }|vc2tonehost
+host-unfollow|c_.frees.release(mods.lfos[(size_t)lfo].w.follow);|c_.frees.release(mods.lfos[0].w.follow);|vc2tonehost
+host-unlist-swapped|if (fromOne) c_.lists.unlistNew(self(), c_.pool);|if (fromOne) c_.lists.unlistSounding(self(), c_.pool);|vc2tonehost
+host-tick-envelope|mods.envelopes[(size_t)envelope].tick(n); }|mods.envelopes[(size_t)envelope].tick(1); }|vc2tonehost
+host-tick-lfo|mods.lfos[(size_t)lfo].tick(n); }|mods.lfos[(size_t)lfo].tick(n + 1); }|vc2tonehost
+host-clock-lfo|mods.lfos[(size_t)lfo].clock(x); }|mods.lfos[(size_t)lfo].clock(0.0f); }|vc2tonehost
+host-render-mix|mix.render(a, b, c, tail(), c_.rings);|mix.render(b, a, c, tail(), c_.rings);|vc2tonehost
+host-install-mix|mix.install(kind3, tail());|mix.install(false, tail());|vc2tonehost
+host-note-on-envelope|    mods.envelopes[(size_t)envelope].noteOn(block);|    mods.envelopes[(size_t)envelope].settings(block);|vc2tonehost
+host-note-on-lfo|mods.lfos[(size_t)lfo].noteOn(block, x); }|mods.lfos[(size_t)lfo].noteOn(block, 120.0f); }|vc2tonehost
+host-follow-itself|follow(hostOf(tone).mods.lfos[(size_t)lfo], block, c_.frees);|follow(mods.lfos[(size_t)lfo], block, c_.frees);|vc2tonehost
+host-free-take|return c_.frees.take(id, lfo); }|return c_.frees.take(id, 0); }|vc2tonehost
+host-attach|mods.lfos[(size_t)lfo].attach(free, c_.frees); }|mods.lfos[0].attach(free, c_.frees); }|vc2tonehost
+host-start-free|    mods.lfos[(size_t)lfo].startFree(block, x, c_.frees);|    mods.lfos[(size_t)lfo].startFree(block, 120.0f, c_.frees);|vc2tonehost
+host-relist|c_.frees.addClock(follow, id, lfo); }|c_.frees.addClock(follow, id, 0); }|vc2tonehost
+host-list|c_.frees.removeClock(id, lfo); }|c_.frees.removeClock(id, 0); }|vc2tonehost
+host-mark-lfo|    o.lfo = lfo;\n||vc2tonehost
+host-mark-id|    o.id = id;\n||vc2tonehost
+host-note-on-mix|mix.noteOn(block, flag1, flag2, tail(), c_.rings);|mix.noteOn(block, flag2, flag1, tail(), c_.rings);|vc2tonehost
+host-enlist|c_.lists.enlist(self(), c_.pool); }|c_.lists.enlist(c_.pool.addressOf(0), c_.pool); }|vc2tonehost
+host-settings-lfo|mods.lfos[lfo].settings(block); }|mods.lfos[0].settings(block); }|vc2tonehost
+host-settings-envelope|    mods.envelopes[envelope].settings(block);|    mods.envelopes[0].settings(block);|vc2tonehost
+host-settings-mix|{ mix.settings(block, tail()); }|{ (void)block; }|vc2tonehost
+host-release-lfo|mods.lfos[(size_t)lfo].release(); }|mods.lfos[0].release(); }|vc2tonehost
+host-release-envelope|mods.envelopes[(size_t)envelope].release(); }|mods.envelopes[0].release(); }|vc2tonehost
+host-flags-envelopes|mods.envelopes[(size_t)e].w.on = 1;|mods.envelopes[(size_t)e].w.on = 0;|vc2tonehost
+host-flags-lfos|mods.lfos[(size_t)l].w.on = 0;|mods.lfos[(size_t)l].w.on = 1;|vc2tonehost
