@@ -14,6 +14,7 @@
 #ifdef XT_VC2TONE_MAIN
 #include "Vc2ToneSides.h"
 #include "Vc2CarrierTables.h"
+#include "Vc2CheckRom2.h"
 #include "Vc2Kind6Tables.h"
 #include "Vc2OscTables.h"
 #include "Vc2RampTables.h"
@@ -66,9 +67,7 @@ std::string vc2ToneCase(ToneSides& s, std::mt19937& rng) {
 // The mix's constants from rom.4; XtEnvelope's and XtLfo's tables from the rom.2 beside it: rom.4's are the same words as
 // far as they're read
 bool toneLoadTables(const char* path) {
-    std::string rom2 = path;
-    const size_t at = rom2.rfind("rom.4");
-    if (at != std::string::npos) rom2.replace(at, 5, "rom.2");
+    const std::string rom2 = vc2Rom2Of(path);
     return vc2LoadToneMix(path) && vc2LoadTva(path) && vc2LoadCosm(path) && vc2LoadOsc(path) && vc2LoadRamp(path)
            && vc2LoadCarrier(path) && vc2LoadKind6(path) && xtEnvLoadTables(rom2.c_str())
            && xtLfoLoadTables(rom2.c_str()) && xtCosmLoadTables(rom2.c_str());

@@ -118,3 +118,11 @@ table-over-short|kExpOver { 0x898c5660, 7 }|kExpOver { 0x898c5660, 6 }|vc2libmta
 table-under|kExpUnder { 0x898c567c, 7 }|kExpUnder { 0x898c5680, 7 }|vc2libmtables
 table-under-short|kExpUnder { 0x898c567c, 7 }|kExpUnder { 0x898c567c, 6 }|vc2libmtables
 table-under-is-over|kExpUnder { 0x898c567c, 7 }|kExpUnder { 0x898c5660, 7 }|vc2libmtables
+# v320: the plugin's shared routines (vc2tonemath), each a call of the wrong routine or its arguments moved; xt_vc2libm's
+# second part.
+math-velocity-args|return xtVelCurveValue(velocity, sens, curve);|return xtVelCurveValue(velocity, curve, sens);|vc2tonemath
+math-velocity-held|return xtVelCurveValue(velocity, sens, curve);|return xtVelCurveValue(velocity, sens, curve) & 0x7fff;|vc2tonemath
+math-exp2-negated|{ return xtOscExp2(x); }|{ return xtOscExp2(-x); }|vc2tonemath
+math-exp2-is-exp|{ return xtOscExp2(x); }|{ return vc2LibExp(x); }|vc2tonemath
+math-log-is-exp|{ return vc2LibLog(x); }|{ return vc2LibExp(x); }|vc2tonemath
+math-pow-args|{ return vc2LibPow(x, y); }|{ return vc2LibPow(y, x); }|vc2tonemath

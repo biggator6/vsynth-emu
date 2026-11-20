@@ -931,6 +931,10 @@ version against rom.4's routines with what it calls hooked:
          in the tone's parts' host"). Found: the tone drops the install's answer; an install writes no render for a
          type or code it has no player for; the analog's install reads the code's copy at +0x248; only a note-on
          writes a voice's kind and flag. Next: Vc2Synth's 24 hosts, what a voice calls beyond the tone the part's.
+       - The shared routines for the plugin (v320): `Vc2ToneMath`, a `Vc2ToneShared` on XtOsc's velocity curve and exp2
+         (rom.2's ports of rom.4's `0x893a7fb0` and `0x893a8340`, equal over what the part gives) and Vc2LibMath's
+         logf and powf; xt_vc2libm's second part (HARDWARE_FIRMWARE.md, "The VC-2's shared routines for the plugin").
+         The checks keep rom.4's own (`RomShared`). Next: Vc2Synth's 24 hosts on it.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

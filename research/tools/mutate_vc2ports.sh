@@ -27,7 +27,7 @@
 # (vc2cosmdrive), the Resonator's, Frequency Shifter's and Lo-Fi's (vc2cosmbalanced), under xt_vc2cosm; the Side Band
 # Filters' (vc2cosmsideband, v241), under xt_vc2cosm; the Matrix core's refresh and groups (v243) in vc2matrix's file;
 # the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm; the library's logf and powf (vc2libm) and their
-# constants (vc2libmtables) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
+# constants (vc2libmtables) and the plugin's shared routines (vc2tonemath, v320) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
 # (vc2voicestables) under xt_vc2voices; the part's notes W (vc2notes, v275) under xt_vc2notes; the part's keys
 # (vc2keys, v276) and their tables (vc2keystables) under xt_vc2keys; the assigner's first part (vc2assign, v277)
 # under xt_vc2voices, its second part; its second part (vc2release, vc2nodenotes, v278) under its third; the voice's
@@ -74,7 +74,7 @@ VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmT
          Vc2MatrixSetupDraws Vc2CosmObject Vc2CosmObjectCheck Vc2CosmPools Vc2CosmNoteOn Vc2CosmNoteOnCheck
          Vc2CosmNoteOnDraws Vc2CosmAdapters Vc2CosmAdapterWords Vc2CosmAdapterBlocks Vc2CosmTbAdapter
          Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmDspCheck Vc2CosmDspKinds Vc2CosmDspSlots XtCosm XtOsc XtEnvelope)
-VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
+VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck Vc2ToneMath Vc2ToneMathCheck XtOsc XtEnvelope)
 VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes
            Vc2Assigner Vc2AssignCheck Vc2AssignEvents Vc2AssignRelease Vc2AssignNotes Vc2AssignReleaseCheck
            Vc2AssignReleaseEvents Vc2Keys Vc2KeysTables Vc2VoiceClass Vc2VoiceQueue Vc2VoiceClassCheck
@@ -202,6 +202,7 @@ VC2PORTS=(
     "vc2cosmbalanced|Vc2CosmBalanced.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2libm|Vc2LibMath.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
     "vc2libmtables|Vc2LibMathTables.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
+    "vc2tonemath|Vc2ToneMath.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
     "vc2voices|Vc2PartVoices.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2voicestables|Vc2PartVoicesTables.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2assign|Vc2Assigner.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"

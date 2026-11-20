@@ -91,6 +91,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmBufferedAdapters.cpp
     Source/Vc2LibMath.cpp
     Source/Vc2LibMathTables.cpp
+    Source/Vc2ToneMath.cpp
     Source/Vc2CosmDsp.cpp
     Source/Vc2PartVoices.cpp
     Source/Vc2PartVoicesTables.cpp

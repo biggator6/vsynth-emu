@@ -816,6 +816,7 @@ dsp: 40 cases, 6000 events: 693 notes (377 stereo, 106 long, 59 on slot 0, 72 on
 xt_vc2cosm: 0 different
 == xt_vc2libm
 calls: 5352268, answers NaN 1241571, infinite 1048364, zero 1058897, negative 675765; errno written 1725662 times
+shared: 666880 velocity curves, 1063030 exp2s within ±7 octaves, 20000 logfs, 20000 powfs through Vc2ToneMath
 xt_vc2libm: 0 different
 == xt_vc2voices
 voices: 40 cases, 16000 events, 701 inits, 2649 takes (2479 from free, 78 stolen, 92 none), 2700 moves, 1318 reserves, 1367 ended scans (6235 end tests), 647 stop alls, 1967 stops, 1992 costs, 2699 budgets; 12863 destroys; 5264 splices, 554 lists dealt

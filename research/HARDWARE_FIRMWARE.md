@@ -1546,6 +1546,46 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's shared routines for the plugin (2026-11-20, v320) {#vc2-tone-math}
+
+Step 4.3's forty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-fifth part). The VC-2's ports take four
+routines through `Vc2ToneShared`: the velocity curve `0x893a7fb0`, exp2 `0x893a8340`, logf `0x895065f4` and powf
+`0x89506e54`. The OSC voices, their ramps, the COSMs' converters and the carrier all reach them. Until v320 only the
+checks gave them, rom.4's own in the interpreter (`RomShared`). `Vc2ToneMath` gives them to the plugin, where
+Vc2Synth's tone hosts need them next:
+- the velocity curve and exp2 are rom.2's ports of the same code, XtOsc's `xtVelCurveValue` (`0x894ebd60`) and
+  `xtOscExp2` (`0x894ec090`), on their tables from the rom.2 the plugin loads beside rom.4;
+- logf and powf are rom.4's own, `Vc2LibMath` (v257).
+
+**What rom.4's two do, against rom.2's ports.** Read at `0x893a7fb0`, and run against them both:
+- **The velocity curve is rom.2's code.** A sens of 0 answers 0x8000, and so does a curve from 7 on. A sens from 200
+  on takes 0x10000, from −200 down −0x10000, and else the sens table; then the curve's 128 bytes by the velocity.
+  It differs from rom.2's port in three places, all outside what the part gives:
+  - it tests the curve against 7 alone (`cmp/ge`), so a curve below 0 reads a pointer from before its table of
+    eight, where rom.2's port answers 0x8000;
+  - it takes the sens by `exts.w`, its low 16 bits;
+  - a velocity past 127 reads past the curve's 128 bytes, where rom.2's port holds it to 127.
+- **exp2 is the same within ±7 octaves.** Past them rom.4 reads on beyond its seven words ("The VC-2's LITE
+  note-on"), where rom.2's port holds the octave at 6. The part's pitch keeps within ±6000 cents.
+
+**The check.** xt_vc2libm's second part (`Vc2ToneMathCheck.cpp`) holds the class to rom.4's own, every answer bit for
+bit:
+- the velocity curve on every velocity 0…127, sens −260…260 and curve 0…9, 666,880 calls;
+- exp2 on its edges within ±7 octaves (each whole octave and either side, the fraction's first and last steps) and
+  every 2048th float pattern within them, from an offset the seed draws, both signs: 1,063,030 calls;
+- logf and powf through the class on 20,000 of the first part's draws each.
+
+It loads XtOsc's tables from the rom.2 beside rom.4 by `vc2Rom2Of` (`Vc2CheckRom2.h`). That helper is the derivation
+xt_vc2cosm and xt_vc2tone each held inline, so both now call it.
+
+Results:
+- 0 different at seeds 2024, 7 and 31337, at 20,000 draws; the first part's lines are unchanged.
+- Every routine of `Vc2ToneMath.cpp` reached.
+- 6 new planted errors, 0 missed (a call of the wrong routine or its arguments moved), and the whole `--libm` (112),
+  `--cosm` (1439) and `--tone` (751) lists.
+
+**Next.** Vc2Synth holds the 24 tone hosts, on `Vc2ToneMath`.
+
 ### The OSC voices in the tone's parts' host (2026-11-20, v319) {#vc2-tone-host-oscs}
 
 Step 4.3's forty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-fourth part). `Vc2ToneHost` holds each

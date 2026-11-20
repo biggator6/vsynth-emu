@@ -6,9 +6,12 @@
 // XT_VC2LIBM_STOP stops there.  XT_VC2LIBM_MAIN only.
 #ifdef XT_VC2LIBM_MAIN
 #include "Vc2CheckRig.h"
+#include "Vc2CheckRom2.h"
 #include "Vc2LibMath.h"
 #include "Vc2LibMathDraws.h"
 #include "Vc2LibMathTables.h"
+#include "Vc2ToneMathCheck.h"
+#include "XtOsc.h"
 
 namespace {
 constexpr uint32_t kLog = 0x895065f4, kPow = 0x89506e54, kExp = 0x89509928, kLdexp = 0x8950ae24;   // [FW]
@@ -106,11 +109,14 @@ void checkPow(LibRig& r, const Vc2Run& run, std::mt19937& rng) {
     sweepPatterns(r, rng, [&](float x) { one(x, libDrawPower(rng)); });
     sweepPatterns(r, rng, [&](float y) { one(libDrawBase(rng), y); });
 }
+
+// rom.4's tables, and (v320) XtOsc's from the rom.2 beside it, the second part's velocity curve's and exp2's
+bool libLoadTables(const char* path) { return vc2LoadLibMath(path) && xtOscLoadTables(vc2Rom2Of(path).c_str()); }
 } // namespace
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2libm", vc2LoadLibMath);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2libm", libLoadTables);
     if (!run) return 1;
     LibRig r { fw };
     std::mt19937 rng((uint32_t)run->seed);
@@ -120,6 +126,7 @@ int main(int argc, char** argv) {
     checkPow(r, *run, rng);
     std::printf("calls: %ld, answers NaN %ld, infinite %ld, zero %ld, negative %ld; errno written %ld times\n", r.calls,
                 r.notNumbers, r.infinite, r.zeros, r.negative, r.errnos);
+    if (!r.stopped) vc2ToneMathPart(fw, *run, r.tally);   // v320
     std::printf("xt_vc2libm: %ld different\n", r.tally.different);
     return 0;
 }

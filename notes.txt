@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's shared routines for the plugin v320 (2026-11-20, on claude/vc2-part-4-3 after v319; HARDWARE_FIRMWARE.md,
+  "The VC-2's shared routines for the plugin"): step 4.3's forty-eighth version, item 10's twenty-fifth part.
+  Vc2ToneMath, a Vc2ToneShared without the interpreter: XtOsc's velocity curve and exp2 (rom.2's ports of rom.4's
+  0x893a7fb0 and 0x893a8340, on tables from the rom.2 beside rom.4) and Vc2LibMath's logf and powf. Found: rom.4's
+  velocity curve is rom.2's code but tests the curve against 7 alone, takes the sens by exts.w and reads past 127; its
+  exp2 reads past its tables from 7 octaves on; the part gives none of those. xt_vc2libm's second part
+  (Vc2ToneMathCheck.cpp): every velocity, sens −260…260 and curve 0…9, exp2's edges and every 2048th pattern within
+  ±7 octaves, logf and powf through the class; 0 different at seeds 2024, 7 and 31337. The rom.2 path's derivation one
+  helper, vc2Rom2Of (Vc2CheckRom2.h), xt_vc2cosm's and xt_vc2tone's copies calls of it. Not in the sound yet.
+
 The OSC voices in the tone's parts' host v319 (2026-11-20, on claude/vc2-part-4-3 after v318; HARDWARE_FIRMWARE.md,
   "The OSC voices in the tone's parts' host"): step 4.3's forty-seventh version, item 10's twenty-fourth part.
   Vc2ToneHost holds each tone's two Vc2OscVoices (Vc2ToneHostOsc.cpp), every part a tone has; each voice's parts a

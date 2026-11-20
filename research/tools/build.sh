@@ -104,6 +104,7 @@ done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
+   $( [ -f Vc2ToneMathCheck.cpp ] && echo Vc2ToneMath.cpp Vc2ToneMathCheck.cpp XtOsc.cpp XtEnvelope.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2libm" &
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
