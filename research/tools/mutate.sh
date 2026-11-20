@@ -257,6 +257,9 @@ if [ "$PORT" = enc ]; then
 fi
 [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu)$ ]] && ARGS=("$C") && C=control
 [[ "$PORT" =~ ^fx4 ]] && ARGS=("$C") && C=vc2   # rom.4's driver (IMAGE above): [cases] its events
-# a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500): it counts as one that died
-timeout "${MUT_TIMEOUT:-1500}" "$M/$N" "$IMAGE" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
+# a run the error hangs is stopped as solocmp's alarm stops one (MUT_TIMEOUT seconds, default 1500), and from v312 one
+# that grows past MUT_MEM_MB of resident memory (default 2048) killed (mutate_cap.sh's capped): it counts as one that
+# died
+source "$(dirname "$0")/mutate_cap.sh"
+capped "$M/$N" "$IMAGE" "$C" "${ARGS[@]}" | grep -v "^  " | grep -E "$P"
 st=${PIPESTATUS[0]}; [ "$st" = 124 ] && st=$((128 + 14)); [ "$st" -ge 128 ] && echo "$N: the run died, signal $((st - 128))"
