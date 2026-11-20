@@ -36,6 +36,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2ToneMethods.cpp
     Source/Vc2ToneLists.cpp
     Source/Vc2ToneHost.cpp
+    Source/Vc2ToneHostOsc.cpp
     Source/Vc2ToneEnvelope.cpp
     Source/Vc2ToneLfo.cpp
     Source/Vc2ToneModulators.cpp

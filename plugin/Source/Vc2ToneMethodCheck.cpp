@@ -74,7 +74,7 @@ constexpr ToneSetter kSetters[] = {
     { 0x893b3240, 2, true, &Vc2Tone::setCosmBlock, nullptr, In::kCosms[0], In::kCosms[1] - In::kCosms[0] },
     { 0x893b32d0, 0, false, nullptr, &Vc2Tone::setMixBlock },
     { 0x893b3310, 0, false, nullptr, &Vc2Tone::setTvaBlock, In::kTva },
-    { 0x893b3350, 0, false, nullptr, &Vc2Tone::setLegato },
+    { 0x893b3350, 0, false, nullptr, &Vc2Tone::setLegato, In::kOscSet },
 };
 
 // [FW] the position getters, each by an OSC's number
@@ -121,7 +121,9 @@ void toneDrawLinks(ToneSides& s, int i, std::mt19937& rng) {
 }
 
 // A block from the input, drawn as its converter writes it, as the settings it reaches are real: the mix's, or (v315) the
-// LFOs' and envelopes', (v317) the TVA's, (v318) a COSM's; a COSM's number past 1 reaches none, its block COSM 1's
+// LFOs' and envelopes', (v317) the TVA's, (v318) a COSM's; a COSM's number past 1 reaches none, its block COSM 1's.  From
+// v319 an OSC voice's settings, xt_vc2osc's settings block (its calls name a settings word by its offset there), and the
+// legato's six words as a ramp's
 std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     const ToneSetter& set = kSetters[rng() % std::size(kSetters)];
     const int i = toneDrawLive(s, rng);
@@ -131,6 +133,7 @@ std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     if (set.numbered == &Vc2Tone::setCosmBlock) toneDrawCosmNewBlock(s, i, n, rng);
     else if (set.stride != 0) toneDrawModulatorBlocks(in, rng);
     if (set.block == In::kTva) toneDrawTvaBlock(in, rng);
+    if (set.block == In::kOscSet) toneDrawOscRamp(in, rng);
     s.fw.cpu.write(kToneInputAt, in.words.data(), sizeof in.words);
     const uint32_t offset = set.block + set.stride * (n < set.numbers ? n : 0);
     const uint32_t tone = s.pool.addressOf(i), block = kToneInputAt + offset;
@@ -138,7 +141,16 @@ std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     Vc2ToneParts& parts = s.parts[(size_t)i];
     ++s.n.setters;
     if (set.numbered == &Vc2Tone::setEnvelopeBlock) toneSteerSustain(s, i, n, rng);
+    if (set.plain == &Vc2Tone::setMixBlock && rng() % 2) {   // v319: the sync's flag as a blend's note-on leaves it
+        constexpr uint32_t kSyncOnAt = 0x1afc;   // [FW] the tail's +4
+        toneBothWord(s, i, kSyncOnAt, t.tail.syncOn, 1u);
+    }
     if (set.plain) return toneOn(s, i, set.at, { tone, block }, [&] { (t.*set.plain)(in.block(offset), parts); });
+    if (set.numbered == &Vc2Tone::setOscBlock) {
+        toneDrawOscSettings(s, i, n, rng);
+        const uint32_t* settings = s.shared.osc.settings.data();
+        return toneOn(s, i, set.at, { tone, n, kOscSettingsAt }, [&] { t.setOscBlock(n, settings, parts); });
+    }
     return toneOn(s, i, set.at, { tone, n, block }, [&] { (t.*set.numbered)(n, in.block(offset), parts); });
 }
 
@@ -177,6 +189,7 @@ std::string toneCostOn(ToneSides& s, std::mt19937& rng) {
 std::string toneGetterOn(ToneSides& s, std::mt19937& rng) {
     const ToneGetter& get = kGetters[rng() % std::size(kGetters)];
     const int i = toneDrawLive(s, rng);
+    toneDrawOscHalves(s, i, rng);   // v319
     const uint32_t n = drawPartNumber(rng, 2), tone = s.pool.addressOf(i);
     const Vc2Tone& t = s.pool.tones[(size_t)i];
     Vc2ToneParts& parts = s.parts[(size_t)i];

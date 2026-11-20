@@ -924,6 +924,13 @@ version against rom.4's routines with what it calls hooked:
          "The COSMs in the tone's parts' host"). Found: rom.4's note-on holds the install pass
          inline, nothing reaching `0x893b4060`, so a COSM's mode never changes mid-note in the part. Next: the OSC
          voices, then Vc2Synth's 24 hosts.
+       - The OSC voices joined (v319): the host's two `Vc2OscVoice`s, every part a tone has; each voice's parts a
+         `Vc2ToneOscLink`, its address and the tone's own envelopes' and LFOs' words the host's, the rest (a kind's
+         routines by rom.4's address, the OS's clock, the wave's records, the mic ring, the unvoiced decision) the
+         deriving class's `oscOutside`; `Vc2ToneCommon` gains the shared routines (HARDWARE_FIRMWARE.md, "The OSC voices
+         in the tone's parts' host"). Found: the tone drops the install's answer; an install writes no render for a
+         type or code it has no player for; the analog's install reads the code's copy at +0x248; only a note-on
+         writes a voice's kind and flag. Next: Vc2Synth's 24 hosts, what a voice calls beyond the tone the part's.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -17,26 +17,10 @@ constexpr uint32_t kLinkAt = 0x2618;
 constexpr int kListed = 3;                     // the most tones the lists hold
 constexpr uint32_t kNoSerial = 0x7ffffff0;      // a serial no tone of a case reaches
 constexpr uint32_t kFixMix = 4, kFixKind = 3, kFixWave = 10, kFixedWave = 2;   // [FW] the note-on's fix-up's case
-// An OSC voice's pitch ratio 0.25…4 and its wave's root 55…1760 Hz, xt_vc2cosm's draws of what its COSMs take
-constexpr float kLeastRatio = 0.25f, kRatioSpan = 3.75f, kLeastRoot = 55.0f, kRootSpan = 1705.0f;
 
 bool drawFlag(std::mt19937& rng) { return rng() % 2 == 0; }
-float drawFloat(std::mt19937& rng) { return 4.0f * vc2Unit(rng) - 2.0f; }
-uint32_t drawBits(std::mt19937& rng) { return std::bit_cast<uint32_t>(drawFloat(rng)); }
 
-// The first part word rom.4's memory and the port's mirror differ at, as text; empty when none
-std::string partWordsDifference(const ToneWords& rom, const ToneWords& mine) {
-    std::array<uint32_t, sizeof(ToneWords) / sizeof(uint32_t)> a {}, b {};
-    std::memcpy(a.data(), &rom, sizeof rom);
-    std::memcpy(b.data(), &mine, sizeof mine);
-    const auto [x, y] = std::ranges::mismatch(a, b);
-    if (x == a.end()) return "";
-    char t[96];
-    std::snprintf(t, sizeof t, "its part words, word %d: %08x, against %08x", (int)(x - a.begin()), *y, *x);
-    return t;
-}
-
-// Tone i's own words and part words against rom.4's
+// Tone i's own words and parts' words against rom.4's
 std::string toneWordsDifference(ToneSides& s, int i) {
     const Vc2Tone& t = s.pool.tones[(size_t)i];
     const uint32_t at = s.pool.addressOf(i);
@@ -47,31 +31,17 @@ std::string toneWordsDifference(ToneSides& s, int i) {
     if (what.empty()) what = toneMixDifference(s, i);
     if (what.empty()) what = toneTvaDifference(s, i);
     if (what.empty()) what = toneCosmDifference(s, i);
-    if (what.empty()) what = partWordsDifference(toneReadRom(s.fw, at), s.parts[(size_t)i].words);
+    if (what.empty()) what = toneOscDifference(s, i);
     return what.empty() ? what : "tone " + std::to_string(i) + ", " + what;
 }
 
-ToneWords drawWords(std::mt19937& rng) {
-    ToneWords w;
-    for (ToneOscWords& o : w.osc) {
-        o.kind = rng() % 8;
-        o.flag = drawFlag(rng) ? rng() % 2 : (uint32_t)rng();
-        // [FW] +0x1cc the voice's pitch ratio and +0xa80 its wave's root, Hz, as a COSM's set-up reads them (v318)
-        o.value = std::bit_cast<uint32_t>(kLeastRatio + kRatioSpan * vc2Unit(rng));
-        o.other = std::bit_cast<uint32_t>(kLeastRoot + kRootSpan * vc2Unit(rng));
-        o.byte = rng() % 256;
-        o.wave = rng() % 16;
-        std::ranges::generate(o.binds, [&] { return (uint32_t)rng(); });
-        o.cost = drawBits(rng);
-    }
-    return w;
-}
-
-// The input: every word small (each a usable envelope's or LFO's number), then the words the note-on decides by
+// The input: every word small (each a usable envelope's or LFO's number), then the words the note-on decides by; the
+// OSC blocks (v319) before the modulators', whose LFOs' tempo is OSC 1's block's +0x60
 void drawToneInput(ToneSides& s, std::mt19937& rng) {
     In& in = s.shared.input;
     std::ranges::generate(in.words, [&] { return rng() % 8; });
     in.at(In::kStructure) = rng() % 5 == 0 ? (uint32_t)rng() : rng() % 4;
+    toneDrawOscBlocks(s, rng);
     toneDrawModulatorBlocks(in, rng);
     for (uint32_t l = 0; l < Vc2Tone::kLfos; ++l) in.at(In::kLfos + In::kLfoStride * l + In::kKeySync) = rng() % 2;
     for (uint32_t block : In::kOscs) in.at(block + In::kLegato) = rng() % 2;
@@ -79,24 +49,23 @@ void drawToneInput(ToneSides& s, std::mt19937& rng) {
     toneDrawMixBlock(in, rng);
     in.at(In::kTva) = rng() % Vc2Tone::kEnvelopes;
     toneDrawTvaBlock(in, rng);
-    if (rng() % 6 == 0) {   // the fix-up's case
+    if (rng() % 6 == 0) {   // the fix-up's case: its kind half the time, else one whose type 10 the note-on must leave
+        // [FW] kinds whose install takes no wave's type but kinds 4's and 7's flag at type 1 (Vc2OscVoiceKinds.cpp)
+        constexpr std::array<uint32_t, 3> kOtherKinds { 0, 4, 7 };
         in.at(In::kMix) = kFixMix;
-        in.at(In::kOscs[1]) = kFixKind;
-        in.at(In::kOscs[1] + In::kWave) = kFixWave;
+        const uint32_t kind = drawFlag(rng) ? kFixKind : kOtherKinds[rng() % kOtherKinds.size()];
+        toneOscBlockOfKind(s, 1, kind, kFixWave, rng);
     }
 }
 
 // The fix-up's case against a legato: the earlier tone's OSC 2 of the fix-up's kind, at the wave before it or after it,
-// so that whether the note-on fixes the input before its OSCs' note-ons decides whether the legato takes the player
+// so that whether the note-on fixes the input before its OSCs' note-ons decides whether the legato takes the player;
+// from v319 that voice made an analog one on both sides, as its note would have left it
 void drawFixedLegato(ToneSides& s, int from, std::mt19937& rng) {
     In& in = s.shared.input;
-    ToneWords& was = s.parts[(size_t)from].words;
-    was.osc[1].kind = kFixKind;
-    was.osc[1].wave = drawFlag(rng) ? kFixWave : kFixedWave;
-    toneWriteRom(s.fw, s.pool.addressOf(from), was);
+    toneMakeOscAnalog(s, from, 1, drawFlag(rng) ? kFixWave : kFixedWave, rng);
     in.at(In::kMix) = kFixMix;
-    in.at(In::kOscs[1]) = kFixKind;
-    in.at(In::kOscs[1] + In::kWave) = kFixWave;
+    toneOscBlockOfKind(s, 1, kFixKind, kFixWave, rng);
     in.at(In::kOscs[1] + In::kLegato) = 1;
 }
 
@@ -111,9 +80,8 @@ void drawPrevious(ToneSides& s, std::mt19937& rng) {
         in.at(In::kPrevious) = (uint32_t)s.pool.tones[(size_t)from].head.serial;
         for (size_t o = 0; o < In::kOscs.size(); ++o) {
             if (rng() % 2 != 0) continue;
-            const ToneOscWords& was = s.parts[(size_t)from].words.osc[o];
-            in.at(In::kOscs[o]) = was.kind;
-            in.at(In::kOscs[o] + In::kWave) = was.wave;
+            const Vc2OscVoice& was = s.parts[(size_t)from].oscs[o];   // v319: the real voice, its kind's words drawn
+            toneOscBlockOfKind(s, (int)o, was.kind(), was.u32(Vc2OscVoice::kWave), rng);
         }
         if (rng() % 4 == 0) drawFixedLegato(s, from, rng);
     }
@@ -158,16 +126,12 @@ std::string toneDifference(ToneSides& s, int only) {
     if (what.empty()) what = toneListsDifference(s);
     if (what.empty()) what = tonePoolsDifference(s);
     if (what.empty() && only < 0) what = toneFreeLfosDifference(s);   // the events that can reach the manager
-    return what.empty() ? toneCallsDifference(s.rom, s.shared.calls) : what;
+    if (what.empty()) what = toneCallsDifference(s.rom, s.shared.calls);
+    return what.empty() ? toneOscCallsDifference(s) : what;
 }
 
 void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
-    ToneDraws& d = s.shared.draws;
-    std::ranges::generate(d.installOsc, [&] { return (uint32_t)rng(); });
-    std::ranges::generate(d.word168, [&] { return (uint32_t)rng(); });
-    std::ranges::generate(d.position, [&] { return (uint32_t)rng(); });
-    s.parts[(size_t)i].words = drawWords(rng);
-    toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
+    toneDrawOscs(s, rng);
     toneDrawModulatorWords(s, i, rng);
     toneDrawTva(s, i, rng);
     toneDrawCosms(s, i, rng);

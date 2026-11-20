@@ -1,7 +1,7 @@
 #pragma once
 // xt_vc2osc's shared parts (v230, v232): the calls each side logs, what the hooked routines answer and the records the
 // voice reads (drawn once for both sides), the port's fake parts, and rom.4's side: every routine the OSC voice calls
-// hooked.  XT_VC2OSC_MAIN only.
+// hooked.  From v319 xt_vc2tone's too, whose tones' real voices call the same.  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2OscVoice.h"
 #include <array>
@@ -122,8 +122,10 @@ private:
     Vc2OscVoice& self_;
 };
 
-// rom.4's side: every routine the voice calls hooked to log into `log` and answer from `draws`
-void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log);
+// rom.4's side: every routine the voice calls hooked to log into `log` and answer from `draws`, each call on the voice
+// `voiceOf` numbers by its address (−1 none): xt_vc2osc's two, oscVoiceNumber, or from v319 xt_vc2tone's 48
+void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log, int (*voiceOf)(uint32_t));
+int oscVoiceNumber(uint32_t at);
 // The records written into rom.4's memory where the voice's words point
 void oscWriteRecords(Vc2Fw& fw, const OscRecords& r);
 // The first call the two logs differ at; empty when they don't

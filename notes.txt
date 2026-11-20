@@ -335,6 +335,23 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The OSC voices in the tone's parts' host v319 (2026-11-20, on claude/vc2-part-4-3 after v318; HARDWARE_FIRMWARE.md,
+  "The OSC voices in the tone's parts' host"): step 4.3's forty-seventh version, item 10's twenty-fourth part.
+  Vc2ToneHost holds each tone's two Vc2OscVoices (Vc2ToneHostOsc.cpp), every part a tone has; each voice's parts a
+  Vc2ToneOscLink, its address and the tone's own envelopes' and LFOs' words the host's, every other call (a kind's
+  routines by rom.4's address, the OS's clock, the wave's records, the mic ring, the unvoiced decision) the deriving
+  class's oscOutside; Vc2ToneCommon gains the shared routines (Vc2ToneShared). Found: the tone drops the install's
+  answer (installOsc void); the vibrato's scale needs its static initializer 0x893b2d60; an install writes no render
+  for a type or code it has no player for; the analog's install reads the code's copy at +0x248, which a take copies;
+  only a note-on writes a voice's kind and flag, so the install pass alone keeps COSM 1's mode. xt_vc2tone runs rom.4's
+  own voices, compared whole, what they call beyond the tone xt_vc2osc's hooks and fake parts; xt_vc2osc's draws of
+  what a voice is given moved into Vc2OscDraws.cpp and Vc2OscPartDraws.cpp, its lines unchanged; rules keep the check
+  to what the part does (bound parts the tone's own, types and codes with a render, real waves' records, an LA code
+  given late with the sub off, a voice made analog as its note would leave it, OSC 1 a steady EXT IN under a COSM 1
+  that takes its pitch). 0 different at seeds 2024, 7 and 31337; the host wholly reached; 45 new planted, 0 missed,
+  and the whole --tone (751) and --osc (1204) lists (build-osc-order and matched-order taken out as equivalent
+  now). Not in the sound yet.
+
 The COSMs in the tone's parts' host v318 (2026-11-20, on claude/vc2-part-4-3 after v317; HARDWARE_FIRMWARE.md, "The
   COSMs in the tone's parts' host"): step 4.3's forty-sixth version, item 10's twenty-third part. Vc2ToneHost holds
   each tone's two COSM objects, a Vc2CosmDsp each and the note-on frame, and is their bound

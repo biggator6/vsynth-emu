@@ -80,6 +80,7 @@ std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
     const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng() & kPositiveLowHalf;
     s.n.updates += tone.head.state == Vc2Tone::kSounding;
     toneCountReleaseTicks(s, i);
+    toneHoldOscVibratos(s, i, (int32_t)n);   // v319
     std::string what =
         toneOn(s, i, kUpdateAt, { s.pool.addressOf(i), n }, [&] { tone.update((int32_t)n, partsOf(s, i)); });
     s.n.ends += tone.head.state == Vc2Tone::kEnded;
@@ -92,6 +93,7 @@ std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
     toneBothWord(s, i, kToneRendersAt, tone.tail.renders, rng() % 4 == 0 ? 0 : 1);
     s.n.renders += tone.tail.renders != 0;
     std::string what = toneMixPrepareRender(s, i, rng);
+    if (what.empty()) what = toneFeedMic(s, i, rng);   // v319
     if (!what.empty()) return what;
     toneDrawOut(s, rng);   // v317: the TVA renders into it
     float* out = s.shared.out.data();
@@ -146,7 +148,6 @@ std::string toneAskOn(ToneSides& s, std::mt19937& rng) {
 std::string tonePlainOn(ToneSides& s, std::mt19937& rng) {
     const TonePlain& c = kPlains[rng() % std::size(kPlains)];
     const int i = toneDrawLive(s, rng);
-    if (c.at == kInstallAt) toneKeepCosmMode(s, i);   // v318
     return toneOn(s, i, c.at, { s.pool.addressOf(i) }, [&] { c.act(s.pool.tones[(size_t)i], partsOf(s, i)); });
 }
 
@@ -184,15 +185,17 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     const std::string left = toneLeaveLists(s, i);
     if (!left.empty()) return left;
     tonePrepareNoteOn(s, i, rng);
-    toneCosmsBeforeNoteOn(s, i);   // v318: the slots freed, or a sounding COSM's mode kept
+    toneCosmsBeforeNoteOn(s, i, rng);   // v318: the slots freed, or a sounding COSM's mode kept
+    toneOscBeforeNoteOn(s, i, rng);     // v319
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     ++s.n.noteOns;
+    const long players = s.shared.players;
     std::string what = vc2BothOn(
         s.fw, kNoteOnAt, { s.pool.addressOf(i), kToneInputAt }, "the note-on",
         [&] { tone.noteOn(s.shared.input, s.pool, s.owner, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
     if (what.empty()) what = toneMixRingsOf(s, i);
     toneNoted(s, i);
-    s.n.takes += vc2CountCalls(s.rom, kTakePlayer);
+    s.n.takes += s.shared.players - players;
     s.n.fixes += s.shared.input.at(In::kOscs[1] + In::kWave) == kFixed && s.shared.input.at(In::kMix) == kFixMix;
     return what;
 }

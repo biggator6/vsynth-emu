@@ -1546,6 +1546,106 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The OSC voices in the tone's parts' host (2026-11-20, v319) {#vc2-tone-host-oscs}
+
+Step 4.3's forty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-fourth part). `Vc2ToneHost` holds each
+tone's two OSC voices (`Vc2OscVoice`, v230…v267, at +0x20 and +0xba4): with them it holds every part a tone has.
+`Vc2ToneCommon` gains the routines the voices share (`Vc2ToneShared`: rom.4's velocity curve, exp2, logf and powf),
+which the wiring gives. The host's OSC part is `Vc2ToneHostOsc.cpp`.
+
+**Every call the tone makes on an OSC voice is the voice's own:**
+- the constructor `0x893ae070`, the install `0x893ae0f0`, the update `0x893ae1c0`, the note-on `0x893ae370`;
+- the ramp's start `0x893ae610`, the two counts `0x893ae6c0` and `0x893ae720`, the settings `0x893ae780`, the legato
+  `0x893ae9b0`;
+- the render `0x893ae9f0`, the take `0x893aee20` (given that tone's voice of the same OSC), the getters `0x893aed40`
+  and `0x893aed60`;
+- the key-off `0x893b2b60`, one store, the vibrato's +0x34 to 0, which the host makes.
+
+And the words the tone reads are the voice's: the kind (+0x54), the flag (+0xa40), the wave's type (+0x104) and its
+setter, the ratio COSM 1's update takes (+0x1cc), the set-up's +0x1cc, +0xa80 and byte +0x58, and the cost (+0xa88).
+The binding writes the tone's own envelopes' and LFOs' rom.4 addresses at +0xa4c…+0xa68, then its flags.
+
+**A voice's parts are its link, `Vc2ToneOscLink`.** The host answers two things:
+- the voice's address, the tone's +0x20 or +0xba4 (VariPhrase's install keeps it in the object);
+- the words of the tone's own envelopes and LFOs (`Vc2ToneModulators::boundFloat`).
+
+Every other call goes to the deriving class's `oscOutside`, which Vc2Synth will give:
+- a kind's routines by rom.4's address: the players' renders, set-ups, seeks and event lookup; kinds 1's, 2's, 4's,
+  5's, 6's and 7's updates and settings; the analog's renders;
+- the OS's millisecond word, which a carrier's init reads;
+- the wave's records: its header, its loop record, and VariPhrase's +0xe0 record's word;
+- the mic ring and the unvoiced decision, which kind 6 reads.
+
+**Found.**
+- **The tone drops the install's answer**, so `Vc2ToneParts::installOsc` is void from v319. v228's check answered it
+  as drawn and saw no difference.
+- **The vibrato's scale needs its static initializer.** Its note-on reads the scale's slopes from words that
+  `0x893b2d60` sets. xt_vc2osc runs it; xt_vc2tone didn't, and rom.4's scale came out 1.
+- **An install writes no render for a type or code it has no player for.** That is LITE's types past 2,
+  VariPhrase's 0, 2, 4, 7 and past 8, and the analog's codes past 10 with its sub oscillator off. The voice keeps
+  the word its last use left (0 in a fresh one), and rom.4 would render through it. The converters give none of them.
+- **The analog's install reads the code's copy at +0x248**, the note-on's, not +0x104; a take copies it with the
+  object.
+- **Only a note-on writes a voice's kind and flag.** So the install pass alone keeps COSM 1's mode by itself, and
+  v318's rule for it went.
+- **Kinds 5 and 6 leave +0x1cc**, their pitch being in P. A COSM that takes OSC 1's pitch (the Side Band Filters, the
+  Growl) needs another kind under it.
+
+**The check.** xt_vc2tone runs rom.4's own voices, nothing of theirs hooked. Each voice is compared whole, its 0xb84
+bytes, after every event. What the voices call beyond the tone is xt_vc2osc's: its hooks' table and its fake parts
+(`OscPortParts`), each call on its voice (tone × 2 + its OSC) in a log of its own. xt_vc2osc's draws of what a voice is
+given are shared, moved into `Vc2OscDraws.cpp` and `Vc2OscPartDraws.cpp` with xt_vc2osc's lines unchanged:
+- a note-on's block and the settings' block;
+- the analog's words and object;
+- kinds 5's and 6's words;
+- the vibrato's block and the hold of its fade;
+- the ramps' words and the mic ring.
+
+Its records (`Vc2OscRecords.cpp`), hooks (`Vc2OscFakes.cpp`, given the voices' numbering) and fake parts
+(`Vc2OscPortParts.cpp`) are shared as they stand. The OSC blocks are drawn before the modulators', as the LFOs' tempo
+is OSC 1's block's +0x60. The shared routines are rom.4's own (`RomShared`), with the interpreter's registers kept
+around each (`ToneMath`): the port calls them inside an event whose answer rom.4 has left in r0.
+
+**Rules keep the check to what the part does.** Each came from a difference that was the check's, not the port's.
+- **A block binds the tone's own parts.** Its bound parts' numbers, its kind's (the note-on's switch on the kind), are
+  envelopes and LFOs of the tone. A number past them sends the tone's binding flags past its arrays.
+- **A wave's type or code is one its install has a render for.** On the others rom.4 renders through 0.
+- **The records are a real wave's** (`oscRealWave`: the converter's rates, cents and an octave's tune). xt_vc2osc's
+  far tunes take rom.4's exp2 past its tables, into RAM a tone's note-on has written by the time the port's call reads
+  it.
+- **An analog's code given after its words turns the sub oscillator off on an LA code.** That happens at a legato's
+  match, at the fix-up, and when a code past 10 is drawn again. 2^Fat's sum is ∞ there, and ∞ × 0 is a NaN whose sign
+  `xtf::sub` negates.
+- **A voice made analog for the fix-up's legato is made as its note would leave it**: bound to the tone's own parts,
+  given the code's copy, and installed on both sides.
+- **The analog's object words are drawn before a kind-3 note-on** (v244's), the vibratos' fades held for an update's
+  count (v267's), and a block of the mic fed before a render with a voice of kind 6 (v266's).
+- **A VariPhrase voice's +0x168 is drawn before a getter.** Its players' routines write it, hooked here, so it would be
+  0 on every voice and the getter couldn't tell OSC 1's from OSC 2's (the plant `host-osc-word168` was missed so).
+- **Two draws keep older plants' reach** that the fakes' words gave. The fix-up's case puts its type 10 on an OSC 2
+  of another kind half the time (0, 4 or 7, whose installs read no type but kinds 4's and 7's flag at type 1), where
+  the note-on must leave it (`fixup-no-kind`). The mix's setter finds the sync's flag set half the time, as a blend's
+  note-on leaves it (`mix-settle-ring-sync`).
+- **Under a COSM 1 that takes OSC 1's pitch, OSC 1 is a steady EXT IN.** For codes 7, 8 and 9 it is kind 4 at a ratio
+  of 1 and a root of 440 Hz, stereo or mono half the time. The Side Band Filters' delay must fit their line, as do
+  the Growl's lines; xt_vc2cosm's draws keep the set-up there. The same EXT IN, its wave's type giving COSM 1's
+  sound's mode, is OSC 1 at a note-on that starts no COSMs.
+
+Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400). At 40 cases the OSC voices' note-ons by kind 0…7 are 310,
+  171, 198, 397, 792, 193, 193, 216 (341 OSC 1s steady for a COSM 1 of its pitch), with 85 settings, 90 blocks of
+  the mic and, beyond the tone, 1223 kinds' routines, 458 renders, 206 seeks, 230 object set-ups and 78 event
+  lookups. 225 whole renders through COSM 1, 56 of them a stereo Side Band Filter.
+- Every line, branch and region of `Vc2ToneHost.cpp` and `Vc2ToneHostOsc.cpp` reached at 40 cases. `Vc2Tone.cpp`'s
+  update reaches a TVA that is over at 400 cases of seed 7, not at 40.
+- xt_vc2osc's lines are unchanged.
+- 45 new planted errors, 0 missed, and the whole `--tone` (751) and `--osc` (1204) lists. Taken out of the tone's list
+  as equivalent now: v228's `build-osc-order` and `matched-order`, as each voice's constructor and matched count
+  write that voice alone. v316's to v318's build plants planted a call of `buildPart`, which went; they plant the part
+  left unbuilt.
+
+**Next.** Vc2Synth holds the 24 hosts, and what a voice calls beyond the tone comes from the part.
+
 ### The COSMs in the tone's parts' host (2026-11-20, v318) {#vc2-tone-host-cosms}
 
 Step 4.3's forty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-third part). `Vc2ToneHost` holds each

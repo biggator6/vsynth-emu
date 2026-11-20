@@ -1,7 +1,9 @@
 // xt_vc2osc's rom.4 side: see Vc2OscCheck.h (v230, v232).  Every routine the OSC voice calls hooked, each row of the
 // table with its own reading of the arguments and its answer; the records the voice reads written where its words
-// point.  The port's fake parts are Vc2OscPortParts.cpp.  XT_VC2OSC_MAIN only.
-#ifdef XT_VC2OSC_MAIN
+// point.  The port's fake parts are Vc2OscPortParts.cpp.  From v319 xt_vc2tone's too, whose tones' voices call the
+// same: a call names its voice by a check's own numbering of the voices' addresses.
+// XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+#if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2CheckCalls.h"
 #include "Vc2OscCheck.h"
 #include <algorithm>
@@ -9,12 +11,6 @@
 namespace {
 constexpr uint32_t kOsClock = 0x893018d0;   // [FW] the OS's millisecond word, which a carrier's init reads (v266)
 
-// The voice owning the part at `offset` a callee is given by `at`; −1 when no voice does
-int voiceOwning(uint32_t at, uint32_t offset) {
-    const uint32_t from = at - offset - kOscVoiceAt;
-    const bool one = from % kOscVoiceStride == 0 && from / kOscVoiceStride < (uint32_t)kOscVoices;
-    return one ? (int)(from / kOscVoiceStride) : -1;
-}
 uint32_t settingsOffset(uint32_t at) { return at - kOscSettingsAt; }
 uint32_t outOf(uint32_t at) { return at == kOscOutAt ? 1 : kOscOther; }
 uint8_t byteAt(Sh4& cpu, uint32_t at) {
@@ -23,42 +19,43 @@ uint8_t byteAt(Sh4& cpu, uint32_t at) {
     return b;
 }
 
-// How a hooked routine's arguments read into its call, one shape each
-void self(Sh4& c, OscCall& t, uint32_t) { t.voice = voiceOwning(c.r[4], 0); }
-void routine(Sh4& c, OscCall& t, uint32_t at) {
-    self(c, t, at);
+// How a hooked routine's arguments read into its call, one shape each; each gives the address of the voice the call is
+// on (its object's less the object's offset)
+uint32_t self(Sh4& c, OscCall&, uint32_t) { return c.r[4]; }
+uint32_t routine(Sh4& c, OscCall& t, uint32_t at) {
     t.a = at;
+    return self(c, t, at);
 }
 // A kind's routine, and the pitch ramp's value and factor as it finds them (v236: its update reads them through the
 // targets, so the ramps' ticks before or after it show)
-void kindRoutine(Sh4& c, OscCall& t, uint32_t at) {
-    routine(c, t, at);
+uint32_t kindRoutine(Sh4& c, OscCall& t, uint32_t at) {
     t.b = c.rd32(c.r[4] + kOscRampValueAt);
     t.c = c.rd32(c.r[4] + kOscRampFactorAt);
+    return routine(c, t, at);
 }
-void routineSettings(Sh4& c, OscCall& t, uint32_t at) {
-    routine(c, t, at);
+uint32_t routineSettings(Sh4& c, OscCall& t, uint32_t at) {
     t.b = settingsOffset(c.r[5]);
+    return routine(c, t, at);
 }
-void renderBy(Sh4& c, OscCall& t, uint32_t at) {   // (out, the object, third)
-    t.voice = voiceOwning(c.r[5], Vc2OscVoice::kObject);
+uint32_t renderBy(Sh4& c, OscCall& t, uint32_t at) {   // (out, the object, third)
     t.a = at;
     t.b = outOf(c.r[4]);
     t.c = c.r[6];
+    return c.r[5] - Vc2OscVoice::kObject;
 }
-void seek(Sh4& c, OscCall& t, uint32_t at) {   // (the object, at), and the object's flags as the player finds them
-    t.voice = voiceOwning(c.r[4], Vc2OscVoice::kObject);
+uint32_t seek(Sh4& c, OscCall& t, uint32_t at) {   // (the object, at), and the object's flags as the player finds them
     t.a = at;
     t.b = c.r[5];
     t.c = byteAt(c, c.r[4]);
+    return c.r[4] - Vc2OscVoice::kObject;
 }
-void objectRoutine(Sh4& c, OscCall& t, uint32_t at) {   // a player's routine on the object (v238)
-    t.voice = voiceOwning(c.r[4], Vc2OscVoice::kObject);
+uint32_t objectRoutine(Sh4& c, OscCall& t, uint32_t at) {   // a player's routine on the object (v238)
     t.a = at;
+    return c.r[4] - Vc2OscVoice::kObject;
 }
-void eventAt(Sh4& c, OscCall& t, uint32_t at) {   // the event lookup's (the object, event, &position, &…) (v238)
-    objectRoutine(c, t, at);
+uint32_t eventAt(Sh4& c, OscCall& t, uint32_t at) {   // the event lookup's (the object, event, &position, &…) (v238)
     t.b = c.r[5];
+    return objectRoutine(c, t, at);
 }
 
 // How a hooked routine answers, one shape each: its r0, after what it leaves in fr0 or the object
@@ -79,7 +76,7 @@ uint32_t positions(Sh4& c, const OscDraws& d) {   // the next of the drawn posit
 struct OscHook {
     uint32_t at;
     OscKind kind;
-    void (*decode)(Sh4&, OscCall&, uint32_t);
+    uint32_t (*decode)(Sh4&, OscCall&, uint32_t);
     uint32_t (*answer)(Sh4&, const OscDraws&);
 };
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
@@ -125,11 +122,17 @@ const OscHook kHooks[] = {
 uint32_t oscVoiceAt(int voice) { return kOscVoiceAt + kOscVoiceStride * (uint32_t)voice; }
 uint32_t oscRenderAt(int k) { return kOscRendersAt + 0x10 * (uint32_t)k; }
 
-void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log) {
+int oscVoiceNumber(uint32_t at) {
+    const uint32_t from = at - kOscVoiceAt;
+    const bool one = from % kOscVoiceStride == 0 && from / kOscVoiceStride < (uint32_t)kOscVoices;
+    return one ? (int)(from / kOscVoiceStride) : -1;
+}
+
+void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log, int (*voiceOf)(uint32_t)) {
     for (const OscHook& h : kHooks) {
-        fw.cpu.hook(h.at, [&draws, &log, h](Sh4& cpu) {
+        fw.cpu.hook(h.at, [&draws, &log, h, voiceOf](Sh4& cpu) {
             OscCall call { h.kind, -1, 0, 0, 0 };
-            h.decode(cpu, call, h.at);
+            call.voice = voiceOf(h.decode(cpu, call, h.at));
             log.push_back(call);
             cpu.ret(h.answer(cpu, draws));
         });

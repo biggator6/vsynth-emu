@@ -34,32 +34,6 @@ struct RampRig {
 
 uint32_t rampAt(int ramp) { return kRampsAt + kRampStride * (uint32_t)ramp; }
 
-// A switch on half the time, else off or any word
-uint32_t drawOnSwitch(std::mt19937& rng) { return rng() % 2 ? 1u : (rng() % 2 ? 0u : (uint32_t)rng()); }
-
-// A glide's time: its law's edges (1, 50 and 100, either side of them, 0, negative, huge) or 1…3000 ms
-float drawGlideTime(std::mt19937& rng) {
-    constexpr std::array<float, 8> kEdges { 1.0f, 50.0f, 100.0f, 0.0f, 0.5f, 2.0f, -3.0f, 1e6f };
-    const float edge = kEdges[rng() % kEdges.size()];
-    if (rng() % 4 == 0) return edge;
-    if (rng() % 6 == 0) return std::nextafter(edge, rng() % 2 ? -1e9f : 1e9f);
-    return 1.0f + 3000.0f * vc2Unit(rng);
-}
-
-} // namespace
-
-Vc2RampSettings oscDrawRampSettings(std::mt19937& rng) {
-    Vc2RampSettings s;
-    s.on = drawOnSwitch(rng);
-    s.formantOn = drawOnSwitch(rng);
-    s.walkOn = drawOnSwitch(rng);
-    s.time = drawGlideTime(rng);
-    s.timed = drawOnSwitch(rng);
-    s.unread = (uint32_t)rng();
-    return s;
-}
-
-namespace {
 // A glide's ends in cents: from within ±6000; the span 0, about ±500 or ±1200, or any to ±20000
 std::pair<float, float> drawCents(std::mt19937& rng) {
     constexpr std::array<float, 7> kSpans { 0.0f, 500.0f, -500.0f, 499.99f, 500.01f, 1200.0f, -1200.0f };
@@ -89,7 +63,7 @@ float drawPhase(std::mt19937& rng) {
 void drawRamp(Vc2PitchRamp& r, std::mt19937& rng) {
     Vc2RampWords& w = r.w;
     w.type = rng() % 8 == 0 ? (int32_t)rng() : (int32_t)(rng() % 3);
-    w.on = drawOnSwitch(rng);
+    w.on = oscDrawOnSwitch(rng);
     w.rising = (uint32_t)rng();
     w.settings = oscDrawRampSettings(rng);
     std::tie(w.from, w.to) = drawCents(rng);

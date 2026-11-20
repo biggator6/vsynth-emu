@@ -7,7 +7,6 @@
 # constant is planted where Vc2Tone.cpp uses it), the install pass's read of OSC 1's flag before OSC 2's install (with
 # the installs hooked nothing writes the flag between, so no input tells the two orders apart), and the destructor's
 # vtable word (it never differs from the constructor's: nothing else writes it).
-build-osc-order|{ Piece::osc1, Piece::osc2, Piece::cosm1|{ Piece::osc2, Piece::osc1, Piece::cosm1|vc2tone
 build-no-mix|Piece::tva, Piece::mix, Piece::envelopes|Piece::tva, Piece::envelopes|vc2tone
 build-list-kept|    head.next = head.prev = 0;   // the base's list node, 0x893ad920\n||vc2tone
 build-next-only|    head.next = head.prev = 0;|    head.next = 0;|vc2tone
@@ -58,7 +57,6 @@ count-osc1-only|    parts.countOsc(kVc2ToneOsc1, x);\n    parts.countOsc(kVc2Ton
 count-matched-routine|    parts.countOsc(kVc2ToneOsc2, x);|    parts.countOscMatched(kVc2ToneOsc2, x);|vc2tone
 matched-any-ignored|    if (value != kAnyValue && (head.id & mask) != static_cast<uint32_t>(value)) return;|    if ((head.id & mask) != static_cast<uint32_t>(value)) return;|vc2tone
 matched-unmasked|(head.id & mask) != static_cast<uint32_t>(value)|head.id != static_cast<uint32_t>(value)|vc2tone
-matched-order|    parts.countOscMatched(kVc2ToneOsc1, x);\n    parts.countOscMatched(kVc2ToneOsc2, x);|    parts.countOscMatched(kVc2ToneOsc2, x);\n    parts.countOscMatched(kVc2ToneOsc1, x);|vc2tone
 matched-any-value|constexpr int32_t kAnyValue = -1;|constexpr int32_t kAnyValue = -2;|vc2tone
 sounds-at-zero|return parts.tvaLevel() > 0.0f;|return parts.tvaLevel() >= 0.0f;|vc2tone
 held-not|return parts.tvaHeld();|return !parts.tvaHeld();|vc2tone
@@ -661,9 +659,9 @@ lfo-release-block-mode|if (w.mode - (uint32_t)kFirstOffMode|if ((uint32_t)w.fade
 lfo-release-no-fade|    l.fadeStart();   // rom.4's through the vtable's +0x0c, 0x893ac580 (rom.2's 0x894f04d0)\n||vc2tonelfo
 # v316: the tones' parts' host (vc2tonehost, Vc2ToneHost.cpp), what xt_vc2tone's port side joined until v316.  Not
 # planted: freeValue's word (startFree, its one caller, reads the free object's phase itself and drops the value).
-host-build-envelopes|if (piece == Piece::envelopes) mods.buildEnvelopes();|if (piece == Piece::envelopes) buildPart(piece);|vc2tonehost
-host-build-lfos|else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);|else if (piece == Piece::lfos) buildPart(piece);|vc2tonehost
-host-build-mix|else if (piece == Piece::mix) mix.construct(tail());|else if (piece == Piece::mix) buildPart(piece);|vc2tonehost
+host-build-envelopes|if (piece == Piece::envelopes) mods.buildEnvelopes();|if (piece == Piece::envelopes) {}|vc2tonehost
+host-build-lfos|else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);|else if (piece == Piece::lfos) {}|vc2tonehost
+host-build-mix|else if (piece == Piece::mix) mix.construct(tail());|else if (piece == Piece::mix) {}|vc2tonehost
 host-lfo-follows|return mods.lfos[(size_t)lfo].w.follow != 0; }|return mods.lfos[(size_t)lfo].w.on != 0; }|vc2tonehost
 host-lfo-follow|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[(size_t)lfo].w.follow; }|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[0].w.follow; }|vc2tonehost
 host-lfo-listed|return mods.lfos[(size_t)lfo].w.sync != 0; }|return mods.lfos[(size_t)lfo].w.keySync != 0; }|vc2tonehost
@@ -700,7 +698,7 @@ host-flags-lfos|mods.lfos[(size_t)l].w.on = 0;|mods.lfos[(size_t)l].w.on = 1;|vc
 # update-tests-order (the stopped word asked before the end test: both read alone, and no log orders them now) and
 # v273's methods-truncate-floor (the wait's loop on a fade above 0.5: the told truncation sets the fade to 1, which the
 # waits end at 0, so the loop sees no other value).
-host-build-tva|else if (piece == Piece::tva) tva.construct();|else if (piece == Piece::tva) buildPart(piece);|vc2tonehost
+host-build-tva|else if (piece == Piece::tva) tva.construct();|else if (piece == Piece::tva) {}|vc2tonehost
 host-tva-over|bool Vc2ToneHost::tvaOver() { return tva.over(*this); }|bool Vc2ToneHost::tvaOver() { return tva.silent(*this); }|vc2tonehost
 host-tva-stopped|tva.stoppedWord() != 0; }|tva.stoppedWord() == 0; }|vc2tonehost
 host-update-tva|void Vc2ToneHost::updateTva() { tva.update(*this); }|void Vc2ToneHost::updateTva() {}|vc2tonehost
@@ -730,7 +728,7 @@ host-lfo-at|Mods::kLfoBytes * (uint32_t)lfo; }|Mods::kLfoBytes * ((uint32_t)lfo 
 # its code is 10, which no converter writes, so COSM 2 is given OSC 1's flag's either way), v229's cosmbind-type17 (no
 # converter writes code 17) and v316's host-destroy-lfos (with the COSMs the host's, the LFOs' destructor writes only the
 # vtable word the constructor wrote, as v268 found, and no log is left to see it).
-host-build-cosm|else if (isCosmPiece(piece)) vc2CosmConstruct(cosms[cosmOfPiece(piece)]);|else if (isCosmPiece(piece)) buildPart(piece);|vc2tonehost
+host-build-cosm|else if (isCosmPiece(piece)) vc2CosmConstruct(cosms[cosmOfPiece(piece)]);|else if (isCosmPiece(piece)) {}|vc2tonehost
 host-destroy-cosm-one|else vc2CosmDestroy(cosms[cosmOfPiece(piece)], c_.pools|else vc2CosmDestroy(cosms[0], c_.pools|vc2tonehost
 host-update-cosm-pitch|cosmFrame_.update(cosms[(size_t)cosm], x);|cosmFrame_.update(cosms[(size_t)cosm], 1.0f);|vc2tonehost
 host-update-cosm-sound|    sounds[(size_t)cosm].update(cosms[(size_t)cosm], *this);\n||vc2tonehost
@@ -752,3 +750,54 @@ host-cosm-cost|{ return cosms[0].factor; }|{ return cosms[1].factor; }|vc2toneho
 host-cosm-word|{ return mods.wordAt(self(), at); }|{ return mods.wordAt(self(), at + 4); }|vc2tonehost
 mods-word-at-envelope|envelope % kEnvelopeBytes, word)) return word;|0, word)) return word;|vc2tonemods
 mods-word-at-lfo|boundWordIn(lfos, lfo, kLfoBytes, lfo % kLfoBytes, word);|boundWordIn(lfos, lfo, kLfoBytes, lfo % kEnvelopeBytes, word);|vc2tonemods
+# v319: the OSC voices joined into the host (vc2tonehost: the build's branch and the links; vc2tonehostosc: every join
+# and each link's method).  v316's to v318's build plants planted a call of buildPart, which v319 took out; from v319
+# they plant the part left unbuilt.  Not planted: the shared routines the host passes the voices (c_.shared, the
+# check's rom.4 own), whose plants would be the voices' own, xt_vc2osc's.  Taken out, as the real voices made them
+# equivalent: v228's build-osc-order and matched-order (each OSC voice's constructor and matched count write that
+# voice alone, so their order shows nowhere; the fakes' log showed it).
+host-build-osc|else voice(oscOfPiece(piece)).construct();|else voice(0).construct();|vc2tonehost
+host-build-osc-none|else voice(oscOfPiece(piece)).construct();|else {}|vc2tonehost
+host-links-osc2|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 1)|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 0)|vc2tonehost
+host-update-osc-link|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n, link(1 - osc), c_.shared);|vc2tonehostosc
+host-update-osc-count|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n + 1, link(osc), c_.shared);|vc2tonehostosc
+host-osc-value|{ return voice(osc).f32(kRatio); }|{ return voice(osc).f32(kRatio + 4); }|vc2tonehostosc
+host-render-osc-buffer|{ voice(osc).render(buffer, link(osc)); }|{ voice(osc).render(buffer + 2, link(osc)); }|vc2tonehostosc
+host-count-osc|{ voice(osc).count(x); }|{ voice(osc).count(x + 1); }|vc2tonehostosc
+host-count-osc-matched|{ voice(osc).countMatched(x); }|{ voice(osc).countMatched(0); }|vc2tonehostosc
+host-install-osc-none|::installOsc(int osc) { voice(osc).install(link(osc)); }|::installOsc(int) {}|vc2tonehostosc
+host-osc-kind|{ return (int32_t)voice(osc).kind(); }|{ return (int32_t)voice(0).kind(); }|vc2tonehostosc
+host-osc-flag|{ return voice(osc).tail.flag; }|{ return voice(1 - osc).tail.flag; }|vc2tonehostosc
+host-bind-osc-envelopes|binds[k] = envelopeAt(b.envelopes[k]);|binds[k] = envelopeAt(b.envelopes[0]);|vc2tonehostosc
+host-bind-osc-lfos|binds[kEnvelopeBinds + k] = lfoAt(b.lfos[k]);|binds[kEnvelopeBinds + k] = lfoAt(b.lfos[3 - k]);|vc2tonehostosc
+host-bind-osc-count|kEnvelopeBinds = 4;|kEnvelopeBinds = 3;|vc2tonehostosc
+host-bind-osc-flags|    bindFlags(b.envelopes, b.lfos);\n||vc2tonehostosc
+host-osc-wave|{ return voice(osc).u32(Vc2OscVoice::kWave); }|{ return voice(osc).u32(Vc2OscVoice::kWave + 4); }|vc2tonehostosc
+host-set-osc-wave|voice(osc).setU32(Vc2OscVoice::kWave, wave);|voice(osc).setU32(Vc2OscVoice::kWave, wave + 1);|vc2tonehostosc
+host-note-on-osc-legato|legato ? 1u : 0u|legato ? 0u : 1u|vc2tonehostosc
+host-take-player-osc|voice(osc).take(hostOf(tone).oscs[(size_t)osc]);|voice(osc).take(hostOf(tone).oscs[0]);|vc2tonehostosc
+host-set-osc-start|voice(osc).start(block, link(osc), c_.shared);|voice(osc).start(block + 1, link(osc), c_.shared);|vc2tonehostosc
+host-cosm-setup-ratio|{ v.f32(kRatio), v.tail.hz, v.u8(kByte) }|{ v.tail.hz, v.tail.hz, v.u8(kByte) }|vc2tonehostosc
+host-cosm-setup-root|{ v.f32(kRatio), v.tail.hz, v.u8(kByte) }|{ v.f32(kRatio), v.f32(kRatio), v.u8(kByte) }|vc2tonehostosc
+host-cosm-setup-byte|{ v.f32(kRatio), v.tail.hz, v.u8(kByte) }|{ v.f32(kRatio), v.tail.hz, 0 }|vc2tonehostosc
+host-settings-osc|voice(osc).settings(block, link(osc), c_.shared);|voice(osc).settings(block + 1, link(osc), c_.shared);|vc2tonehostosc
+host-legato-osc|{ voice(osc).legato(ramp); }|{ voice(osc).legato(ramp + 1); }|vc2tonehostosc
+host-key-off-osc|vibrato.w.active = 0;|vibrato.w.falling = 0;|vc2tonehostosc
+host-osc-cost|{ return voice(osc).tail.installed; }|{ return voice(osc).tail.factor; }|vc2tonehostosc
+host-osc-word168|{ return voice(osc).word168(); }|{ return voice(1 - osc).word168(); }|vc2tonehostosc
+host-osc-position|{ return voice(osc).position(); }|{ return (uint32_t)voice(osc).word168(); }|vc2tonehostosc
+link-kind-call|{ outside().kindCall(routine); }|{ outside().kindCall(routine + 4); }|vc2tonehostosc
+link-kind-settings|outside().kindSettings(routine, from);|outside().kindSettings(routine, from + 1);|vc2tonehostosc
+link-render-by|return outside().renderBy(routine, out, third);|return outside().renderBy(routine, out, 0);|vc2tonehostosc
+link-seek|outside().seek(routine, at);|outside().seek(routine, at + 16);|vc2tonehostosc
+link-os-clock|{ return outside().osClock(); }|{ return outside().osClock() + 1; }|vc2tonehostosc
+link-mic-ring|{ return outside().micRing(); }|{ static Vc2MicRing other; return other; }|vc2tonehostosc
+link-unvoiced|{ return outside().unvoiced(); }|{ return outside().unvoiced() + 1; }|vc2tonehostosc
+link-bound-tone|return host_.mods.boundFloat(self, part, offset);|return host_.mods.boundFloat(self, part, offset + 4);|vc2tonehostosc
+link-bound-in-tone|if (part - self < Vc2Tone::kSize)|if (part - self < Vc2Tone::kSize / 2)|vc2tonehostosc
+link-bound-outside|return outside().boundFloat(part, offset);|return 0.0f;|vc2tonehostosc
+link-address|{ return host_.self() + kOscsAt[(size_t)osc_]; }|{ return host_.self() + kOscsAt[0]; }|vc2tonehostosc
+link-object-call|{ outside().objectCall(routine); }|{ outside().objectCall(routine + 4); }|vc2tonehostosc
+link-event-position|{ return outside().eventPosition(event); }|{ return outside().eventPosition(event + 1); }|vc2tonehostosc
+link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHeader(at + 4); }|vc2tonehostosc
+link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc

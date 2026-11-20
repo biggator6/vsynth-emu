@@ -30,6 +30,11 @@ struct ToneCounts {
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
     std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
+    // v319: the OSC voices' note-ons by kind, the settings that reached a voice, the mic's blocks before kind 6's renders,
+    // and the calls they made beyond the tone, by xt_vc2osc's kinds of call
+    std::array<long, 8> oscKinds {};
+    long oscSettings = 0, micBlocks = 0, oscSteadied = 0;   // and the OSC 1s steadied for a COSM that takes its pitch
+    std::array<long, 6> oscCalls {};
 };
 
 // v318: each tone's COSMs' slots (−1 none) its last note-on took and its destructor hasn't freed, and whether it has had
@@ -43,7 +48,8 @@ struct ToneCosmTrack {
     }
 };
 
-// Both sides: rom.4 with its calls' log, the port's pool, its parts (one a tone) and their owner, the tones made
+// Both sides: rom.4 with its calls' logs (v319: the OSC voices' calls beyond the tone, its own), the port's pool, its
+// parts (one a tone) and their owner, the tones made
 struct ToneSides {
     Vc2Fw& fw;
     Vc2TonePool& pool;
@@ -51,16 +57,16 @@ struct ToneSides {
     std::deque<TonePortParts>& parts;
     TonePortOwner& owner;
     std::vector<ToneCall>& rom;
+    std::vector<OscCall>& oscRom;
     std::vector<int> live {};
     ToneCounts n {};
     ToneCosmTrack cosm {};   // v318
 };
 
-// The pool's words, the tones' own and part words (every tone's, or tone `only`'s), the note-on's input and the free
+// The pool's words, the tones' own and parts' words (every tone's, or tone `only`'s), the note-on's input and the free
 // objects, then the calls; empty when nothing differs
 std::string toneDifference(ToneSides& s, int only);
-// Before an event on tone i: the hooked routines' answers and the tone's part words drawn and written on both sides,
-// the free objects cleared, the logs fresh
+// Before an event on tone i: the hooks' answers and the parts' words drawn and written on both sides, the logs fresh
 void tonePrepare(ToneSides& s, int i, std::mt19937& rng);
 // Before a note-on on tone i besides: the input drawn (the legato's tone and matches, the fix-up's case) and the two
 // lists built from the tones made, on both sides
@@ -99,19 +105,49 @@ std::string tonePoolsDifference(ToneSides& s);
 void toneDrawCosms(ToneSides& s, int i, std::mt19937& rng);
 void toneDrawCosmBlocks(Vc2ToneInput& in, std::mt19937& rng);
 void toneDrawCosmNewBlock(ToneSides& s, int i, uint32_t cosm, std::mt19937& rng);
-void toneCosmsBeforeNoteOn(ToneSides& s, int i);
+void toneCosmsBeforeNoteOn(ToneSides& s, int i, std::mt19937& rng);
 void toneNoted(ToneSides& s, int i);
 void toneUnnoted(ToneSides& s, int i, bool freed);
 // Before a destructor: a COSM holding no slot by the check's count names none on both sides, so the destructor frees no
 // slot another tone holds (the part destroys only tones it gave a note)
 void toneHoldNoStaleSlots(ToneSides& s, int i);
-// Before the install pass alone: COSM 1's mode kept as its note chose it (rom.4 installs at the note-on alone)
-void toneKeepCosmMode(ToneSides& s, int i);
+// Before a note-on that starts no COSMs on a tone with a note: COSM 1's mode kept as its note chose it, OSC 1's block an
+// EXT IN's whose flag gives it (rom.4 installs at the note-on alone, which starts the COSMs; v319)
+void toneKeepCosmMode(ToneSides& s, int i, std::mt19937& rng);
 // Whether COSM 1's sound is a stereo Side Band Filter, whose follower reads the three words past buffer c
 bool toneCosmFollows(ToneSides& s, int i);
 // A case's start: both sides' pools set up again by rom.4's static initializer and the port's, no tone noted or holding a
 // slot; what differs after the set-up
 std::string toneFreshCosms(ToneSides& s);
+
+// The real OSC voices (v319, Vc2ToneOscCheck.cpp): tone i's two voices against rom.4's memory, whole; the calls they
+// make beyond the tone, xt_vc2osc's hooks' against its fake parts'.  Before every event, the hooks' answers and the OS's
+// clock drawn, the calls' logs fresh; before a note-on, its OSC blocks, records and ramp words as xt_vc2osc draws them
+// (Vc2OscDraws), each block's bound parts' numbers the tone's own; a block made a kind's (that kind's words with it)
+// where the legato, the fix-up or a COSM's mode wants it; an OSC voice made analog on both sides; the analog's object
+// words on a voice about to take an analog note; the vibratos' fades held for an update's count; a block of the mic
+// before a render with a voice of kind 6; the setter's settings block, an analog's words in it; the ramp words alone;
+// the mic ring set up once and each case
+std::string toneOscDifference(ToneSides& s, int i);
+std::string toneOscCallsDifference(ToneSides& s);
+void toneDrawOscs(ToneSides& s, std::mt19937& rng);
+void toneDrawOscBlocks(ToneSides& s, std::mt19937& rng);
+void toneOscBlockOfKind(ToneSides& s, int osc, uint32_t kind, uint32_t wave, std::mt19937& rng);
+// An OSC block made an EXT IN's (kind 4) of a neutral pitch, its ratio 1 at the root's 440 Hz, its flag 1 for the
+// wave's type 1 alone, and the input written again: what a COSM 1 that takes OSC 1's pitch needs (the Side Band
+// Filters, the Growl), and what keeps COSM 1's mode at a note-on that starts no COSMs (v319)
+void toneOscSteady(ToneSides& s, int osc, uint32_t wave, std::mt19937& rng);
+void toneMakeOscAnalog(ToneSides& s, int i, int osc, uint32_t code, std::mt19937& rng);
+void toneOscBeforeNoteOn(ToneSides& s, int i, std::mt19937& rng);
+void toneHoldOscVibratos(ToneSides& s, int i, int32_t n);
+std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng);
+// Before a getter: a VariPhrase voice's +0x168, which its player's routines write (hooked here, writing none), drawn on
+// both sides, so that the getter tells the voices apart
+void toneDrawOscHalves(ToneSides& s, int i, std::mt19937& rng);
+void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng);
+void toneDrawOscRamp(Vc2ToneInput& in, std::mt19937& rng);
+std::string toneOscSetUp(ToneSides& s);
+std::string toneOscCase(ToneSides& s, std::mt19937& rng);
 
 // The real OSC mix (v269, Vc2ToneMixCheck.cpp): tone i's mix's words against rom.4's; the delay lines of tone i, or of
 // every tone; the mix's block of a note-on's input; a render's buffers drawn on both sides, with a routine installed

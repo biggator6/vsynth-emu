@@ -176,6 +176,12 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2FreeLfos.cpp ] && echo Vc2FreeLfos.cpp Vc2FreeLfoCheck.cpp ) \
    $( [ -f Vc2ToneLists.cpp ] && echo Vc2ToneLists.cpp Vc2ToneMethods.cpp Vc2ToneMethodCheck.cpp ) \
    $( [ -f Vc2ToneHost.cpp ] && echo Vc2ToneHost.cpp ) \
+   $( [ -f Vc2ToneOscCheck.cpp ] && echo Vc2ToneHostOsc.cpp Vc2ToneOscCheck.cpp Vc2OscVoice.cpp Vc2OscVoiceGet.cpp \
+      Vc2OscVoiceKinds.cpp Vc2OscTables.cpp Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2PitchRamp.cpp Vc2PitchRampTick.cpp \
+      Vc2RampTables.cpp Vc2OscPlayers.cpp Vc2OscLite.cpp Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp Vc2OscAnalogSub.cpp \
+      Vc2OscAnalogShape.cpp Vc2OscAnalogUpdate.cpp Vc2OscVibrato.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp Vc2Kind6.cpp \
+      Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2OscDraws.cpp Vc2OscPartDraws.cpp Vc2OscRecords.cpp Vc2OscFakes.cpp \
+      Vc2OscPortParts.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
       Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
@@ -185,6 +191,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked; its ramps (v236) its own
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
    Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp \
+   $( [ -f Vc2OscDraws.cpp ] && echo Vc2OscDraws.cpp Vc2OscPartDraws.cpp ) \
    $( [ -f Vc2OscNoteOn.cpp ] && echo Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2OscGetters.cpp ) \
    $( [ -f Vc2PitchRamp.cpp ] && echo Vc2PitchRamp.cpp Vc2PitchRampTick.cpp Vc2RampTables.cpp Vc2RampCheck.cpp ) \
    $( [ -f Vc2OscPlayers.cpp ] && echo Vc2OscPlayers.cpp Vc2OscRecords.cpp ) \

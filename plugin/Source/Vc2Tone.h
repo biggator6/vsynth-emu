@@ -91,7 +91,7 @@ public:
     virtual void countOscMatched(int osc, uint32_t x) = 0; // 0x893ae720: x into a byte (+0x19d) when its +0x15c bit 2
     virtual float tvaLevel() = 0;                          // its +0x40
     virtual bool tvaHeld() = 0;                            // 0x893b25c0
-    virtual uint32_t installOsc(int osc) = 0;              // 0x893ae0f0
+    virtual void installOsc(int osc) = 0;                  // 0x893ae0f0 (its answer, which the tone drops: v319)
     virtual int32_t oscKind(int osc) = 0;                  // its +0x54
     virtual uint32_t oscFlag(int osc) = 0;                 // its +0xa40
     virtual void installMix(bool kind3) = 0;               // 0x893ade90

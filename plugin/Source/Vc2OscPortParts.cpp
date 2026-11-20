@@ -1,6 +1,7 @@
 // xt_vc2osc's port side: the voice's fake parts (Vc2OscCheck.h, v230, v232), logging each call as rom.4's hooks do and
-// answering from the same draws and records.  XT_VC2OSC_MAIN only.
-#ifdef XT_VC2OSC_MAIN
+// answering from the same draws and records.  From v319 xt_vc2tone's too: what its tones' real voices call beyond the
+// tone.  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+#if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2OscCheck.h"
 #include <bit>
 

@@ -782,16 +782,17 @@ mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 
 voices' update and schedule: 16000 events
 xt_vc2mixer: 0 different
 == xt_vc2tone
-tone: 40 cases, 16000 events, 899 made, 1561 none, 457 built in place, 450 unmade (394 back), 774 updates, 162 ended, 686 renders, 0 different
-note-on: 1291 note-ons, 248 players taken, 1940 LFOs following, 2566 free LFOs, 284 inputs fixed
-free LFOs: 429 ticks, 489 clocks
-modulators: 433 reads of their bound words
-mix: 831 plays, blocks by routine: 2061 679 266 626 191 652 273 444
-methods: 884 setters, 419 key-offs, 402 truncations (277 waits), 438 costs, 454 getters
-lists: 938 starts (801 tones started), 446 moves alone, 899 left before a rebuild
-settings and release: 35 envelopes' settings in sustain, 588 LFOs' fades started, 479 released envelopes ticked
-tva: 63 renders whose told fade ended
-cosm: 730 slots taken, 346 freed before a note-on, 355 stale named none, 124 modes kept, 269 whole renders through COSM 1 (97 a stereo Side Band Filter)
+tone: 40 cases, 16000 events, 955 made, 2221 none, 421 built in place, 441 unmade (382 back), 814 updates, 178 ended, 610 renders, 0 different
+note-on: 1235 note-ons, 222 players taken, 1989 LFOs following, 2380 free LFOs, 214 inputs fixed
+free LFOs: 373 ticks, 377 clocks
+modulators: 442 reads of their bound words
+mix: 799 plays, blocks by routine: 2164 640 138 569 205 634 319 393
+methods: 777 setters, 386 key-offs, 431 truncations (319 waits), 423 costs, 436 getters
+lists: 858 starts (755 tones started), 401 moves alone, 849 left before a rebuild
+settings and release: 30 envelopes' settings in sustain, 545 LFOs' fades started, 374 released envelopes ticked
+tva: 53 renders whose told fade ended
+cosm: 670 slots taken, 295 freed before a note-on, 368 stale named none, 188 modes kept, 225 whole renders through COSM 1 (56 a stereo Side Band Filter)
+osc: note-ons by kind 310 171 198 397 792 193 193 216 (341 OSC 1s steady for a COSM 1 of its pitch), 85 settings, 90 mic blocks; calls beyond the tone: 1223 kinds' routines, 8 settings, 458 renders, 206 seeks, 230 object setups, 78 event lookups
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values

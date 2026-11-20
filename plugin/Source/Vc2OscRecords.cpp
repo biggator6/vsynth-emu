@@ -1,9 +1,10 @@
 // xt_vc2osc's records (v238; v230's, moved here from Vc2OscCheck.cpp and Vc2OscFakes.cpp as they grew): what the
 // voice reads where its words point (the wave headers, the loop records, the bound envelopes and LFOs, the block's
 // +0xe0 records), their addresses in the interpreter's RAM, their draws and their writing into rom.4's memory, where
-// both sides read them.  XT_VC2OSC_MAIN only.
-#ifdef XT_VC2OSC_MAIN
-#include "Vc2OscSides.h"
+// both sides read them.  From v319 xt_vc2tone's too, its tones' voices reading the same.
+// XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+#if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
+#include "Vc2OscDraws.h"
 
 namespace {
 // [FW] where a record's fields are (Vc2OscVoice.h's): the wave header's, the loop record's

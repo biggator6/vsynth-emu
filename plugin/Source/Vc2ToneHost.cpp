@@ -10,6 +10,7 @@ constexpr uint32_t kCosmDestroyFlags = 2;   // [FW] 0x893b2fc0: the tone's COSMs
 
 bool isCosmPiece(Vc2TonePiece piece) { return piece == Piece::cosm1 || piece == Piece::cosm2; }
 size_t cosmOfPiece(Vc2TonePiece piece) { return (size_t)((int)piece - (int)Piece::cosm1); }
+int oscOfPiece(Vc2TonePiece piece) { return (int)piece - (int)Piece::osc1; }
 
 Vc2CosmBlockWords blockAt(const uint32_t* block) {   // a converter's block in the note's input
     Vc2CosmBlockWords b;
@@ -20,15 +21,17 @@ Vc2CosmBlockWords blockAt(const uint32_t* block) {   // a converter's block in t
 
 Vc2ToneHost::Vc2ToneHost(int tone, const Vc2ToneCommon& common)
     : sounds { { Vc2CosmDsp(common.pools), Vc2CosmDsp(common.pools) } }, tone_(tone), c_(common),
-      cosmFrame_(common.pools, *this) {}
+      cosmFrame_(common.pools, *this), links_ { { Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 1) } } {}
 
+// [FW] 0x893b2db0's parts in its order (Vc2TonePiece): the OSC voices' constructor 0x893ae070, the COSMs', the TVA's,
+// the mix's, the envelopes' and the LFOs' arrays
 void Vc2ToneHost::build(Vc2TonePiece piece) {
     if (piece == Piece::envelopes) mods.buildEnvelopes();
     else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);
     else if (piece == Piece::mix) mix.construct(tail());
     else if (piece == Piece::tva) tva.construct();
     else if (isCosmPiece(piece)) vc2CosmConstruct(cosms[cosmOfPiece(piece)]);
-    else buildPart(piece);
+    else voice(oscOfPiece(piece)).construct();
 }
 
 // [FW] 0x893b2fc0 takes down the LFOs and the two COSMs alone (Vc2Tone.cpp's kDestroyOrder), all the host's from v318

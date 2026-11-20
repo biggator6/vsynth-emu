@@ -2,6 +2,7 @@
 // their frame's words, the pools' words, and their sound through the render's buffer c.  XT_VC2TONE_MAIN only.
 #ifdef XT_VC2TONE_MAIN
 #include "Vc2ToneSides.h"
+#include "Vc2CosmGrowl.h"
 #include "Vc2CosmNoteOnDraws.h"
 #include "Vc2ToneMixTables.h"
 #include <cstring>
@@ -14,6 +15,7 @@ constexpr uint32_t kPastAt = 0x89998e20;   // [FW] after buffer c: the part mixe
 constexpr uint32_t kBindingsAt = 0x150;    // [FW] the object's four bound parts' addresses
 constexpr uint32_t kSlotAt = 0x144;        // [FW] the object's slot, −1 none
 constexpr int32_t kFirstSideBand = 7, kSecondSideBand = 8;   // [FW] the Side Band Filters' codes
+constexpr uint32_t kStereoWave = 1, kMonoWave = 0;   // [FW] an EXT IN's flag by the wave's type (kind 4's row, v319)
 constexpr float kPastLevel = 2.0f;   // the words past buffer c, against the mix's full scale (xt_vc2cosm's are the frames')
 
 // [FW] what of the object the sound keeps, rom.4's DSP's state (D+4…), which the port keeps in XtCosm's objects (v263)
@@ -98,9 +100,9 @@ void toneDrawCosmNewBlock(ToneSides& s, int i, uint32_t cosm, std::mt19937& rng)
 // A note-on drawn that starts the COSMs again: each slot the tone's last one took in use no longer on both sides, as the
 // part's destructor would have left it.  One that starts none (a structure past 2, which the part's notes never have):
 // COSM 1's mode kept, as its install would otherwise switch a sounding note's
-void toneCosmsBeforeNoteOn(ToneSides& s, int i) {
+void toneCosmsBeforeNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     if (!startsCosms(s)) {
-        toneKeepCosmMode(s, i);
+        toneKeepCosmMode(s, i, rng);
         return;
     }
     for (size_t k = 0; k < 2; ++k) {
@@ -111,6 +113,13 @@ void toneCosmsBeforeNoteOn(ToneSides& s, int i) {
         slot = -1;
         ++s.n.cosmFreed;
     }
+    // v319: the Side Band Filters (their delay) and the Growl (its lines) take OSC 1's ratio and root, which their
+    // converters keep within 0.25…4 and 55…1760 Hz (xt_vc2cosm's draws); a real voice's +0x1cc is its kind's (kinds 5
+    // and 6 leave it, their pitch in P), so OSC 1 a steady EXT IN's, stereo or mono
+    const auto first = static_cast<int32_t>(s.shared.input.at(In::kCosms[0]));
+    if (first != kFirstSideBand && first != kSecondSideBand && first != Vc2CosmGrowl::kCode) return;
+    toneOscSteady(s, 0, rng() % 2 ? kStereoWave : kMonoWave, rng);
+    ++s.n.oscSteadied;
 }
 
 void toneNoted(ToneSides& s, int i) {
@@ -138,14 +147,14 @@ void toneHoldNoStaleSlots(ToneSides& s, int i) {
 
 // OSC 1's flag, which COSM 1's install takes as mono (0) or stereo, as its note chose: rom.4 reaches its install pass from
 // the note-on alone (nothing names 0x893b4060: its note-on holds the pass inline), so a sound's mode never changes during
-// a note, and rom.4's mono routines keep a stereo state the port's mono sound doesn't
-void toneKeepCosmMode(ToneSides& s, int i) {
+// a note, and rom.4's mono routines keep a stereo state the port's mono sound doesn't.  From v319 the voices are real: a
+// voice's kind and flag stay as its note-on left them (nothing else writes them), so the install pass alone keeps the
+// mode by itself, and a note-on that starts no COSMs (a structure past 2, which the part never gives) is what could
+// change it: OSC 1's block is made an EXT IN's (kind 4), whose note-on's flag is 1 for the wave's type 1 alone, at a
+// steady pitch, which a sounding Side Band Filter takes at COSM 1's updates
+void toneKeepCosmMode(ToneSides& s, int i, std::mt19937& rng) {
     if (!s.cosm.noted[(size_t)i]) return;
-    ToneOscWords& osc = s.parts[(size_t)i].words.osc[0];
-    const bool stereo = s.parts[(size_t)i].sounds[0].section().stereo;
-    if ((osc.flag != 0) == stereo) return;
-    osc.flag = stereo ? 1u : 0u;
-    toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
+    toneOscSteady(s, 0, s.parts[(size_t)i].sounds[0].section().stereo ? kStereoWave : kMonoWave, rng);
     ++s.n.cosmModesKept;
 }
 
