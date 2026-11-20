@@ -1546,6 +1546,60 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's envelopes' and LFOs' settings and release (2026-11-20, v315) {#vc2-modulators-settings-release}
+
+Step 4.3's forty-third version (VC2_MODE_PLAN.md, step 4.3, item 10's twentieth part). The tone's parts need a host
+before Vc2Synth can hold them, and the host needs every routine the tone calls on its envelopes and LFOs. Four had no
+port: the settings and the release of each (VC2_MODE_PLAN.md's table, "What each interface still needs").
+`Vc2ToneEnvelope::settings` and `release`, `Vc2ToneLfo::settings` and `release` are those four.
+
+**They are rom.2's.** Each of the four is rom.2's routine word for word: rom.4's envelope code sits 0x143f70 below
+rom.2's and its LFO code 0x143f50 below, as v268 found for the rest:
+
+| rom.4 | rom.2 | What | Its law |
+|---|---|---|---|
+| `0x893ac110` | `0x894f0080` | an envelope's settings | `XtEnvelope::update` |
+| `0x893ac470` | `0x894f03e0` | an envelope's release | `XtEnvelope::noteOff` |
+| `0x893acff0` | `0x894f0f40` | an LFO's settings | `XtLfo::update` |
+| `0x893ac8c0` | `0x894f0810` | an LFO's release | `XtLfo::fadeStart`, by its own test |
+
+As v268's adapters do, each loads rom.4's words into XtEnvelope or XtLfo, runs the law and stores the words back.
+What rom.4 reads and writes decided three details:
+- **The envelope's +0x50**, the level a release starts from, is written by the release alone and read by the release
+  stage's output. `load` and `store` now carry it, which changes nothing that ran before: no other routine writes
+  it.
+- **The LFO's settings copy six of the block's eight words**: the wave, rate, delay, fade, offset and fade mode
+  (`0x893acff8…0x893ad01c`), not the key sync or the note value's switch. Then the fade's three times again through
+  the vtable (+0x54 and +0x48 on the fade, +0x3c on the delay; `0x893ac650`, `0x893ac620`, `0x893ac610`, in the
+  direction the note-on chose), and a note value's step, 65535 over the rate. That is XtLfo's update on the words as
+  they then stand.
+- **The LFO's release tests the mode the note-on took** (+0x2c), not the block's (+0x68), which the settings
+  rewrite. It tests that mode as unsigned, mode − 2 below 2, so only modes 2 and 3 start the fade, through the
+  vtable's +0x0c (`0x893ac580`). XtLfo's `noteOff` reads its own copy as `fadeMode >= 2`, which would differ past 3.
+  So the release is written out on the words, with XtLfo's fade start alone.
+
+**Never reached on the VC-2.** The settings' other two branches: an envelope at stage 6 (only a negative tick count
+reaches it, which the tone's caller never gives, as v268 found) and a negative scale (the converter writes 1). An LFO
+mode past 3 never reaches the release (the converter writes 0…3).
+
+**The check.** xt_vc2tone runs rom.4's own four routines; their hooks are gone. The setter event now gives the LFO
+and envelope setters their own blocks, drawn as the converters write them; they were all given the mix's when the
+four were hooked. The tone's sustain is seldom reached by its own ticks in a case, so half the time the envelope
+setter finds a started envelope in sustain (stage 3, phase 0), drawn on both sides. At 40 cases: 43 envelope
+settings in sustain, 569 LFO fades started by a release, 521 released envelopes ticked. Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400);
+- the new code's lines and branches all reached;
+- 26 new planted errors, 0 missed, and the whole `--tone` list, 634 planted, 0 missed.
+
+Every count line of xt_vc2tone moves, as in v268…v273, because the setter event draws more.
+
+**Two of v273's planted errors became equivalent** once the releases were real, and are taken out of the list:
+- `methods-keyoff-lfo0`, a key-off passing over LFO 0: no note-on starts LFO 0 (its loop runs 1…7), and its
+  constructor clears its +0x28. So its release finds it inactive and returns at once. rom.4's key-off releases it for
+  nothing.
+- `methods-keyoff-order`, the envelopes released before the LFOs: neither release touches a word of the other's. The
+  log that ordered them while both were hooked is gone.
+
 ### The VC-2 part as one object: Vc2Synth's start (2026-11-20, v314) {#vc2-synth-start}
 
 Step 4.3's forty-second version (VC2_MODE_PLAN.md, step 4.3, item 10's nineteenth part), the first of Vc2Synth:
@@ -3884,7 +3938,7 @@ Every list is walked to its end, as nothing keeps a tail. The note-on's search f
 
 **The mix's settings update `0x893add60(mix, block)`,** by the type its note-on took (the mix's +0): type 0 the four targets from the block; type 1 its first over 2^31 (its own word, `0x893adea8`) and the next two; types 2 and 3 three targets; all four of those clear the sync switch. Type 4 sets the sync switch and takes the hold from the block. Any other type changes nothing. The block's own type is not read.
 
-**Left hooked, with no port yet:** the envelopes' and LFOs' settings and release (`0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have, and the vibrato's key-off `0x893b2b60`.
+**Left hooked, with no port yet:** the envelopes' and LFOs' settings and release (`0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have (ported in v315, "The VC-2's envelopes' and LFOs' settings and release"), and the vibrato's key-off `0x893b2b60`.
 
 **The check.** `xt_vc2tone` no longer hooks `0x893ad9a0`, `0x893ada10` or `0x893ada30`. rom.4's own lists run on their words, compared after every event. A tone leaves its list by rom.4's own routine before anything builds it again (a note-on, a constructor) and after its destructor, as the part keeps a tone on one list at most. The scribble keeps a tone's links, its own address and its vtable. Events of their own run the setters on drawn numbers and the mix's block, key-off, both truncations with one to three waits, the cost, the getters, the start and the lists' routines alone. The new routines' callees are hooked, and the OSCs' costs, the TVA's fade and COSM 1's cost are drawn. 0 different at seed 2024 (40 cases) and at seeds 7 and 31337 (400 cases each). Every line and region of the new port code runs. `mutate_vc2.py --tone`: 610 planted, 65 new, 0 missed. The first run missed v228's two plants on the constructor's clearing of the links: with every tone off its list before it is built, the links were already 0, so the check now gives a tone on no list stale links half the time. v228's plant on the destructor's order of the unlist and its parts' teardown is gone, as no log orders real list work against the parts' calls.
 

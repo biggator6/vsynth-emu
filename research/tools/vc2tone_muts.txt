@@ -600,10 +600,8 @@ methods-mix|parts.settingsMix(block); }|}|vc2tonemethods
 methods-tva|parts.newBlockTva(block); }|}|vc2tonemethods
 methods-legato|for (int osc : kOscs) parts.legatoOsc(osc, ramp);|parts.legatoOsc(kVc2ToneOsc1, ramp);|vc2tonemethods
 methods-keyoff-state|    if (head.state != kSounding) return;\n    for (int lfo|    if (head.state == kBuilt) return;\n    for (int lfo|vc2tonemethods
-methods-keyoff-lfo0|for (int lfo = 0; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);|for (int lfo = 1; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);|vc2tonemethods
 methods-keyoff-envelope0|for (int envelope = 0; envelope < kEnvelopes; ++envelope)|for (int envelope = 1; envelope < kEnvelopes; ++envelope)|vc2tonemethods
 methods-keyoff-osc|for (int osc : kOscs) parts.keyOffOsc(osc);|parts.keyOffOsc(kVc2ToneOsc1);|vc2tonemethods
-methods-keyoff-order|    for (int lfo = 0; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);   // all eight, LFO 0 too\n    for (int envelope = 0; envelope < kEnvelopes; ++envelope) parts.releaseEnvelope(envelope);|    for (int envelope = 0; envelope < kEnvelopes; ++envelope) parts.releaseEnvelope(envelope);\n    for (int lfo = 0; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);|vc2tonemethods
 methods-truncate-told|    parts.truncateTvaTold();\n    while|    while|vc2tonemethods
 methods-truncate-once|while (parts.tvaFade() > 0.0f) parts.waitFade();|if (parts.tvaFade() > 0.0f) parts.waitFade();|vc2tonemethods
 methods-truncate-floor|while (parts.tvaFade() > 0.0f) parts.waitFade();|while (parts.tvaFade() > 0.5f) parts.waitFade();|vc2tonemethods
@@ -635,3 +633,34 @@ mix-settle-other-row|false, settleNone }|false, settleFour }|vc2tonemix
 mix-settle-type|typeOf(w.type).settings(w, block, tail)|typeOf((int32_t)block[0]).settings(w, block, tail)|vc2tonemix
 mixt-settings|{ 0x893adea8, &t.settingsScale }|{ 0x893e4988, &t.settingsScale }|vc2tonemixtables
 noteon-walk-heads|node != 0 && pool.holds(node);|node != 0;|vc2tonenoteon
+# v315: the envelopes' settings and release (vc2toneenv) and the LFOs' (vc2tonelfo).  Not planted: the LFO release's test
+# taken signed (mode < 2), which differs from rom.4's unsigned mode − 2 only for a mode past 3, which no converter gives.
+# Taken out, as the real releases made them equivalent: v273's methods-keyoff-lfo0 (LFO 0's release finds it inactive:
+# its constructor clears +0x28 and no note-on starts LFO 0, so the release returns at once) and methods-keyoff-order (an
+# envelope's release and an LFO's touch no word of each other's, and no log orders them now).
+env-settings-scale-word|kScaleWord = 1,|kScaleWord = 0,|vc2toneenv
+env-settings-times-word|kTimesWord = 5,|kTimesWord = 4,|vc2toneenv
+env-settings-levels-word|kLevelsWord = 9;|kLevelsWord = 8;|vc2toneenv
+env-settings-no-scale|    w.scale = std::bit_cast<float>(block[kScaleWord]);\n||vc2toneenv
+env-settings-no-times|    std::memcpy(w.time.data(), block + kTimesWord, sizeof w.time);\n||vc2toneenv
+env-settings-no-levels|    std::memcpy(w.level.data(), block + kLevelsWord, sizeof w.level);\n||vc2toneenv
+env-settings-not-run|    e.update(e.p);   // the words as they now stand\n||vc2toneenv
+env-release-not-run|    e.noteOff();\n||vc2toneenv
+env-release-ticked|    e.noteOff();|    e.tick(1);|vc2toneenv
+env-load-release|    e.rel = w.release;\n||vc2toneenv
+env-store-release|    w.release = e.rel;\n||vc2toneenv
+lfo-off-modes|kOffModes = 2;|kOffModes = 1;|vc2tonelfo
+lfo-settings-key-sync|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 4, 6, 7 };|vc2tonelfo
+lfo-settings-sync|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 5, 6, 7 };|vc2tonelfo
+lfo-settings-no-wave|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 1, 2, 3, 6, 7 };|vc2tonelfo
+lfo-settings-no-rate|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 2, 3, 6, 7 };|vc2tonelfo
+lfo-settings-no-delay|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 3, 6, 7 };|vc2tonelfo
+lfo-settings-no-fade|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 6, 7 };|vc2tonelfo
+lfo-settings-no-offset|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 7 };|vc2tonelfo
+lfo-settings-no-fade-mode|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 6 };|vc2tonelfo
+lfo-settings-not-updated|    l.update(l.p);   // XtLfo's update (rom.2's 0x894f0f40) on the words as they now stand\n||vc2tonelfo
+lfo-settings-no-step|    w.clockStep = l.s84;\n||vc2tonelfo
+lfo-release-always|    if (w.active == 0) return;\n||vc2tonelfo
+lfo-release-stays-active|    w.active = 0;\n    if (w.mode|    if (w.mode|vc2tonelfo
+lfo-release-block-mode|if (w.mode - (uint32_t)kFirstOffMode|if ((uint32_t)w.fadeMode - (uint32_t)kFirstOffMode|vc2tonelfo
+lfo-release-no-fade|    l.fadeStart();   // rom.4's through the vtable's +0x0c, 0x893ac580 (rom.2's 0x894f04d0)\n||vc2tonelfo

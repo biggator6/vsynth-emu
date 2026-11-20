@@ -75,6 +75,7 @@ std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
     constexpr uint32_t kPositiveLowHalf = 0xffff7fff;
     const uint32_t n = rng() % 2 == 0 ? rng() % 64 : (uint32_t)rng() & kPositiveLowHalf;
     s.n.updates += tone.head.state == Vc2Tone::kSounding;
+    toneCountReleaseTicks(s, i);
     std::string what =
         toneOn(s, i, kUpdateAt, { s.pool.addressOf(i), n }, [&] { tone.update((int32_t)n, partsOf(s, i)); });
     s.n.ends += tone.head.state == Vc2Tone::kEnded;

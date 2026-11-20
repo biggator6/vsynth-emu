@@ -2,8 +2,9 @@
 // The VC-2 tone's envelope (v268): rom.4's object, 0x70 bytes word for word, over XtEnvelope.  rom.4's envelope code
 // (0x893ab5b0…0x893ac4a0) is rom.2's opcode for opcode but for its pool's addresses, so its laws are XtEnvelope's, run on
 // rom.4's words and stored back.  Its converter (0x8939a400) writes curve 0 or 2, scale 1 and sync 0 alone: curve 1's
-// output (0x893abcb0) and the synced rate at +0x10 are never reached, and neither is ported.  Bit for bit: xt_vc2tone
-// against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs".  Audio thread.
+// output (0x893abcb0) and the synced rate at +0x10 are never reached, and neither is ported.  The settings and release
+// from v315.  Bit for bit: xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2's envelopes and
+// LFOs", "The VC-2's envelopes' and LFOs' settings and release".  Audio thread.
 #include <array>
 #include <cstdint>
 
@@ -22,7 +23,7 @@ struct Vc2EnvelopeWords {
     int32_t phase = 0;               // +0x44
     float unread = 0.0f;             // +0x48: 1 from the constructor, read by nothing here
     float out = 0.0f;                // +0x4c
-    float release = 0.0f;            // +0x50: the level a release starts from, which only a note-off writes
+    float release = 0.0f;            // +0x50: the level a release starts from, which only the release writes
     float coef = 0.0f;               // +0x54
     float onset = 0.0f;              // +0x58
     std::array<uint32_t, 3> output {};   // +0x5c: the output routine's member pointer, by the curve
@@ -36,6 +37,10 @@ public:
     void construct();                     // 0x893abe40 on an envelope given: what it leaves alone keeps the last use's
     void noteOn(const uint32_t* block);   // 0x893ac1c0: the converter's 14 words
     void tick(int32_t n);                 // 0x893abe80
+    // 0x893ac110 (v315): a new block's times, levels and scale while the note sounds, XtEnvelope's update (rom.2's
+    // 0x894f0080): a sustain moves to its new level at once
+    void settings(const uint32_t* block);
+    void release();                       // 0x893ac470 (v315): a key let go, XtEnvelope's note-off (0x894f03e0)
     bool started() const { return w.output[2] != 0; }   // a note-on has given it an output routine
 
     Vc2EnvelopeWords w {};

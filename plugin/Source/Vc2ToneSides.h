@@ -19,6 +19,8 @@ struct ToneCounts {
     long noteOns = 0, takes = 0, fixes = 0;
     long freeTicks = 0, freeClocks = 0;   // v271: the free LFOs' two passes
     long setters = 0, keyOffs = 0, truncations = 0, waits = 0, costs = 0, getters = 0;   // v273: the remaining methods
+    // v315: the envelopes' settings in sustain, the LFOs' fades a release starts, the released envelopes an update ticks
+    long sustains = 0, releaseFades = 0, releaseTicks = 0;
     long starts = 0, started = 0, listMoves = 0, leaves = 0;   // the part's lists: starts, tones started, moves, leaves
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
@@ -52,6 +54,12 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng);
 std::string toneModulatorsDifference(ToneSides& s, int i);
 void toneDrawModulatorBlocks(Vc2ToneInput& in, std::mt19937& rng);
 void toneDrawModulatorWords(ToneSides& s, int i, std::mt19937& rng);
+// v315: what an event about to run on tone i reaches of the envelopes' and LFOs' settings and release, counted: an
+// envelope's settings in sustain (half the time a started one put there on both sides, as its ticks would leave it, so
+// few of the check's tones tick that far), the fades a key-off's releases start, the released envelopes an update ticks
+void toneSteerSustain(ToneSides& s, int i, uint32_t envelope, std::mt19937& rng);
+void toneCountReleases(ToneSides& s, int i);
+void toneCountReleaseTicks(ToneSides& s, int i);
 
 // The real OSC mix (v269, Vc2ToneMixCheck.cpp): tone i's mix's words against rom.4's; the delay lines of tone i, or of
 // every tone; the mix's block of a note-on's input; a render's buffers drawn on both sides, with a routine installed

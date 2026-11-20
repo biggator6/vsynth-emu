@@ -782,13 +782,14 @@ mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 
 voices' update and schedule: 16000 events
 xt_vc2mixer: 0 different
 == xt_vc2tone
-tone: 40 cases, 16000 events, 884 made, 2094 none, 398 built in place, 396 unmade (342 back), 823 updates, 369 ended, 671 renders, 0 different
-note-on: 1263 note-ons, 219 players taken, 1916 LFOs following, 2485 free LFOs, 302 inputs fixed
-free LFOs: 411 ticks, 412 clocks
-modulators: 439 reads of their bound words
-mix: 903 plays, blocks by routine: 2347 876 194 671 253 636 536 482
-methods: 841 setters, 437 key-offs, 401 truncations (77 waits), 410 costs, 432 getters
-lists: 820 starts (754 tones started), 412 moves alone, 840 left before a rebuild
+tone: 40 cases, 16000 events, 866 made, 1520 none, 484 built in place, 419 unmade (374 back), 841 updates, 401 ended, 654 renders, 0 different
+note-on: 1276 note-ons, 234 players taken, 1974 LFOs following, 2514 free LFOs, 292 inputs fixed
+free LFOs: 422 ticks, 445 clocks
+modulators: 405 reads of their bound words
+mix: 963 plays, blocks by routine: 2802 858 187 701 274 580 486 520
+methods: 853 setters, 466 key-offs, 428 truncations (72 waits), 395 costs, 445 getters
+lists: 821 starts (729 tones started), 439 moves alone, 883 left before a rebuild
+settings and release: 43 envelopes' settings in sustain, 569 LFOs' fades started, 521 released envelopes ticked
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values

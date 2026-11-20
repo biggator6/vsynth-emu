@@ -99,6 +99,8 @@ int main(int argc, char** argv) {
                 n.keyOffs, n.truncations, n.waits, n.costs, n.getters);
     std::printf("lists: %ld starts (%ld tones started), %ld moves alone, %ld left before a rebuild\n", n.starts,
                 n.started, n.listMoves, n.leaves);
+    std::printf("settings and release: %ld envelopes' settings in sustain, %ld LFOs' fades started, %ld released "
+                "envelopes ticked\n", n.sustains, n.releaseFades, n.releaseTicks);
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

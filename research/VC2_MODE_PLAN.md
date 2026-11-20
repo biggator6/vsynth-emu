@@ -634,7 +634,7 @@ version against rom.4's routines with what it calls hooked:
 
      | Interface | Has a port | No port yet |
      |---|---|---|
-     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269), the free LFOs' manager (v271), the part's lists of tones and the mix's settings update (v273) | the envelopes' and LFOs' settings and release `0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`; the vibrato's key-off `0x893b2b60` (its +0x34 to 0) |
+     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269), the free LFOs' manager (v271), the part's lists of tones and the mix's settings update (v273); the envelopes' and LFOs' settings and release (v315) | the vibrato's key-off `0x893b2b60` (its +0x34 to 0) |
      | `Vc2OscParts` | carrier and kind 6 on the voice (v266), the vibrato (v267), players' installs, seeks | kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by address (`vc2Kind5Update` and `Vc2Kind6::set` are their ports, for the part's wiring) |
      | `Vc2TvaParts` | the TVA itself | the fade's step, the word at `0x8993eb08`, which the TVA's converter writes (`0x893a67a2`, with a twin from `0x893a6eba`): version 8's; the event is the task's |
      | `Vc2MixerParts` | all nine | none |
@@ -905,6 +905,12 @@ version against rom.4's routines with what it calls hooked:
          modulators), C's OSC-block and COSM-input children (unported: 0x8939fe00 and its kin, Random Pitch's seed),
          then the tasks' wiring: the OS model of events and waits, the three tasks in one block order, MIDI through
          v313's handler, then v308's dispatcher.
+       - The envelopes' and LFOs' settings and release done (v315): `0x893ac110`, `0x893ac470`, `0x893acff0` and
+         `0x893ac8c0`, rom.2's word for word, as `Vc2ToneEnvelope::settings` and `release` and `Vc2ToneLfo::settings`
+         and `release` on XtEnvelope's and XtLfo's laws, their hooks out of xt_vc2tone (HARDWARE_FIRMWARE.md, "The
+         VC-2's envelopes' and LFOs' settings and release"). The tone's parts' host needed them. Next: that host, a
+         port class joining a tone's real parts (the envelopes, LFOs, mix, lists and free LFOs, which xt_vc2tone's
+         port side joins today, then the TVA, the COSMs and the OSC voices one at a time), which Vc2Synth holds 24 of.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

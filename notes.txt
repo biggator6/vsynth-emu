@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's envelopes' and LFOs' settings and release v315 (2026-11-20, on claude/vc2-part-4-3 after v314;
+  HARDWARE_FIRMWARE.md, "The VC-2's envelopes' and LFOs' settings and release"): step 4.3's forty-third version, item
+  10's twentieth part. rom.4's 0x893ac110, 0x893ac470, 0x893acff0 and 0x893ac8c0, rom.2's word for word, as
+  Vc2ToneEnvelope::settings and release (XtEnvelope's update and note-off; the envelope's +0x50 carried through load
+  and store) and Vc2ToneLfo::settings and release (the six words rom.4 copies, then XtLfo's update; the release by the
+  note-on's mode at +0x2c, unsigned, then XtLfo's fade start). Their hooks out of xt_vc2tone; its setter event gives
+  them their own blocks and now and then a started envelope in sustain. 0 different at seeds 2024, 7 and 31337;
+  26 new planted errors, 0 missed; the whole --tone list 634 planted, 0 missed, v273's methods-keyoff-lfo0 and
+  methods-keyoff-order taken out as equivalent now (LFO 0 is never started, so its release returns at once; the two
+  releases share no word). Every count line of xt_vc2tone moves, as its draws do. Not in the sound yet.
+
 Vc2Synth's start v314 (2026-11-20, on claude/vc2-part-4-3 after v313; HARDWARE_FIRMWARE.md, "The VC-2 part as one
   object: Vc2Synth's start"): step 4.3's forty-second version, item 10's nineteenth part. Vc2Synth (Vc2Synth.h/.cpp):
   every port's object of the part at its rom.4 address, and start(): .data's and .bss's words no port gives, then the

@@ -12,8 +12,6 @@ constexpr uint32_t kNoBuffer = 0xff, kByte = 0xff;
 uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 int32_t oscCode(int osc) { return tonePartCode(static_cast<Piece>((int)Piece::osc1 + osc), 0); }
 int32_t cosmCode(int cosm) { return tonePartCode(static_cast<Piece>((int)Piece::cosm1 + cosm), 0); }
-int32_t lfoCode(int lfo) { return tonePartCode(Piece::lfos, lfo); }
-int32_t envelopeCode(int envelope) { return tonePartCode(Piece::envelopes, envelope); }
 const int32_t kTvaCode = tonePartCode(Piece::tva, 0);
 constexpr uint32_t kFadeEvent = 0x1000;   // [FW] 0x893b3be4: the event the truncation's task waits on
 uint32_t byteOf(int32_t x) { return (uint32_t)x & kByte; }
@@ -172,12 +170,11 @@ void TonePortParts::enlist() { s_.lists.enlist(s_.pool->addressOf(tone_), *s_.po
 // v273: the remaining methods' parts, each logged as rom.4's hook reads it but the mix's, which is real
 void TonePortParts::settingsOsc(int osc, const uint32_t* block) { log(kSettingsOsc, oscCode(osc), { blockOf(block) }); }
 
-void TonePortParts::settingsLfo(uint32_t lfo, const uint32_t* block) {
-    log(kSettingsLfo, lfoCode((int)lfo), { blockOf(block) });
-}
+// v315: the envelopes' and LFOs' settings and release are real
+void TonePortParts::settingsLfo(uint32_t lfo, const uint32_t* block) { mods.lfos[lfo].settings(block); }
 
 void TonePortParts::settingsEnvelope(uint32_t envelope, const uint32_t* block) {
-    log(kSettingsEnvelope, envelopeCode((int)envelope), { blockOf(block) });
+    mods.envelopes[envelope].settings(block);
 }
 
 void TonePortParts::newBlockCosm(int cosm, const uint32_t* block) {
@@ -187,8 +184,8 @@ void TonePortParts::newBlockCosm(int cosm, const uint32_t* block) {
 void TonePortParts::settingsMix(const uint32_t* block) { mix.settings(block, tail()); }
 void TonePortParts::newBlockTva(const uint32_t* block) { log(kNewBlockTva, kTvaCode, { blockOf(block) }); }
 void TonePortParts::legatoOsc(int osc, const uint32_t* ramp) { log(kLegatoOsc, oscCode(osc), { blockOf(ramp) }); }
-void TonePortParts::releaseLfo(int lfo) { log(kReleaseLfo, lfoCode(lfo)); }
-void TonePortParts::releaseEnvelope(int envelope) { log(kReleaseEnvelope, envelopeCode(envelope)); }
+void TonePortParts::releaseLfo(int lfo) { mods.lfos[(size_t)lfo].release(); }
+void TonePortParts::releaseEnvelope(int envelope) { mods.envelopes[(size_t)envelope].release(); }
 void TonePortParts::keyOffOsc(int osc) { log(kKeyOffOsc, oscCode(osc)); }
 void TonePortParts::truncateTvaTold() { log(kTruncateTold, kTvaCode); }
 void TonePortParts::truncateTva() { log(kTruncate, kTvaCode); }

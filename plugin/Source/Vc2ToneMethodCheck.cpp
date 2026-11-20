@@ -15,7 +15,6 @@ constexpr uint32_t kUnlistSoundingAt = 0x893ad9a0, kUnlistNewAt = 0x893ada30, kE
 constexpr uint32_t kJoinAt = 0x893ada90, kStartAt = 0x893b1cd0, kKeyOffAt = 0x893b3ad0;
 constexpr uint32_t kTruncateWaitAt = 0x893b3bc0, kTruncateNowAt = 0x893b3c20, kCostAt = 0x893b4020;
 constexpr uint32_t kListHeadBytes = 0x1c;   // [FW] 0x893b1fcc: each head an object of 0x1c bytes
-constexpr uint32_t kMixBlockBytes = 5 * sizeof(uint32_t);
 constexpr int kMostWaits = 3;
 static_assert(offsetof(Lists, joined) == offsetof(Lists, newest) + sizeof(uint32_t), "the marks' words");
 
@@ -57,18 +56,21 @@ std::string bothListsOn(ToneSides& s, uint32_t at, const char* name, void (Lists
 }
 
 // [FW] the block setters: the routine, how many numbers it takes (0 none) and whether one past 1 is its to pass over,
-// and the method, one taking a number or one not
+// the method, one taking a number or one not, and the input's block it is given: the mix's, or from v315, when the
+// settings are real, the LFO's or envelope's own, the first at `block` and the others `stride` apart
 struct ToneSetter {
     uint32_t at;
     uint32_t numbers;
     bool bounded;
     void (Vc2Tone::*numbered)(uint32_t, const uint32_t*, Vc2ToneParts&);
     void (Vc2Tone::*plain)(const uint32_t*, Vc2ToneParts&);
+    uint32_t block = In::kMix, stride = 0;
 };
 constexpr ToneSetter kSetters[] = {
     { 0x893b3110, 2, true, &Vc2Tone::setOscBlock, nullptr },
-    { 0x893b31a0, Vc2Tone::kLfos, false, &Vc2Tone::setLfoBlock, nullptr },
-    { 0x893b31f0, Vc2Tone::kEnvelopes, false, &Vc2Tone::setEnvelopeBlock, nullptr },
+    { 0x893b31a0, Vc2Tone::kLfos, false, &Vc2Tone::setLfoBlock, nullptr, In::kLfos, In::kLfoStride },
+    { 0x893b31f0, Vc2Tone::kEnvelopes, false, &Vc2Tone::setEnvelopeBlock, nullptr, In::kEnvelopes,
+      In::kEnvelopeStride },
     { 0x893b3240, 2, true, &Vc2Tone::setCosmBlock, nullptr },
     { 0x893b32d0, 0, false, nullptr, &Vc2Tone::setMixBlock },
     { 0x893b3310, 0, false, nullptr, &Vc2Tone::setTvaBlock },
@@ -118,26 +120,31 @@ void toneDrawLinks(ToneSides& s, int i, std::mt19937& rng) {
     toneBothWord(s, i, kTonePrevAt, h.prev, (uint32_t)rng());
 }
 
-// A block from the input: the mix's, drawn as its converter writes it, as the mix's settings are real
+// A block from the input, drawn as its converter writes it, as the settings it reaches are real: the mix's, or (v315) the
+// LFOs' and envelopes'
 std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     const ToneSetter& set = kSetters[rng() % std::size(kSetters)];
     const int i = toneDrawLive(s, rng);
     In& in = s.shared.input;
     toneDrawMixBlock(in, rng);
-    s.fw.cpu.write(kToneInputAt + In::kMix, in.block(In::kMix), kMixBlockBytes);
+    if (set.stride != 0) toneDrawModulatorBlocks(in, rng);
+    s.fw.cpu.write(kToneInputAt, in.words.data(), sizeof in.words);
     const uint32_t n = set.numbers == 0 ? 0 : (set.bounded ? drawPartNumber(rng, set.numbers) : rng() % set.numbers);
-    const uint32_t tone = s.pool.addressOf(i), block = kToneInputAt + In::kMix;
+    const uint32_t offset = set.block + set.stride * n;
+    const uint32_t tone = s.pool.addressOf(i), block = kToneInputAt + offset;
     Vc2Tone& t = s.pool.tones[(size_t)i];
     Vc2ToneParts& parts = s.parts[(size_t)i];
     ++s.n.setters;
-    if (set.plain) return toneOn(s, i, set.at, { tone, block }, [&] { (t.*set.plain)(in.block(In::kMix), parts); });
-    return toneOn(s, i, set.at, { tone, n, block }, [&] { (t.*set.numbered)(n, in.block(In::kMix), parts); });
+    if (set.numbered == &Vc2Tone::setEnvelopeBlock) toneSteerSustain(s, i, n, rng);
+    if (set.plain) return toneOn(s, i, set.at, { tone, block }, [&] { (t.*set.plain)(in.block(offset), parts); });
+    return toneOn(s, i, set.at, { tone, n, block }, [&] { (t.*set.numbered)(n, in.block(offset), parts); });
 }
 
 std::string toneKeyOffOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawSounding(s, rng, 4);
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     ++s.n.keyOffs;
+    toneCountReleases(s, i);
     return toneOn(s, i, kKeyOffAt, { s.pool.addressOf(i) }, [&] { tone.keyOff(s.parts[(size_t)i]); });
 }
 

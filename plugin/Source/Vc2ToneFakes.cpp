@@ -122,8 +122,8 @@ struct ToneHook {
     void (*decode)(Sh4&, ToneCall&);
     Answer answer;
 };
-// [FW] every routine the tone's frame, note-on and remaining methods call but the envelopes', the LFOs' (v268), the mix's
-// (v269), the free LFOs' (v271) and the part's lists (v273), which run
+// [FW] every routine the tone's frame, note-on and remaining methods call but the envelopes', the LFOs' (v268, their
+// settings and release v315), the mix's (v269), the free LFOs' (v271) and the part's lists (v273), which run
 const ToneHook kHooks[] = {
     { 0x893ae070, kBuild, 4, none, zero }, { 0x893aa030, kBuild, 4, none, zero }, { 0x893b20b0, kBuild, 4, none, zero },
     { 0x893aa060, kDestroy, 4, none, zero }, { 0x893ae1c0, kUpdateOsc, 4, r5, zero },
@@ -139,10 +139,8 @@ const ToneHook kHooks[] = {
     { 0x893ae610, kSetOsc, 4, block5, zero },
     { 0x893aa590, kSetUpCosm, 4, setUp, zero }, { 0x893aa0e0, kStartCosm, 4, blockR6, zero },
     { 0x893b2100, kNoteOnTva, 4, blockR6, zero },
-    { 0x893ae780, kSettingsOsc, 4, block5, zero }, { 0x893acff0, kSettingsLfo, 4, block5, zero },
-    { 0x893ac110, kSettingsEnvelope, 4, block5, zero }, { 0x893aa5d0, kNewBlockCosm, 4, block5, zero },
+    { 0x893ae780, kSettingsOsc, 4, block5, zero }, { 0x893aa5d0, kNewBlockCosm, 4, block5, zero },
     { 0x893b23b0, kNewBlockTva, 4, block5, zero }, { 0x893ae9b0, kLegatoOsc, 4, block5, zero },
-    { 0x893ac8c0, kReleaseLfo, 4, none, zero }, { 0x893ac470, kReleaseEnvelope, 4, none, zero },
     { 0x893b2b60, kKeyOffOsc, 4, none, zero }, { 0x893b25a0, kTruncateTold, 4, none, zero },
     { 0x893b25b0, kTruncate, 4, none, zero }, { kToneTruncatedAt, kTruncated, 4, none, zero },
     { 0x893aed40, kOscWord168, 4, none, word168 }, { 0x893aed60, kOscPosition, 4, none, position },

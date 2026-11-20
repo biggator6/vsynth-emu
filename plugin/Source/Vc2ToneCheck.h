@@ -27,9 +27,9 @@ enum ToneKind : int32_t {
     kCountOscMatched, kTvaHeld, kInstallOsc, kInstallCosm,
     kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc,
     kSetUpCosm, kStartCosm, kNoteOnTva,
-    // v273: what the tone's remaining methods call
-    kSettingsOsc, kSettingsLfo, kSettingsEnvelope, kNewBlockCosm, kNewBlockTva, kLegatoOsc, kReleaseLfo,
-    kReleaseEnvelope, kKeyOffOsc, kTruncateTold, kTruncate, kWaitFade, kTruncated, kOscWord168, kOscPosition,
+    // v273: what the tone's remaining methods call (the envelopes' and LFOs' settings and release real from v315)
+    kSettingsOsc, kNewBlockCosm, kNewBlockTva, kLegatoOsc, kKeyOffOsc, kTruncateTold, kTruncate, kWaitFade, kTruncated,
+    kOscWord168, kOscPosition,
 };
 
 // A call as either side made it: what, on which tone of the pool (−1 none) and which of its parts (Vc2TonePiece × 100
