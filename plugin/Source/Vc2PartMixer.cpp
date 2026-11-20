@@ -68,3 +68,31 @@ void Vc2PartMixer::reset(Vc2MixerParts& parts) {
     parts.resetUnvoiced();
     parts.resetRing();
 }
+
+namespace {
+// The blocks since a routine's last run, its block kept (in rom.4's 32-bit arithmetic)
+int32_t blocksSince(int32_t& at, int32_t blocks) {
+    const auto d = static_cast<int32_t>(static_cast<uint32_t>(blocks) - static_cast<uint32_t>(at));
+    at = blocks;
+    return d;
+}
+} // namespace
+
+void Vc2PartMixer::updateTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts) {
+    const Vc2PartMixerTables& t = vc2MixerTables();
+    const float ticks = xtf::div(mul(xtf::flt(blocksSince(w.updatedAt, w.blocks)), t.blockSeconds), t.updateSeconds);
+    const int32_t n = ticks > 1.0f ? static_cast<int32_t>(ticks) : 1;
+    for (Vc2MixerTone* tone : tones) tone->update(n);
+    parts.glue(w.carried);
+}
+
+void Vc2PartMixer::scheduleTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts) {
+    const Vc2PartMixerTables& t = vc2MixerTables();
+    float seconds = mul(xtf::flt(blocksSince(w.scheduledAt, w.blocks)), t.blockSeconds);
+    if (seconds == 0.0f) seconds = t.blockSeconds;
+    parts.freeLfosClock(seconds);
+    for (Vc2MixerTone* tone : tones) {
+        tone->clock(seconds);
+        tone->count(1);
+    }
+}

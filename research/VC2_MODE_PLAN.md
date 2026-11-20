@@ -872,6 +872,13 @@ version against rom.4's routines with what it calls hooked:
          library's MIDI byte reader: the plugin's host gives parsed messages, as XtSynth's `tgNoteOn` takes them for
          rom.2, so the wiring may hand them to v308's dispatcher directly. Next: the block task `0x89395ac0`, then
          Vc2Synth.
+       - the voices' update and schedule done (v311): `Vc2PartMixer::updateTones` and `scheduleTones`, rom.4's
+         `0x893b16a0` (the blocks since its last in 10 ms ticks, at least 1, to each tone's +0x0c, then the vocoder's
+         glue on the carried word) and `0x893b1710` (the blocks since its last in seconds, a block's when none, to the
+         free LFOs' clock and each tone's +0x30 and +0x3c), on v227's words; xt_vc2mixer's second part
+         (HARDWARE_FIRMWARE.md, "The VC-2 part's voices' update and schedule"). The block task `0x89395ac0` is the DMA's
+         and interrupts' plumbing around the part mixer (its input frames' pointer, then `0x893b1820`), which
+         processBlock is in the plugin: the wiring's, not a port. Next: Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

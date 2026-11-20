@@ -155,7 +155,8 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    "${SH4[@]}" -o "$O/xt_vc2autonote" &
 # The part mixer (v227) against rom.4's own routines, the voices and the calls it makes hooked
 [ -f Vc2PartMixerCheck.cpp ] && cc -DXT_VC2MIXER_MAIN Vc2PartMixerCheck.cpp Vc2PartMixerFakes.cpp Vc2PartMixer.cpp \
-   Vc2MixerBlock.cpp Vc2PartMixerTables.cpp Vc2Math.cpp "${SH4[@]}" -o "$O/xt_vc2mixer" &
+   Vc2MixerBlock.cpp Vc2PartMixerTables.cpp Vc2Math.cpp \
+   $( [ -f Vc2MixerTasksCheck.cpp ] && echo Vc2MixerTasksCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2mixer" &
 # The tone object's frame (v228) against rom.4's own routines, every part routine hooked
 [ -f Vc2ToneCheck.cpp ] && cc -DXT_VC2TONE_MAIN Vc2ToneCheck.cpp Vc2ToneSides.cpp Vc2ToneFakes.cpp Vc2Tone.cpp \
    $( [ -f Vc2ToneNoteOn.cpp ] && echo Vc2ToneNoteOn.cpp Vc2TonePortParts.cpp Vc2ToneEvents.cpp ) \

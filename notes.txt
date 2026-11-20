@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's voices' update and schedule v311 (2026-11-20, on claude/vc2-part-4-3 after v310; HARDWARE_FIRMWARE.md,
+  "The VC-2 part's voices' update and schedule"): step 4.3's thirty-ninth version, item 10's sixteenth part. On
+  Vc2PartMixer: updateTones (rom.4's 0x893b16a0: the blocks since its last in the update's 10 ms ticks, at least 1, to
+  each tone's +0x0c, then the vocoder's glue on the carried word) and scheduleTones (0x893b1710: the blocks since its
+  last in seconds, a block's when none, to the free LFOs' clock and each tone's +0x30 and +0x3c with 1); the tones
+  through Vc2MixerTone, the calls out through Vc2MixerTaskParts; a block's seconds and the update's tick read by
+  Vc2PartMixerTables. xt_vc2mixer gains a second part (Vc2MixerTasksCheck.cpp): 0 different at seeds 2024, 7 and
+  31337, the first part's line unchanged; mutate_vc2.py --mixer 98 planted, 0 missed; rom4-no-mixer caught. Not in the
+  sound yet.
+
 The VC-2 part's update task v310 (2026-11-20, on claude/vc2-part-4-3 after v309; HARDWARE_FIRMWARE.md, "The VC-2 part's
   update task"): step 4.3's thirty-eighth version, item 10's fifteenth part. Vc2UpdateTask (Vc2UpdateTask.cpp): rom.4's
   update task's pass, the loop body 0x89395316…0x89395414 on its wait's events: the timer's (with ticks elapsed, each

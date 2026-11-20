@@ -779,6 +779,7 @@ auto note: 40 cases, 24000 blocks, 1890 note-ons posted, 633 refused, 480 note-o
 xt_vc2autonote: 0 different
 == xt_vc2mixer
 mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 renders, 8668 vocoder calls, 1659 events, 0 different
+voices' update and schedule: 16000 events
 xt_vc2mixer: 0 different
 == xt_vc2tone
 tone: 40 cases, 16000 events, 884 made, 2094 none, 398 built in place, 396 unmade (342 back), 823 updates, 369 ended, 671 renders, 0 different

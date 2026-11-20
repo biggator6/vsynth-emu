@@ -1546,6 +1546,36 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's voices' update and schedule (2026-11-20, v311) {#vc2-part-tones-update-schedule}
+
+Step 4.3's thirty-ninth version (VC2_MODE_PLAN.md, step 4.3, item 10's sixteenth part): the two routines in the part
+mixer's file that the tasks call on the part's tones, `0x893b16a0` (the update task's, v310) and `0x893b1710` (the
+notes' task's schedule, v309), now the port's own as `Vc2PartMixer::updateTones` and `scheduleTones` on v227's mixer
+words:
+- **The voices' update** `0x893b16a0`: the blocks mixed since its last run (`0x8993eae4` less `0x8993ead8`, which takes
+  the blocks), as a float, × a block's seconds (32/44100, `0x893b17ec`) ÷ the update's tick (0.01 s, `0x893b17f4`); n
+  that truncated when above 1, else 1. Each tone on the sounding list (`[0x899996d0]`) is given its +0x0c (v228's
+  update) with n, and then the vocoder's glue (`0x893f07a0` on `0x89999758`, v220's) the carried word (`0x8993eac4`).
+- **The voices' schedule** `0x893b1710`: the blocks since its last run (`0x8993eae0`) × a block's seconds, a block's
+  seconds when that is 0, to the free LFOs' clock (`0x893ad870` on `0x8a0c6d84`, v271's), then each tone's +0x30 (its
+  LFOs' clock) with them and +0x3c (its OSC voices' count) with 1.
+
+The tones go through `Vc2MixerTone`, given as the list stands, as the block's voices are (v227); the free LFOs' clock
+and the glue go through `Vc2MixerTaskParts`. The two constants are read by `Vc2PartMixerTables`.
+
+**The check.** `xt_vc2mixer`'s second part (`Vc2MixerTasksCheck.cpp`), on the seed after the run's: rom.4's own two
+routines on its own mixer words. Up to three tones are linked in the part's list as the first part links its voices,
+their vtable's three methods each at a hooked address logging the tone and its argument; the free LFOs' clock and the
+glue log their float. Each event is either routine. Before it come the tones' count, the blocks mixed and each routine's
+last blocks (a few before, about the update's tick, the same, any, after), and the carried word 0, 1 or any. After each,
+the mixer's words and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first part's line as it was.
+- Every line and branch of `Vc2PartMixer.cpp` is reached.
+- `mutate_vc2.py --mixer`: 98 plants, none missed; v311's 14 new (not planted: the least count's test at 1 by one, a
+  whole number of ticks below 2 giving 1 either way); `mutate_panel.py rom4-no-mixer` caught.
+
 ### The VC-2 part's update task (2026-11-20, v310) {#vc2-part-update-task}
 
 Step 4.3's thirty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's fifteenth part): the update task `0x893952b0`
