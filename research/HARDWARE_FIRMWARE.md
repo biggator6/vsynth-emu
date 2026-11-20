@@ -1546,6 +1546,55 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's update queue with the static M's node (2026-11-20, v312) {#vc2-queue-static-node}
+
+Step 4.3's fortieth version (VC2_MODE_PLAN.md, step 4.3, item 10's seventeenth part), the first of Vc2Synth's ground:
+v279's update queue takes one node besides the voices' and the head, the static M's (v295's, at `0x89997278`), which
+the static M's part init enqueues. rom.4's queue routines take any node by its address and read its first 0x14 bytes,
+which a voice, the head and the static M lay out alike (the links, the queued word, the queue's byte, the class). The
+port's queue kept a node's words in one of two places, the head's or a voice's; from v312 it is given the static M's
+node by its address (`Vc2UpdateQueue::setNode`), and every routine reaches a node's words through one view of them,
+`slotsOf` (`Vc2QueueSlots`: the links, the queued word, the queue's byte), the head's, the node given's or a voice's.
+v310's walk reads them the same way. `Vc2QueueNode` has its own header, `Vc2QueueNode.h`.
+
+**What the walk runs on it.** A node's class's update is called as rom.4's old ABI lays a virtual out: the word at the
+class's +0x0c added to the node's address, and the routine at its +0x14 called on that. The static M's node's class
+(`0x898cd460`, v295's) gives −0x170 and `0x893a2ee0`: the update task's walk runs M's init (v247's) on the static M
+itself, its answer the node's queued word. The voices' class gives 0 and the voice's update (v279's).
+
+**The check.** `xt_vc2voices`' seventh part (in `Vc2UpdateTaskCheck.cpp`, on the seed after the sixth part's): the sixth
+part's sides with the static M's node given to the port's queue and written into rom.4's memory beside the queue's
+words before each event and compared after it. The queue's draws place it among the voices (shuffled with them, on the
+queue or linked to itself, its links aimed elsewhere now and then), and one time in four a queue routine's node is it.
+Each event is either the update task's pass, with the static M's class's update hooked as the voices' are, or one of the
+fourth part's eleven queue events. The fourth part's class events are not drawn: the sixth part's hooks on the classes'
++0x0c would stand in for rom.4's own update there. The queue's draws and compare moved into their own file,
+`Vc2VoiceQueueCheck.cpp`; with no node given, they draw as before.
+
+**A bound on the port's side.** rom.4's routines run in the interpreter, whose step limit ends any that runs on; the
+port's run natively, and nothing ended them. A planted error that breaks how a node's words are found can send the
+port's walk round the voices' list heads forever, each turn logging its wait, signal and update into the check's log:
+v312's first two plant runs grew that log until the machine ran out of memory (the four mutants that ran on held 152,
+101, 92 and 63 GB). So `xt_vc2voices` bounds each event (`Vc2PartVoicesCheck.h`): every port-side call goes through
+`voicesLog`, which throws past 65536 calls in one event, the update task's part's draws throw past as many tries at a
+sound queue or a walk past every voice, and each part's case runs its draw and event through `voicesBounded`, which
+says that as the event's difference. No real event comes near it, and the clean runs' lines are as before. The port's
+walk itself has no bound, as rom.4's has none. And a bound on every plant run besides (the user's decision, here in
+v312): `mutate.sh` runs a mutant through `capped` (`research/tools/mutate_cap.sh`), which polls its resident size every
+0.1 s and kills it past `MUT_MEM_MB`, 2048 by default, a run that died, so its plant reads as caught. The clean checks
+peak under 300 MB (`xt_tone` 278 at 2000 cases, `xt_files` 215, the VC-2 checks under 50), and six jobs at the cap
+leave the 24 GB machine room. `mutate_cap_test.sh` proves it: an allocator past a 512 MB cap is killed at it and reads
+as died, while a run under the cap, one with its own exit status and one past `MUT_TIMEOUT` read as before. The four
+plants that took the machine then ran alone, each caught in seconds.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first six parts' lines as they were. At seed 2024 the
+  node is on the queue after 2547 of the 16000 events.
+- Every line and branch of `Vc2VoiceQueue.cpp` and `Vc2UpdateTask.cpp` is reached.
+- `mutate_vc2.py --voices`: 328 plants, none missed. v312's 12 new: the voices' and the node given's words in
+  `slotsOf`, its test and registration, the enqueue's view and the walk's. Six of v279's and v310's reworded where v312
+  changed their text. Not planted: the head's queued word and queue byte, as no routine is given the head as its node.
+
 ### The VC-2 part's voices' update and schedule (2026-11-20, v311) {#vc2-part-tones-update-schedule}
 
 Step 4.3's thirty-ninth version (VC2_MODE_PLAN.md, step 4.3, item 10's sixteenth part): the two routines in the part

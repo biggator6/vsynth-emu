@@ -8,8 +8,9 @@
 // (unlinked, the current node its +0 link) when that is 0 and it is still linked; then the ticks since the last pass
 // measured into the time struct 0x8993d084 (its count, as a half, and its last).  0x1: the pitch source 0x89394a60
 // (on 0x89989748) and the voices' update 0x893b16a0.  The interrupts' masking around the walk changes no memory.  The
-// calls out through Vc2UpdateTaskParts.  The queue's nodes the voices' (v279's queue takes no other).  Not in the sound
-// yet.  Bit for bit: xt_vc2voices' sixth part.  HARDWARE_FIRMWARE.md, "The VC-2 part's update task".
+// calls out through Vc2UpdateTaskParts.  The queue's nodes the voices' and, from v312, the static M's (its words through
+// the queue's slotsOf; its update M's init 0x893a2ee0 on the static M).  Not in the sound yet.  Bit for bit:
+// xt_vc2voices' sixth and seventh parts.  HARDWARE_FIRMWARE.md, "The VC-2 part's update task".
 #include "Vc2VoiceQueue.h"
 #include <cstdint>
 

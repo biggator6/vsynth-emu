@@ -5,13 +5,21 @@ namespace {
 constexpr uint32_t kQueueBytes = sizeof(Vc2QueueWords);
 } // namespace
 
-uint32_t& Vc2UpdateQueue::nextOf(uint32_t node, Vc2PartVoices& v) {
-    return node == kHeadAt ? q.next : v.at(node).queueNext;
+void Vc2UpdateQueue::setNode(uint32_t at, Vc2QueueNode& node) {
+    givenAt_ = at;
+    given_ = &node;
 }
 
-uint32_t& Vc2UpdateQueue::prevOf(uint32_t node, Vc2PartVoices& v) {
-    return node == kHeadAt ? q.prev : v.at(node).queuePrev;
+Vc2QueueSlots Vc2UpdateQueue::slotsOf(uint32_t node, Vc2PartVoices& v) {
+    if (node == kHeadAt) return { q.next, q.prev, q.queued, q.byte };
+    if (given_ != nullptr && node == givenAt_) return { given_->next, given_->prev, given_->queued, given_->queue };
+    Vc2VoiceNode& n = v.at(node);
+    return { n.queueNext, n.queuePrev, n.queued, n.queue };
 }
+
+uint32_t& Vc2UpdateQueue::nextOf(uint32_t node, Vc2PartVoices& v) { return slotsOf(node, v).next; }
+
+uint32_t& Vc2UpdateQueue::prevOf(uint32_t node, Vc2PartVoices& v) { return slotsOf(node, v).prev; }
 
 void Vc2UpdateQueue::construct() {
     q.next = kHeadAt;
@@ -58,8 +66,9 @@ void Vc2UpdateQueue::enqueue(uint32_t node, Vc2PartVoices& v, Vc2QueueParts& par
         return;
     }
     link(node, kHeadAt, v);
-    v.at(node).queued = 1;
-    v.at(node).queue = 0;
+    const Vc2QueueSlots n = slotsOf(node, v);
+    n.queued = 1;
+    n.queue = 0;
 }
 
 void Vc2UpdateQueue::moveOn(uint32_t node, Vc2PartVoices& v, Vc2QueueParts& parts) {
@@ -86,5 +95,5 @@ void Vc2UpdateQueue::moveTo(uint32_t node, uint32_t queue, Vc2PartVoices& v) {
     advance(node, v);
     unlink(node, v);
     link(node, kHeadAt + kQueueBytes * queue, v);
-    v.at(node).queue = (uint8_t)queue;
+    slotsOf(node, v).queue = (uint8_t)queue;
 }

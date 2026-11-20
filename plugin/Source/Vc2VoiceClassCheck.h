@@ -10,6 +10,7 @@ inline constexpr uint32_t kClassSetsAt = 0x89997fe8, kClassSetBytes = 0x6c;   //
 inline constexpr uint32_t kClassLockAt = 0x8994fec8;                        // [FW] the OS object the update locks
 inline constexpr uint32_t kClassRetuneWordAt = 0x8953fb2c;                  // [FW] the retune's word
 inline constexpr uint32_t kClassQueueByte = 0x0c;                           // [FW] a voice's queue, by number
+inline constexpr uint32_t kClassStaticNodeClass = 0x898cd460;               // [FW] the static M's node's class (v295)
 
 class ClassPortParts final : public Vc2VoiceClassParts, public Vc2QueueParts {
 public:
@@ -50,6 +51,7 @@ struct ClassCounts {
     long events = 0;
     std::array<long, 19> byEvent {};
     long setCalls = 0, osCalls = 0;
+    long passes = 0, others = 0, onQueue = 0, taskCalls = 0;   // the seventh part's (v312)
 };
 
 // The fourth part's sides: the release part's, the port's queue and class, their parts, the counts
@@ -60,7 +62,18 @@ struct ClassSides {
     Vc2VoiceClass voices {};
     ClassPortParts parts;
     ClassCounts n {};
+
+    // The one node besides the voices' on the port's queue, the static M's (v312): the seventh part's alone, given by
+    // giveNode with its class; a node's class, the node given's or a voice's
+    bool hasNode = false;
+    Vc2QueueNode node {};
+    void giveNode();
+    uint32_t classOf(uint32_t at);
 };
+
+// The queue's words and the node given written into rom.4's memory; what differs in them after (v312's file)
+void classQueueWrite(ClassSides& c);
+std::string classQueueDiffer(ClassSides& c);
 
 // rom.4's routine on `args` after the queue's words are written into its memory too, then the port's `mine()` giving
 // its answer; what differs in the voices' or keys' span, the queue's words, the calls or the answer
@@ -69,6 +82,9 @@ std::string classOnBoth(ClassSides& c, const Vc2CheckRoutine& routine, std::init
 
 using ClassEvent = std::string (*)(ClassSides&, std::mt19937&);
 std::span<const ClassEvent> classEvents();
+// The update queue's own routines' events alone, the last of classEvents (v312: the seventh part's, whose hooks on the
+// classes' +0x0c would shadow rom.4's update virtual)
+std::span<const ClassEvent> classQueueEvents();
 
 // The fourth part's rom.4 hooks, case start, queue draw and draws before an event (all at a case's first): shared
 // with the sixth part from v310

@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's update queue with the static M's node v312 (2026-11-20, on claude/vc2-part-4-3 after v311;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's update queue with the static M's node"): step 4.3's fortieth version, item 10's
+  seventeenth part. Vc2UpdateQueue given the static M's node by its address (setNode), each routine and v310's walk
+  reaching a node's words through one view, slotsOf (Vc2QueueSlots), the head's, the node given's or a voice's;
+  Vc2QueueNode its own header. xt_vc2voices gains a seventh part (in Vc2UpdateTaskCheck.cpp; the queue's draws and
+  compare moved into Vc2VoiceQueueCheck.cpp, drawing as before with no node given; assignHookSlot given the classes to
+  hook): 0 different at seeds 2024, 7 and 31337, the first six parts' lines unchanged; mutate_vc2.py --voices 328
+  planted, 0 missed. xt_vc2voices bounds the port's side of each event (voicesLog, voicesBounded
+  in Vc2PartVoicesCheck.h: past 65536 calls or as many redraws the event differs), after two plant runs whose mutants'
+  endless walks took the machine's memory; and mutate.sh kills any mutant past MUT_MEM_MB of resident memory (default
+  2048; mutate_cap.sh's capped, proved by mutate_cap_test.sh), the kill a run that died. Not in the sound yet.
+
 The VC-2 part's voices' update and schedule v311 (2026-11-20, on claude/vc2-part-4-3 after v310; HARDWARE_FIRMWARE.md,
   "The VC-2 part's voices' update and schedule"): step 4.3's thirty-ninth version, item 10's sixteenth part. On
   Vc2PartMixer: updateTones (rom.4's 0x893b16a0: the blocks since its last in the update's 10 ms ticks, at least 1, to

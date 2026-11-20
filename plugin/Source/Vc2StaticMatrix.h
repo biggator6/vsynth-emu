@@ -8,6 +8,7 @@
 // set-up (0x89317a10) and the queue's enqueue (0x89394fa0, v279's) through Vc2StaticMatrixParts.  Not in the sound
 // yet.  Bit for bit: xt_vc2settings' ninth part.  HARDWARE_FIRMWARE.md, "The VC-2 part's static M".
 #include "Vc2MatrixSetup.h"
+#include "Vc2QueueNode.h"
 #include <array>
 #include <cstdint>
 
@@ -19,18 +20,10 @@ public:
     virtual void enqueue(uint32_t queue, uint32_t node) = 0;          // 0x89394fa0
 };
 
-// [FW] an update queue's node, as a list's head and a voice begin (v272's Vc2VoiceNode's first 0x14 bytes)
-struct Vc2QueueNode {
-    uint32_t next = 0, prev = 0;   // +0x00, +0x04: its links, itself out of a queue
-    uint32_t queued = 0;           // +0x08
-    uint8_t queue = 0;             // +0x0c
-    uint8_t unread0d[3] {};
-    uint32_t vtable = 0;           // +0x10
-};
-
 struct Vc2StaticMatrix {
     static constexpr uint32_t kAt = 0x89997108;                                    // [FW]
     static constexpr uint32_t kNodeAt = kAt + 0x170, kStateAt = kAt + 0x198;       // [FW]
+    static_assert(kNodeAt == kVc2StaticNodeAt, "the queue's other node is the static M's");
     Vc2MatrixWords m {};                  // +0x000
     Vc2MatrixLinks links {};              // +0x168: the channel state's word, the part
     Vc2QueueNode node {};                 // +0x170

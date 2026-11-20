@@ -7,9 +7,10 @@
 // the time; now and then none or any word), the time struct's count 0, small or any and its last any, the ticks a few
 // past the last, past a half's wrap, or any; the queue's links drawn again until its walk ends at the head and every
 // node on it is linked both ways.  After each the voices' and keys' spans, the queue's words, the time struct and the
-// ticks, the calls.  Not drawn: a node on the queue but a voice (v279's queue takes no other), a queue whose nodes or
-// head are not each linked both ways (rom.4's walk need not end on one) but for one node now and then whose +0 link is
-// itself.  XT_VC2VOICES_MAIN only.
+// ticks, the calls.  Not drawn: a queue whose nodes or head are not each linked both ways (rom.4's walk need not end on
+// one) but for one node now and then whose +0 link is itself.  The seventh part (v312), at the end: the same with the
+// static M's node given to the port's queue among the voices, each event the pass or one of the fourth part's queue
+// events.  XT_VC2VOICES_MAIN only.
 #ifdef XT_VC2VOICES_MAIN
 #include "Vc2CheckCalls.h"
 #include "Vc2UpdateTask.h"
@@ -56,24 +57,24 @@ public:
     void signal(uint32_t object) override { u_.parts.signal(object); }
     void post(uint32_t object) override { u_.parts.post(object); }
     uint32_t nodeUpdate(uint32_t node, uint32_t time) override {
-        const VoicesCall slot = voicesSlotCall(s_.fw, kVoicesTask, node, s_.port.at(node).vtable, kNodeUpdateEntry);
-        s_.mine.push_back({ kVoicesTask, slot.routine, slot.object, { time } });
+        const VoicesCall slot = voicesSlotCall(s_.fw, kVoicesTask, node, u_.classOf(node), kNodeUpdateEntry);
+        voicesLog(s_.mine, { kVoicesTask, slot.routine, slot.object, { time } });
         return s_.draws.next(s_.draws.port).updated;
     }
-    void pitchSource() override { s_.mine.push_back({ kVoicesTask, kPitchSourceAt, kPitchAt }); }
-    void voicesUpdate() override { s_.mine.push_back({ kVoicesTask, kVoicesUpdateAt, 0 }); }
+    void pitchSource() override { voicesLog(s_.mine, { kVoicesTask, kPitchSourceAt, kPitchAt }); }
+    void voicesUpdate() override { voicesLog(s_.mine, { kVoicesTask, kVoicesUpdateAt, 0 }); }
 
 private:
     UpdateSides& u_;
     VoicesSides& s_;
 };
 
-// Whether the walk from the head by the +4 links comes back to it within the voices' count, each node and the head
-// linked both ways (on a list broken otherwise rom.4's walk need not end)
+// Whether the walk from the head by the +4 links comes back to it within the voices' count and the node given, each
+// node and the head linked both ways (on a list broken otherwise rom.4's walk need not end)
 bool walkSound(UpdateSides& u) {
     V& port = u.r.a.s.port;
     uint32_t at = Q::kHeadAt;
-    for (int k = 0; k <= V::kVoices; ++k) {
+    for (int k = 0; k <= V::kVoices + 1; ++k) {
         const uint32_t before = u.queue.prevOf(at, port);
         if (u.queue.nextOf(before, port) != at) return false;
         at = before;
@@ -83,21 +84,27 @@ bool walkSound(UpdateSides& u) {
 }
 
 // One time in eight a node on the walk with its +0 link to itself, which the walk passes by (the walk still ends: it
-// goes by the +4 links)
+// goes by the +4 links); a walk past every node runs on past the check's bound (v312)
 void unlinkOneOnWalk(UpdateSides& u, std::mt19937& rng) {
     V& port = u.r.a.s.port;
     std::vector<uint32_t> walked;
-    for (uint32_t at = u.queue.prevOf(Q::kHeadAt, port); at != Q::kHeadAt; at = u.queue.prevOf(at, port))
+    for (uint32_t at = u.queue.prevOf(Q::kHeadAt, port); at != Q::kHeadAt; at = u.queue.prevOf(at, port)) {
+        if (walked.size() > V::kVoices) throw VoicesRunaway {};
         walked.push_back(at);
+    }
     if (walked.empty() || rng() % 8 != 0) return;
     const uint32_t node = walked[rng() % walked.size()];
-    port.at(node).queueNext = node;
+    u.queue.nextOf(node, port) = node;
 }
 
-// The voice class's draws, the queue's again until its walk is sound, the events, the time struct and the ticks
+// The voice class's draws, the queue's again until its walk is sound (past the check's bound of tries, v312, the draw
+// runs on), the events, the time struct and the ticks
 void updateDraw(UpdateSides& u, std::mt19937& rng, bool first) {
     classDraw(u, rng, first);
-    while (!walkSound(u)) drawQueue(u, rng);
+    for (size_t tries = 0; !walkSound(u); ++tries) {
+        if (tries == kVoicesLogBound) throw VoicesRunaway {};
+        drawQueue(u, rng);
+    }
     unlinkOneOnWalk(u, rng);
     const uint32_t events[4] = { 1 + rng() % 3, 1 + rng() % 3, 0, (uint32_t)rng() };
     u.events = events[rng() % 4];
@@ -155,5 +162,51 @@ void sayUpdateCounts(const ClassCounts& n) {
 long vc2UpdateTaskPart(VoicesSides& s, const Vc2Run& run) {
     return voicesPart<UpdateSides, updateInstallRom, classStart, updateDraw, updateEvents, updateCount,
                       sayUpdateCounts>(s, run, 5);
+}
+
+namespace {
+// The seventh part's sides (v312): the sixth's with the static M's node given to the port's queue
+struct StaticNodeSides : UpdateSides {
+    explicit StaticNodeSides(VoicesSides& s) : UpdateSides(s) { giveNode(); }
+};
+
+// The sixth part's hooks, and the static M's node's class's update too
+void staticNodeInstallRom(StaticNodeSides& x) {
+    updateInstallRom(x);
+    assignHookSlot(x.r.a.s, kVoicesTask, kNodeUpdateEntry, 1, updateAnswer, { kClassStaticNodeClass });
+}
+
+std::string staticNodePassEvent(StaticNodeSides& x, std::mt19937& rng) {
+    ++x.n.passes;
+    return taskPassEvent(x, rng);
+}
+
+// Any of the fourth part's queue events, the queue's routines on the static M's node among the voices
+std::string staticNodeClassEvent(StaticNodeSides& x, std::mt19937& rng) {
+    ++x.n.others;
+    const auto events = classQueueEvents();
+    return events[rng() % events.size()](x, rng);
+}
+
+using StaticNodeEvent = std::string (*)(StaticNodeSides&, std::mt19937&);
+constexpr StaticNodeEvent kStaticNodeEvents[] = { staticNodePassEvent, staticNodeClassEvent };
+std::span<const StaticNodeEvent> staticNodeEvents() { return kStaticNodeEvents; }
+
+void staticNodeCount(StaticNodeSides& x) {
+    ++x.n.events;
+    x.n.onQueue += x.node.next != kVc2StaticNodeAt ? 1 : 0;
+    x.n.taskCalls += vc2CountCalls(x.r.a.s.mine, kVoicesTask);
+    x.n.osCalls += vc2CountCalls(x.r.a.s.mine, kVoicesOs);
+}
+
+void sayStaticNodeCounts(const ClassCounts& n) {
+    std::printf("queue node: %ld events: %ld passes, %ld other events, %ld with the static M's node on the queue, %ld "
+                "task calls, %ld OS calls\n", n.events, n.passes, n.others, n.onQueue, n.taskCalls, n.osCalls);
+}
+} // namespace
+
+long vc2QueueNodePart(VoicesSides& s, const Vc2Run& run) {
+    return voicesPart<StaticNodeSides, staticNodeInstallRom, classStart, updateDraw, staticNodeEvents,
+                      staticNodeCount, sayStaticNodeCounts>(s, run, 6);
 }
 #endif

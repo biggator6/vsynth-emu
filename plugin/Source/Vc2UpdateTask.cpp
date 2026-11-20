@@ -24,11 +24,11 @@ void runNodes(W& w) {
     while (at != Q::kHeadAt) {
         q.q.current = at;
         w.parts.wait(q.q.lock);
-        Vc2VoiceNode& n = w.voices.at(at);
-        if (n.queueNext != at) n.queued = w.parts.nodeUpdate(at, kTimeAt) & kAnswerBits;
+        const Vc2QueueSlots n = q.slotsOf(at, w.voices);
+        if (n.next != at) n.queued = w.parts.nodeUpdate(at, kTimeAt) & kAnswerBits;
         w.parts.signal(q.q.lock);
-        if (n.queued == 0 && n.queueNext != at) {
-            q.q.current = n.queueNext;
+        if (n.queued == 0 && n.next != at) {
+            q.q.current = n.next;
             q.unlink(at, w.voices);
         }
         at = q.prevOf(q.q.current, w.voices);

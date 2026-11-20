@@ -12,12 +12,13 @@ using OnNode = void (Vc2UpdateQueue::*)(uint32_t, Vc2PartVoices&, Vc2QueueParts&
 
 uint32_t classVoice(ClassSides& c, std::mt19937& rng) { return c.r.a.s.port.addressOf((int)(rng() % V::kVoices)); }
 
-// A node for the queue's own routines, which don't read its queue byte: half the time that byte drawn, on both sides
+// A node for the queue's own routines, which don't read its queue byte: a voice, or one time in four the node given
+// when there is one (v312); half the time that byte drawn, on both sides
 uint32_t queueNode(ClassSides& c, std::mt19937& rng) {
-    const uint32_t node = classVoice(c, rng);
+    const uint32_t node = c.hasNode && rng() % 4 == 0 ? kVc2StaticNodeAt : classVoice(c, rng);
     if (rng() % 2) return node;
     const uint8_t queue = (uint8_t)rng();
-    c.r.a.s.port.at(node).queue = queue;
+    c.queue.slotsOf(node, c.r.a.s.port).queue = queue;
     c.r.a.s.fw.cpu.wr8(node + kClassQueueByte, queue);
     return node;
 }
@@ -164,13 +165,17 @@ std::string queueMoveEvent(ClassSides& c, std::mt19937& rng) {
     return classPlain(c, { 0x89395210, "the move" }, { node, 0 }, [&] { c.queue.moveTo(node, 0, c.r.a.s.port); });
 }
 
-const ClassEvent kEvents[] = {
+constexpr ClassEvent kEvents[] = {
     classVoiceEvent<0>,   classRetuneEvent,      classVoiceEvent<1>,    classVoiceEvent<2>,  classPrepareEvent,
     classPrepareEvent,    classChangedEvent,     classPrepareWordsEvent, classRetuneWordsEvent, queueConstructEvent,
     queueStaticEvent,     queueLinkEvent,        queueUnlinkEvent,      queueNodeEvent<0>,   queueNodeEvent<1>,
     queueNodeEvent<2>,    queueNodeEvent<3>,     queueWaitEvent,        queueWaitAllEvent,   queueMoveEvent,
 };
+constexpr size_t kFirstQueueEvent = 9;   // queueConstructEvent's: the queue's own routines from it on
+static_assert(kEvents[kFirstQueueEvent] == queueConstructEvent, "the queue's events are the list's last");
 } // namespace
 
 std::span<const ClassEvent> classEvents() { return kEvents; }
+
+std::span<const ClassEvent> classQueueEvents() { return std::span(kEvents).subspan(kFirstQueueEvent); }
 #endif

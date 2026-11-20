@@ -30,8 +30,10 @@ VoicesCall called(VoicesKind kind, uint32_t routine, uint32_t object, std::array
 }
 } // namespace
 
-void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers, uint32_t (*answer)(VoicesSides&)) {
-    for (const uint32_t vtable : { V::kVoiceVtable, kVoicesNoteClass }) {
+void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers, uint32_t (*answer)(VoicesSides&),
+                    std::initializer_list<uint32_t> classes) {
+    const std::initializer_list<uint32_t> both = { V::kVoiceVtable, kVoicesNoteClass };
+    for (const uint32_t vtable : classes.size() != 0 ? classes : both) {
         const VoicesCall slot = voicesSlotCall(s.fw, kind, 0, vtable, entry);
         s.fw.cpu.hook(slot.routine, [&s, kind, registers, slot, answer](Sh4& c) {
             std::array<uint32_t, 7> more {};
@@ -44,7 +46,7 @@ void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registe
 
 void AssignPortParts::slotCalled(VoicesKind kind, uint32_t voice, uint32_t entry, std::array<uint32_t, 7> more) {
     const VoicesCall slot = voicesSlotCall(s_.fw, kind, voice, s_.port.at(voice).vtable, entry);
-    s_.mine.push_back(called(kind, slot.routine, slot.object, more));
+    voicesLog(s_.mine, called(kind, slot.routine, slot.object, more));
 }
 
 // rom.4's side: the voice's two virtuals of both classes, the note's three routines and the queue's wait
@@ -162,8 +164,8 @@ Vc2AssignCall assignDrawCall(AssignSides& a, std::mt19937& rng) {
 
 void AssignPortParts::prepare(uint32_t voice, const Vc2AssignCall& call, const Vc2Legato& legato) {
     const VoicesCall slot = voicesSlotCall(s_.fw, kVoicesPrepare, voice, s_.port.at(voice).vtable, kAssignPrepareEntry);
-    s_.mine.push_back(called(kVoicesPrepare, slot.routine, slot.object,
-                             { call.message, call.part, call.onByte, packLegato(legato), call.passed, call.kind, 0 }));
+    voicesLog(s_.mine, called(kVoicesPrepare, slot.routine, slot.object,
+                              { call.message, call.part, call.onByte, packLegato(legato), call.passed, call.kind, 0 }));
     s_.port.at(voice).note = assignNoteOf(s_.draws.next(s_.draws.port));
 }
 
@@ -172,21 +174,21 @@ void AssignPortParts::retune(uint32_t voice, uint32_t message, uint32_t part, ui
 }
 
 void AssignPortParts::noteOn(uint32_t note, uint32_t partner, int32_t onByte) {
-    s_.mine.push_back(called(kVoicesNoteOn, kRoutinesAt[0], note, { partner, (uint32_t)onByte }));
+    voicesLog(s_.mine, called(kVoicesNoteOn, kRoutinesAt[0], note, { partner, (uint32_t)onByte }));
 }
 
 void AssignPortParts::startNote(uint32_t note) {
-    s_.mine.push_back(called(kVoicesStartNote, kRoutinesAt[1], note, {}));
+    voicesLog(s_.mine, called(kVoicesStartNote, kRoutinesAt[1], note, {}));
 }
 
 void AssignPortParts::truncateOnce(uint32_t note) {
-    s_.mine.push_back(called(kVoicesTruncateOnce, kRoutinesAt[2], note, {}));
+    voicesLog(s_.mine, called(kVoicesTruncateOnce, kRoutinesAt[2], note, {}));
 }
 
 int8_t AssignPortParts::onByteOf(uint32_t note) { return (int8_t)s_.fw.cpu.rd8(note + kAssignNoteOnByte); }
 
 void AssignPortParts::waitQueue(uint32_t queue, uint32_t voice) {
-    s_.mine.push_back(called(kVoicesWait, kRoutinesAt[3], queue, { voice }));
+    voicesLog(s_.mine, called(kVoicesWait, kRoutinesAt[3], queue, { voice }));
 }
 
 void AssignPortParts::keyOff(uint32_t voice) { slotCalled(kVoicesKeyOff, voice, kAssignKeyOffEntry, {}); }
@@ -200,11 +202,12 @@ uint8_t AssignPortParts::partSetting(uint32_t part, uint32_t offset) {
 }
 
 void AssignPortParts::readParameters(uint32_t part) {
-    s_.mine.push_back(called(kVoicesParameters, kAssignReadAt, kAssignParametersAt + kAssignParameterBytes * part, {}));
+    const uint32_t parameters = kAssignParametersAt + kAssignParameterBytes * part;
+    voicesLog(s_.mine, called(kVoicesParameters, kAssignReadAt, parameters, {}));
 }
 
 int32_t AssignPortParts::clock() {
-    s_.mine.push_back(called(kVoicesClock, kAssignClockAt, 0, {}));
+    voicesLog(s_.mine, called(kVoicesClock, kAssignClockAt, 0, {}));
     return ms;
 }
 

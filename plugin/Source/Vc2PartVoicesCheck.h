@@ -36,6 +36,25 @@ struct VoicesCall {
     bool operator==(const VoicesCall&) const = default;
 };
 
+// The port's log of one event is bounded (v312): past kVoicesLogBound calls the port has run on without end, as a
+// planted error can send its update task's walk round a cycle forever, which rom.4's step limit ends on its side and
+// nothing would on the port's (two plant runs took the machine's memory so).  voicesLog appends a port's call, throwing
+// VoicesRunaway past the bound, as do the update task's part's draws past kVoicesLogBound tries at a sound queue or a
+// walk past the voices; voicesBounded runs a draw and event and says that as its difference.  No real event comes near
+// it: a walk over the queue's 25 nodes logs three calls a node, and a drawn queue is sound three times in four.
+inline constexpr size_t kVoicesLogBound = 1 << 16;
+struct VoicesRunaway {};
+void voicesLog(std::vector<VoicesCall>& log, const VoicesCall& call);
+
+template <class Event>
+std::string voicesBounded(Event event) {
+    try {
+        return event();
+    } catch (const VoicesRunaway&) {
+        return "the port ran on past its bound (" + std::to_string(kVoicesLogBound) + ") in one event";
+    }
+}
+
 // What a hooked call answers, and what a destroy leaves in its voice: its note, state, +0x30, +0x44 and where its age
 // is (0 the zero's, 1 its +0x20, 2 its +0x24)
 struct VoicesAnswer {
@@ -135,3 +154,6 @@ long vc2VoiceClassPart(VoicesSides& s, const Vc2Run& run);
 long vc2AssignListenersPart(VoicesSides& s, const Vc2Run& run);
 // The update task's pass's part (v310, Vc2UpdateTaskCheck.cpp), after the listeners' on the seed after its
 long vc2UpdateTaskPart(VoicesSides& s, const Vc2Run& run);
+// The static M's node on the update queue's part (v312, Vc2UpdateTaskCheck.cpp), after the update task's on the seed
+// after its
+long vc2QueueNodePart(VoicesSides& s, const Vc2Run& run);

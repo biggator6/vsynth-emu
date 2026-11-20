@@ -43,7 +43,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2AssignReleaseCheck.cpp ] && echo Vc2AssignReleaseCheck.cpp Vc2AssignReleaseEvents.cpp \
       Vc2AssignRelease.cpp Vc2AssignNotes.cpp Vc2Keys.cpp Vc2KeysTables.cpp ) \
    $( [ -f Vc2VoiceClassCheck.cpp ] && echo Vc2VoiceClassCheck.cpp Vc2VoiceClassEvents.cpp Vc2VoiceClass.cpp \
-      Vc2VoiceQueue.cpp ) \
+      Vc2VoiceQueue.cpp Vc2VoiceQueueCheck.cpp ) \
    $( [ -f Vc2AssignListenersCheck.cpp ] && echo Vc2AssignListenersCheck.cpp ) \
    $( [ -f Vc2UpdateTask.cpp ] && echo Vc2UpdateTask.cpp Vc2UpdateTaskCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2voices" &

@@ -63,8 +63,13 @@ void voicesApplyDestroy(Vc2VoiceNode& v, uint32_t self, const VoicesAnswer& a) {
     v.age = a.age == 0 ? Vc2PartVoices::kZeroAge : self + kOrderAt + kOrderBytes * (uint32_t)(a.age - 1);
 }
 
+void voicesLog(std::vector<VoicesCall>& log, const VoicesCall& call) {
+    if (log.size() >= kVoicesLogBound) throw VoicesRunaway {};
+    log.push_back(call);
+}
+
 void VoicesPortParts::destroy(uint32_t voice) {
-    log_.push_back(voicesSlotCall(fw_, kVoicesDestroy, voice, port_.at(voice).vtable, kVoicesDestroyEntry));
+    voicesLog(log_, voicesSlotCall(fw_, kVoicesDestroy, voice, port_.at(voice).vtable, kVoicesDestroyEntry));
     voicesApplyDestroy(port_.at(voice), voice, draws_.next(draws_.port));
 }
 
@@ -76,12 +81,12 @@ int8_t VoicesPortParts::kindOf(uint32_t note) {
 
 bool VoicesPortParts::ended(uint32_t tone) {
     const uint32_t vtable = fw_.cpu.rd32(tone + kVoicesToneVtable);
-    log_.push_back(voicesSlotCall(fw_, kVoicesEnded, tone, vtable, kVoicesEndedEntry));
+    voicesLog(log_, voicesSlotCall(fw_, kVoicesEnded, tone, vtable, kVoicesEndedEntry));
     return draws_.next(draws_.port).ended != 0;
 }
 
 float VoicesPortParts::cost(uint32_t tone) {
-    log_.push_back({ kVoicesCost, kVoicesCostAt, tone });
+    voicesLog(log_, { kVoicesCost, kVoicesCostAt, tone });
     return draws_.next(draws_.port).cost;
 }
 

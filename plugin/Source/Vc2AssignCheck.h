@@ -48,9 +48,10 @@ private:
 
 // rom.4's side: the virtual at `entry` of both classes hooked to log its object and the `registers` past r4, answering
 // 0 (v305; the retune's and the key-off's own until then)
-// (v310) `answer`, when given, what the hook answers (the update task's part's)
+// (v310) `answer`, when given, what the hook answers (the update task's part's); (v312) `classes`, when given, the
+// classes hooked in theirs' place (the static M's node's, the seventh part's)
 void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers,
-                    uint32_t (*answer)(VoicesSides&) = nullptr);
+                    uint32_t (*answer)(VoicesSides&) = nullptr, std::initializer_list<uint32_t> classes = {});
 
 inline constexpr uint32_t kAssignSettingsAt = 0x89995390, kAssignSettingBytes = 32;    // [FW] the parts' settings
 inline constexpr uint32_t kAssignParametersAt = 0x89996120, kAssignParameterBytes = 24;   // [FW] their messages
@@ -85,15 +86,18 @@ void assignStack(AssignSides& a, std::initializer_list<uint32_t> words);
 using AssignEvent = std::string (*)(AssignSides&, std::mt19937&);
 std::span<const AssignEvent> assignEvents();
 // A part's case: `Start`, then up to 400 of `Events()`, each after `Draw` (all at the first) and the voices' prepare,
-// its calls counted by `Count` after it; what differs, or nothing
+// its calls counted by `Count` after it; what differs, or nothing; a draw or event that runs on past its bound (v312)
+// differs
 template <auto Start, auto Draw, auto Events, auto Count, class Sides>
 std::string voicesPartCase(Sides& x, VoicesSides& s, std::mt19937& rng) {
     std::string what = Start(x, rng);
     const auto events = Events();
     for (int k = 0; k < 400 && what.empty(); ++k) {
-        Draw(x, rng, k == 0);
-        voicesPrepare(s, (uint32_t)rng());
-        what = events[rng() % events.size()](x, rng);
+        what = voicesBounded([&] {
+            Draw(x, rng, k == 0);
+            voicesPrepare(s, (uint32_t)rng());
+            return events[rng() % events.size()](x, rng);
+        });
         Count(x);
     }
     return what;

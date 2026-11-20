@@ -10,7 +10,6 @@
 #ifdef XT_VC2VOICES_MAIN
 #include "Vc2CheckCalls.h"
 #include "Vc2VoiceClassCheck.h"
-#include <algorithm>
 
 namespace {
 using V = Vc2PartVoices;
@@ -74,59 +73,6 @@ void classInstallRom(ClassSides& c) {
 }
 
 namespace {
-std::string queueDiffer(ClassSides& c) {
-    Vc2QueueWords theirs;
-    c.r.a.s.fw.cpu.read(Q::kAt, &theirs, sizeof theirs);
-    const auto* ours = reinterpret_cast<const uint32_t*>(&c.queue.q);
-    const auto* rom = reinterpret_cast<const uint32_t*>(&theirs);
-    for (uint32_t k = 0; k < sizeof theirs / 4; ++k) {
-        if (ours[k] == rom[k]) continue;
-        char t[96];
-        std::snprintf(t, sizeof t, "the queue's +0x%02x: %08x, against %08x", 4 * k, ours[k], rom[k]);
-        return t;
-    }
-    return "";
-}
-
-// The link after `node`: the queue's head's, or a voice's
-uint32_t& nextAfter(ClassSides& c, uint32_t node) {
-    return node == Q::kHeadAt ? c.queue.q.next : c.r.a.s.port.at(node).queueNext;
-}
-
-} // namespace
-
-// The voices' queue links one list: a few on the queue in a drawn order, the rest linked to themselves, and one time
-// in four a voice's link aimed elsewhere; every voice on queue 0; the queue's current node one of them, the head or none
-void drawQueue(ClassSides& c, std::mt19937& rng) {
-    V& port = c.r.a.s.port;
-    std::array<uint32_t, V::kVoices> all {};
-    for (int i = 0; i < V::kVoices; ++i) all[(size_t)i] = port.addressOf(i);
-    std::ranges::shuffle(all, rng);
-    const size_t queued = rng() % 8;
-    uint32_t last = Q::kHeadAt;
-    for (size_t i = 0; i < all.size(); ++i) {
-        Vc2VoiceNode& n = port.at(all[i]);
-        n.queue = 0;
-        n.queued = rng() % 2;
-        n.queueNext = all[i];
-        n.queuePrev = all[i];
-        if (i >= queued) continue;
-        n.queuePrev = last;
-        nextAfter(c, last) = all[i];
-        last = all[i];
-    }
-    nextAfter(c, last) = Q::kHeadAt;
-    c.queue.q.prev = last;
-    const uint32_t odd = all[rng() % all.size()], to = rng() % 3 ? all[rng() % all.size()] : Q::kHeadAt;
-    if (rng() % 4 == 0) (rng() % 2 ? port.at(odd).queueNext : port.at(odd).queuePrev) = to;
-    const uint32_t currents[4] = { 0, Q::kHeadAt, all[0], all[rng() % all.size()] };
-    c.queue.q.current = currents[rng() % 4];
-    c.queue.q.vtable = rng() % 4 ? Q::kHeadVtable : (uint32_t)rng();
-    c.queue.q.post = (uint32_t)rng();
-    c.queue.q.lock = (uint32_t)rng();
-}
-
-namespace {
 // A voice's words the class decides by: its set, +0x58 and the bytes +0x50…+0x55; its held bits any byte one time in
 // four (the release path's draws keep them below 8)
 void drawClassWords(Vc2Voice& w, std::mt19937& rng) {
@@ -177,7 +123,7 @@ void sayClassCounts(const ClassCounts& n) {
 ClassSides::ClassSides(VoicesSides& s) : r(s), parts(s, queue) {}
 
 uint32_t ClassPortParts::logged(int32_t kind, uint32_t routine, uint32_t object, std::array<uint32_t, 7> more) {
-    s_.mine.push_back({ kind, routine, object, more });
+    voicesLog(s_.mine, { kind, routine, object, more });
     return 0;
 }
 
@@ -276,11 +222,11 @@ std::string classOnBoth(ClassSides& c, const Vc2CheckRoutine& routine, std::init
                         const std::function<uint32_t()>& mine) {
     VoicesSides& s = c.r.a.s;
     s.fw.cpu.write(Vc2Keys::kTablesAt, &c.r.keys, sizeof c.r.keys);
-    s.fw.cpu.write(Q::kAt, &c.queue.q, sizeof c.queue.q);
+    classQueueWrite(c);
     const std::string what = vc2BothAnswer(s.fw, routine, args, mine, [&] {
         std::string d = voicesDifference(s);
         if (d.empty()) d = releaseKeysDiffer(c.r);
-        return d.empty() ? queueDiffer(c) : d;
+        return d.empty() ? classQueueDiffer(c) : d;
     });
     return what.empty() ? what : std::string(routine.name) + ": " + what;
 }
