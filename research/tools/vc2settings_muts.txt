@@ -21,7 +21,7 @@
 # reading and nothing posted again) and vc2partcontrollers (Vc2PartControllers.cpp, v301; not the Y way's set with the
 # trip stopped given its Y field for the value, which it has just stored) and vc2partnumbers (Vc2PartNumbers.cpp, v302;
 # not the init's glides' reset in the nodes' loop, whose every word the glides' static initializer after it writes
-# again).  Not planted: the depth
+# again) and vc2partstartup (Vc2PartStartUp.cpp, v304).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -722,3 +722,22 @@ h-table|return Vc2Keys::tableAt(static_cast<uint32_t>(h.source - 1), static_cast
 h-class-sost|{ 0x898cd280, 0x89393a10, sostenuto, false },|{ 0x898cd280, 0x89393a10, hold, false },|vc2partnumbers
 h-class-11|{ 0x898cd328, 0x89393d90, base, false },|{ 0x898cd328, 0x89393d90, poly, false },|vc2partnumbers
 h-class-1|{ 0x898cd250, 0x89393920, base, false },|{ 0x898cd250, 0x89393920, soundOff, false },|vc2partnumbers
+start-off|constexpr int8_t kOff = -1;|constexpr int8_t kOff = 1;|vc2partstartup
+start-trips|t.tripAssigns.fill(kOff);|t.tripAssigns.fill(0);|vc2partstartup
+start-after|s.after.fill(kOff);|s.after.fill(0);|vc2partstartup
+start-pi|halfPi * kTwo;|halfPi;|vc2partstartup
+start-float-0|s.floats[0] = pi;|s.floats[0] = pi / kTwo;|vc2partstartup
+start-float-1|s.floats[1] = pi / kTwo;|s.floats[1] = pi;|vc2partstartup
+start-routing-0|s.routing[0] = kRoutingFirst;|s.routing[0] = kRoutingSecond;|vc2partstartup
+start-routing-1|s.routing[1] = kRoutingSecond;|s.routing[1] = kRoutingFirst;|vc2partstartup
+start-routing-127|kRoutingSecond = 127;|kRoutingSecond = 126;|vc2partstartup
+start-remain|kSettingsObjectAt + 1;|kSettingsObjectAt;|vc2partstartup
+start-init|    vc2PartInit(w.init);\n|\n|vc2partstartup
+start-voices|    w.voices.initVoices();\n|\n|vc2partstartup
+start-lists|    w.voices.initLists();\n|\n|vc2partstartup
+start-reload|w.reloads.objects[0];|w.reloads.objects[1];|vc2partstartup
+start-reload-part|r.part = 0;|r.part = 1;|vc2partstartup
+start-reload-state|r.state = 0;|r.state = 1;|vc2partstartup
+start-reload-posted|r.posted = 0;|r.posted = 1;|vc2partstartup
+start-static|    w.staticM.partInit(w.staticParts);\n|\n|vc2partstartup
+tables-half-pi|halfPi = std::bit_cast<float>(image.rd32(0x898c5710));|halfPi = std::bit_cast<float>(image.rd32(0x898c5714));|vc2settingstables

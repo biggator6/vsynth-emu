@@ -1546,6 +1546,39 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's start-up (2026-11-19, v304) {#vc2-part-start-up}
+
+Step 4.3's thirty-second version (VC2_MODE_PLAN.md, step 4.3, item 10's ninth part): `0x89392ab0`, the first thing
+the notes' task runs (`0x8938fc2e`), now the port's own as `vc2PartStartUp` (`Vc2PartStartUp.cpp`), checked by
+`xt_vc2settings`' eighteenth part. In rom.4's order:
+- Time Trip Assign X and Y's bytes (`0x89989404`, v296's) and the two bytes after them (`0x89989406`) −1.
+- The routing object (`0x899893f8`, the routing reset's and the receive channel's `this`): its +1 127, its +4
+  `acosf(0)` × 2 (π) and its +8 that ÷ 2 (π/2), its +0 0. acosf at 0 is its π/2 (`0x898c5710`) less asin 0, which is
+  0, so the constant itself; × 2 and ÷ 2 are exact. `Vc2PartSettingsTables::halfPi` reads it.
+- The settings object (`0x899826fc`): its constructor `0x89391610` sets its +0x14 to its own +1 (the Patch Remain byte,
+  v296's `0x899826fd`).
+- The part's init `0x89393370` (v302's `vc2PartInit`), then v272's voices' and lists' inits (`0x89391ba0`,
+  `0x89391270`).
+- `0x8939b200`: part 0's reload object (v300's, `0x89996120`) idle, its part, state and posted word 0; eight calls that
+  return at once (`0x893a7f40`, `0x893a1ae0`, `0x893a0330`, `0x8939a8b0`, `0x8939b7d0`, `0x89399c10`, `0x893a6f10`,
+  `0x893a6200`), left out; and the static M's part init `0x893a2fe0` (v295's) as its tail.
+
+The words no port held before are `Vc2PartStartWords` (the routing object's two bytes and two floats, the bytes after
+the assigns, the settings object's +0x14); the rest are the ports' own objects, reached through `Vc2PartStartWorld`.
+
+**The check.** `xt_vc2settings`' eighteenth part, on the seed seventeen after the run's: rom.4's own start-up with
+everything under it its own (the init, the voices' inits, acosf, 0x8939b200) but the static M's two calls out, which
+the ninth part hooked. Each case gives every table noise, then 16 start-ups, each on noise first in all it reaches,
+the same on both sides: the nodes, their lists, class bytes and part objects, the keys, the number objects and their
+table, the voices with their heads, globals and age word, the reload objects, the static M and the start-up's own
+words (`startRegions`, one table both writes them into rom.4's memory and compares them after). After each, the
+tables, those words, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first seventeen parts' lines as they were.
+- Every line and branch of `Vc2PartStartUp.cpp` is reached.
+- `mutate_vc2.py --settings`: 712 plants, none missed; v304's 19 new (18 in the start-up, π/2's read).
+
 ### The VC-2 part's controller handlers (2026-11-19, v303) {#vc2-part-number-handlers}
 
 Step 4.3's thirty-first version (VC2_MODE_PLAN.md, step 4.3, item 10's eighth part): the number classes' handlers

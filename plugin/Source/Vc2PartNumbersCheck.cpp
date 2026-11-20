@@ -112,12 +112,7 @@ const SettingsEvent kNumberEvents[] = { numberEvent };
 
 // A case: the nodes, the lists, the part objects (an index 0…15) and the keys noise; then the tables' and the events
 std::string numbersCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    Vc2PartNodes& n = s.nodes;
-    settingsNoise(n.nodes.data(), sizeof n.nodes, rng);
-    settingsNoise(n.lists.data(), sizeof n.lists, rng);
-    settingsNoise(n.objects.data(), sizeof n.objects, rng);
-    for (Vc2PartObject& o : n.objects) o.index = (uint8_t)(rng() % Vc2PartNodes::kObjects);
-    settingsNoise(&s.keys, sizeof s.keys, rng);
+    settingsNodesKeysNoise(s, rng);
     s.fw.cpu.write(Vc2Keys::kTablesAt, &s.keys, sizeof s.keys);
     return settingsCaseOf<kNumberEvents, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
 }

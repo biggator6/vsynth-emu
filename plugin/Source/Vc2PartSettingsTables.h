@@ -23,6 +23,8 @@ struct Vc2PartSettingsTables {
     std::array<float, 3> reloadFloats {};
     // The word the part's init gives part 0's nodes (v302): 0x8950d7a0's
     uint32_t nodeWord = 0;
+    // π/2 (v304): acosf's constant (0x898c5710), the answer to the part's start-up's acos 0
+    float halfPi = 0;
 };
 
 [[nodiscard]] bool vc2LoadPartSettings(const char* path);

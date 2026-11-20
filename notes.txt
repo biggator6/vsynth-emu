@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's start-up v304 (2026-11-19, on claude/vc2-part-4-3 after v303; HARDWARE_FIRMWARE.md, "The VC-2 part's
+  start-up"): step 4.3's thirty-second version, item 10's ninth part. Vc2PartStartUp (Vc2PartStartUp.cpp): rom.4's
+  0x89392ab0, which the notes' task runs first: Time Trip's assigns and the two bytes after them −1, the routing
+  object's bytes 0 and 127 and floats π and π/2 (acosf's constant 0x898c5710, read by Vc2PartSettingsTables::halfPi),
+  the settings object's +0x14, the part's init (v302), v272's voices' and lists' inits, and 0x8939b200 (part 0's reload
+  object idle, eight bare returns left out, the static M's part init). xt_vc2settings gains an eighteenth part
+  (Vc2PartStartUpCheck.cpp; the further parts' rows in Vc2PartSettingsParts.h, split off at the 300-line limit), 16
+  start-ups a case on noise in all they reach: 0 different at seeds 2024, 7 and 31337, the first seventeen parts' lines
+  unchanged; mutate_vc2.py --settings 712 planted, 0 missed. Not in the sound yet.
+
 The VC-2 part's controller handlers v303 (2026-11-19, on claude/vc2-part-4-3 after v302; HARDWARE_FIRMWARE.md, "The
   VC-2 part's controller handlers"): step 4.3's thirty-first version, item 10's eighth part. On Vc2PartNumbers
   (Vc2PartNumbers.cpp): the number classes' handlers as the class rows' ways (the base's listeners of the channel's

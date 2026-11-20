@@ -825,6 +825,12 @@ version against rom.4's routines with what it calls hooked:
          press, not its release (`holdPresses`); xt_vc2settings' seventeenth part (HARDWARE_FIRMWARE.md, "The VC-2
          part's controller handlers"). Next: the listeners' run `0x89390ea0` (the list at `[0x899826e0]`), `0x8939b200`,
          the Time Trip object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
+       - the part's start-up done (v304): `vc2PartStartUp`, rom.4's `0x89392ab0`, the notes' task's first call: Time
+         Trip's assigns and the two bytes after them −1, the routing object's bytes and floats (π, π/2 by acosf's
+         constant), the settings object's +0x14, then the part's init, v272's voices' and lists' inits and `0x8939b200`
+         (part 0's reload object idle, eight bare returns, the static M's part init); its words `Vc2PartStartWords`;
+         xt_vc2settings' eighteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's start-up"). Next: the listeners' run
+         `0x89390ea0`, the Time Trip object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

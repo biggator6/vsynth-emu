@@ -853,6 +853,7 @@ reload objects: 16000 events: 512 static initializers, 2568 constructors, 2581 c
 controllers: 16000 events: 8121 controllers, 7879 part controllers, 5621 trip sets, 972 trip moves (14714 calls)
 controller numbers: 16000 events: 4037 inits, 11963 controllers, 2977 objects drawn (23926 calls)
 number handlers: 16000 events: 16000 controllers, 3101 key-table routines, 11752 notifies (16273 calls)
+start-up: 640 events: 640 start-ups (640 calls)
 settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
 xt_vc2settings: 0 different
 == xt_tone msm

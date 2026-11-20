@@ -41,6 +41,19 @@ std::string saidRead(const SettingsCall& c) {
 }
 
 // The bytes past the tables' words, and the controls' flag
+} // namespace
+
+std::string settingsBytesDifference(Sh4& cpu, std::span<const std::pair<uint32_t, uint8_t>> bytes) {
+    for (const auto& [at, mine] : bytes) {
+        if (cpu.rd8(at) == mine) continue;
+        char text[96];
+        std::snprintf(text, sizeof text, "byte 0x%08x: %02x, against %02x", at, mine, cpu.rd8(at));
+        return text;
+    }
+    return "";
+}
+
+namespace {
 std::string settingsTails(SettingsSides& s) {
     const Vc2PartRows& t = s.rows;
     const std::pair<uint32_t, uint8_t> bytes[] = { { kLfosAt + kLfoWords, t.lfos[kLfoWords] },
@@ -51,13 +64,7 @@ std::string settingsTails(SettingsSides& s) {
                                                    { kTripAssignsAt, (uint8_t)t.tripAssigns[0] },
                                                    { kTripAssignsAt + 1, (uint8_t)t.tripAssigns[1] },
                                                    { kPatchRemainAt, t.patchRemain } };
-    for (const auto& [at, mine] : bytes) {
-        if (s.fw.cpu.rd8(at) == mine) continue;
-        char text[96];
-        std::snprintf(text, sizeof text, "byte 0x%08x: %02x, against %02x", at, mine, s.fw.cpu.rd8(at));
-        return text;
-    }
-    return "";
+    return settingsBytesDifference(s.fw.cpu, bytes);
 }
 
 std::string settingsDifference(SettingsSides& s) {
@@ -138,9 +145,9 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
                                       &kStaticPartRow, &kSystemPartRow })
         different += settingsRunPart(s, run, *p);
     for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow,
-                                      &kControllerPartRow, &kNumberPartRow })
+                                      &kControllerPartRow, &kNumberPartRow, &kHandlerPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kHandlerPartRow);
+    return different + settingsRunPart(s, run, kStartPartRow);
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {
@@ -267,7 +274,8 @@ std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std
 
 int main(int argc, char** argv) {
     const Vc2CheckStart start { "xt_vc2settings",
-                                vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath, vc2LoadMatrix, vc2LoadKeys>,
+                                vc2LoadAll<vc2LoadPartSettings, vc2LoadLibMath, vc2LoadMatrix, vc2LoadKeys,
+                                           vc2LoadPartVoices>,
                                 { "XT_VC2SETTINGS_FIRST", "XT_VC2SETTINGS_STOP" } };
     return vc2CheckMain<SettingsSides>(argc, argv, start, settingsCase, saySettingsCounts, settingsMoreParts);
 }

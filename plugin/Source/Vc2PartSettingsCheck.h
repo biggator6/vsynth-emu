@@ -13,6 +13,9 @@
 #include "Vc2PartControllers.h"
 #include "Vc2PartNumbers.h"
 #include "Vc2PartSettingsCalls.h"
+#include "Vc2PartStartUp.h"
+#include "Vc2PartVoicesTables.h"
+#include <utility>
 #include "Vc2PartSettingsTables.h"
 #include <span>
 
@@ -122,10 +125,11 @@ struct SettingsCounts {
     long controllerEvents = 0, controllerCalls = 0;                             // the fifteenth's (v301)
     long numberEvents = 0, numberCalls = 0;                                     // the sixteenth's (v302)
     long handlerEvents = 0, handlerCalls = 0;                                   // the seventeenth's (v303)
+    long startEvents = 0, startCalls = 0;                                       // the eighteenth's (v304)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
     // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69,
-    // v303's at 70…72
-    std::array<long, 73> byEvent {};
+    // v303's at 70…72, v304's at 73
+    std::array<long, 74> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -148,11 +152,15 @@ struct SettingsSides {
     std::array<Vc2TripFront, kSettingsParts> trips {};   // v301: the parts' trip objects, the port's
     uint8_t tripAnswer = 0;                              // v301: the trip's move's answer, drawn for both sides
     Vc2PartNumbers numbers {};                           // v302
+    Vc2PartVoices voices {};                             // v304: v272's voices, which the start-up inits
+    Vc2PartStartWords startWords {};                     // v304
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
 };
 
+// Each byte rom.4 holds at an address against the port's (v304; settingsTails' loop until then): the first that differs
+std::string settingsBytesDifference(Sh4& cpu, std::span<const std::pair<uint32_t, uint8_t>> bytes);
 // rom.4's routine on `args` and the port's `mine()`, both from the same flags, store and flip; what differs in the
 // tables, the calls or the answer
 std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std::initializer_list<uint32_t> args,
@@ -185,53 +193,6 @@ inline constexpr SettingsCallee kSettingsNotesOffCallee { 0x89391e30, settingsNo
 inline constexpr SettingsCallee kSettingsStopCallee { 0x89390f70, settingsStopped };
 inline constexpr SettingsCallee kSettingsTruncateAllCallee { 0x89391120, settingsTruncatedAll };
 inline constexpr SettingsCallee kSettingsHeldOnCallee { 0x89391e50, settingsHeldOn };
-// A count in a part's line said by its counts alone (v298): its event's index in byEvent, what it counts
-struct SettingsSaid {
-    int event;
-    const char* what;
-};
-// A further part (v289): its seed's offset from the run's, its counts, a case of its events, its line, and what it
-// does first; from v298, a line of its events alone by its name and counts, with no `say`
-struct SettingsPartRow {
-    uint32_t offset;
-    long SettingsCounts::*events;
-    long SettingsCounts::*calls;
-    std::string (*oneCase)(SettingsSides&, std::mt19937&, long&, long&);
-    void (*say)(const SettingsCounts&);
-    void (*start)(SettingsSides&) = nullptr;
-    const char* name = nullptr;
-    std::span<const SettingsSaid> said {};
-};
-// Its cases, its line, how many differ
-long settingsRunPart(SettingsSides& s, const Vc2Run& run, const SettingsPartRow& p);
-// The third part (v288): the OSC table's readers, the block reader hooked; the fourth (v289): rom.4's own
-// (Vc2PartSettingsOscCheck.cpp); the fifth (v290): the vocoder reader (Vc2PartSettingsVocoderCheck.cpp)
-extern const SettingsPartRow kOscPartRows[2];
-extern const SettingsPartRow kVocoderPartRow;
-// The sixth (v291): the mode row and Auto Note's switch (Vc2PartSettingsModesCheck.cpp)
-extern const SettingsPartRow kModePartRow;
-// The seventh (v292): the dispatchers and G's channel word (Vc2PartSettingsDispatchCheck.cpp)
-extern const SettingsPartRow kDispatchPartRow;
-// The eighth (v294): the Category and budget (Vc2PartSettingsCategoryCheck.cpp)
-extern const SettingsPartRow kCategoryPartRow;
-// The ninth (v295): the static M's initializers (Vc2StaticMatrixCheck.cpp)
-extern const SettingsPartRow kStaticPartRow;
-// The tenth (v296): the system's readers and the budget (Vc2PartSettingsSystemCheck.cpp)
-extern const SettingsPartRow kSystemPartRow;
-// The eleventh (v297): the parameters' messages (Vc2PartSettingsMessagesCheck.cpp)
-extern const SettingsPartRow kMessagePartRow;
-// The twelfth (v298): the receive channel (Vc2PartSettingsReceiveCheck.cpp)
-extern const SettingsPartRow kReceivePartRow;
-// The thirteenth (v299): the routing's reset (Vc2PartSettingsRoutingCheck.cpp)
-extern const SettingsPartRow kRoutingPartRow;
-// The fourteenth (v300): the reload objects (Vc2PartReloadsCheck.cpp)
-extern const SettingsPartRow kReloadPartRow;
-// The fifteenth (v301): the controllers (Vc2PartControllersCheck.cpp)
-extern const SettingsPartRow kControllerPartRow;
-// The sixteenth (v302): the controller numbers and the part's init (Vc2PartNumbersCheck.cpp)
-extern const SettingsPartRow kNumberPartRow;
-// The seventeenth (v303): the number classes' handlers (Vc2PartHandlersCheck.cpp)
-extern const SettingsPartRow kHandlerPartRow;
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words
@@ -244,11 +205,23 @@ inline void settingsNoise(void* at, size_t bytes, std::mt19937& rng) {
     for (size_t k = 0; k < bytes; ++k) b[k] = (uint8_t)rng();
 }
 
+// The nodes, their lists, the part objects (each one's index 0…15) and the keys noise (the sixteenth part's, v302;
+// shared with the eighteenth from v304)
+inline void settingsNodesKeysNoise(SettingsSides& s, std::mt19937& rng) {
+    Vc2PartNodes& n = s.nodes;
+    settingsNoise(n.nodes.data(), sizeof n.nodes, rng);
+    settingsNoise(n.lists.data(), sizeof n.lists, rng);
+    settingsNoise(n.objects.data(), sizeof n.objects, rng);
+    for (Vc2PartObject& o : n.objects) o.index = (uint8_t)(rng() % Vc2PartNodes::kObjects);
+    settingsNoise(&s.keys, sizeof s.keys, rng);
+}
+
 using SettingsEvent = std::string (*)(SettingsSides&, std::mt19937&);
 
 // A case: noise in the tables up to `Noised` bytes in (each part's draws as it first drew them), the tables into
-// rom.4's memory, then 400 of `Events` with `Flipped` flags to set, counted in `events` and `calls`
-template <const auto& Events, size_t Noised, uint32_t Flipped>
+// rom.4's memory, then `Count` (400, or from v304 fewer) of `Events` with `Flipped` flags to set, counted in `events`
+// and `calls`
+template <const auto& Events, size_t Noised, uint32_t Flipped, int Count = kEventsACase>
 std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
     auto* rows = reinterpret_cast<uint8_t*>(&s.rows);
     for (uint8_t* b = rows; b != rows + Noised; ++b) *b = (uint8_t)rng();
@@ -275,7 +248,7 @@ std::string settingsCaseOf(SettingsSides& s, std::mt19937& rng, long& events, lo
     s.fw.cpu.wr32(kChordMemoryAt, (uint32_t)t.chordMemory);
     s.fw.cpu.write(kHoldPressesAt, t.holdPresses.data(), sizeof t.holdPresses);
     std::string what;
-    for (int k = 0; k < kEventsACase && what.empty(); ++k, ++events) {
+    for (int k = 0; k < Count && what.empty(); ++k, ++events) {
         settingsDraw(s, rng, Flipped);
         what = Events[rng() % std::size(Events)](s, rng);
         calls += (long)s.mine.log.size();
@@ -289,3 +262,5 @@ std::string settingsNodesCaseOf(SettingsSides& s, std::mt19937& rng, long& event
     settingsNoise(s.nodes.nodes.data(), sizeof s.nodes.nodes, rng);
     return settingsCaseOf<Events, Noised, 5>(s, rng, events, calls);
 }
+
+#include "Vc2PartSettingsParts.h"
