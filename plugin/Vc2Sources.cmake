@@ -127,4 +127,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartControllers.cpp
     Source/Vc2PartNumbers.cpp
     Source/Vc2PartStartUp.cpp
+    Source/Vc2TimeTrip.cpp
 )

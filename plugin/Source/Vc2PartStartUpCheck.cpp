@@ -57,17 +57,14 @@ void drawStart(SettingsSides& s, std::mt19937& rng) {
     settingsNoise(s.reloads.objects.data(), sizeof s.reloads.objects, rng);
     settingsNoise(&s.staticM, sizeof s.staticM, rng);
     settingsNoise(&s.startWords, sizeof s.startWords, rng);
-    for (const Vc2Region& r : startRegions(s)) s.fw.cpu.write(r.at, r.mine, r.bytes);
+    settingsWriteRegions(s, startRegions(s));
     for (const auto& [at, b] : startBytes(s.startWords)) s.fw.cpu.wr8(at, b);
 }
 
 // What differs in the words the start-up reaches beyond the tables
 std::string startWordsDifference(SettingsSides& s) {
-    for (const Vc2Region& r : startRegions(s)) {
-        std::string what = vc2FirstDifference(s.fw, r.at, r.mine, r.bytes, r.what);
-        if (!what.empty()) return what;
-    }
-    return settingsBytesDifference(s.fw.cpu, startBytes(s.startWords));
+    const std::string words = settingsRegionsDifference(s, startRegions(s));
+    return words.empty() ? settingsBytesDifference(s.fw.cpu, startBytes(s.startWords)) : words;
 }
 
 // The start-up on both sides

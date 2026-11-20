@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's Time Trip v306 (2026-11-19, on claude/vc2-part-4-3 after v305; HARDWARE_FIRMWARE.md, "The VC-2 part's
+  Time Trip"): step 4.3's thirty-fourth version, item 10's eleventh part. Vc2TimeTrip (Vc2TimeTrip.cpp): rom.4's 16 part
+  records of 0x34 bytes at 0x89989408 (Vc2TripRecords; the trip object's 0x20 bytes Vc2TripObject, v301's
+  Vc2TripFront now it and the pad) and their static initializer 0x89394570; the trip's constructor 0x893b0400, rate
+  0x893b05b0, set 0x893b0610 and X-Y move 0x893b0460 with the position 0x893b0690 (the polar table 0x89543f18), the
+  steps 0x893b0790 on its scratch words 0x899996a4 and the broadcast 0x893b1780 to the sounding tones' +0x48 through
+  Vc2TripParts; the tables read by Vc2PartSettingsTables. xt_vc2settings gains a nineteenth part (Vc2TimeTripCheck.cpp;
+  a region table's write and compare shared, settingsWriteRegions and settingsRegionsDifference): 0 different at seeds
+  2024, 7 and 31337, the first eighteen parts' lines unchanged; mutate_vc2.py --settings 785 planted, 0 missed. Not
+  in the sound yet.
+
 The VC-2 part's listeners' run v305 (2026-11-19, on claude/vc2-part-4-3 after v304; HARDWARE_FIRMWARE.md, "The VC-2
   part's listeners' run"): step 4.3's thirty-third version, item 10's tenth part. Vc2Assigner::notify
   (Vc2AssignRelease.cpp): rom.4's 0x89390ea0, each sounding voice whose key table's channel state is the one given, its

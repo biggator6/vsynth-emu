@@ -837,6 +837,12 @@ version against rom.4's routines with what it calls hooked:
          Next: the Time Trip object (`0x893b0610` the set, `0x893b0460`, `0x893b04d0`, `0x893b0540` the moves, the
          polar table `0x89543f18` through `0x893b0690`, the steps `0x893b0790`, `0x893b1780`), then the MIDI dispatcher
          `0x8938fed0`.
+       - the Time Trip done (v306): `Vc2TripRecords`, the 16 part records at `0x89989408` and their static
+         initializer `0x89394570`, the trip object's constructor `0x893b0400`, rate `0x893b05b0`, set `0x893b0610` and
+         X-Y move `0x893b0460` with the position `0x893b0690` (the polar table), the steps `0x893b0790` and the
+         broadcast `0x893b1780` to the sounding tones' +0x48 through `Vc2TripParts`; v301's front the trip object and
+         the pad; xt_vc2settings' nineteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's Time Trip"). Next: the MIDI
+         dispatcher `0x8938fed0`, the mailbox and the three tasks, then Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

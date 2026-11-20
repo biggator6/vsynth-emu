@@ -14,6 +14,10 @@ struct Read : Vc2PartSettingsTables {
         image.read(0x8954012c, oscIds.data(), sizeof oscIds);
         nodeWord = image.rd32(0x8950d7a0);
         halfPi = std::bit_cast<float>(image.rd32(0x898c5710));
+        image.read(0x89543f18, tripPolar.data(), sizeof tripPolar);
+        image.read(0x8954601a, tripSteps.data(), sizeof tripSteps);
+        image.read(0x8954602c, tripOffsets.data(), sizeof tripOffsets);
+        tripScale = std::bit_cast<float>(image.rd32(0x893948ec));
         for (uint32_t r = 0; r < kRecords; ++r)
             templateShifts[r] = std::bit_cast<float>(image.rd32(kRecordsAt + kRecordBytes * r + kShiftAt));
         const Vc2PoolWord pool[] = { { 0x893a75ec, &shiftBase }, { 0x893a75f0, &shiftStep }, { 0x893a75f8, &per127 },

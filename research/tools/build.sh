@@ -86,6 +86,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2PartHandlersCheck.cpp ] && echo Vc2PartHandlersCheck.cpp ) \
    $( [ -f Vc2PartStartUp.cpp ] && echo Vc2PartStartUp.cpp Vc2PartStartUpCheck.cpp Vc2PartVoices.cpp \
       Vc2PartVoicesTables.cpp ) \
+   $( [ -f Vc2TimeTrip.cpp ] && echo Vc2TimeTrip.cpp Vc2TimeTripCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \

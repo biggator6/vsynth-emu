@@ -126,10 +126,11 @@ struct SettingsCounts {
     long numberEvents = 0, numberCalls = 0;                                     // the sixteenth's (v302)
     long handlerEvents = 0, handlerCalls = 0;                                   // the seventeenth's (v303)
     long startEvents = 0, startCalls = 0;                                       // the eighteenth's (v304)
+    long tripEvents = 0, tripCalls = 0;                                         // the nineteenth's (v306)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
     // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69,
-    // v303's at 70…72, v304's at 73
-    std::array<long, 74> byEvent {};
+    // v303's at 70…72, v304's at 73, v306's at 74…81
+    std::array<long, 82> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -154,6 +155,7 @@ struct SettingsSides {
     Vc2PartNumbers numbers {};                           // v302
     Vc2PartVoices voices {};                             // v304: v272's voices, which the start-up inits
     Vc2PartStartWords startWords {};                     // v304
+    Vc2TripRecords tripRecords {};                       // v306: the parts' Time Trip records and the steps' scratch
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -161,6 +163,10 @@ struct SettingsSides {
 
 // Each byte rom.4 holds at an address against the port's (v304; settingsTails' loop until then): the first that differs
 std::string settingsBytesDifference(Sh4& cpu, std::span<const std::pair<uint32_t, uint8_t>> bytes);
+// The port's words of each region written into rom.4's memory, and the first region whose words differ (v306; the
+// eighteenth part's own until then)
+void settingsWriteRegions(SettingsSides& s, std::span<const Vc2Region> regions);
+std::string settingsRegionsDifference(SettingsSides& s, std::span<const Vc2Region> regions);
 // rom.4's routine on `args` and the port's `mine()`, both from the same flags, store and flip; what differs in the
 // tables, the calls or the answer
 std::string settingsOnBoth(SettingsSides& s, const Vc2CheckRoutine& routine, std::initializer_list<uint32_t> args,

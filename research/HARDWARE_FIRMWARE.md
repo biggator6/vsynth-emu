@@ -1546,6 +1546,59 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's Time Trip (2026-11-19, v306) {#vc2-part-time-trip}
+
+Step 4.3's thirty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's eleventh part): the trip objects v301's
+part's controller drives, now the port's own (`Vc2TimeTrip.cpp`). The part table `0x8993d040` points at 16 records of
+0x34 bytes from `0x89989408` (to `0x89989748`), `Vc2TripRecord`: the trip object's 0x20 bytes (`Vc2TripObject`), the
+pad's X and Y (+0x20, +0x21), two bytes made 0, the level the Matrix reads (+0x24, 127 at rest), the rate's index
+(+0x28, 2), 4 over it (+0x2c, the pool's 4.0 at `0x893948ec`) and the part (+0x30). v301's `Vc2TripFront` is now the
+trip object and the pad.
+- **The records' static initializer** `0x89394570`: for each part k the constructor with (k, 0xffff), then the record's
+  bytes, the index 2 and the rate with it, and 4 / 2.
+- **The constructor** `0x893b0400(object, part, mask)` (a new 32 bytes when given none; the initializer always gives
+  one): +0 the part and +4 the mask a tone is matched by, the way and carry 0, the rate of index 4, +0x14 and +0x15 64,
+  the last radius and angle −1, X and Y 64, the radius and angle −1. +8, the trip under way, is left as it was.
+- **The rate** `0x893b05b0(object, index)`: below 9 the steps a turn (`0x8954601a`, 0 at index 0) and the offset
+  (`0x8954602c`) by index; at 0 the trip stopped. **The set** `0x893b0610(object, on, x, y)`: 0 stops it (under way 0,
+  way 0, X and Y 64, the radius, angle and last ones −1, +0x14 and +0x15 0); else, with the steps above 0, under way and
+  X and Y stored.
+- **The move** `0x893b0460(object, x, y)`, answering the radius: X and Y stored and the position `0x893b0690` taken; under
+  way, the steps `0x893b0790`, broadcast `0x893b1780` with the count, then 127 nearer 0, while it has the count's sign;
+  the radius and angle kept as the last.
+- **The position**: a quarter of the pad by X and Y about 64, the polar table `0x89543f18` (65 × 65 pairs, a radius
+  and an angle 0…32) by the two distances from the centre, the radius stored and the angle (64, 96, 32 or 128 less the
+  table's, the last quarter's 0 kept 0) × 4, so 0…512 a turn.
+- **The steps**, on three scratch words (`0x899996a4`, `Vc2TripScratch`): from the last angle to the new one (none or
+  the same, 0 steps), the turn wrapped to ±256. Not turning yet, the way is the turn's (at angle 0, by the half the last
+  is in); turning, a turn past 64 drops the carry, one against the way with the carry not with it is held as the carry,
+  else the carry comes off the angle from. With a way, the angle from (a turn back's plus the offset and 1) is quantized
+  to the steps (× steps, ÷ 512 and back by shifts, ÷ steps by the library's division), its distance to the new folded
+  to half a turn, and the count is that × steps ÷ 512, negative turning back.
+- **The broadcast**: each tone on the sounding list (`[0x899996d0]`, v273's) by its +0 link, its vtable's +0x48 (v228's
+  `0x893b4ca0`, the OSC voices' counts when its +0x1c under the mask is the part) given the count, part and mask,
+  through `Vc2TripParts`.
+
+Not ported, as nothing in rom.4 calls them: the X-only and Y-only moves `0x893b04d0` and `0x893b0540` and the steps'
+sender `0x893b0740`; nor `0x893b09f0`'s two floats (`0x899996b0`, `0x899996b4`), which nothing reads.
+
+**The check.** `xt_vc2settings`' nineteenth part (`Vc2TimeTripCheck.cpp`), on the seed eighteen after the run's: rom.4's
+own routines on its own records and scratch words, the fifteenth part's hooks on the set and the move taken off, the
+tone's +0x48 hooked to log. Each event a routine on a record drawn (the static initializer one time in 32), the record's
+words drawn half the time about the edges (angles a few steps or half a turn from the last, 0, 256, none, any; the carry
+about the most held; the way 0, 1, −1 or any; the rate's words the table's or any; X and Y the centre one time in four),
+one move in four aimed at a count of one or two broadcasts exactly (`aimMove`, on a copy placed by `vc2TripPlace`, the
+move's first part), and up to three tones on the sounding list. After each, the tables, the records, the scratch words,
+the calls and the answer. Not drawn: X or Y past 127 where the position is reached (rom.4 reads past its table), steps
+below 1 where the steps are reached (its division by them), a rate's index below 0.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first eighteen parts' lines as they were.
+- Every line and branch of `Vc2TimeTrip.cpp` and `Vc2PartControllers.cpp` is reached.
+- `mutate_vc2.py --settings`: 785 plants, none missed; v306's 73 new (69 in the trip, four in its tables' reads; the
+  steps' distance taken the other way is not planted, the fold after it giving a turn and its negative the same), and
+  v301's three on the trip's flag moved to its new name.
+
 ### The VC-2 part's listeners' run (2026-11-19, v305) {#vc2-part-listeners}
 
 Step 4.3's thirty-third version (VC2_MODE_PLAN.md, step 4.3, item 10's tenth part): `0x89390ea0(state)`, which the

@@ -60,7 +60,7 @@ void drawControllerWords(SettingsSides& s, std::mt19937& rng) {
     if (rng() % 2 == 0) {
         Vc2TripFront& t = s.trips[rng() % kSettingsParts];
         const std::array<uint32_t, 3> flags { 0, 1, (uint32_t)rng() };
-        t.moving = flags[rng() % flags.size()];
+        t.trip.moving = flags[rng() % flags.size()];
         t.x = (int8_t)rng();
         t.y = (int8_t)rng();
     }

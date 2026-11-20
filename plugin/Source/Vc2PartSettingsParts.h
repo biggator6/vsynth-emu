@@ -55,3 +55,5 @@ extern const SettingsPartRow kNumberPartRow;
 extern const SettingsPartRow kHandlerPartRow;
 // The eighteenth (v304): the part's start-up (Vc2PartStartUpCheck.cpp)
 extern const SettingsPartRow kStartPartRow;
+// The nineteenth (v306): the Time Trip (Vc2TimeTripCheck.cpp)
+extern const SettingsPartRow kTripPartRow;

@@ -53,6 +53,18 @@ std::string settingsBytesDifference(Sh4& cpu, std::span<const std::pair<uint32_t
     return "";
 }
 
+void settingsWriteRegions(SettingsSides& s, std::span<const Vc2Region> regions) {
+    for (const Vc2Region& r : regions) s.fw.cpu.write(r.at, r.mine, r.bytes);
+}
+
+std::string settingsRegionsDifference(SettingsSides& s, std::span<const Vc2Region> regions) {
+    for (const Vc2Region& r : regions) {
+        std::string what = vc2FirstDifference(s.fw, r.at, r.mine, r.bytes, r.what);
+        if (!what.empty()) return what;
+    }
+    return "";
+}
+
 namespace {
 std::string settingsTails(SettingsSides& s) {
     const Vc2PartRows& t = s.rows;
@@ -147,7 +159,8 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow,
                                       &kControllerPartRow, &kNumberPartRow, &kHandlerPartRow })
         different += settingsRunPart(s, run, *p);
-    return different + settingsRunPart(s, run, kStartPartRow);
+    for (const SettingsPartRow* p : { &kStartPartRow, &kTripPartRow }) different += settingsRunPart(s, run, *p);
+    return different;
 }
 
 void saySettingsCounts(const Vc2Run& run, const SettingsCounts& n, long different) {

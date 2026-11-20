@@ -25,6 +25,12 @@ struct Vc2PartSettingsTables {
     uint32_t nodeWord = 0;
     // π/2 (v304): acosf's constant (0x898c5710), the answer to the part's start-up's acos 0
     float halfPi = 0;
+    // The Time Trip's (v306): the polar table 0x89543f18, by 65 × a + b two bytes, a radius and an angle; the rates'
+    // two tables by index, the steps a turn (0x8954601a) and the offset (0x8954602c); the records' 4 (0x893948ec)
+    static constexpr int kTripSide = 65, kTripRates = 9;   // [FW]
+    std::array<std::array<int8_t, 2>, kTripSide * kTripSide> tripPolar {};
+    std::array<int16_t, kTripRates> tripSteps {}, tripOffsets {};
+    float tripScale = 0;
 };
 
 [[nodiscard]] bool vc2LoadPartSettings(const char* path);

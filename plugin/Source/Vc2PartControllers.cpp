@@ -22,7 +22,7 @@ void Vc2PartControllers::padX(uint8_t part, int32_t value) {
     const uint32_t at = parts_.tripAt(part);
     Vc2TripFront& t = parts_.trip(at);
     const auto v = static_cast<int8_t>(value);
-    if (t.moving == 0 || v > 0) {
+    if (t.trip.moving == 0 || v > 0) {
         t.x = v;
         return;
     }
@@ -34,7 +34,7 @@ void Vc2PartControllers::padY(uint8_t part, int32_t value) {
     const uint32_t at = parts_.tripAt(part);
     Vc2TripFront& t = parts_.trip(at);
     const auto v = static_cast<int8_t>(value);
-    if (t.moving == 0) {
+    if (t.trip.moving == 0) {
         if (v <= 0) return;
         t.y = v;
         if (t.x > 0) parts_.tripSet(at, kStart, t.x, v);

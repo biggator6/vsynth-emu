@@ -7,22 +7,10 @@
 // object's 0x893b0610 and 0x893b0460 through Vc2ControllerParts.  Not in the sound yet.  Bit for bit: xt_vc2settings'
 // fifteenth part.  HARDWARE_FIRMWARE.md, "The VC-2 part's controllers".  The notes' task.
 #include "Vc2PartSettings.h"
+#include "Vc2TimeTrip.h"   // Vc2TripFront, a part's record's front (v301's, there from v306)
 #include <array>
 #include <cstddef>
 #include <cstdint>
-
-// one-off: rom.4's own layout, checked by its offsets; a declaration, not a job to template
-// [FW] a part's trip object's front, the part table's (v245's), as the part's controller reads and writes it
-struct Vc2TripFront {
-    std::array<uint32_t, 2> unread0 {};   // +0x00
-    uint32_t moving = 0;                  // +0x08: the trip under way
-    std::array<uint8_t, 0x14> unread0c {};
-    int8_t x = 0, y = 0;                  // +0x20, +0x21: the pad's X and Y
-    std::array<uint8_t, 2> unread22 {};
-    uint8_t level = 0;                    // +0x24: the part's byte the Matrix reads, 127 at rest
-    std::array<uint8_t, 3> unread25 {};
-};
-static_assert(offsetof(Vc2TripFront, x) == 0x20 && sizeof(Vc2TripFront) == 0x28, "rom.4's layout");
 
 // What the controllers reach: the number's object's virtual (its vtable's +0x14, given the source, the channel and,
 // from v302, the value, which 0x89392f90 leaves in r7 for it; v301 left it out), a node's word's first byte (its part),

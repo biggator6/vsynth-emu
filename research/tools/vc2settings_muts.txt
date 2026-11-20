@@ -21,7 +21,8 @@
 # reading and nothing posted again) and vc2partcontrollers (Vc2PartControllers.cpp, v301; not the Y way's set with the
 # trip stopped given its Y field for the value, which it has just stored) and vc2partnumbers (Vc2PartNumbers.cpp, v302;
 # not the init's glides' reset in the nodes' loop, whose every word the glides' static initializer after it writes
-# again) and vc2partstartup (Vc2PartStartUp.cpp, v304).  Not planted: the depth
+# again) and vc2partstartup (Vc2PartStartUp.cpp, v304) and vc2timetrip (Vc2TimeTrip.cpp, v306; not the steps' distance taken the other way, as the fold
+# that follows gives a turn and its negative the same).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -629,12 +630,12 @@ ctl-list|Vc2PartNodes::kChannels * (source - 1) + channel;|Vc2PartNodes::kChanne
 ctl-list-walk|at != 0; at = nodes_.node(at).next)|at != 0; at = 0)|vc2partcontrollers
 ctl-part-byte|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8) & 7, number, value);|vc2partcontrollers
 ctl-part-args|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8), value, number);|vc2partcontrollers
-padx-moving|    if (t.moving == 0 \|\| v > 0) {|    if (t.moving == 0 && v > 0) {|vc2partcontrollers
-padx-sign|    if (t.moving == 0 \|\| v > 0) {|    if (t.moving == 0 \|\| v >= 0) {|vc2partcontrollers
+padx-moving|    if (t.trip.moving == 0 \|\| v > 0) {|    if (t.trip.moving == 0 && v > 0) {|vc2partcontrollers
+padx-sign|    if (t.trip.moving == 0 \|\| v > 0) {|    if (t.trip.moving == 0 \|\| v >= 0) {|vc2partcontrollers
 padx-store|        t.x = v;\n        return;|        t.y = v;\n        return;|vc2partcontrollers
 padx-stop|    parts_.tripSet(at, kStop, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|    parts_.tripSet(at, kStart, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|vc2partcontrollers
 padx-level|    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|    t.level = 0;\n}\n\nvoid Vc2PartControllers::padY|vc2partcontrollers
-pady-moving|    if (t.moving == 0) {\n        if (v <= 0) return;|    if (t.moving != 0) {\n        if (v <= 0) return;|vc2partcontrollers
+pady-moving|    if (t.trip.moving == 0) {\n        if (v <= 0) return;|    if (t.trip.moving != 0) {\n        if (v <= 0) return;|vc2partcontrollers
 pady-off-sign|        if (v <= 0) return;|        if (v < 0) return;|vc2partcontrollers
 pady-off-store|        t.y = v;\n        if (t.x > 0)|        if (t.x > 0)|vc2partcontrollers
 pady-off-x|        if (t.x > 0) parts_.tripSet(at, kStart, t.x, v);|        if (t.x >= 0) parts_.tripSet(at, kStart, t.x, v);|vc2partcontrollers
@@ -741,3 +742,76 @@ start-reload-state|r.state = 0;|r.state = 1;|vc2partstartup
 start-reload-posted|r.posted = 0;|r.posted = 1;|vc2partstartup
 start-static|    w.staticM.partInit(w.staticParts);\n|\n|vc2partstartup
 tables-half-pi|halfPi = std::bit_cast<float>(image.rd32(0x898c5710));|halfPi = std::bit_cast<float>(image.rd32(0x898c5714));|vc2settingstables
+trip-stop-moving|void stop(Vc2TripObject& t) {\n    t.moving = 0;|void stop(Vc2TripObject& t) {\n    t.moving = 1;|vc2timetrip
+trip-stop-turning|    t.moving = 0;\n    t.turning = 0;\n    t.x = kCentre;|    t.moving = 0;\n    t.turning = 1;\n    t.x = kCentre;|vc2timetrip
+trip-stop-x|    t.turning = 0;\n    t.x = kCentre;|    t.turning = 0;\n    t.x = 0;|vc2timetrip
+trip-stop-angle|    t.angle = kNoAngle;\n    t.lastRadius = kNoRadius;|    t.angle = 0;\n    t.lastRadius = kNoRadius;|vc2timetrip
+trip-stop-last-angle|    t.lastAngle = kNoAngle;\n    t.byte14 = 0;|    t.byte14 = 0;|vc2timetrip
+trip-stop-byte15|    t.byte15 = 0;\n}|}|vc2timetrip
+trip-q-base|{ true, -1, -1, 64, false },|{ true, -1, -1, 63, false },|vc2timetrip
+trip-q-row|{ false, 1, -1, 96, false },|{ true, 1, -1, 96, false },|vc2timetrip
+trip-q-base-32|{ false, -1, 1, 32, false },|{ false, -1, 1, 31, false },|vc2timetrip
+trip-q-zero|{ true, 1, 1, 128, true },|{ true, 1, 1, 128, false },|vc2timetrip
+trip-q-order|kQuarters[2 * (dx > 0) + (dy > 0)]|kQuarters[(dx > 0) + 2 * (dy > 0)]|vc2timetrip
+trip-q-centre|kQuarters[2 * (dx > 0) + (dy > 0)]|kQuarters[2 * (dx >= 0) + (dy > 0)]|vc2timetrip
+trip-pos-side|T::kTripSide * row + column|T::kTripSide * column + row|vc2timetrip
+trip-pos-radius|t.radius = entry[0];|t.radius = entry[1];|vc2timetrip
+trip-pos-shift|((uint32_t)angle << 2)|((uint32_t)angle << 1)|vc2timetrip
+trip-pos-sign|q.base - entry[1]|q.base + entry[1]|vc2timetrip
+trip-fraction|constexpr int kFraction = 9;|constexpr int kFraction = 8;|vc2timetrip
+trip-quant-back|    return (int32_t)((uint32_t)fixed << kFraction) / steps;|    return fixed;|vc2timetrip
+trip-keep-most|if (s.turn * way > kHeld) {|if (s.turn * way >= kHeld) {|vc2timetrip
+trip-keep-dropped|        t.carry = 0;\n        return 0;\n    }\n    if (t.turning == -way|        return 0;\n    }\n    if (t.turning == -way|vc2timetrip
+trip-keep-against|if (t.turning == -way && t.carry * way <= 0) {|if (t.turning == way && t.carry * way <= 0) {|vc2timetrip
+trip-keep-carry-sign|t.carry * way <= 0|t.carry * way < 0|vc2timetrip
+trip-keep-held|        t.carry = (int16_t)s.turn;|        t.carry = 0;|vc2timetrip
+trip-keep-from|    s.from -= t.carry;|    s.from += t.carry;|vc2timetrip
+trip-start-half|if (s.to == 0) return s.from >= kHalfTurn ? 1 : -1;|if (s.to == 0) return s.from > kHalfTurn ? 1 : -1;|vc2timetrip
+trip-start-zero|if (s.to == 0) return|if (s.to == 1) return|vc2timetrip
+trip-start-way|return s.turn >= 0 ? 1 : -1;|return s.turn >= 0 ? -1 : 1;|vc2timetrip
+trip-make-part|    t.part = part;\n    t.mask = mask;|    t.part = mask;\n    t.mask = mask;|vc2timetrip
+trip-make-offset|t.offset = tables.tripOffsets[kMadeRate];|t.offset = tables.tripOffsets[kInitRate];|vc2timetrip
+trip-make-steps|t.steps = tables.tripSteps[kMadeRate];|t.steps = tables.tripOffsets[kMadeRate];|vc2timetrip
+trip-make-carry|    t.turning = 0;\n    t.carry = 0;\n    t.offset|    t.turning = 0;\n    t.offset|vc2timetrip
+trip-make-byte14|t.byte14 = kCentre;|t.byte14 = 0;|vc2timetrip
+trip-make-last|    t.lastRadius = kNoRadius;\n    t.lastAngle = kNoAngle;\n    t.x = kCentre;|    t.lastRadius = kNoRadius;\n    t.x = kCentre;|vc2timetrip
+trip-rate-bound|if (index >= T::kTripRates) return;|if (index > T::kTripRates) return;|vc2timetrip
+trip-rate-swap|    t.steps = tables.tripSteps[(size_t)index];\n    t.offset = tables.tripOffsets[(size_t)index];|    t.steps = tables.tripOffsets[(size_t)index];\n    t.offset = tables.tripSteps[(size_t)index];|vc2timetrip
+trip-rate-stop|if (index == 0) stop(t);|if (index == 1) stop(t);|vc2timetrip
+trip-set-on|    if (on == 0) {\n        stop(t);|    if (on <= 0) {\n        stop(t);|vc2timetrip
+trip-set-steps|if (t.steps <= 0) return;|if (t.steps < 0) return;|vc2timetrip
+trip-set-moving|    t.moving = 1;\n    t.x = x;|    t.moving = 2;\n    t.x = x;|vc2timetrip
+trip-set-y|    t.y = y;\n}|    t.y = x;\n}|vc2timetrip
+trip-steps-none|if (s.from == kNoAngle \|\| s.from == s.to) return 0;|if (s.from == s.to) return 0;|vc2timetrip
+trip-steps-same|if (s.from == kNoAngle \|\| s.from == s.to) return 0;|if (s.from == kNoAngle) return 0;|vc2timetrip
+trip-steps-wrap-up|if (s.turn > kHalfTurn) s.turn -= kTurn;|if (s.turn >= kHalfTurn) s.turn -= kTurn;|vc2timetrip
+trip-steps-wrap-down|if (s.turn < -kHalfTurn) s.turn += kTurn;|if (s.turn <= -kHalfTurn) s.turn += kTurn;|vc2timetrip
+trip-steps-way|    t.turning = way;\n    t.carry = 0;|    t.carry = 0;|vc2timetrip
+trip-steps-carry|    t.turning = way;\n    t.carry = 0;|    t.turning = way;|vc2timetrip
+trip-steps-back|way < 0 ? s.from + t.offset + 1 : s.from|way < 0 ? s.from + t.offset : s.from|vc2timetrip
+trip-steps-fwd|way < 0 ? s.from + t.offset + 1 : s.from|way < 0 ? s.from + t.offset + 1 : s.from + t.offset + 1|vc2timetrip
+trip-steps-mask|& (kTurn - 1)|& kTurn|vc2timetrip
+trip-steps-half|if (s.turn > kHalfTurn) s.turn = kTurn - s.turn;|if (s.turn > kHalfTurn) s.turn = kHalfTurn - s.turn;|vc2timetrip
+trip-steps-sign|return way < 0 ? -count : count;|return count;|vc2timetrip
+trip-bc-args|parts.stepTone(tone, count, part, mask);|parts.stepTone(tone, count, mask, part);|vc2timetrip
+trip-bc-first|tone = parts.nextTone(tone))|tone = 0)|vc2timetrip
+trip-move-moving|if (t.moving != 0) {|if (t.moving == 1) {|vc2timetrip
+trip-move-chunk|constexpr int32_t kChunk = 127;|constexpr int32_t kChunk = 128;|vc2timetrip
+trip-move-back-end|first < 0 ? count < 0 : count > 0|first < 0 ? count <= 0 : count > 0|vc2timetrip
+trip-move-fwd-end|first < 0 ? count < 0 : count > 0|first < 0 ? count < 0 : count >= 0|vc2timetrip
+trip-move-last-radius|    t.lastRadius = t.radius;\n    t.lastAngle = t.angle;\n    return t.radius;|    t.lastAngle = t.angle;\n    return t.radius;|vc2timetrip
+trip-move-last-angle|    t.lastRadius = t.radius;\n    t.lastAngle = t.angle;\n    return t.radius;|    t.lastRadius = t.radius;\n    return t.radius;|vc2timetrip
+trip-move-part|vc2TripBroadcast(count, t.part, t.mask, parts);|vc2TripBroadcast(count, t.mask, t.part, parts);|vc2timetrip
+trip-init-part-word|vc2TripConstruct(r.front.trip, (uint32_t)k, kRecordMask);|vc2TripConstruct(r.front.trip, 0, kRecordMask);|vc2timetrip
+trip-init-mask|constexpr uint32_t kRecordMask = 0xffff;|constexpr uint32_t kRecordMask = 0xfffe;|vc2timetrip
+trip-init-part|r.part = (uint8_t)k;|r.part = 0;|vc2timetrip
+trip-init-pad|        r.front.x = 0;\n|\n|vc2timetrip
+trip-init-level|r.front.level = kRest;|r.front.level = 0;|vc2timetrip
+trip-init-bytes|        r.front.byte22.fill(0);\n|\n|vc2timetrip
+trip-init-rate|kMadeRate = 4, kInitRate = 2;|kMadeRate = 4, kInitRate = 3;|vc2timetrip
+trip-init-rate-call|        vc2TripRate(r.front.trip, kInitRate);\n|\n|vc2timetrip
+trip-init-per-rate|r.perRate = xtf::div(scale, (float)r.rate);|r.perRate = xtf::div((float)r.rate, scale);|vc2timetrip
+tables-trip-polar|image.read(0x89543f18, tripPolar.data()|image.read(0x89543f1a, tripPolar.data()|vc2settingstables
+tables-trip-steps|image.read(0x8954601a, tripSteps.data()|image.read(0x8954601c, tripSteps.data()|vc2settingstables
+tables-trip-offsets|image.read(0x8954602c, tripOffsets.data()|image.read(0x8954602e, tripOffsets.data()|vc2settingstables
+tables-trip-scale|image.rd32(0x893948ec)|image.rd32(0x893948e8)|vc2settingstables
