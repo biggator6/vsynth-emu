@@ -30,14 +30,14 @@ VoicesCall called(VoicesKind kind, uint32_t routine, uint32_t object, std::array
 }
 } // namespace
 
-void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers) {
+void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers, uint32_t (*answer)(VoicesSides&)) {
     for (const uint32_t vtable : { V::kVoiceVtable, kVoicesNoteClass }) {
         const VoicesCall slot = voicesSlotCall(s.fw, kind, 0, vtable, entry);
-        s.fw.cpu.hook(slot.routine, [&s, kind, registers, slot](Sh4& c) {
+        s.fw.cpu.hook(slot.routine, [&s, kind, registers, slot, answer](Sh4& c) {
             std::array<uint32_t, 7> more {};
             for (int n = 0; n < registers; ++n) more[(size_t)n] = c.r[5 + n];
             s.rom.push_back(called(kind, slot.routine, c.r[4], more));
-            c.ret(0);
+            c.ret(answer != nullptr ? answer(s) : 0);
         });
     }
 }

@@ -51,9 +51,11 @@ public:
 
     Vc2QueueWords q {};
 
-private:
+    // A node's two links, the head's or a voice's (public from v310, the update task's walk's)
     uint32_t& nextOf(uint32_t node, Vc2PartVoices& v);
     uint32_t& prevOf(uint32_t node, Vc2PartVoices& v);
+
+private:
     void waitCurrent(Vc2QueueParts& parts);
     bool advance(uint32_t node, Vc2PartVoices& v);
 };

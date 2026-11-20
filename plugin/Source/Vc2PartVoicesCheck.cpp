@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
     vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return voicesCase(s, rng); });
     sayVoiceCounts(*run, s.n);
     const long assigner = vc2AssignPart(s, *run) + vc2AssignReleasePart(s, *run) + vc2VoiceClassPart(s, *run) +
-                          vc2AssignListenersPart(s, *run);
+                          vc2AssignListenersPart(s, *run) + vc2UpdateTaskPart(s, *run);
     std::printf("xt_vc2voices: %ld different\n", tally.different + assigner);
     return 0;
 }

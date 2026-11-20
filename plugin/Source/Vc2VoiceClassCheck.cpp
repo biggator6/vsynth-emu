@@ -57,6 +57,8 @@ std::array<uint32_t, 7> argsOf(Sh4& c, Shape shape) {
     return { c.rd32(s), c.rd32(s + 4), c.rd32(s + 8), shape == Shape::setNote ? c.r[6] : 0 };
 }
 
+} // namespace
+
 // rom.4's side: the note's, C's and the OS's routines; the queue's wait its own again
 void classInstallRom(ClassSides& c) {
     VoicesSides& s = c.r.a.s;
@@ -71,6 +73,7 @@ void classInstallRom(ClassSides& c) {
     for (const uint32_t at : kTheirsAgain) s.fw.cpu.unhook(at);
 }
 
+namespace {
 std::string queueDiffer(ClassSides& c) {
     Vc2QueueWords theirs;
     c.r.a.s.fw.cpu.read(Q::kAt, &theirs, sizeof theirs);
@@ -89,6 +92,8 @@ std::string queueDiffer(ClassSides& c) {
 uint32_t& nextAfter(ClassSides& c, uint32_t node) {
     return node == Q::kHeadAt ? c.queue.q.next : c.r.a.s.port.at(node).queueNext;
 }
+
+} // namespace
 
 // The voices' queue links one list: a few on the queue in a drawn order, the rest linked to themselves, and one time
 // in four a voice's link aimed elsewhere; every voice on queue 0; the queue's current node one of them, the head or none
@@ -121,6 +126,7 @@ void drawQueue(ClassSides& c, std::mt19937& rng) {
     c.queue.q.lock = (uint32_t)rng();
 }
 
+namespace {
 // A voice's words the class decides by: its set, +0x58 and the bytes +0x50…+0x55; its held bits any byte one time in
 // four (the release path's draws keep them below 8)
 void drawClassWords(Vc2Voice& w, std::mt19937& rng) {
@@ -130,6 +136,8 @@ void drawClassWords(Vc2Voice& w, std::mt19937& rng) {
     for (uint8_t* b : { &w.byte50, &w.byte51, &w.byte52, &w.byte53, &w.byte54, &w.byte55 })
         *b = (uint8_t)rng();
 }
+
+} // namespace
 
 // The release path's draws, the queue's, the messages' keys (not past 127), the age counter now and then (its top bits
 // set), the retune's word (0 in rom.4) half the time, and each voice's class words now and then
@@ -149,6 +157,7 @@ std::string classStart(ClassSides& c, std::mt19937& rng) {
     return what;
 }
 
+namespace {
 void classCount(ClassSides& c) {
     ++c.n.events;
     c.n.setCalls += vc2CountCalls(c.r.a.s.mine, kVoicesSet);

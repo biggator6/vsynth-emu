@@ -48,7 +48,9 @@ private:
 
 // rom.4's side: the virtual at `entry` of both classes hooked to log its object and the `registers` past r4, answering
 // 0 (v305; the retune's and the key-off's own until then)
-void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers);
+// (v310) `answer`, when given, what the hook answers (the update task's part's)
+void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers,
+                    uint32_t (*answer)(VoicesSides&) = nullptr);
 
 inline constexpr uint32_t kAssignSettingsAt = 0x89995390, kAssignSettingBytes = 32;    // [FW] the parts' settings
 inline constexpr uint32_t kAssignParametersAt = 0x89996120, kAssignParameterBytes = 24;   // [FW] their messages

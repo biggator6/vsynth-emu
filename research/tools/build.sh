@@ -45,6 +45,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2VoiceClassCheck.cpp ] && echo Vc2VoiceClassCheck.cpp Vc2VoiceClassEvents.cpp Vc2VoiceClass.cpp \
       Vc2VoiceQueue.cpp ) \
    $( [ -f Vc2AssignListenersCheck.cpp ] && echo Vc2AssignListenersCheck.cpp ) \
+   $( [ -f Vc2UpdateTask.cpp ] && echo Vc2UpdateTask.cpp Vc2UpdateTaskCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2voices" &
 # The part's notes W (v275) against rom.4's own routines, every tone method they reach hooked
 [ -f Vc2NotesCheck.cpp ] && cc -DXT_VC2NOTES_MAIN Vc2NotesCheck.cpp Vc2NotesEvents.cpp Vc2NotesFakes.cpp \

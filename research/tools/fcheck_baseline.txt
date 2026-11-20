@@ -818,6 +818,7 @@ assigner: 16000 events: 2637 starts and 2671 builds (3557 voices prepared, 1287 
 release: 16000 events: 1991 releases, 999 and 1009 lifts, 1989 note-offs, 995 and 983 pedals off, 986 truncations, 1003 and 1013 releases of a table, 2950 node note starts and 2082 offs (3032 key-offs, 3693 voices prepared, 34 retunes)
 class: 16000 events: 793 updates, 786 retunes, 843 destroys, 794 key-offs, 1626 prepares, 794 change tests, 813 and 813 words; queue: 778 constructors, 787 initializers, 804 links, 809 unlinks, 799 enqueues, 827 moves on, 801 passes on, 788 takes off, 792 and 775 waits, 778 moves (6334 set calls, 2904 OS calls)
 listeners: 16000 events, 76169 change tests
+update task: 16000 events: 16000 passes, 31089 task calls, 33774 OS calls
 xt_vc2voices: 0 different
 == xt_vc2notes
 notes: 40 cases, 16000 events: 1964 constructors, 2023 note-ons (1375 with a partner), 993 ends, 983 and 1056 passes, 1032 releases, 1070 truncations once, 1017 starts and 1005 copies', 985 placements, 947 positions, 940 and 1001 of the tone's routines, 984 initializers

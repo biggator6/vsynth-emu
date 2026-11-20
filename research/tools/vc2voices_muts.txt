@@ -311,3 +311,24 @@ notify-table|keys.table(n.channel).channel == state;|n.channel == state;|vc2rele
 notify-word|keys.table(n.channel).channel == state;|keys.table(n.channel).source == state;|vc2release
 notify-part|parts.changed(voice, v.at(voice).part);|parts.changed(voice, v.at(voice).source);|vc2release
 notify-voice|parts.changed(voice, v.at(voice).part);|parts.changed(v.at(voice).next, v.at(voice).part);|vc2release
+ut-timer|constexpr uint32_t kTimer = 2, kUpdate = 1;|constexpr uint32_t kTimer = 4, kUpdate = 1;|vc2updatetask
+ut-update|constexpr uint32_t kTimer = 2, kUpdate = 1;|constexpr uint32_t kTimer = 2, kUpdate = 4;|vc2updatetask
+ut-time-at|constexpr uint32_t kTimeAt = 0x8993d084;|constexpr uint32_t kTimeAt = 0x8993d080;|vc2updatetask
+ut-wrap|constexpr int32_t kTickWrap = 0x10000;|constexpr int32_t kTickWrap = 0x8000;|vc2updatetask
+ut-answer-bits|constexpr uint32_t kAnswerBits = 0xffff;|constexpr uint32_t kAnswerBits = 0xff;|vc2updatetask
+ut-measure-sign|    if (d < 0) d += kTickWrap;|    if (d <= 0) d += kTickWrap;|vc2updatetask
+ut-measure-last|    w.time.last += static_cast<uint32_t>(d);|    w.time.last = w.ticks;|vc2updatetask
+ut-measure-half|    w.time.elapsed = static_cast<int16_t>(d);|    w.time.elapsed = static_cast<int16_t>(d / 2);|vc2updatetask
+ut-walk-skip|        if (w.time.elapsed != 0) runNodes(w);|        runNodes(w);|vc2updatetask
+ut-measure-before|        if (w.time.elapsed != 0) runNodes(w);\n        measure(w);|        measure(w);\n        if (w.time.elapsed != 0) runNodes(w);|vc2updatetask
+ut-walk-start|    uint32_t at = q.prevOf(Q::kHeadAt, w.voices);|    uint32_t at = q.nextOf(Q::kHeadAt, w.voices);|vc2updatetask
+ut-current|        q.q.current = at;\n        w.parts.wait|        w.parts.wait|vc2updatetask
+ut-lock|        w.parts.wait(q.q.lock);|        w.parts.wait(q.q.post);|vc2updatetask
+ut-signal|        w.parts.signal(q.q.lock);\n|\n|vc2updatetask
+ut-linked|        if (n.queueNext != at) n.queued = w.parts.nodeUpdate(at, kTimeAt) & kAnswerBits;|        n.queued = w.parts.nodeUpdate(at, kTimeAt) & kAnswerBits;|vc2updatetask
+ut-time-arg|w.parts.nodeUpdate(at, kTimeAt) & kAnswerBits;|w.parts.nodeUpdate(at, kTimeAt + 4) & kAnswerBits;|vc2updatetask
+ut-off-test|        if (n.queued == 0 && n.queueNext != at) {|        if (n.queued == 0) {|vc2updatetask
+ut-off-current|            q.q.current = n.queueNext;|            q.q.current = n.queuePrev;|vc2updatetask
+ut-end-current|    q.q.current = at;\n}|}|vc2updatetask
+ut-pitch|    w.parts.pitchSource();\n|\n|vc2updatetask
+ut-voices|    w.parts.voicesUpdate();\n|\n|vc2updatetask

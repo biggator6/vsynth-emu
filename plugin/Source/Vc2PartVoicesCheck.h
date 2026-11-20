@@ -24,7 +24,7 @@ inline constexpr int kVoicesNotes = 24, kVoicesTones = 24;
 enum VoicesKind : int32_t {
     kVoicesDestroy, kVoicesEnded, kVoicesCost, kVoicesPrepare, kVoicesRetune, kVoicesNoteOn, kVoicesStartNote,
     kVoicesTruncateOnce, kVoicesWait, kVoicesKeyOff, kVoicesParameters, kVoicesClock, kVoicesNote, kVoicesSet,
-    kVoicesOs, kVoicesChanged, kVoicesKinds   // v305: the change test, the listeners' run's
+    kVoicesOs, kVoicesChanged, kVoicesTask, kVoicesKinds   // v305: the change test; v310: the update task's calls
 };
 
 // A call as either side made it: what, the routine it reached and the object it was given, and from v277 the arguments
@@ -133,3 +133,5 @@ long vc2AssignReleasePart(VoicesSides& s, const Vc2Run& run);
 long vc2VoiceClassPart(VoicesSides& s, const Vc2Run& run);
 // The listeners' run's part (v305, Vc2AssignListenersCheck.cpp), after the voice class's on the seed after its
 long vc2AssignListenersPart(VoicesSides& s, const Vc2Run& run);
+// The update task's pass's part (v310, Vc2UpdateTaskCheck.cpp), after the listeners' on the seed after its
+long vc2UpdateTaskPart(VoicesSides& s, const Vc2Run& run);

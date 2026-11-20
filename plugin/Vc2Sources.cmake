@@ -131,4 +131,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartChannel.cpp
     Source/Vc2MidiDispatch.cpp
     Source/Vc2NotesTask.cpp
+    Source/Vc2UpdateTask.cpp
 )

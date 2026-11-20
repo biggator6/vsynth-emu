@@ -69,3 +69,10 @@ std::string classOnBoth(ClassSides& c, const Vc2CheckRoutine& routine, std::init
 
 using ClassEvent = std::string (*)(ClassSides&, std::mt19937&);
 std::span<const ClassEvent> classEvents();
+
+// The fourth part's rom.4 hooks, case start, queue draw and draws before an event (all at a case's first): shared
+// with the sixth part from v310
+void classInstallRom(ClassSides& c);
+std::string classStart(ClassSides& c, std::mt19937& rng);
+void drawQueue(ClassSides& c, std::mt19937& rng);
+void classDraw(ClassSides& c, std::mt19937& rng, bool first);

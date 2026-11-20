@@ -864,6 +864,14 @@ version against rom.4's routines with what it calls hooked:
          xt_vc2settings' twenty-second part (HARDWARE_FIRMWARE.md, "The VC-2 part's notes' task"). Next: the mailbox
          (the queue's drain `0x893110b0` and what posts to it), the update task `0x893952b0` and the block task
          `0x89395ac0`, then Vc2Synth.
+       - the update task's pass done (v310): `vc2UpdateTaskPass`, rom.4's loop body `0x89395316`…`0x89395414` on its
+         wait's events (the timer's: with ticks elapsed, each node on v279's update queue given its +0x0c under the
+         queue's lock and taken off on an answer of 0, then the ticks measured into the time struct `0x8993d084`; the
+         update's: the pitch source and the voices' update `0x893b16a0`); through `Vc2UpdateTaskParts`; xt_vc2voices'
+         sixth part (HARDWARE_FIRMWARE.md, "The VC-2 part's update task"). The queue's drain `0x893110b0` is the OS
+         library's MIDI byte reader: the plugin's host gives parsed messages, as XtSynth's `tgNoteOn` takes them for
+         rom.2, so the wiring may hand them to v308's dispatcher directly. Next: the block task `0x89395ac0`, then
+         Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -1546,6 +1546,40 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's update task (2026-11-20, v310) {#vc2-part-update-task}
+
+Step 4.3's thirty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's fifteenth part): the update task `0x893952b0`
+(its object `0x8994ff64`) loops from `0x89395310`: it waits for events (`0x893017f0`, mask 3) and makes one pass, now the
+port's own as `vc2UpdateTaskPass` (`Vc2UpdateTask.cpp`). In rom.4's order:
+- **0x2**, the timer's (`0x893952a0` counts its ticks at `0x8993d080` and raises it). With ticks elapsed since the last
+  pass (the time struct `0x8993d084`'s count, a half, not 0), each node on the update queue (v279's, `0x89989cc4`), from
+  the head by its +4 link, is made the queue's current node and given its vtable's (+0x10) +0x0c virtual (a voice's
+  update, v279's) with the time struct's address, under the queue's lock (its +0x20, the OS's wait `0x893018b0` and
+  signal `0x893018c0`). Its +8 takes the answer's low half; with that 0 and the node still linked (its +0 not itself),
+  the current node becomes its +0 link and it is unlinked (`0x89394f20`). The walk goes on from the current node's +4
+  link to the head, which it leaves current. Then the ticks since the last pass are measured into the time struct:
+  their difference as a half, a negative one taken past the wrap, into its count, and added to its last.
+- **0x1**: the pitch source `0x89394a60` on `0x89989748` (v226's), then the voices' update `0x893b16a0`.
+
+The interrupts' masking around the walk changes no memory. The calls out go through `Vc2UpdateTaskParts` (with
+v279's `Vc2QueueParts`), and v279's queue links are now public for the walk.
+
+**The check.** `xt_vc2voices`' sixth part (`Vc2UpdateTaskCheck.cpp`), on the seed after the listeners' part's: rom.4's
+own loop body entered at its top and left when it comes back there (v309's way), on the voice class part's sides,
+hooks and draws (v279's install, start and draws shared from v310). Beyond those, the wait answers the events drawn;
+both voice classes' +0x0c log the node and the time struct's address and answer from the voices' draws
+(`assignHookSlot`'s answer, v310); the pitch source and the voices' update log. Before each pass come the events, the
+time struct and the ticks (a few past the last, past a half's wrap, or any). The queue's links are drawn again until
+each node and the head are linked both ways, and one pass in eight has a node on the walk whose +0 link is itself.
+After each, the voices' and keys' spans, the queue's words, the time struct, the ticks and the calls. Not drawn: a
+node on the queue but a voice (v279's queue takes no other), or a list linked otherwise, on which rom.4's walk need not
+end. The first draws let a node's +0 link point past the head, and both sides looped there.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first five parts' lines as they were.
+- Every line and branch of `Vc2UpdateTask.cpp` and `Vc2VoiceQueue.cpp` is reached.
+- `mutate_vc2.py --voices`: 316 plants, none missed; v310's 21 new.
+
 ### The VC-2 part's notes' task (2026-11-19, v309) {#vc2-part-notes-task}
 
 Step 4.3's thirty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's fourteenth part): the notes' task
