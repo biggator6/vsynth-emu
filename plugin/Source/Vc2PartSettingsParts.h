@@ -57,3 +57,5 @@ extern const SettingsPartRow kHandlerPartRow;
 extern const SettingsPartRow kStartPartRow;
 // The nineteenth (v306): the Time Trip (Vc2TimeTripCheck.cpp)
 extern const SettingsPartRow kTripPartRow;
+// The twentieth (v307): the channel messages (Vc2PartChannelCheck.cpp)
+extern const SettingsPartRow kChannelPartRow;

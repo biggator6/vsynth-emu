@@ -843,6 +843,13 @@ version against rom.4's routines with what it calls hooked:
          broadcast `0x893b1780` to the sounding tones' +0x48 through `Vc2TripParts`; v301's front the trip object and
          the pad; xt_vc2settings' nineteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's Time Trip"). Next: the MIDI
          dispatcher `0x8938fed0`, the mailbox and the three tasks, then Vc2Synth.
+       - the channel messages done (v307): `Vc2PartChannel`, the note-on `0x89392da0` and note-off `0x89392e70` (Auto
+         Note's source 4 on source 3's tables through the pitch source `0x89989748` and its On Switch, the key
+         tables', the nodes' part objects' +0x0c and +0x18, v278's release over a key table) and the three that tell
+         the listeners (`0x893930a0`, `0x893930c0`, `0x893930e0`, one code); the program change a bare return; v303's
+         key table, channel state and node walk shared; xt_vc2settings' twentieth part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's channel messages"). Next: the dispatcher `0x8938fed0` (the status classes `0x8938fe50`, the parameters'
+         message `0x89390230`, the 0x41 messages, 0x70), the mailbox and the three tasks, then Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

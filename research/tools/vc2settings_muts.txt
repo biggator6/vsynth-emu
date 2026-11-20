@@ -22,7 +22,9 @@
 # trip stopped given its Y field for the value, which it has just stored) and vc2partnumbers (Vc2PartNumbers.cpp, v302;
 # not the init's glides' reset in the nodes' loop, whose every word the glides' static initializer after it writes
 # again) and vc2partstartup (Vc2PartStartUp.cpp, v304) and vc2timetrip (Vc2TimeTrip.cpp, v306; not the steps' distance taken the other way, as the fold
-# that follows gives a turn and its negative the same).  Not planted: the depth
+# that follows gives a turn and its negative the same) and vc2partchannel (Vc2PartChannel.cpp, v307,
+# v303's shared code's plants among them; not the count's rise before Auto Note's release, which leaves the count
+# alone, nor the floor's test at 0 by one, at 0 the same).  Not planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -684,8 +686,8 @@ init-lists|w.nodes.lists.fill(0);|w.nodes.lists.fill(1);|vc2partnumbers
 init-numbers|    w.numbers.make(w.t);\n|\n|vc2partnumbers
 tables-node-word|nodeWord = image.rd32(0x8950d7a0);|nodeWord = image.rd32(0x8950d7a4);|vc2settingstables
 h-no-channel|    if (h.channel == kNoChannel) return;\n    w.parts.notify|    if (h.channel == 0) return;\n    w.parts.notify|vc2partnumbers
-h-state-word|constexpr uint32_t kStateWord = 2;|constexpr uint32_t kStateWord = 3;|vc2partnumbers
-h-state-row|k.sources[static_cast<size_t>(h.source - 1)]|k.sources[0]|vc2partnumbers
+h-state-word|constexpr uint32_t kStateWord = 2;|constexpr uint32_t kStateWord = 3;|vc2partchannel
+h-state-row|k.sources[static_cast<size_t>(source - 1)]|k.sources[0]|vc2partchannel
 h-hold-press|if (h.value >= kPressed && w.t.holdPresses|if (h.value < kPressed && w.t.holdPresses|vc2partnumbers
 h-hold-pressed|kNoChannel = -1, kPressed = 64, kMonoMost = 16;|kNoChannel = -1, kPressed = 65, kMonoMost = 16;|vc2partnumbers
 h-hold-byte|w.t.holdPresses[static_cast<size_t>(h.channel)] == 0) return;|w.t.holdPresses[static_cast<size_t>(h.channel)] != 0) return;|vc2partnumbers
@@ -717,9 +719,9 @@ h-clear-glides|    clearGlideHolds(w, h);\n    (w.parts.*then)(k);|    (w.parts.
 h-glides-flag|p.lastMonoHeld = 0;|p.lastMonoHeld = 1;|vc2partnumbers
 h-glides-prev|            p.prevMonoHeld = 0;\n|\n|vc2partnumbers
 h-glides-index|kGlidesASource * n.source + 2 * n.byteE + g|kGlidesASource * n.source + 2 * n.byteE|vc2partnumbers
-h-glides-list|Vc2PartNodes::kChannels * (h.source - 1) + h.channel)|Vc2PartNodes::kChannels * (h.source - 1) + (h.channel & 7))|vc2partnumbers
-h-glides-walk|at != 0; at = w.nodes.node(at).next)|at != 0; at = 0)|vc2partnumbers
-h-table|return Vc2Keys::tableAt(static_cast<uint32_t>(h.source - 1), static_cast<uint32_t>(h.channel));|return Vc2Keys::tableAt(static_cast<uint32_t>(h.source % 4), static_cast<uint32_t>(h.channel));|vc2partnumbers
+h-glides-list|Vc2PartNodes::kChannels * (source - 1) + channel)|Vc2PartNodes::kChannels * (source - 1) + (channel & 7))|vc2partchannel
+h-glides-walk|at != 0; at = nodes.node(at).next)|at != 0; at = 0)|vc2partchannel
+h-table|return Vc2Keys::tableAt(static_cast<uint32_t>(source - 1), static_cast<uint32_t>(channel));|return Vc2Keys::tableAt(static_cast<uint32_t>(source % 4), static_cast<uint32_t>(channel));|vc2partchannel
 h-class-sost|{ 0x898cd280, 0x89393a10, sostenuto, false },|{ 0x898cd280, 0x89393a10, hold, false },|vc2partnumbers
 h-class-11|{ 0x898cd328, 0x89393d90, base, false },|{ 0x898cd328, 0x89393d90, poly, false },|vc2partnumbers
 h-class-1|{ 0x898cd250, 0x89393920, base, false },|{ 0x898cd250, 0x89393920, soundOff, false },|vc2partnumbers
@@ -815,3 +817,29 @@ tables-trip-polar|image.read(0x89543f18, tripPolar.data()|image.read(0x89543f1a,
 tables-trip-steps|image.read(0x8954601a, tripSteps.data()|image.read(0x8954601c, tripSteps.data()|vc2settingstables
 tables-trip-offsets|image.read(0x8954602c, tripOffsets.data()|image.read(0x8954602e, tripOffsets.data()|vc2settingstables
 tables-trip-scale|image.rd32(0x893948ec)|image.rd32(0x893948e8)|vc2settingstables
+ch-auto-source|constexpr int32_t kAutoNote = 4, kAutoNoteTables = 3;|constexpr int32_t kAutoNote = 3, kAutoNoteTables = 3;|vc2partchannel
+ch-auto-tables|constexpr int32_t kAutoNote = 4, kAutoNoteTables = 3;|constexpr int32_t kAutoNote = 4, kAutoNoteTables = 4;|vc2partchannel
+ch-releasing|constexpr int32_t kReleasing = 1;|constexpr int32_t kReleasing = 2;|vc2partchannel
+ch-release-velocity|constexpr uint32_t kReleaseVelocity = 64;|constexpr uint32_t kReleaseVelocity = 63;|vc2partchannel
+ch-note-seen|constexpr uint8_t kNoteSeen = 0xff;|constexpr uint8_t kNoteSeen = 0xfe;|vc2partchannel
+ch-on-held|if (p.others > 0) return;|if (p.others > 1) return;|vc2partchannel
+ch-on-auto-key|        p.note = (int32_t)key;\n|\n|vc2partchannel
+ch-on-auto-from|        from = kAutoNoteTables;\n|\n|vc2partchannel
+ch-on-release-zero|if (p.note >= 0 && w.autoNoteSwitch == kReleasing)|if (p.note > 0 && w.autoNoteSwitch == kReleasing)|vc2partchannel
+ch-on-release-switch|if (p.note >= 0 && w.autoNoteSwitch == kReleasing)|if (p.note >= 0 && w.autoNoteSwitch != 0)|vc2partchannel
+ch-on-release-key|vc2ChannelNoteOff(w, kAutoNote, channel, (uint32_t)p.note, kReleaseVelocity);|vc2ChannelNoteOff(w, kAutoNote, channel, key, kReleaseVelocity);|vc2partchannel
+ch-on-count|p.others = (int32_t)((uint32_t)p.others + 1);|p.others = (int32_t)((uint32_t)p.others + 2);|vc2partchannel
+ch-on-key|k.noteOn(key, velocity);|k.noteOn(key, velocity / 2);|vc2partchannel
+ch-on-node-args|w.parts.objectNoteOn(n.object, table, n.word8, key, velocity);|w.parts.objectNoteOn(n.object, table, n.word8, velocity, key);|vc2partchannel
+ch-on-seen|    k.wasReset = kNoteSeen;\n|\n|vc2partchannel
+ch-off-from|const int32_t from = autoNote ? kAutoNoteTables : source;|const int32_t from = source;|vc2partchannel
+ch-off-key|k.noteOff(key, velocity);|k.noteOff(key, 0);|vc2partchannel
+ch-off-node|w.parts.objectNoteOff(n.object, table, n.word8);|w.parts.objectNoteOff(n.object, table, 0);|vc2partchannel
+ch-off-release|    w.parts.releaseTable(table);\n|\n|vc2partchannel
+ch-off-even|if (k.ons[key] == k.offs[key]) {|if (k.ons[key] != k.offs[key]) {|vc2partchannel
+ch-off-clear-offs|        k.offs[key] = 0;\n        k.ons[key] = 0;|        k.ons[key] = 0;|vc2partchannel
+ch-off-clear-ons|        k.offs[key] = 0;\n        k.ons[key] = 0;|        k.offs[key] = 0;|vc2partchannel
+ch-off-auto|        p.note = -1;\n        return;|        return;|vc2partchannel
+ch-off-auto-count|        p.note = -1;\n        return;|        p.note = -1;|vc2partchannel
+ch-off-floor|p.others = left > 0 ? left : 0;|p.others = left;|vc2partchannel
+ch-heard-state|w.parts.notify(vc2ChannelStateOf(source, channel));|w.parts.notify(vc2ChannelStateOf(source, 0));|vc2partchannel

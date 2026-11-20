@@ -4,7 +4,7 @@
 // Each constructor writes the base's vtable (0x898cd220) and then its own; only its own stands.  A handler's key table
 // is the source's (counting from 1) and channel's; the channel's state its row's word + 2 (rom.4's tables, v276's).
 #include "Vc2PartNumbers.h"
-#include "Vc2KeysTables.h"
+#include "Vc2PartChannel.h"
 #include "Vc2PartSettingsTables.h"
 #include <algorithm>
 #include <iterator>
@@ -19,25 +19,16 @@ struct Hand {
 using Way = void (*)(Vc2NumberWorld&, const Hand&);
 
 constexpr int32_t kNoChannel = -1, kPressed = 64, kMonoMost = 16;   // [FW]
-constexpr uint32_t kStateWord = 2;                                   // [FW] a channel's state: its row's word + 2
 constexpr uint8_t kNoKey = 0xff;                                     // [FW] CC 84's key cleared
 constexpr int kGlidesASource = 2 * Vc2Keys::kChannels, kGlidesAnObject = 2;
 
-uint32_t tableOf(const Hand& h) {
-    return Vc2Keys::tableAt(static_cast<uint32_t>(h.source - 1), static_cast<uint32_t>(h.channel));
-}
-
-uint32_t stateOf(const Hand& h) {
-    const Vc2KeysTables& k = vc2KeysTables();
-    const auto row = static_cast<size_t>(k.sources[static_cast<size_t>(h.source - 1)]);
-    return k.states[Vc2Keys::kChannels * row + static_cast<size_t>(h.channel)] + kStateWord;
-}
+// A handler's key table and channel's state (Vc2PartChannel's from v307)
+uint32_t tableOf(const Hand& h) { return vc2ChannelTableOf(h.source, h.channel); }
+uint32_t stateOf(const Hand& h) { return vc2ChannelStateOf(h.source, h.channel); }
 
 // 0x89393000: each node on the source's channel's list, its two glides' held flags cleared
 void clearGlideHolds(Vc2NumberWorld& w, const Hand& h) {
-    const auto list = static_cast<size_t>(Vc2PartNodes::kChannels * (h.source - 1) + h.channel);
-    for (uint32_t at = w.nodes.lists[list]; at != 0; at = w.nodes.node(at).next) {
-        const Vc2PartNode& n = w.nodes.node(at);
+    vc2EachNode(w.nodes, h.source, h.channel, [&](const Vc2PartNode& n) {
         for (int g = 0; g < kGlidesAnObject; ++g) {
             Vc2KeyGlide& p = w.keys.glides[static_cast<size_t>(kGlidesASource * n.source + 2 * n.byteE + g)];
             p.lastMonoHeld = 0;
@@ -45,7 +36,7 @@ void clearGlideHolds(Vc2NumberWorld& w, const Hand& h) {
             p.prevPolyHeld = 0;
             p.prevMonoHeld = 0;
         }
-    }
+    });
 }
 
 // The key table cleared, the glides' held flags, then a routine of the release path on the table

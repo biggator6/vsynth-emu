@@ -54,6 +54,10 @@ inline constexpr int32_t kOutNotify = 44, kOutVocoderHold = 45, kOutKeyRoutine =
 // The Time Trip's (v306): a sounding tone's +0x48, its count, part and mask as the part, kind and COSM, the tone as the
 // ID
 inline constexpr int32_t kOutTripStep = 47;
+// The channel messages' (v307): a part object's virtual (the key table, the node's word and the key as the part, kind
+// and COSM, the object as the ID), then its routine (the velocity as the part, the routine as the ID); v278's note-off
+// over a key table (the table as the ID)
+inline constexpr int32_t kOutObjectNote = 48, kOutObjectRoutine = 49, kOutReleaseTable = 50;
 // The held flags as a log carries them
 inline SettingsCall settingsUnposted(const uint8_t* held, uint32_t object) {
     const auto low = (int32_t)(held[0] | held[1] << 8 | held[2] << 16 | (uint32_t)held[3] << 24);

@@ -1546,6 +1546,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's channel messages (2026-11-19, v307) {#vc2-part-channel-messages}
+
+Step 4.3's thirty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's twelfth part): what the MIDI dispatcher
+`0x8938fed0` calls for a source's channel message, given the source (1…4), the channel and the message's two bytes, now
+the port's own (`Vc2PartChannel.cpp`). Below, K is the source's and channel's key table, its list the nodes on the
+source's channel (`0x899890d0`, v293's), and a node's call its part object's vtable (the object's +4) entry, the held
+class's (`0x898cd3b8`) v278's node routines, the plain class's (`0x898cd184`) others:
+- **The note-on** `0x89392da0(source, channel, key, velocity)` (the dispatcher sends a velocity of 0 as a note-off). Auto
+  Note's notes come as source 4, which plays on source 3's key table and list, through the pitch source `0x89989748`
+  (v226's `Vc2PitchSource`): with another key down (its +4 above 0) nothing; else its key (+0) the note's. Any other
+  source: with Auto Note's key held (+0 not below 0) and its On Switch (`0x8993fe50`, v226's) at 1, Auto Note's note
+  released first (the note-off of source 4, that key, velocity 64); then the other keys' count +1. Then K's note-on
+  (`0x89391e90`, v276's), each node's +0x0c (the note's start, `0x89396a80`) given K, the node's word, the key and the
+  velocity on the stack, and K's +0x130 0xff.
+- **The note-off** `0x89392e70`: source 4 on source 3's again; K's note-off (`0x89391ef0`), each node's +0x18 (the note's
+  end, `0x89396c90`) given K and the node's word, v278's release over K's voices (`0x89390c00`), and the key's note-on
+  and note-off counts both cleared when they are as many. Then Auto Note's key −1 for source 4, else the other keys'
+  count less 1, no lower than 0.
+- **The polyphonic aftertouch** `0x893930a0`, **channel pressure** `0x893930c0` and **pitch bend** `0x893930e0`, one code:
+  the channel's state (v303's: its source's row's word + 2) to the listeners (`0x89390ea0`, v305's); their data unread.
+  **The program change** `0x89393090` is a bare return, not ported.
+
+The part objects' two virtuals, the release and the listeners go out through `Vc2ChannelParts`. v303's key table,
+channel state and node walk are now `Vc2PartChannel`'s, shared (`vc2ChannelTableOf`, `vc2ChannelStateOf`,
+`vc2EachNode`).
+
+**The check.** `xt_vc2settings`' twentieth part (`Vc2PartChannelCheck.cpp`), on the seed nineteen after the run's:
+rom.4's own handlers on its own keys, nodes, lists and part objects, the pitch source and the On Switch; the part
+objects' four routines, the release and the listeners hooked to log (`kSettingsNotifyCallee`, v303's hook shared), the
+key tables' note-on and note-off rom.4's own. Each case gives the nodes' lists as xt_vc2keys' second part draws them,
+each node's part object one of the 16 and each part object's class either, and the keys noise with each table's curve
+one of the eight. Events are a note-on or note-off of a source 1…4, a channel, a key and a velocity (0 one time in
+eight), or one of the three; before each, the pitch source's key −1 or a key, its count 0, 1, 2 or any below 64, and
+the On Switch 0, 1, 2 or any. After each, the tables, the keys' span, the pitch source, the calls. Not drawn: a key or
+velocity past 127 (rom.4 reads past a table's counts and curve), a source but 1…4.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first nineteen parts' lines as they were.
+- Every line and branch of `Vc2PartChannel.cpp` and `Vc2PartNumbers.cpp` is reached.
+- `mutate_vc2.py --settings`: 811 plants, none missed; v307's 26 new (and v303's five on the shared code moved
+  with it; not planted: the count's rise before Auto Note's release, which leaves the count alone, and the floor's
+  test at 0 by one, at 0 the same).
+
 ### The VC-2 part's Time Trip (2026-11-19, v306) {#vc2-part-time-trip}
 
 Step 4.3's thirty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's eleventh part): the trip objects v301's

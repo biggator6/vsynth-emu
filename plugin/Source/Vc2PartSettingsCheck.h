@@ -12,6 +12,7 @@
 #include "Vc2MatrixTables.h"
 #include "Vc2PartControllers.h"
 #include "Vc2PartNumbers.h"
+#include "Vc2PartChannel.h"
 #include "Vc2PartSettingsCalls.h"
 #include "Vc2PartStartUp.h"
 #include "Vc2PartVoicesTables.h"
@@ -127,10 +128,11 @@ struct SettingsCounts {
     long handlerEvents = 0, handlerCalls = 0;                                   // the seventeenth's (v303)
     long startEvents = 0, startCalls = 0;                                       // the eighteenth's (v304)
     long tripEvents = 0, tripCalls = 0;                                         // the nineteenth's (v306)
+    long channelEvents = 0, channelCalls = 0;                                   // the twentieth's (v307)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
     // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69,
-    // v303's at 70…72, v304's at 73, v306's at 74…81
-    std::array<long, 82> byEvent {};
+    // v303's at 70…72, v304's at 73, v306's at 74…81, v307's at 82…86
+    std::array<long, 87> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -156,6 +158,8 @@ struct SettingsSides {
     Vc2PartVoices voices {};                             // v304: v272's voices, which the start-up inits
     Vc2PartStartWords startWords {};                     // v304
     Vc2TripRecords tripRecords {};                       // v306: the parts' Time Trip records and the steps' scratch
+    Vc2PitchSource pitch {};                             // v307: 0x89989748
+    int32_t autoNoteSwitch = 0;                          // v307: Auto Note's On Switch, 0x8993fe50
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -194,11 +198,13 @@ inline SettingsCall settingsNotesOff(Sh4&) { return { kOutNotesOff, 0, 0, 0, 0 }
 inline SettingsCall settingsStopped(Sh4& c) { return { kOutStopVoices, 0, 0, 0, (int32_t)c.r[4] }; }
 inline SettingsCall settingsTruncatedAll(Sh4&) { return { kOutTruncateAll, 0, 0, 0, 0 }; }
 inline SettingsCall settingsHeldOn(Sh4&) { return { kOutHeldNoteOn, 0, 0, 0, 0 }; }
+inline SettingsCall settingsNotified(Sh4& c) { return { kOutNotify, 0, 0, 0, (int32_t)c.r[4] }; }   // v303's, v307
 inline constexpr SettingsCallee kSettingsControllerCallee { 0x89392f90, settingsControlled };
 inline constexpr SettingsCallee kSettingsNotesOffCallee { 0x89391e30, settingsNotesOff };
 inline constexpr SettingsCallee kSettingsStopCallee { 0x89390f70, settingsStopped };
 inline constexpr SettingsCallee kSettingsTruncateAllCallee { 0x89391120, settingsTruncatedAll };
 inline constexpr SettingsCallee kSettingsHeldOnCallee { 0x89391e50, settingsHeldOn };
+inline constexpr SettingsCallee kSettingsNotifyCallee { 0x89390ea0, settingsNotified };   // the listeners
 // v291's to v293's parts' noise stops before v294's word
 inline constexpr size_t kV293Rows = offsetof(Vc2PartRows, heldNote);
 // v294's and v295's parts' noise stops before v296's words

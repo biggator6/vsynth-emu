@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's channel messages v307 (2026-11-19, on claude/vc2-part-4-3 after v306; HARDWARE_FIRMWARE.md, "The VC-2
+  part's channel messages"): step 4.3's thirty-fifth version, item 10's twelfth part. Vc2PartChannel
+  (Vc2PartChannel.cpp): rom.4's note-on 0x89392da0 and note-off 0x89392e70 (Auto Note's source 4 on source 3's tables
+  through the pitch source 0x89989748 and its On Switch 0x8993fe50; the key table's note-on or note-off, each node's
+  part object's +0x0c or +0x18, the note-off's release over the table 0x89390c00 and a key's even counts cleared) and
+  the three that tell the listeners (0x893930a0, 0x893930c0, 0x893930e0, one code); the program change 0x89393090 a
+  bare return; the virtuals, the release and the listeners through Vc2ChannelParts; v303's key table, channel state
+  and node walk shared from it. xt_vc2settings gains a twentieth part (Vc2PartChannelCheck.cpp): 0 different at seeds
+  2024, 7 and 31337, the first nineteen parts' lines unchanged; mutate_vc2.py --settings 811 planted, 0 missed. Not
+  in the sound yet.
+
 The VC-2 part's Time Trip v306 (2026-11-19, on claude/vc2-part-4-3 after v305; HARDWARE_FIRMWARE.md, "The VC-2 part's
   Time Trip"): step 4.3's thirty-fourth version, item 10's eleventh part. Vc2TimeTrip (Vc2TimeTrip.cpp): rom.4's 16 part
   records of 0x34 bytes at 0x89989408 (Vc2TripRecords; the trip object's 0x20 bytes Vc2TripObject, v301's

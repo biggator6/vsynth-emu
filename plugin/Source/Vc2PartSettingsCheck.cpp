@@ -159,7 +159,8 @@ long settingsMoreParts(SettingsSides& s, const Vc2Run& run) {
     for (const SettingsPartRow* p : { &kMessagePartRow, &kReceivePartRow, &kRoutingPartRow, &kReloadPartRow,
                                       &kControllerPartRow, &kNumberPartRow, &kHandlerPartRow })
         different += settingsRunPart(s, run, *p);
-    for (const SettingsPartRow* p : { &kStartPartRow, &kTripPartRow }) different += settingsRunPart(s, run, *p);
+    for (const SettingsPartRow* p : { &kStartPartRow, &kTripPartRow, &kChannelPartRow })
+        different += settingsRunPart(s, run, *p);
     return different;
 }
 

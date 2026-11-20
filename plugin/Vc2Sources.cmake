@@ -128,4 +128,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2PartNumbers.cpp
     Source/Vc2PartStartUp.cpp
     Source/Vc2TimeTrip.cpp
+    Source/Vc2PartChannel.cpp
 )

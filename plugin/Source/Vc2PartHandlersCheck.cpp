@@ -18,10 +18,9 @@ template <int32_t Which>
 SettingsCall keyRoutineCalled(Sh4& c) {
     return { kOutKeyRoutine, Which, 0, 0, (int32_t)c.r[4] };
 }
-SettingsCall notifyCalled(Sh4& c) { return { kOutNotify, 0, 0, 0, (int32_t)c.r[4] }; }
 SettingsCall pedalCalled(Sh4& c) { return { kOutVocoderHold, 0, 0, 0, (int32_t)c.r[4] }; }
 constexpr SettingsCallee kHandlerCallees[] = {
-    { 0x89390ea0, notifyCalled },        { 0x893b1c10, pedalCalled },         { 0x89390cd0, keyRoutineCalled<0> },
+    kSettingsNotifyCallee,               { 0x893b1c10, pedalCalled },         { 0x89390cd0, keyRoutineCalled<0> },
     { 0x89390d10, keyRoutineCalled<1> }, { 0x89390d50, keyRoutineCalled<2> }, { 0x89390da0, keyRoutineCalled<3> },
     { 0x89390e20, keyRoutineCalled<4> } };
 // The handlers rom.4's own again, and the controller
