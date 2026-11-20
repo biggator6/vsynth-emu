@@ -21,6 +21,7 @@ struct ToneCounts {
     long setters = 0, keyOffs = 0, truncations = 0, waits = 0, costs = 0, getters = 0;   // v273: the remaining methods
     // v315: the envelopes' settings in sustain, the LFOs' fades a release starts, the released envelopes an update ticks
     long sustains = 0, releaseFades = 0, releaseTicks = 0;
+    long told = 0;   // v317: the renders whose told fade ended, the TVA setting the OS's event
     long starts = 0, started = 0, listMoves = 0, leaves = 0;   // the part's lists: starts, tones started, moves, leaves
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
@@ -60,6 +61,16 @@ void toneDrawModulatorWords(ToneSides& s, int i, std::mt19937& rng);
 void toneSteerSustain(ToneSides& s, int i, uint32_t envelope, std::mt19937& rng);
 void toneCountReleases(ToneSides& s, int i);
 void toneCountReleaseTicks(ToneSides& s, int i);
+
+// The real TVA (v317, Vc2ToneTvaCheck.cpp): tone i's TVA against rom.4's words; its words drawn and written on both
+// sides as xt_vc2tva draws them (Vc2TvaDraws), bound to the tone's own envelope and LFOs, now and then stopped, and
+// the fade's step; a note-on's TVA block, its envelope's and LFOs' numbers kept; and a render's output, drawn on both
+// sides before and compared after
+std::string toneTvaDifference(ToneSides& s, int i);
+void toneDrawTva(ToneSides& s, int i, std::mt19937& rng);
+void toneDrawTvaBlock(Vc2ToneInput& in, std::mt19937& rng);
+void toneDrawOut(ToneSides& s, std::mt19937& rng);
+std::string toneOutDifference(ToneSides& s);
 
 // The real OSC mix (v269, Vc2ToneMixCheck.cpp): tone i's mix's words against rom.4's; the delay lines of tone i, or of
 // every tone; the mix's block of a note-on's input; a render's buffers drawn on both sides, with a routine installed

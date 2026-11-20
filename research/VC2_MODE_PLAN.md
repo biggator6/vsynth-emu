@@ -636,7 +636,7 @@ version against rom.4's routines with what it calls hooked:
      |---|---|---|
      | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269), the free LFOs' manager (v271), the part's lists of tones and the mix's settings update (v273); the envelopes' and LFOs' settings and release (v315) | the vibrato's key-off `0x893b2b60` (its +0x34 to 0) |
      | `Vc2OscParts` | carrier and kind 6 on the voice (v266), the vibrato (v267), players' installs, seeks | kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by address (`vc2Kind5Update` and `Vc2Kind6::set` are their ports, for the part's wiring) |
-     | `Vc2TvaParts` | the TVA itself | the fade's step, the word at `0x8993eb08`, which the TVA's converter writes (`0x893a67a2`, with a twin from `0x893a6eba`): version 8's; the event is the task's |
+     | `Vc2TvaParts` | the TVA itself; in the tone's parts' host from v317, its envelope and LFOs the tone's, the fade's step the part's word at `0x8993eb08` (`Vc2ToneCommon::fadeStep`, which C's TVA child writes, v285) | the event is the task's (the host's deriving class's `osEvent`) |
      | `Vc2MixerParts` | all nine | none |
      | `Vc2AutoNoteHost` | none | `0x89391dc0` (Auto Note's note + 12, posted when no key holds it), `0x89391e20` |
      | `Vc2MatrixParams` | `Vc2Params`' descriptors | the readers `0x89320760`, `0x89320790`, `0x893207b0`, `0x89320a50`, `0x89320f60` on the getter `0x89324350`: in the plugin, the host parameters |
@@ -914,6 +914,10 @@ version against rom.4's routines with what it calls hooked:
          (`Vc2ToneCommon`), the code xt_vc2tone's port side joined them with, moved into the plugin; the parts not
          joined yet a deriving class's (HARDWARE_FIRMWARE.md, "The VC-2 tone's parts' host"). Next: the TVA joined,
          then the COSMs, then the OSC voices; with the three the host is whole and Vc2Synth holds 24.
+       - The TVA joined (v317): the host's `Vc2Tva`, its envelope and LFOs the tone's own through the modulators, its
+         fade's step the part's word 0x8993eb08 (`Vc2ToneCommon::fadeStep`), the OS's event the deriving class's; the
+         tone's input 0x738 bytes, the TVA's block whole (HARDWARE_FIRMWARE.md, "The TVA in the tone's parts' host").
+         The fade step's entry in the interfaces' table is closed. Next: the COSMs, then the OSC voices.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

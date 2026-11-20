@@ -16,8 +16,7 @@
 
 // A note W as rom.4 lays it out
 struct Vc2NoteWords {
-    Vc2ToneInput input {};              // +0x000: what the conversion writes and the tone's note-on reads
-    std::array<uint32_t, 14> rest {};   // +0x700…+0x737: not touched by the note's routines
+    Vc2ToneInput input {};              // +0x000: what the conversion writes and the tone's note-on reads (to +0x737)
     uint32_t tone = 0;                  // +0x738: its tone, by address
     uint32_t partner = 0;               // +0x73c: the note a legato takes from, 0 none
     uint8_t onByte = 0;                 // +0x740: the note-on's third argument

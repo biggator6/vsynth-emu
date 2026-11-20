@@ -176,6 +176,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2FreeLfos.cpp ] && echo Vc2FreeLfos.cpp Vc2FreeLfoCheck.cpp ) \
    $( [ -f Vc2ToneLists.cpp ] && echo Vc2ToneLists.cpp Vc2ToneMethods.cpp Vc2ToneMethodCheck.cpp ) \
    $( [ -f Vc2ToneHost.cpp ] && echo Vc2ToneHost.cpp ) \
+   $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tone" &
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked; its ramps (v236) its own
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
@@ -195,7 +196,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    "${SH4[@]}" -o "$O/xt_vc2osc" &
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \
-   Vc2TvaTables.cpp "${SH4[@]}" -o "$O/xt_vc2tva" &
+   Vc2TvaTables.cpp $( [ -f Vc2TvaDraws.cpp ] && echo Vc2TvaDraws.cpp ) "${SH4[@]}" -o "$O/xt_vc2tva" &
 # COSM (v234): the Growl against rom.4's own routines, the Matrix readers hooked; the converters' frame with the TVF's
 # converter and the Matrix's readers (v235); the converters by type and v237's six; v239's five; v241's two; the
 # Matrix core's part (v243), on the Matrix's own sources (v245); the Matrix set-up's part (v247); the COSM object's

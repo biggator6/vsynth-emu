@@ -89,12 +89,15 @@ std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
     s.n.renders += tone.tail.renders != 0;
     std::string what = toneMixPrepareRender(s, i, rng);
     if (!what.empty()) return what;
+    toneDrawOut(s, rng);   // v317: the TVA renders into it
     float* out = s.shared.out.data();
     const std::initializer_list<uint32_t> args = { s.pool.addressOf(i), kToneOutAt };
     what = rng() % 2 == 0
                ? toneOn(s, i, kWholeAt, args, [&] { tone.renderWhole(out, s.shared.buffers, partsOf(s, i)); })
                : toneOn(s, i, kRenderAt, args, [&] { tone.render(out, s.shared.buffers, partsOf(s, i)); });
-    return what.empty() ? toneMixRendered(s, i) : what;
+    s.n.told += vc2CountCalls(s.rom, kOsEvent);
+    if (what.empty()) what = toneMixRendered(s, i);
+    return what.empty() ? toneOutDifference(s) : what;
 }
 
 std::string toneClockOn(ToneSides& s, std::mt19937& rng) {

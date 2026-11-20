@@ -782,14 +782,15 @@ mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 
 voices' update and schedule: 16000 events
 xt_vc2mixer: 0 different
 == xt_vc2tone
-tone: 40 cases, 16000 events, 866 made, 1520 none, 484 built in place, 419 unmade (374 back), 841 updates, 401 ended, 654 renders, 0 different
-note-on: 1276 note-ons, 234 players taken, 1974 LFOs following, 2514 free LFOs, 292 inputs fixed
-free LFOs: 422 ticks, 445 clocks
-modulators: 405 reads of their bound words
-mix: 963 plays, blocks by routine: 2802 858 187 701 274 580 486 520
-methods: 853 setters, 466 key-offs, 428 truncations (72 waits), 395 costs, 445 getters
-lists: 821 starts (729 tones started), 439 moves alone, 883 left before a rebuild
-settings and release: 43 envelopes' settings in sustain, 569 LFOs' fades started, 521 released envelopes ticked
+tone: 40 cases, 16000 events, 892 made, 1227 none, 436 built in place, 475 unmade (419 back), 813 updates, 163 ended, 655 renders, 0 different
+note-on: 1375 note-ons, 229 players taken, 2096 LFOs following, 2747 free LFOs, 308 inputs fixed
+free LFOs: 441 ticks, 467 clocks
+modulators: 457 reads of their bound words
+mix: 905 plays, blocks by routine: 2550 935 221 601 187 628 372 440
+methods: 864 setters, 398 key-offs, 451 truncations (292 waits), 442 costs, 476 getters
+lists: 939 starts (838 tones started), 471 moves alone, 922 left before a rebuild
+settings and release: 36 envelopes' settings in sustain, 548 LFOs' fades started, 455 released envelopes ticked
+tva: 60 renders whose told fade ended
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values

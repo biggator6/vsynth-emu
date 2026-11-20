@@ -13,17 +13,21 @@ constexpr uint32_t kNoBuffer = 0xff, kByte = 0xff;
 uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 int32_t oscCode(int osc) { return tonePartCode(static_cast<Piece>((int)Piece::osc1 + osc), 0); }
 int32_t cosmCode(int cosm) { return tonePartCode(static_cast<Piece>((int)Piece::cosm1 + cosm), 0); }
-const int32_t kTvaCode = tonePartCode(Piece::tva, 0);
 constexpr uint32_t kFadeEvent = 0x1000;   // [FW] 0x893b3be4: the event the truncation's task waits on
 uint32_t byteOf(int32_t x) { return (uint32_t)x & kByte; }
 } // namespace
 
 TonePortParts::TonePortParts(int tone, ToneShared& shared)
-    : Vc2ToneHost(tone, { *shared.pool, shared.lists, shared.rings, shared.frees, shared.chaos }), s_(shared) {}
+    : Vc2ToneHost(tone, { *shared.pool, shared.lists, shared.rings, shared.frees, shared.chaos, shared.fadeStep }),
+      s_(shared) {}
 
 void TonePortParts::buildPart(Vc2TonePiece piece) { log(kBuild, tonePartCode(piece, 0)); }
 void TonePortParts::destroyPart(Vc2TonePiece piece) { log(kDestroy, tonePartCode(piece, 0)); }
 const Vc2ToneHost& TonePortParts::hostOf(int tone) { return (*s_.parts)[(size_t)tone]; }
+
+void TonePortParts::osEvent(uint32_t event, uint32_t flags) {
+    log(kOsEvent, kToneNone, { event, flags }, false);
+}
 
 void TonePortParts::followLfo(int lfo, int tone, const uint32_t* block) {
     ++s_.follows;
@@ -37,7 +41,6 @@ uint32_t TonePortParts::freeLfo(uint32_t id, int lfo) {
 
 void TonePortParts::updateOsc(int osc, int32_t n) { log(kUpdateOsc, oscCode(osc), { (uint32_t)n }); }
 void TonePortParts::updateCosm(int cosm, float x) { log(kUpdateCosm, cosmCode(cosm), { bits(x) }); }
-void TonePortParts::updateTva() { log(kUpdateTva, kTvaCode); }
 
 void TonePortParts::ended() {
     log(kEnded, kToneNone, { s_.pool ? (uint32_t)s_.pool->tones[(size_t)tone()].head.state : 0u });
@@ -46,10 +49,6 @@ void TonePortParts::ended() {
 void TonePortParts::renderOsc(int osc, float* buffer) { log(kRenderOsc, oscCode(osc), { bufferOf(buffer) }); }
 
 void TonePortParts::renderCosm(int cosm, float* buffer) { log(kRenderCosm, cosmCode(cosm), { bufferOf(buffer) }); }
-
-void TonePortParts::renderTva(const float* in, float* out) {
-    log(kRenderTva, kTvaCode, { bufferOf(in) | bufferOf(out) << 8 });
-}
 
 void TonePortParts::countOsc(int osc, uint32_t x) { log(kCountOsc, oscCode(osc), { x }); }
 void TonePortParts::countOscMatched(int osc, uint32_t x) { log(kCountOscMatched, oscCode(osc), { x }); }
@@ -78,13 +77,6 @@ void TonePortParts::bindCosm(int cosm, const Vc2ToneBinding<2>& b) {
     bindFlags(b.envelopes, b.lfos);
 }
 
-void TonePortParts::bindTva(int envelope, int lfoA, int lfoB, int32_t serial) {
-    words.tvaBinds = { toneEnvelopeAt(self(), envelope), toneLfoAt(self(), lfoA), toneLfoAt(self(), lfoB),
-                       (uint32_t)serial };
-    const int32_t envelopes[] = { envelope }, lfos[] = { lfoA, lfoB };
-    bindFlags(envelopes, lfos);
-}
-
 void TonePortParts::noteOnOsc(int osc, const uint32_t* block, bool legato) {
     log(kNoteOnOsc, oscCode(osc), { blockOf(block), legato ? 1u : 0u });
 }
@@ -93,7 +85,6 @@ void TonePortParts::takePlayer(int osc, int tone) {
     log(kTakePlayer, oscCode(osc), { (uint32_t)tone, (uint32_t)osc });
 }
 
-void TonePortParts::setOsc(int osc, const uint32_t* block) { log(kSetOsc, oscCode(osc), { blockOf(block) }); }
 
 Vc2ToneCosmSetUp TonePortParts::cosmSetUp(int osc) {
     const ToneOscWords& o = words.osc[(size_t)osc];
@@ -108,27 +99,18 @@ void TonePortParts::startCosm(int cosm, const uint32_t* block, int which) {
     log(kStartCosm, cosmCode(cosm), { blockOf(block), (uint32_t)which });
 }
 
-void TonePortParts::noteOnTva(const uint32_t* block, uint32_t flag) {
-    log(kNoteOnTva, kTvaCode, { blockOf(block), flag });
-}
-
-// v273: the remaining methods' parts, each logged as rom.4's hook reads it
-void TonePortParts::settingsOsc(int osc, const uint32_t* block) { log(kSettingsOsc, oscCode(osc), { blockOf(block) }); }
-
-void TonePortParts::newBlockCosm(int cosm, const uint32_t* block) {
-    log(kNewBlockCosm, cosmCode(cosm), { blockOf(block) });
-}
-
-void TonePortParts::newBlockTva(const uint32_t* block) { log(kNewBlockTva, kTvaCode, { blockOf(block) }); }
-void TonePortParts::legatoOsc(int osc, const uint32_t* ramp) { log(kLegatoOsc, oscCode(osc), { blockOf(ramp) }); }
+// v273: the remaining methods' parts, each logged as rom.4's hook reads it; with setOsc, the calls given a block
+void TonePortParts::setOsc(int osc, const uint32_t* block) { logBlock(kSetOsc, oscCode(osc), block); }
+void TonePortParts::settingsOsc(int osc, const uint32_t* block) { logBlock(kSettingsOsc, oscCode(osc), block); }
+void TonePortParts::newBlockCosm(int cosm, const uint32_t* block) { logBlock(kNewBlockCosm, cosmCode(cosm), block); }
+void TonePortParts::legatoOsc(int osc, const uint32_t* ramp) { logBlock(kLegatoOsc, oscCode(osc), ramp); }
 void TonePortParts::keyOffOsc(int osc) { log(kKeyOffOsc, oscCode(osc)); }
-void TonePortParts::truncateTvaTold() { log(kTruncateTold, kTvaCode); }
-void TonePortParts::truncateTva() { log(kTruncate, kTvaCode); }
 
-// A wait the truncation's task makes; the fade at 0 once the draws' count of them has passed, as rom.4's hook leaves it
+// A wait the truncation's task makes; the TVA's fade at 0 once the draws' count of them has passed, as rom.4's hook
+// leaves it, the block task's renders standing in
 void TonePortParts::waitFade() {
     log(kWaitFade, kToneNone, { kFadeEvent }, false);
-    if (--s_.fade.portLeft <= 0) words.tvaFade = 0;
+    if (--s_.fade.portLeft <= 0) tva.w.fade = 0.0f;
 }
 
 void TonePortParts::truncated() { log(kTruncated, kToneNone); }
@@ -141,11 +123,6 @@ int32_t TonePortParts::oscWord168(int osc) {
 uint32_t TonePortParts::oscPosition(int osc) {
     log(kOscPosition, oscCode(osc));
     return s_.draws.position[(size_t)osc];
-}
-
-bool TonePortParts::answered(ToneKind kind, bool answer) {
-    log(kind, kTvaCode);
-    return answer;
 }
 
 uint32_t TonePortParts::bufferOf(const float* p) const {

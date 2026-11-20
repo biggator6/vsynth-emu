@@ -43,6 +43,7 @@ std::string toneWordsDifference(ToneSides& s, int i) {
                                                     { at + kLinkAt, &t.link, sizeof t.link, "its link" } });
     if (what.empty()) what = toneModulatorsDifference(s, i);
     if (what.empty()) what = toneMixDifference(s, i);
+    if (what.empty()) what = toneTvaDifference(s, i);
     if (what.empty()) what = partWordsDifference(toneReadRom(s.fw, at), s.parts[(size_t)i].words);
     return what.empty() ? what : "tone " + std::to_string(i) + ", " + what;
 }
@@ -59,12 +60,6 @@ ToneWords drawWords(std::mt19937& rng) {
         std::ranges::generate(o.binds, [&] { return (uint32_t)rng(); });
         o.cost = drawBits(rng);
     }
-    constexpr uint32_t kZeros[] = { 0x00000000, 0x80000000 };   // the level test's edge, +0 and −0
-    const uint32_t pick = rng() % 8;
-    w.tvaLevel = pick < 2 ? kZeros[pick] : (pick < 4 ? (uint32_t)rng() : std::bit_cast<uint32_t>(vc2Unit(rng) - 0.5f));
-    std::ranges::generate(w.tvaBinds, [&] { return (uint32_t)rng(); });
-    const uint32_t fade = rng() % 4;   // none, its edges or fading
-    w.tvaFade = fade < 2 ? kZeros[fade] : std::bit_cast<uint32_t>(fade == 2 ? -vc2Unit(rng) : vc2Unit(rng));
     w.cosmCost = drawBits(rng);
     return w;
 }
@@ -80,6 +75,7 @@ void drawToneInput(ToneSides& s, std::mt19937& rng) {
     for (uint32_t block : In::kCosms) in.at(block) = rng() % 23;
     toneDrawMixBlock(in, rng);
     in.at(In::kTva) = rng() % Vc2Tone::kEnvelopes;
+    toneDrawTvaBlock(in, rng);
     if (rng() % 6 == 0) {   // the fix-up's case
         in.at(In::kMix) = kFixMix;
         in.at(In::kOscs[1]) = kFixKind;
@@ -163,9 +159,6 @@ std::string toneDifference(ToneSides& s, int only) {
 
 void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     ToneDraws& d = s.shared.draws;
-    d.tvaOver = rng() % 4 == 0;
-    d.tvaStopped = rng() % 4 == 0;
-    d.tvaHeld = drawFlag(rng);
     std::ranges::generate(d.installOsc, [&] { return (uint32_t)rng(); });
     std::ranges::generate(d.installCosm, [&] { return drawFlag(rng) ? rng() % 2 : (uint32_t)rng(); });
     std::ranges::generate(d.word168, [&] { return (uint32_t)rng(); });
@@ -173,6 +166,7 @@ void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     s.parts[(size_t)i].words = drawWords(rng);
     toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
     toneDrawModulatorWords(s, i, rng);
+    toneDrawTva(s, i, rng);
     s.rom.clear();
     s.shared.calls.clear();
     ++s.n.events;

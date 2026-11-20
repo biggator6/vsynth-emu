@@ -3,12 +3,15 @@
 
 namespace {
 using Piece = Vc2TonePiece;
+using Mods = Vc2ToneModulators;
+constexpr uint32_t kTvaLevelAt = 0x40;   // [FW] 0x893b4c00: the TVA's word the level test reads, its block's +0x40
 } // namespace
 
 void Vc2ToneHost::build(Vc2TonePiece piece) {
     if (piece == Piece::envelopes) mods.buildEnvelopes();
     else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);
     else if (piece == Piece::mix) mix.construct(tail());
+    else if (piece == Piece::tva) tva.construct();
     else buildPart(piece);
 }
 
@@ -85,3 +88,38 @@ void Vc2ToneHost::bindFlags(std::span<const int32_t> envelopes, std::span<const 
     for (int32_t e : envelopes) mods.envelopes[(size_t)e].w.on = 1;
     for (int32_t l : lfos) mods.lfos[(size_t)l].w.on = 0;
 }
+
+// v317: the TVA
+bool Vc2ToneHost::tvaOver() { return tva.over(*this); }
+bool Vc2ToneHost::tvaStopped() { return tva.stoppedWord() != 0; }
+void Vc2ToneHost::updateTva() { tva.update(*this); }
+void Vc2ToneHost::renderTva(const float* in, float* out) { tva.render(in, out, *this); }
+float Vc2ToneHost::tvaLevel() { return tva.blockF(kTvaLevelAt); }
+bool Vc2ToneHost::tvaHeld() { return tva.silent(*this); }
+
+// The tone's note-on binds its TVA to an envelope and two LFOs of its own, by rom.4's addresses, and its serial
+void Vc2ToneHost::bindTva(int envelope, int lfoA, int lfoB, int32_t serial) {
+    tva.w.envelope = envelopeAt(envelope);
+    tva.w.lfo = lfoAt(lfoA);
+    tva.w.panLfo = lfoAt(lfoB);
+    tva.w.serial = (uint32_t)serial;
+    const int32_t envelopes[] = { envelope }, lfos[] = { lfoA, lfoB };
+    bindFlags(envelopes, lfos);
+}
+
+void Vc2ToneHost::noteOnTva(const uint32_t* block, uint32_t flag) { tva.noteOn(block, flag, *this); }
+void Vc2ToneHost::newBlockTva(const uint32_t* block) { tva.newBlock(block); }
+void Vc2ToneHost::truncateTvaTold() { tva.truncateTold(); }
+void Vc2ToneHost::truncateTva() { tva.truncate(); }
+float Vc2ToneHost::tvaFade() { return tva.w.fade; }
+
+Vc2TvaEnvelope Vc2ToneHost::envelope(uint32_t at) { return mods.tvaEnvelope(self(), at); }
+float Vc2ToneHost::lfoOut(uint32_t at) { return mods.lfoOut(self(), at); }
+float Vc2ToneHost::fadeStep() { return c_.fadeStep; }
+void Vc2ToneHost::setEvent(uint32_t event, uint32_t flags) { osEvent(event, flags); }
+
+uint32_t Vc2ToneHost::envelopeAt(int envelope) const {
+    return self() + Mods::kEnvelopesAt + Mods::kEnvelopeBytes * (uint32_t)envelope;
+}
+
+uint32_t Vc2ToneHost::lfoAt(int lfo) const { return self() + Mods::kLfosAt + Mods::kLfoBytes * (uint32_t)lfo; }

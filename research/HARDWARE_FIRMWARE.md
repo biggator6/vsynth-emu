@@ -1546,6 +1546,58 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The TVA in the tone's parts' host (2026-11-20, v317) {#vc2-tone-host-tva}
+
+Step 4.3's forty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-second part). `Vc2ToneHost` holds each
+tone's TVA, `Vc2Tva` (v233), at the tone's +0x19f0, and every call the tone makes on it is the TVA's own:
+- its constructor, note-on, new block and update;
+- the two end tests (`0x893b2560`, the stopped word `0x893b2610`) and silent, which the tone's held asks (`0x893b25c0`);
+- the render, into the output;
+- the two truncations, and the fade the truncation's waits read;
+- the level the tone's level test reads, its +0x40 (`0x893b4c00`).
+
+**What the TVA reads beyond itself, joined:**
+- **Its envelope and two LFOs** are the tone's own. The tone's note-on binds them by rom.4's addresses at +0xa4,
+  +0xa8 and +0xac with its serial at +0xc0, and leaves the bindings' flags. The TVA reads them through
+  `Vc2ToneModulators::tvaEnvelope` and `lfoOut` (v268's), which take those addresses.
+- **The fade's step** is rom.4's word 0x8993eb08, the one C's TVA child writes (v285). It sits in `Vc2ToneCommon` as
+  `fadeStep`, every tone's.
+- **The OS's event** (`0x89301830`), which a told truncation's fade end sets, goes to the deriving class
+  (`osEvent`). In the part it wakes the truncation's task.
+
+**The tone's input is 0x738 bytes**, not 0x700. The TVA's block starts at +0x6e8 and its note-on copies 0x50 bytes,
+to +0x738: the note W's last 0x38 bytes before its tone word, which v275 named `rest` and "not touched". The note's
+routines don't touch them. The TVA's note-on reads them, so `Vc2ToneInput` now holds them; W's layout and size are
+as they were.
+
+**The check.** xt_vc2tone runs rom.4's own TVA, its ten hooks gone. The OS's event is hooked to log its event and
+flags, and the port's `osEvent` logs the same. The drawn answers for the end tests and held are gone: they come from
+the TVA now. Changes to the draws and compares:
+- **Each event** draws the tone's TVA words on both sides by xt_vc2tva's laws. Those draws are now
+  `Vc2TvaDraws.h/.cpp`, shared by the two checks; xt_vc2tva's lines are unchanged. The bindings go to an envelope
+  and two LFOs of the tone's own, the stopped word one time in four, and the fade's step both sides' word.
+- **A note-on's and the setter's TVA block** draw the words the TVA reads as floats, keeping the numbers the note-on
+  binds by.
+- **A render** draws the output on both sides first and compares it after, with the TVA's 0xc8 bytes after every
+  event.
+
+Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400).
+- At 40 cases: 163 tones ended by the TVA's own answers and 292 waits on a real fade; 60 renders end a told fade and
+  set the OS's event.
+- Every line, branch and region of `Vc2ToneHost.cpp`, `Vc2Tone.cpp` and `Vc2ToneMethods.cpp` reached.
+- 23 new planted errors, 0 missed. The whole lists: `--tone` 690, `--tva` 109, `--notes` 55 and `--sets` 374
+  planted, 0 missed.
+
+**Two planted errors became equivalent** once the TVA was real, and are taken out of the list:
+- `update-tests-order`, the update asking the stopped word before the end test: both only read, and no log orders
+  them now.
+- `methods-truncate-floor`, the truncation's wait looping on a fade above 0.5: the told truncation sets the fade to 1
+  (`0x893b25a0`), and the waits end it at 0, so the loop sees no other value.
+
+**Next.** The COSMs join the host (`Vc2CosmObject`, its note-on frame, the adapters, the update and the DSP,
+v249…v264, on the pools v250), then the OSC voices; then Vc2Synth holds 24.
+
 ### The VC-2 tone's parts' host (2026-11-20, v316) {#vc2-tone-host}
 
 Step 4.3's forty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-first part). Vc2Synth needs a tone's

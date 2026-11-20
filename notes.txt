@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The TVA in the tone's parts' host v317 (2026-11-20, on claude/vc2-part-4-3 after v316; HARDWARE_FIRMWARE.md, "The TVA
+  in the tone's parts' host"): step 4.3's forty-fifth version, item 10's twenty-second part. Vc2ToneHost holds each
+  tone's Vc2Tva, every call the tone makes on it the TVA's own, its envelope and LFOs the tone's through the modulators,
+  its fade's step the part's word 0x8993eb08 (Vc2ToneCommon::fadeStep), the OS's event the deriving class's (osEvent).
+  Vc2ToneInput is 0x738 bytes (the TVA's block runs to there; the note W's `rest` words gone into it, W as it was).
+  xt_vc2tone runs rom.4's own TVA, the OS's event hooked; xt_vc2tva's draws shared as Vc2TvaDraws (its lines
+  unchanged); the TVA's words drawn each event and compared, a render's output too (Vc2ToneTvaCheck.cpp). 0 different
+  at seeds 2024, 7 and 31337; the host, Vc2Tone.cpp and Vc2ToneMethods.cpp all reached; 23 new planted, 0 missed; the
+  whole --tone 690, --tva 109, --notes 55 and --sets 374, 0 missed, update-tests-order and methods-truncate-floor taken
+  out as equivalent now (two reads alone; the told truncation's fade is 1, then 0). Not in the sound yet.
+
 The VC-2 tone's parts' host v316 (2026-11-20, on claude/vc2-part-4-3 after v315; HARDWARE_FIRMWARE.md, "The VC-2
   tone's parts' host"): step 4.3's forty-fourth version, item 10's twenty-first part. Vc2ToneHost (Vc2ToneHost.h/.cpp,
   in Vc2Sources.cmake): Vc2ToneParts for the parts the port has whole (a tone's envelopes, LFOs and mix, the free LFOs,

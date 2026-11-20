@@ -73,7 +73,7 @@ constexpr ToneSetter kSetters[] = {
       In::kEnvelopeStride },
     { 0x893b3240, 2, true, &Vc2Tone::setCosmBlock, nullptr },
     { 0x893b32d0, 0, false, nullptr, &Vc2Tone::setMixBlock },
-    { 0x893b3310, 0, false, nullptr, &Vc2Tone::setTvaBlock },
+    { 0x893b3310, 0, false, nullptr, &Vc2Tone::setTvaBlock, In::kTva },
     { 0x893b3350, 0, false, nullptr, &Vc2Tone::setLegato },
 };
 
@@ -128,6 +128,7 @@ std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     In& in = s.shared.input;
     toneDrawMixBlock(in, rng);
     if (set.stride != 0) toneDrawModulatorBlocks(in, rng);
+    if (set.block == In::kTva) toneDrawTvaBlock(in, rng);   // v317: the TVA's new block is real
     s.fw.cpu.write(kToneInputAt, in.words.data(), sizeof in.words);
     const uint32_t n = set.numbers == 0 ? 0 : (set.bounded ? drawPartNumber(rng, set.numbers) : rng() % set.numbers);
     const uint32_t offset = set.block + set.stride * n;

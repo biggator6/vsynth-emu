@@ -13,6 +13,7 @@
 #ifdef XT_VC2TONE_MAIN
 #include "Vc2ToneSides.h"
 #include "Vc2ToneMixTables.h"
+#include "Vc2TvaTables.h"
 #include "XtEnvelope.h"
 #include "XtLfo.h"
 #include <algorithm>
@@ -34,6 +35,7 @@ void toneFreshPools(ToneSides& s) {
         p.words = {};
         p.mods = {};
         p.mix = {};
+        p.tva = {};
     }
     toneEmptyLists(s);
     s.live.clear();
@@ -59,7 +61,7 @@ bool toneLoadTables(const char* path) {
     std::string rom2 = path;
     const size_t at = rom2.rfind("rom.4");
     if (at != std::string::npos) rom2.replace(at, 5, "rom.2");
-    return vc2LoadToneMix(path) && xtEnvLoadTables(rom2.c_str()) && xtLfoLoadTables(rom2.c_str());
+    return vc2LoadToneMix(path) && vc2LoadTva(path) && xtEnvLoadTables(rom2.c_str()) && xtLfoLoadTables(rom2.c_str());
 }
 } // namespace
 
@@ -101,6 +103,7 @@ int main(int argc, char** argv) {
                 n.started, n.listMoves, n.leaves);
     std::printf("settings and release: %ld envelopes' settings in sustain, %ld LFOs' fades started, %ld released "
                 "envelopes ticked\n", n.sustains, n.releaseFades, n.releaseTicks);
+    std::printf("tva: %ld renders whose told fade ended\n", n.told);
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

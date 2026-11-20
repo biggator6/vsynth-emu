@@ -40,7 +40,6 @@ update-osc-order|    parts.updateOsc(kVc2ToneOsc1, ticks);\n    parts.updateOsc(
 update-cosm2|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm2, parts.oscValue(kVc2ToneOsc1));|vc2tone
 update-cosm-level|parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|parts.updateCosm(kVc2ToneCosm1, parts.tvaLevel());|vc2tone
 update-stopped-unasked|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaOver()) {|vc2tone
-update-tests-order|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaStopped() && !parts.tvaOver()) {|vc2tone
 update-tva-lost|        parts.updateTva();\n        return;|        return;|vc2tone
 update-ended-state|    head.state = kEnded;\n    parts.ended();|    parts.ended();|vc2tone
 update-ended-call-lost|    parts.ended();\n}|}|vc2tone
@@ -604,7 +603,6 @@ methods-keyoff-envelope0|for (int envelope = 0; envelope < kEnvelopes; ++envelop
 methods-keyoff-osc|for (int osc : kOscs) parts.keyOffOsc(osc);|parts.keyOffOsc(kVc2ToneOsc1);|vc2tonemethods
 methods-truncate-told|    parts.truncateTvaTold();\n    while|    while|vc2tonemethods
 methods-truncate-once|while (parts.tvaFade() > 0.0f) parts.waitFade();|if (parts.tvaFade() > 0.0f) parts.waitFade();|vc2tonemethods
-methods-truncate-floor|while (parts.tvaFade() > 0.0f) parts.waitFade();|while (parts.tvaFade() > 0.5f) parts.waitFade();|vc2tonemethods
 methods-truncated-lost|    parts.truncated();\n||vc2tonemethods
 methods-truncate-now|{ parts.truncateTva(); }|{ parts.truncateTvaTold(); }|vc2tonemethods
 methods-cost-osc2|parts.oscCost(kVc2ToneOsc2)|parts.oscCost(kVc2ToneOsc1)|vc2tonemethods
@@ -701,3 +699,31 @@ host-release-lfo|mods.lfos[(size_t)lfo].release(); }|mods.lfos[0].release(); }|v
 host-release-envelope|mods.envelopes[(size_t)envelope].release(); }|mods.envelopes[0].release(); }|vc2tonehost
 host-flags-envelopes|mods.envelopes[(size_t)e].w.on = 1;|mods.envelopes[(size_t)e].w.on = 0;|vc2tonehost
 host-flags-lfos|mods.lfos[(size_t)l].w.on = 0;|mods.lfos[(size_t)l].w.on = 1;|vc2tonehost
+# v317: the TVA joined into the host (vc2tonehost).  Not planted: the input's size (Vc2ToneInput.h), which the note W's
+# static_assert holds at 0x744 with the tone's word at +0x738.  Taken out, as the real TVA made them equivalent: v228's
+# update-tests-order (the stopped word asked before the end test: both read alone, and no log orders them now) and
+# v273's methods-truncate-floor (the wait's loop on a fade above 0.5: the told truncation sets the fade to 1, which the
+# waits end at 0, so the loop sees no other value).
+host-build-tva|else if (piece == Piece::tva) tva.construct();|else if (piece == Piece::tva) buildPart(piece);|vc2tonehost
+host-tva-over|bool Vc2ToneHost::tvaOver() { return tva.over(*this); }|bool Vc2ToneHost::tvaOver() { return tva.silent(*this); }|vc2tonehost
+host-tva-stopped|tva.stoppedWord() != 0; }|tva.stoppedWord() == 0; }|vc2tonehost
+host-update-tva|void Vc2ToneHost::updateTva() { tva.update(*this); }|void Vc2ToneHost::updateTva() {}|vc2tonehost
+host-render-tva|tva.render(in, out, *this);|tva.render(out, out, *this);|vc2tonehost
+host-tva-level|kTvaLevelAt = 0x40;|kTvaLevelAt = 0x44;|vc2tonehost
+host-tva-held|bool Vc2ToneHost::tvaHeld() { return tva.silent(*this); }|bool Vc2ToneHost::tvaHeld() { return tva.over(*this); }|vc2tonehost
+host-bind-envelope|tva.w.envelope = envelopeAt(envelope);|tva.w.envelope = envelopeAt(0);|vc2tonehost
+host-bind-lfo|tva.w.lfo = lfoAt(lfoA);|tva.w.lfo = lfoAt(lfoB);|vc2tonehost
+host-bind-pan-lfo|tva.w.panLfo = lfoAt(lfoB);|tva.w.panLfo = lfoAt(lfoA);|vc2tonehost
+host-bind-serial|    tva.w.serial = (uint32_t)serial;\n||vc2tonehost
+host-bind-tva-flags|    const int32_t envelopes[] = { envelope }, lfos[] = { lfoA, lfoB };\n    bindFlags(envelopes, lfos);\n||vc2tonehost
+host-note-on-tva|tva.noteOn(block, flag, *this);|tva.noteOn(block, 0, *this);|vc2tonehost
+host-new-block-tva|{ tva.newBlock(block); }|{ (void)block; }|vc2tonehost
+host-truncate-told|void Vc2ToneHost::truncateTvaTold() { tva.truncateTold(); }|void Vc2ToneHost::truncateTvaTold() { tva.truncate(); }|vc2tonehost
+host-truncate|void Vc2ToneHost::truncateTva() { tva.truncate(); }|void Vc2ToneHost::truncateTva() { tva.truncateTold(); }|vc2tonehost
+host-tva-fade|{ return tva.w.fade; }|{ return tva.w.one; }|vc2tonehost
+host-tva-envelope|return mods.tvaEnvelope(self(), at);|return mods.tvaEnvelope(self(), envelopeAt(0));|vc2tonehost
+host-tva-lfo|return mods.lfoOut(self(), at);|return mods.lfoOut(self(), lfoAt(1));|vc2tonehost
+host-fade-step|{ return c_.fadeStep; }|{ return 0.0f; }|vc2tonehost
+host-os-event|{ osEvent(event, flags); }|{ osEvent(event, 0); }|vc2tonehost
+host-envelope-at|Mods::kEnvelopeBytes * (uint32_t)envelope;|Mods::kEnvelopeBytes * ((uint32_t)envelope / 2);|vc2tonehost
+host-lfo-at|Mods::kLfoBytes * (uint32_t)lfo; }|Mods::kLfoBytes * ((uint32_t)lfo / 2); }|vc2tonehost

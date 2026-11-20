@@ -24,13 +24,15 @@ inline constexpr int kToneOut = 4;
 
 enum ToneKind : int32_t {
     kBuild, kDestroy, kUpdateOsc, kUpdateCosm,
-    kTvaOver, kTvaStopped, kUpdateTva, kEnded, kRenderOsc, kRenderCosm, kRenderTva, kCountOsc,
-    kCountOscMatched, kTvaHeld, kInstallOsc, kInstallCosm,
+    kEnded, kRenderOsc, kRenderCosm, kCountOsc,
+    kCountOscMatched, kInstallOsc, kInstallCosm,
     kBindCosm, kNoteOnOsc, kTakePlayer, kSetOsc,
-    kSetUpCosm, kStartCosm, kNoteOnTva,
-    // v273: what the tone's remaining methods call (the envelopes' and LFOs' settings and release real from v315)
-    kSettingsOsc, kNewBlockCosm, kNewBlockTva, kLegatoOsc, kKeyOffOsc, kTruncateTold, kTruncate, kWaitFade, kTruncated,
+    kSetUpCosm, kStartCosm,
+    // v273: what the tone's remaining methods call (the envelopes' and LFOs' settings and release real from v315, the
+    // TVA's from v317)
+    kSettingsOsc, kNewBlockCosm, kLegatoOsc, kKeyOffOsc, kWaitFade, kTruncated,
     kOscWord168, kOscPosition,
+    kOsEvent,   // v317: the OS's event 0x89301830, which a told truncation's fade end sets
 };
 
 // A call as either side made it: what, on which tone of the pool (−1 none) and which of its parts (Vc2TonePiece × 100
@@ -44,7 +46,6 @@ struct ToneCall {
 
 // What the hooked routines answer, drawn once for both sides
 struct ToneDraws {
-    bool tvaOver = false, tvaStopped = false, tvaHeld = false;
     std::array<uint32_t, 2> installOsc {}, installCosm {};
     std::array<uint32_t, 2> word168 {}, position {};   // v273: each OSC voice's 0x893aed40 and 0x893aed60
 };
@@ -58,14 +59,11 @@ struct ToneOscWords {
     bool operator==(const ToneOscWords&) const = default;
 };
 
-// [FW] a tone's hooked parts' words the tone reads or writes: the OSC voices', the TVA's +0x40 and its +0xa4, +0xa8,
-// +0xac and +0xc0, and from v273 the TVA's fade +0x64 and COSM 1's cost +0x14c (the envelopes and LFOs are the real ones
-// from v268, Vc2ToneModulators)
+// [FW] a tone's hooked parts' words the tone reads or writes: the OSC voices', and from v273 COSM 1's cost +0x14c (the
+// envelopes and LFOs are the real ones from v268, Vc2ToneModulators, and the TVA from v317, Vc2Tva, the host's)
 struct ToneWords {
     std::array<ToneOscWords, 2> osc {};
-    uint32_t tvaLevel = 0;
-    std::array<uint32_t, 4> tvaBinds {};
-    uint32_t tvaFade = 0, cosmCost = 0;
+    uint32_t cosmCost = 0;
     bool operator==(const ToneWords&) const = default;
 };
 
@@ -79,6 +77,8 @@ struct ToneFadeWait {
 int32_t tonePartCode(Vc2TonePiece piece, int index);   // a part as a call names it
 uint32_t toneEnvelopeAt(uint32_t tone, int envelope);  // rom.4's address of a tone's envelope, LFO
 uint32_t toneLfoAt(uint32_t tone, int lfo);
+uint32_t toneTvaAt(uint32_t tone);                     // and of its TVA (v317)
+inline constexpr uint32_t kToneFadeStepAt = 0x8993eb08;   // [FW] the TVAs' fade step, in .data (v317)
 
 class TonePortParts;
 
@@ -97,6 +97,7 @@ struct ToneShared {
     float chaos = Vc2ToneLfo::kChaosStart;   // the LFOs' constructors' generator, rom.4's word 0x89999668
     Vc2ToneMixRings rings {};                // the mixes' delay lines (v269)
     Vc2FreeLfos frees {};                    // the free LFOs' manager (v271)
+    float fadeStep = 0.0f;                   // the TVAs' fade step, rom.4's word 0x8993eb08 (v317)
     long follows = 0, takes = 0;             // the LFOs that followed another tone's, took a free object
 };
 
@@ -110,24 +111,17 @@ public:
     void updateOsc(int osc, int32_t n) override;
     float oscValue(int osc) override { return std::bit_cast<float>(words.osc[(size_t)osc].value); }
     void updateCosm(int cosm, float x) override;
-    bool tvaOver() override { return answered(kTvaOver, s_.draws.tvaOver); }
-    bool tvaStopped() override { return answered(kTvaStopped, s_.draws.tvaStopped); }
-    void updateTva() override;
     void ended() override;   // logged with the tone's state as the end routine finds it
     void renderOsc(int osc, float* buffer) override;
     void renderCosm(int cosm, float* buffer) override;
-    void renderTva(const float* in, float* out) override;
     void countOsc(int osc, uint32_t x) override;
     void countOscMatched(int osc, uint32_t x) override;
-    float tvaLevel() override { return std::bit_cast<float>(words.tvaLevel); }
-    bool tvaHeld() override { return answered(kTvaHeld, s_.draws.tvaHeld); }
     uint32_t installOsc(int osc) override;
     int32_t oscKind(int osc) override { return (int32_t)words.osc[(size_t)osc].kind; }
     uint32_t oscFlag(int osc) override { return words.osc[(size_t)osc].flag; }
     uint32_t installCosm(int cosm, uint32_t flag) override;
     void bindOsc(int osc, const Vc2ToneBinding<4>& b) override;
     void bindCosm(int cosm, const Vc2ToneBinding<2>& b) override;
-    void bindTva(int envelope, int lfoA, int lfoB, int32_t serial) override;
     uint32_t oscWave(int osc) override { return words.osc[(size_t)osc].wave; }
     void setOscWave(int osc, uint32_t wave) override { words.osc[(size_t)osc].wave = wave; }
     void noteOnOsc(int osc, const uint32_t* block, bool legato) override;
@@ -136,15 +130,10 @@ public:
     Vc2ToneCosmSetUp cosmSetUp(int osc) override;
     void setUpCosm(int cosm, const Vc2ToneCosmSetUp& s, uint32_t flag) override;
     void startCosm(int cosm, const uint32_t* block, int which) override;
-    void noteOnTva(const uint32_t* block, uint32_t flag) override;
     void settingsOsc(int osc, const uint32_t* block) override;
     void newBlockCosm(int cosm, const uint32_t* block) override;
-    void newBlockTva(const uint32_t* block) override;
     void legatoOsc(int osc, const uint32_t* ramp) override;
     void keyOffOsc(int osc) override;
-    void truncateTvaTold() override;
-    void truncateTva() override;
-    float tvaFade() override { return std::bit_cast<float>(words.tvaFade); }
     void waitFade() override;
     void truncated() override;
     float oscCost(int osc) override { return std::bit_cast<float>(words.osc[(size_t)osc].cost); }
@@ -158,12 +147,14 @@ protected:
     void buildPart(Vc2TonePiece piece) override;     // logged
     void destroyPart(Vc2TonePiece piece) override;
     const Vc2ToneHost& hostOf(int tone) override;
+    void osEvent(uint32_t event, uint32_t flags) override;   // logged as rom.4's hook reads it (v317)
 
 private:
     void log(ToneKind kind, int32_t part, std::array<uint32_t, 4> args = {}, bool onTone = true) {
         s_.calls.push_back({ kind, onTone ? tone() : kToneNone, part, args[0], args[1], args[2], args[3] });
     }
-    bool answered(ToneKind kind, bool answer);
+    // A call given an input block, logged by the block's offset (setOsc, settingsOsc, newBlockCosm, legatoOsc)
+    void logBlock(ToneKind kind, int32_t part, const uint32_t* block) { log(kind, part, { blockOf(block) }); }
     uint32_t bufferOf(const float* p) const;
     uint32_t blockOf(const uint32_t* p) const;
     ToneShared& s_;
