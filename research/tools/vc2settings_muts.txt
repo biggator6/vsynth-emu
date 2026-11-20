@@ -25,7 +25,8 @@
 # that follows gives a turn and its negative the same) and vc2partchannel (Vc2PartChannel.cpp, v307,
 # v303's shared code's plants among them; not the count's rise before Auto Note's release, which leaves the count
 # alone, nor the floor's test at 0 by one, at 0 the same) and vc2mididispatch (Vc2MidiDispatch.cpp,
-# v308; not the class's bounds by one, 0x80 being its own class and 0xf0 none either way).  Not planted: the depth
+# v308; not the class's bounds by one, 0x80 being its own class and 0xf0 none either way) and vc2notestask (Vc2NotesTask.cpp, v309).  Not
+# planted: the depth
 # law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
 # the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
 # Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
@@ -870,3 +871,30 @@ md-row-program|{ 0xc0, handled, H::kProgram }|{ 0xc0, handled, H::kPressure }|vc
 md-row-noteon|{ 0x90, noteOn, H::kNoteOn }|{ 0x90, handled, H::kNoteOn }|vc2mididispatch
 md-row-reset|{ 0x70, reset, H::kNoteOff },|{ 0x71, reset, H::kNoteOff },|vc2mididispatch
 md-data|const MidiCall c { w, m.source, m.status & kChannelBits, m.data1, m.data2, word };|const MidiCall c { w, m.source, m.status & kChannelBits, m.data2, m.data1, word };|vc2mididispatch
+nt-inputs|constexpr int32_t kInputs = 3, kAutoNote = 4;|constexpr int32_t kInputs = 2, kAutoNote = 4;|vc2notestask
+nt-auto-source|constexpr int32_t kInputs = 3, kAutoNote = 4;|constexpr int32_t kInputs = 3, kAutoNote = 3;|vc2notestask
+nt-notes-off-number|constexpr uint32_t kNotesOffNumber = 123;|constexpr uint32_t kNotesOffNumber = 120;|vc2notestask
+nt-off-velocity|kOffVelocity = 64, kOnVelocity = 100;|kOffVelocity = 63, kOnVelocity = 100;|vc2notestask
+nt-on-velocity|kOffVelocity = 64, kOnVelocity = 100;|kOffVelocity = 64, kOnVelocity = 101;|vc2notestask
+nt-c4|kC4 = 60, kC4Velocity = 127;|kC4 = 61, kC4Velocity = 127;|vc2notestask
+nt-c4-velocity|kC4 = 60, kC4Velocity = 127;|kC4 = 60, kC4Velocity = 126;|vc2notestask
+nt-node|Vc2PartNodes::kParts * (kAutoNote - 1);|Vc2PartNodes::kParts * (kAutoNote - 2);|vc2notestask
+nt-reset-gate|    if (w.noteGate == 0) return true;|    if (w.noteGate != 0) return true;|vc2notestask
+nt-reset-from|for (int32_t source = 1; source <= kInputs; ++source)|for (int32_t source = 0; source <= kInputs; ++source)|vc2notestask
+nt-schedule-clear|    w.scheduled = 0;\n|\n|vc2notestask
+nt-schedule-count|for (; count > 0; --count)|for (; count > 1; --count)|vc2notestask
+nt-notesoff-count|    w.pitch.others = 0;\n|\n|vc2notestask
+nt-notesoff-release|if (w.pitch.note >= 0) w.parts.autoNoteRelease();|if (w.pitch.note > 0) w.parts.autoNoteRelease();|vc2notestask
+nt-notesoff-key|    w.pitch.note = -1;\n    return true;|    return true;|vc2notestask
+nt-on-gate|if (w.noteGate != 0 \|\| w.pitch.others > 0) return false;|if (w.pitch.others > 0) return false;|vc2notestask
+nt-on-others|if (w.noteGate != 0 \|\| w.pitch.others > 0) return false;|if (w.noteGate != 0 \|\| w.pitch.others > 1) return false;|vc2notestask
+nt-on-end|if (w.noteGate != 0 \|\| w.pitch.others > 0) return false;|if (w.noteGate != 0 \|\| w.pitch.others > 0) return true;|vc2notestask
+nt-c4-gate|    if (w.noteGate != 0) return false;\n    w.parts.channelMessage(H::kNoteOn, kInputs|    w.parts.channelMessage(H::kNoteOn, kInputs|vc2notestask
+nt-pressure-data|w.parts.channelMessage(H::kPolyPressure, kInputs, autoNoteChannel(w), 0, 0);|w.parts.channelMessage(H::kPolyPressure, kInputs, autoNoteChannel(w), 0, 1);|vc2notestask
+nt-order-auto|{ 0x040, autoNoteOff }, { 0x020, autoNoteOn },|{ 0x020, autoNoteOn }, { 0x040, autoNoteOff },|vc2notestask
+nt-order-notesoff|{ 0x080, inputsNotesOff }, { 0x040, autoNoteOff },|{ 0x040, autoNoteOff }, { 0x080, inputsNotesOff },|vc2notestask
+nt-bit-queue|{ 0x002, taskQueue }|{ 0x001, taskQueue }|vc2notestask
+nt-bit-c4|{ 0x200, heldC4 }|{ 0x400, heldC4 }|vc2notestask
+nt-bit-pressure|{ 0x100, taskPressure }|{ 0x080, taskPressure }|vc2notestask
+nt-pass-end|if ((events & bit) != 0 && !way(w)) return;|if ((events & bit) != 0) way(w);|vc2notestask
+nt-ended|    w.parts.endedScan();\n|\n|vc2notestask

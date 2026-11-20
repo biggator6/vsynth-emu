@@ -15,25 +15,22 @@ namespace {
 constexpr uint32_t kMidiDispatchAt = 0x8938fed0, kGateAt = 0x89981904, kPartAt = 0x899888ac;   // [FW]
 constexpr uint32_t kMidiMessageAt = 0x8C046000, kWordAt = 0x8C046010;                         // in Vc2Fw's RAM
 // [FW] the handlers by Vc2MidiHandler, and whether each is given the second data byte
-constexpr uint32_t kHandlers[] = { 0x89392e70, 0x89392da0, 0x893930a0, 0x89392f90, 0x89393090, 0x893930c0, 0x893930e0 };
+constexpr const auto& kHandlers = kVc2MidiHandlers;
 constexpr bool kTwoBytes[] = { true, true, true, true, false, false, true };
 constexpr uint32_t kParametersAt = 0x89392890, kPartParametersAt = 0x89392830, kDcCutAt = 0x893955e0;   // [FW]
 
-SettingsCall fourCalled(Sh4& c) {
-    return { kOutMidi, (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7], (int32_t)c.r[4] };
-}
 SettingsCall threeCalled(Sh4& c) { return { kOutMidi, (int32_t)c.r[5], (int32_t)c.r[6], 0, (int32_t)c.r[4] }; }
 SettingsCall wordCalled(Sh4& c) { return { kOutMidi, (int32_t)c.rd32(c.r[5]), 0, 0, (int32_t)c.r[4] }; }
 SettingsCall dcCutCalled(Sh4& c) { return { kOutMidi, (int32_t)c.r[4], 0, 0, 0 }; }
-SettingsCall routineCalled(Sh4& c) { return { kOutMidiRoutine, 0, 0, 0, (int32_t)c.pc }; }
 
 constexpr auto kMidiCallees = [] {
+    constexpr auto routine = settingsCalledRoutine;
     std::array<SettingsCallee, std::size(kHandlers) + 4> a {};
     for (size_t k = 0; k < std::size(kHandlers); ++k)
-        a[k] = { kHandlers[k], kTwoBytes[k] ? fourCalled : threeCalled, nullptr, routineCalled };
-    a[std::size(kHandlers)] = { kParametersAt, wordCalled, nullptr, routineCalled };
-    a[std::size(kHandlers) + 1] = { kPartParametersAt, wordCalled, nullptr, routineCalled };
-    a[std::size(kHandlers) + 2] = { kDcCutAt, dcCutCalled, nullptr, routineCalled };
+        a[k] = { kHandlers[k], kTwoBytes[k] ? settingsCalledFour : threeCalled, nullptr, routine };
+    a[std::size(kHandlers)] = { kParametersAt, wordCalled, nullptr, routine };
+    a[std::size(kHandlers) + 1] = { kPartParametersAt, wordCalled, nullptr, routine };
+    a[std::size(kHandlers) + 2] = { kDcCutAt, dcCutCalled, nullptr, routine };
     a[std::size(kHandlers) + 3] = kSettingsNotesOffCallee;
     return a;
 }();
@@ -56,10 +53,7 @@ public:
     void allNotesOff() override { s_.mine.log.push_back({ kOutNotesOff, 0, 0, 0, 0 }); }
 
 private:
-    void called(uint32_t routine, std::array<int32_t, 4> a) {
-        s_.mine.log.push_back({ kOutMidi, a[0], a[1], a[2], a[3] });
-        s_.mine.log.push_back({ kOutMidiRoutine, 0, 0, 0, (int32_t)routine });
-    }
+    void called(uint32_t routine, const std::array<int32_t, 4>& a) { settingsLogRoutine(s_.mine.log, routine, a); }
     SettingsSides& s_;
 };
 
@@ -106,15 +100,11 @@ std::string midiEvent(SettingsSides& s, std::mt19937& rng) {
 }
 
 const SettingsEvent kMidiEvents[] = { midiEvent };
-
-std::string midiCase(SettingsSides& s, std::mt19937& rng, long& events, long& calls) {
-    return settingsCaseOf<kMidiEvents, sizeof(Vc2PartRows), 5>(s, rng, events, calls);
-}
-
 constexpr SettingsSaid kMidiSaid[] = { { 87, "channel messages" }, { 88, "parameters' messages" }, { 89, "resets" },
                                        { 90, "others" } };
 } // namespace
 
-const SettingsPartRow kMidiPartRow { 20, &SettingsCounts::midiEvents, &SettingsCounts::midiCalls, midiCase, nullptr,
-                                     hookMidi, "MIDI dispatcher", kMidiSaid };
+const SettingsPartRow kMidiPartRow { 20, &SettingsCounts::midiEvents, &SettingsCounts::midiCalls,
+                                     settingsCaseOf<kMidiEvents, sizeof(Vc2PartRows), 5>, nullptr, hookMidi,
+                                     "MIDI dispatcher", kMidiSaid };
 #endif

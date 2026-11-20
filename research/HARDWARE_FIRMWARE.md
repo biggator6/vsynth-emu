@@ -1546,6 +1546,42 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's notes' task (2026-11-19, v309) {#vc2-part-notes-task}
+
+Step 4.3's thirty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's fourteenth part): the notes' task
+`0x8938fc00` (its object `0x8998190c`), after its start-up (v304's `0x89392ab0`) and its set-up, loops from
+`0x8938fc66`: it waits for events (`0x893017f0`, mask 0x3fe) and makes one pass over what the wait gave, now the port's
+own as `vc2NotesTaskPass` (`Vc2NotesTask.cpp`). In rom.4's order of tests:
+- **0x002**: the MIDI queue `0x89981918` drained (`0x893110b0`, each message to v308's dispatcher).
+- **0x004**: v272's ended scan (`0x89390ee0`).
+- **0x008**: while the word at `0x89981904` is set, v308's reset (`0x89390340`) of sources 1, 2 and 3.
+- **0x010**: the schedule `0x893b1710` once per count, the count (`0x89981b60`, the schedule object `0x89981b40`'s
+  +0x20) taken and cleared under the interrupts' mask.
+- **0x080**: All Notes Off (controller 123) on source 3, Auto Note's count of other keys cleared, its key let go
+  (`0x893ebcf0`) if one is held, and its key −1 (the pitch source `0x89989748`, v226's).
+- **0x040**: Auto Note's note-off, source 4, the key at `0x8993d038`, velocity 64.
+- **0x020**: Auto Note's note-on, the key at `0x8993d034`, velocity 100, but not with `0x89981904` set or another key
+  down; either ends the pass there.
+- **0x100**: the polyphonic aftertouch on source 3, data 0 and 0.
+- **0x200**: with `0x89981904` clear, a held C4 on source 3 (key 60, velocity 127).
+
+Each message goes on the channel of source 4's part 0 node (`0x89988bd0`'s +0xd). The calls out go through
+`Vc2NotesTaskParts`, the handlers by v308's `Vc2MidiHandler`.
+
+**The check.** `xt_vc2settings`' twenty-second part (`Vc2NotesTaskCheck.cpp`), on the seed twenty-one after the run's:
+rom.4's own loop body, entered at the loop's top with the registers its prologue leaves (r8…r12) and the queue's
+address on its stack, and left when it comes back there (XtFxCheckHand's way of leaving a task at its wait); the wait
+hooked to answer the events drawn, and the queue's drain, the ended scan, the reset, the schedule, Auto Note's release
+and the four handlers hooked to log. Each pass is on events drawn (each of the nine bits half the time; now and then
+none or any word). Before it come the note-on gate 0, 1 or any, the pitch source, the schedule's count (0…3, −1, any
+below 6), Auto Note's two keys, and the node's channel (−1, 0…15 or any). After each, the tables, the pitch source, the
+schedule's count and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first twenty-one parts' lines as they were.
+- Every line and branch of `Vc2NotesTask.cpp` is reached.
+- `mutate_vc2.py --settings`: 864 plants, none missed; v309's 27 new.
+
 ### The VC-2 part's MIDI dispatcher (2026-11-19, v308) {#vc2-part-midi-dispatcher}
 
 Step 4.3's thirty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's thirteenth part): `0x8938fed0`, a virtual of

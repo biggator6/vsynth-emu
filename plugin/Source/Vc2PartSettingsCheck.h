@@ -131,10 +131,11 @@ struct SettingsCounts {
     long tripEvents = 0, tripCalls = 0;                                         // the nineteenth's (v306)
     long channelEvents = 0, channelCalls = 0;                                   // the twentieth's (v307)
     long midiEvents = 0, midiCalls = 0;                                         // the twenty-first's (v308)
+    long taskEvents = 0, taskCalls = 0;                                         // the twenty-second's (v309)
     // from v298 the twelfth's controllers and held notes heard at 50 and 51, from v299 the thirteenth's all notes off
     // at 54, from v300 the fourteenth's removes made held at 62, from v301 the fifteenth's at 63…66, v302's at 67…69,
-    // v303's at 70…72, v304's at 73, v306's at 74…81, v307's at 82…86, v308's at 87…90
-    std::array<long, 91> byEvent {};
+    // v303's at 70…72, v304's at 73, v306's at 74…81, v307's at 82…86, v308's at 87…90, v309's at 91 and 92
+    std::array<long, 93> byEvent {};
 };
 
 // The two sides: rom.4's interpreter with the read objects' set-ups, the getter and (v288) the OSC block's reader
@@ -163,6 +164,8 @@ struct SettingsSides {
     Vc2PitchSource pitch {};                             // v307: 0x89989748
     int32_t autoNoteSwitch = 0;                          // v307: Auto Note's On Switch, 0x8993fe50
     uint32_t noteGate = 0;                               // v308: 0x89981904, no note-on while set
+    uint32_t scheduled = 0, autoNoteOn = 0, autoNoteOff = 0;   // v309: 0x89981b60, 0x8993d034, 0x8993d038
+    uint32_t taskEvents = 0;                             // v309: what the notes' task's wait answers
     SettingsCounts n {};
     // rom.4's side's read: logged and answered from the store, the flag set in its memory at the flip
     uint32_t romRead(Sh4& c, const SettingsCall& call);
@@ -202,6 +205,11 @@ inline SettingsCall settingsStopped(Sh4& c) { return { kOutStopVoices, 0, 0, 0, 
 inline SettingsCall settingsTruncatedAll(Sh4&) { return { kOutTruncateAll, 0, 0, 0, 0 }; }
 inline SettingsCall settingsHeldOn(Sh4&) { return { kOutHeldNoteOn, 0, 0, 0, 0 }; }
 inline SettingsCall settingsNotified(Sh4& c) { return { kOutNotify, 0, 0, 0, (int32_t)c.r[4] }; }   // v303's, v307
+// A callee's r5…r7 and r4, then its routine (v308's, shared from v309)
+inline SettingsCall settingsCalledFour(Sh4& c) {
+    return { kOutMidi, (int32_t)c.r[5], (int32_t)c.r[6], (int32_t)c.r[7], (int32_t)c.r[4] };
+}
+inline SettingsCall settingsCalledRoutine(Sh4& c) { return { kOutMidiRoutine, 0, 0, 0, (int32_t)c.pc }; }
 inline constexpr SettingsCallee kSettingsControllerCallee { 0x89392f90, settingsControlled };
 inline constexpr SettingsCallee kSettingsNotesOffCallee { 0x89391e30, settingsNotesOff };
 inline constexpr SettingsCallee kSettingsStopCallee { 0x89390f70, settingsStopped };

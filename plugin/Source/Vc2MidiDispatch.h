@@ -24,6 +24,9 @@ struct Vc2MidiMessage {
 // [FW] a channel message's handler: the note-off 0x89392e70, note-on 0x89392da0, polyphonic aftertouch 0x893930a0,
 // controller 0x89392f90, program change 0x89393090, channel pressure 0x893930c0 and pitch bend 0x893930e0
 enum class Vc2MidiHandler : uint8_t { kNoteOff, kNoteOn, kPolyPressure, kController, kProgram, kPressure, kBend };
+// [FW] their routines, by Vc2MidiHandler (the checks' hooks', v309; v308's check's own until then)
+inline constexpr uint32_t kVc2MidiHandlers[] = { 0x89392e70, 0x89392da0, 0x893930a0, 0x89392f90,
+                                                 0x89393090, 0x893930c0, 0x893930e0 };
 
 // What the dispatcher calls
 class Vc2MidiParts {

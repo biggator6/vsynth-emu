@@ -61,6 +61,14 @@ inline constexpr int32_t kOutObjectNote = 48, kOutObjectRoutine = 49, kOutReleas
 // The MIDI dispatcher's (v308): a handler's arguments past r4 as the part, kind and COSM, r4 as the ID (a parameters'
 // routine its word as the part), then the routine as the ID
 inline constexpr int32_t kOutMidi = 51, kOutMidiRoutine = 52;
+// The notes' task's (v309): its wait (the mask as the ID), and a call out as the dispatcher's two
+inline constexpr int32_t kOutTaskWait = 53;
+// A call out as the port's side logs it, the dispatcher's two entries: its arguments past r4 and r4, then its routine
+// (v308's MidiPortParts' own, shared from v309)
+inline void settingsLogRoutine(std::vector<SettingsCall>& log, uint32_t routine, const std::array<int32_t, 4>& a) {
+    log.push_back({ kOutMidi, a[0], a[1], a[2], a[3] });
+    log.push_back({ kOutMidiRoutine, 0, 0, 0, (int32_t)routine });
+}
 // The held flags as a log carries them
 inline SettingsCall settingsUnposted(const uint8_t* held, uint32_t object) {
     const auto low = (int32_t)(held[0] | held[1] << 8 | held[2] << 16 | (uint32_t)held[3] << 24);

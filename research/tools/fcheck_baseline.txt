@@ -858,6 +858,7 @@ start-up: 640 events: 640 start-ups (640 calls)
 Time Trip: 16000 events: 497 static initializers, 2207 constructors, 2118 rates, 2192 sets, 2230 moves, 2195 positions, 2275 steps, 2286 broadcasts (6270 calls)
 channel messages: 16000 events: 6331 note-ons, 6408 note-offs, 3261 messages heard, 8175 part objects' calls, 7140 releases of a table (26751 calls)
 MIDI dispatcher: 16000 events: 8927 channel messages, 4073 parameters' messages, 2051 resets, 949 others (136955 calls)
+notes' task: 16000 events: 16000 passes, 64753 calls out (145506 calls)
 settings: 40 cases, 16000 events: 1040 commons; envelopes 978, 1018 rows; LFOs 959, 987 rows, 1023 systems; mix 970, 1021 rows; TVAs 930, 992 rows, 1042 velocity rows, 1055 trailers, 992 routes, 969 controls; laws 1018 curves, 1006 depths (2097110 reads)
 xt_vc2settings: 0 different
 == xt_tone msm

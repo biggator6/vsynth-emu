@@ -61,3 +61,5 @@ extern const SettingsPartRow kTripPartRow;
 extern const SettingsPartRow kChannelPartRow;
 // The twenty-first (v308): the MIDI dispatcher (Vc2MidiDispatchCheck.cpp)
 extern const SettingsPartRow kMidiPartRow;
+// The twenty-second (v309): the notes' task's pass (Vc2NotesTaskCheck.cpp)
+extern const SettingsPartRow kTaskPartRow;

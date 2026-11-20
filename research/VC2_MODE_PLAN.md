@@ -857,6 +857,13 @@ version against rom.4's routines with what it calls hooked:
          twenty-first part (HARDWARE_FIRMWARE.md, "The VC-2 part's MIDI dispatcher"). Next: the mailbox and the three
          tasks (to be read: the routines before the dispatcher, `0x8938fc00`…`0x8938fec4`, which set event flags at
          `0x8994fec8` through `0x89301830`), then Vc2Synth.
+       - the notes' task's pass done (v309): `vc2NotesTaskPass`, rom.4's loop body `0x8938fc72`…`0x8938fdac` on the
+         events its wait gives (the MIDI queue drained, the ended scan, the reset while `0x89981904` is set, the
+         schedule once per count, all notes off on source 3 with Auto Note's key let go, Auto Note's note-off and
+         note-on, the aftertouch, a held C4), each on source 4's part 0 node's channel; through `Vc2NotesTaskParts`;
+         xt_vc2settings' twenty-second part (HARDWARE_FIRMWARE.md, "The VC-2 part's notes' task"). Next: the mailbox
+         (the queue's drain `0x893110b0` and what posts to it), the update task `0x893952b0` and the block task
+         `0x89395ac0`, then Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
