@@ -29,6 +29,7 @@ VC2_TABLES=(
     Vc2KeysTables               # the part's keys' (v276)
     Vc2SetEnvelopeTables        # C's envelopes' (v282)
     Vc2PartSettingsTables       # the part's settings' (v287)
+    Vc2OsMidiTables             # the OS MIDI task's (v313)
 )
 
 # vc2Tables <source dir> [suffix]: the rows' files the tree has, one a line, each with the suffix (.cpp for a source).

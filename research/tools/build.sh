@@ -34,7 +34,7 @@ V4=($(vc2Tables . .cpp))
 BUILT=(xt_osc xt_cosm xt_lfo xt_env xt_fw xt_enc xt_analog xt_synth xt_tone xt_fx xt_files xt_arp xt_msm xt_vc2params
        xt_vc2in xt_vc2legacy xt_vc2hireso xt_vc2vocoder xt_vc2carrier xt_vc2tracker xt_vc2kind6 xt_vc2autonote
        xt_vc2mixer xt_vc2tone xt_vc2osc classifier_test rd xt_vc2tva xt_vc2cosm xt_vc2libm xt_vc2voices xt_vc2notes
-       xt_vc2keys xt_vc2sets xt_vc2settings)
+       xt_vc2keys xt_vc2sets xt_vc2settings xt_vc2midi)
 for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
@@ -54,6 +54,9 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 [ -f Vc2KeysCheck.cpp ] && cc -DXT_VC2KEYS_MAIN Vc2KeysCheck.cpp Vc2KeysEvents.cpp Vc2Keys.cpp Vc2KeysTables.cpp \
    $( [ -f Vc2PartNodesCheck.cpp ] && echo Vc2PartNodes.cpp Vc2PartNodesCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2keys" &
+# The OS MIDI task's handler and the channel states (v313) against rom.4's own, the OS's listeners and routines hooked
+[ -f Vc2OsMidiCheck.cpp ] && cc -DXT_VC2MIDI_MAIN Vc2OsMidiCheck.cpp Vc2OsMidiEvents.cpp Vc2OsMidi.cpp \
+   Vc2OsMidiHandler.cpp Vc2OsMidiTables.cpp Vc2KeysTables.cpp "${SH4[@]}" -o "$O/xt_vc2midi" &
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
    Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp \

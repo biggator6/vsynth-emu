@@ -887,6 +887,16 @@ version against rom.4's routines with what it calls hooked:
          start `0x893952b0` with a period of 10 (the kernel's unit taken to be ms, as rom.2's note-on takes its
          clock), its routine `0x893952a0` a tick added to `0x8993d080` and event 2 posted; so Vc2Synth runs the update
          task's timer pass every 10 ms, 441 samples. Next: Vc2Synth.
+       - rom.4's MIDI channel states done (v313): `Vc2OsMidi`, the OS library's MIDI task's handler `0x89314e90` and
+         its channel-state module, the 32 states and 48 port objects with their initializers `0x89317d00` and
+         `0x89317910`; xt_vc2midi (HARDWARE_FIRMWARE.md, "rom.4's MIDI channel states"). It puts right v310's "the
+         wiring may hand parsed messages to the dispatcher directly": the part only reads the channel states (the
+         controllers, bend and pressures), and only this handler writes them, on the XT most likely before the part's
+         dispatcher sees the message, so Vc2Synth runs it on each message first. The OS's part objects, its listeners,
+         turn some messages into parameter edits: a patch change by Bank Select and Program Change, Portamento Time and
+         Switch by CC 5 and 65, Mono and Poly by CC 126 and 127, the bend range and tunes by RPN 0…2, the scale tunes
+         by SysEx. They are not ported. They are the plugin's side's to decide with the parameters as a host sees them
+         (step 5), and Vc2Synth gives them through `Vc2OsMidiParts`. Next: Vc2Synth.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

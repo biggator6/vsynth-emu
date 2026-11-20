@@ -132,4 +132,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2MidiDispatch.cpp
     Source/Vc2NotesTask.cpp
     Source/Vc2UpdateTask.cpp
+    Source/Vc2OsMidi.cpp
+    Source/Vc2OsMidiHandler.cpp
+    Source/Vc2OsMidiTables.cpp
 )

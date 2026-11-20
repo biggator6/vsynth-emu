@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's MIDI channel states v313 (2026-11-20, on claude/vc2-part-4-3 after v312; HARDWARE_FIRMWARE.md, "rom.4's MIDI
+  channel states"): step 4.3's forty-first version, item 10's eighteenth part. Vc2OsMidi (Vc2OsMidi.cpp, its handler
+  and control change in Vc2OsMidiHandler.cpp): the OS library's MIDI task's handler 0x89314e90, which alone writes the
+  channel states the part reads (controllers, bend, pressures, the resets, Receive Bank Select's gate, the RPN's and
+  NRPN's numbers), so Vc2Synth runs it on each message before v308's dispatcher; the 32 states and 48 port objects with
+  their initializers; the OS's part objects (the listeners, parameter edits), its other routines and SysEx's flag
+  through Vc2OsMidiParts. Vc2OsMidiTables, read by loadVc2 through vc2LoadOsMidi. xt_vc2midi (Vc2OsMidiCheck.cpp,
+  Vc2OsMidiEvents.cpp, in fcheck): 0 different at seeds 2024, 7 and 31337; mutate_vc2.py --midi 95 planted, 0 missed;
+  rom4-no-osmidi caught. Not in the sound yet.
+
 The VC-2 part's update queue with the static M's node v312 (2026-11-20, on claude/vc2-part-4-3 after v311;
   HARDWARE_FIRMWARE.md, "The VC-2 part's update queue with the static M's node"): step 4.3's fortieth version, item 10's
   seventeenth part. Vc2UpdateQueue given the static M's node by its address (setNode), each routine and v310's walk

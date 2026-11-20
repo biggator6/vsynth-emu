@@ -1,0 +1,105 @@
+# Planted errors in rom.4's OS MIDI task's handler and channel states (v313), for mutate_vc2.py --midi: each must make
+# xt_vc2midi, on rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2osmidi (Vc2OsMidi.cpp: the states'
+# routines, the port objects' resets and initializers), vc2osmidihandler (Vc2OsMidiHandler.cpp: the handler by status
+# and the control change) and vc2osmiditables (Vc2OsMidiTables.cpp: the three tables' addresses, each moved a neighbour
+# on).  Not planted: a poly pressure's most started at 0 (the value just stored is among the 128), the real-time
+# statuses' early return from 0xf0 on (rom.4's table has no way for 0xf0…0xf7 either), the channel mask from 0x90
+# (a note has no way, masked or not), Reset All Controllers' second write of the last pressure (the poly pressures'
+# clear wrote it 0 just before, as rom.4 does), kind 0's full reset of every channel moved after the OS's next routine
+# (it makes no calls, and the check compares its writes and the OS's calls apart), and the template's address a word
+# on (rom.4's template reads the same states from there; it is planted onto the port objects' table instead).
+centre|constexpr uint16_t kCentre = 0x2000;|constexpr uint16_t kCentre = 0x2001;|vc2osmidi
+setup-order-7|constexpr int kSetUpOrder[] = { 7, 10, 93, 91 };|constexpr int kSetUpOrder[] = { 10, 93, 91 };|vc2osmidi
+setup-order-10|constexpr int kSetUpOrder[] = { 7, 10, 93, 91 };|constexpr int kSetUpOrder[] = { 7, 93, 91 };|vc2osmidi
+setup-order-93|constexpr int kSetUpOrder[] = { 7, 10, 93, 91 };|constexpr int kSetUpOrder[] = { 7, 10, 91 };|vc2osmidi
+setup-order-91|constexpr int kSetUpOrder[] = { 7, 10, 93, 91 };|constexpr int kSetUpOrder[] = { 7, 10, 93 };|vc2osmidi
+reset-order-11|{ 11, 1, 2, 34,|{ 1, 2, 34,|vc2osmidi
+reset-order-69|80, 81, 82, 83, 64, 66, 67, 69 };|80, 81, 82, 83, 64, 66, 67 };|vc2osmidi
+reset-order-64|80, 81, 82, 83, 64, 66, 67, 69 };|80, 81, 82, 83, 66, 67, 69 };|vc2osmidi
+default-7|{ { 7, 127 },|{ { 7, 126 },|vc2osmidi
+default-10|{ 10, 64 }|{ 10, 63 }|vc2osmidi
+default-93|{ 93, 127 }|{ 93, 0 }|vc2osmidi
+default-91|{ 91, 127 }|{ 91, 0 }|vc2osmidi
+default-11|{ 11, 127 } };|{ 11, 0 } };|vc2osmidi
+default-other|const uint8_t value = d == std::end(kDefaults) ? 0 : d->value;|const uint8_t value = d == std::end(kDefaults) ? 1 : d->value;|vc2osmidi
+default-stored|    const uint8_t value = d == std::end(kDefaults) ? 0 : d->value;\n    if (cc < S::kStored)|    const uint8_t value = d == std::end(kDefaults) ? 0 : d->value;\n    if (cc <= S::kStored)|vc2osmidi
+store-bound|void vc2ChannelStore(S& s, int cc, uint8_t value) {\n    if (cc < S::kStored)|void vc2ChannelStore(S& s, int cc, uint8_t value) {\n    if (cc <= S::kStored)|vc2osmidi
+reset-bend|    s.bend = kCentre;   // 0x89317bd0|    s.bend = 0;   // 0x89317bd0|vc2osmidi
+reset-bend-up|    s.bend = kCentre;   // 0x89317bd0\n    s.controllers[S::kBendUp] = 0;\n|    s.bend = kCentre;   // 0x89317bd0\n|vc2osmidi
+reset-bend-down|    s.controllers[S::kBendDown] = 0;\n    s.poly.fill(0);|    s.poly.fill(0);|vc2osmidi
+reset-poly|    s.poly.fill(0);     // 0x89317bf0|    s.poly[0] = 0;     // 0x89317bf0|vc2osmidi
+reset-poly-most|    s.polyMost = 0;\n|\n|vc2osmidi
+reset-pressure|    s.pressure = 0;\n|\n|vc2osmidi
+full-template|std::memcpy(&s.bend, t.data(), t.size());|std::memcpy(&s.bend, t.data(), t.size() - 1);|vc2osmidi
+full-defaults|    std::memcpy(&s.bend, t.data(), t.size());   // C…C+0xe7\n    for (const int cc : kSetUpOrder) vc2ChannelDefault(s, cc);\n|    std::memcpy(&s.bend, t.data(), t.size());   // C…C+0xe7\n|vc2osmidi
+full-resets|    vc2ChannelResetControllers(s);\n}\n\nvoid vc2ChannelSetUp|}\n\nvoid vc2ChannelSetUp|vc2osmidi
+setup-channel|    s.channel = channel;\n|\n|vc2osmidi
+bend-shift|(uint32_t)msb << 7 \| lsb|(uint32_t)msb << 8 \| lsb|vc2osmidi
+bend-centre-up|        s.controllers[S::kBendUp] = 0;\n        s.controllers[S::kBendDown] = 0;\n    } else if|        s.controllers[S::kBendDown] = 0;\n    } else if|vc2osmidi
+bend-centre-down|        s.controllers[S::kBendUp] = 0;\n        s.controllers[S::kBendDown] = 0;\n    } else if|        s.controllers[S::kBendUp] = 0;\n    } else if|vc2osmidi
+bend-side|} else if (bend > kCentre) {|} else if (bend < kCentre) {|vc2osmidi
+bend-up-shift|(uint8_t)((bend - kCentre) >> 6)|(uint8_t)((bend - kCentre) >> 7)|vc2osmidi
+bend-down|(uint8_t)((kCentre - 1 - bend) >> 6)|(uint8_t)((kCentre - bend) >> 6)|vc2osmidi
+poly-key|    s.poly[key] = value;|    s.poly[key & 0x3f] = value;|vc2osmidi
+poly-most|    s.polyMost = most;|    s.polyMost = value;|vc2osmidi
+poly-last|    s.controllers[S::kLastPressure] = most;|    s.controllers[S::kLastPressure] = value;|vc2osmidi
+pressure-value|    s.pressure = value;|    s.pressure = 0;|vc2osmidi
+pressure-last|    s.pressure = value;\n    s.controllers[S::kLastPressure] = value;\n|    s.pressure = value;\n|vc2osmidi
+port-row|t.ports[(size_t)(t.portRows[source] * 16 + channel)]|t.ports[(size_t)(t.portRows[source == 2 ? 3 : source] * 16 + channel)]|vc2osmidi
+init-states-row|for (const int row : { 0, 1 })|for (const int row : { 0 })|vc2osmidi
+init-states-channel|vc2ChannelSetUp(state(at), (uint8_t)c);|vc2ChannelSetUp(state(at), (uint8_t)row);|vc2osmidi
+init-ports-rows|for (int row = 0; row < 3; ++row) {|for (int row = 0; row < 2; ++row) {|vc2osmidi
+init-ports-source|k.states[(size_t)(k.sources[(size_t)row] * 16 + c)];|k.states[(size_t)(k.sources[(size_t)row + 1] * 16 + c)];|vc2osmidi
+init-ports-numbers|            nulled(p);\n            p.listeners = 0;|            p.listeners = 0;|vc2osmidi
+init-ports-listeners|            nulled(p);\n            p.listeners = 0;|            nulled(p);|vc2osmidi
+tell-object|parts.heard(parts.listenerOf(node), slot, a, b);|parts.heard(node, slot, a, b);|vc2osmidi
+tell-data-order|        parts.heard(parts.listenerOf(node), Vc2OsMidiParts::kRpnSlot, p.rpn, p.data);\n        parts.heard(parts.listenerOf(node), Vc2OsMidiParts::kNrpnSlot, p.nrpn, p.data);|        parts.heard(parts.listenerOf(node), Vc2OsMidiParts::kNrpnSlot, p.nrpn, p.data);\n        parts.heard(parts.listenerOf(node), Vc2OsMidiParts::kRpnSlot, p.rpn, p.data);|vc2osmidi
+tell-data-rpn|Vc2OsMidiParts::kRpnSlot, p.rpn, p.data);|Vc2OsMidiParts::kRpnSlot, p.nrpn, p.data);|vc2osmidi
+tell-data-nrpn|Vc2OsMidiParts::kNrpnSlot, p.nrpn, p.data);|Vc2OsMidiParts::kNrpnSlot, p.nrpn, p.rpn);|vc2osmidi
+store-and-tell|    vc2ChannelStore(state(p.state), cc, value);\n    tellAll|    tellAll|vc2osmidi
+store-and-tell-slot|tellAll(p, parts, Vc2OsMidiParts::kControllerSlot, cc, value);|tellAll(p, parts, Vc2OsMidiParts::kProgramSlot, cc, value);|vc2osmidi
+program-gate|if (receiveProgram != 0) tellAll|if (receiveProgram == 0) tellAll|vc2osmidi
+source-reset|        vc2ChannelResetControllers(state(p.state));\n        nulled(p);|        vc2ChannelFullReset(state(p.state));\n        nulled(p);|vc2osmidi
+source-numbers|        vc2ChannelResetControllers(state(p.state));\n        nulled(p);|        vc2ChannelResetControllers(state(p.state));|vc2osmidi
+channel-sources|for (const uint8_t source : { 1, 3 }) {|for (const uint8_t source : { 1, 2 }) {|vc2osmidi
+channel-numbers|        vc2ChannelFullReset(state(p.state));\n        nulled(p);|        vc2ChannelFullReset(state(p.state));|vc2osmidi
+all-bit|if ((word >> 8 & 0x80) == 0) return;|if ((word >> 8 & 0x40) == 0) return;|vc2osmidi
+flags-ids|kProgramId = 0x45, kBankId = 0x46;|kProgramId = 0x45, kBankId = 0x45;|vc2osmidi
+flags-program|    receiveProgram = (uint8_t)params.value|    receiveProgram = 1 + (uint8_t)params.value|vc2osmidi
+unselected|constexpr uint16_t kUnselected = 0x8000;|constexpr uint16_t kUnselected = 0x4000;|vc2osmidihandler
+lsb-kept|kLsbKept = 0x7f80,|kLsbKept = 0xff80,|vc2osmidihandler
+msb-kept|kMsbKept = 0x00ff,|kMsbKept = 0x007f,|vc2osmidihandler
+data-kept|kDataKept = 0x3f80;|kDataKept = 0x7f80;|vc2osmidihandler
+number-other|    p.*Other = (uint16_t)(p.*Other \| kUnselected);\n|\n|vc2osmidihandler
+bank-gate|if (m.receiveBank != 0) m.storeAndTell|if (m.receiveBank == 0) m.storeAndTell|vc2osmidihandler
+data-tell|    m.tellData(p, parts);\n    m.storeAndTell|    m.storeAndTell|vc2osmidihandler
+reset-value|    if (value == 0) {|    if (value != 0) {|vc2osmidihandler
+reset-numbers|        m.nulled(p);\n|\n|vc2osmidihandler
+reset-store|        m.nulled(p);\n    }\n    m.storeAndTell(p, cc, value, parts);|        m.nulled(p);\n        return;\n    }\n    m.storeAndTell(p, cc, value, parts);|vc2osmidihandler
+row-32|    { 32, ccBank },|    { 31, ccBank },|vc2osmidihandler
+row-6|    { 6, ccData<0, 7> },|    { 6, ccData<0, 8> },|vc2osmidihandler
+row-38|    { 38, ccData<kDataKept, 0> },|    { 37, ccData<kDataKept, 0> },|vc2osmidihandler
+row-98|    { 98, ccNumber<&Vc2MidiPort::nrpn, &Vc2MidiPort::rpn, kLsbKept, 0> },|    { 98, ccNumber<&Vc2MidiPort::rpn, &Vc2MidiPort::nrpn, kLsbKept, 0> },|vc2osmidihandler
+row-99|    { 99, ccNumber<&Vc2MidiPort::nrpn, &Vc2MidiPort::rpn, kMsbKept, 8> },|    { 99, ccNumber<&Vc2MidiPort::nrpn, &Vc2MidiPort::rpn, kMsbKept, 7> },|vc2osmidihandler
+row-101|    { 101, ccNumber<&Vc2MidiPort::rpn, &Vc2MidiPort::nrpn, kMsbKept, 8> },|    { 102, ccNumber<&Vc2MidiPort::rpn, &Vc2MidiPort::nrpn, kMsbKept, 8> },|vc2osmidihandler
+row-121|    { 121, ccReset },|    { 120, ccReset },|vc2osmidihandler
+state-channel|return m.state(m.port(m.portOf(msg.source, msg.status & 15)).state);|return m.state(m.port(m.portOf(msg.source, msg.status & 7)).state);|vc2osmidihandler
+control-bytes|m.controlChange(m.portOf(msg.source, msg.status & 15), msg.data1, msg.data2, parts);|m.controlChange(m.portOf(msg.source, msg.status & 15), msg.data2, msg.data1, parts);|vc2osmidihandler
+bend-bytes|vc2ChannelBend(stateFor(m, msg), msg.data1, msg.data2);|vc2ChannelBend(stateFor(m, msg), msg.data2, msg.data1);|vc2osmidihandler
+poly-bytes|vc2ChannelPoly(stateFor(m, msg), msg.data1, msg.data2);|vc2ChannelPoly(stateFor(m, msg), msg.data2, msg.data1);|vc2osmidihandler
+pressure-byte|vc2ChannelPressure(stateFor(m, msg), msg.data1);|vc2ChannelPressure(stateFor(m, msg), msg.data2);|vc2osmidihandler
+program-byte|m.programChange(m.portOf(msg.source, msg.status & 15), msg.data1, parts);|m.programChange(m.portOf(msg.source, msg.status & 15), msg.data2, parts);|vc2osmidihandler
+kind0-reset|    { 0x89317fe0, kResetAllAt, 0x89318420, 0x89318210 },|    { 0x89317fe0, 0x89318420, 0x89318210 },|vc2osmidihandler
+kind4-flags|    { 0x89318040, kReadFlagsAt, 0x89318450, 0x893154a0, 0x8931a420 },|    { 0x89318040, 0x89318450, 0x893154a0, 0x8931a420 },|vc2osmidihandler
+kind5|    { 0x8931a460 },|    {},|vc2osmidihandler
+kind-byte|const uint32_t kind = word & 0xff;|const uint32_t kind = word >> 8 & 0xff;|vc2osmidihandler
+sysex-gate|if (parts.sysexOn() != 0) parts.osRoutine|if (parts.sysexOn() == 0) parts.osRoutine|vc2osmidihandler
+way-70|{ 0x70, reset }|{ 0x71, reset }|vc2osmidihandler
+way-01|{ 0x01, system }|{ 0x02, system }|vc2osmidihandler
+way-d0|{ 0xd0, pressure }|{ 0xd0, poly }|vc2osmidihandler
+way-c0|{ 0xc0, program }|{ 0xc1, program }|vc2osmidihandler
+way-40|{ 0x40, parameters }|{ 0x41, parameters }|vc2osmidihandler
+mask-end|m.status >= 0x80 && m.status < 0xf0 ?|m.status >= 0x80 && m.status < 0xe0 ?|vc2osmidihandler
+rows-at|image.read(0x8950d528, portRows.data()|image.read(0x8950d529, portRows.data()|vc2osmiditables
+ports-at|image.read(0x8950d530, ports.data()|image.read(0x8950d534, ports.data()|vc2osmiditables
+template-at|image.read(0x8950d5f0, stateTemplate.data()|image.read(0x8950d530, stateTemplate.data()|vc2osmiditables

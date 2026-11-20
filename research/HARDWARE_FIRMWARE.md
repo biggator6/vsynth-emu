@@ -1546,6 +1546,104 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's MIDI channel states (2026-11-20, v313) {#vc2-os-midi-channel-states}
+
+Step 4.3's forty-first version (VC2_MODE_PLAN.md, step 4.3, item 10's eighteenth part), and a change to Vc2Synth's
+plan. That plan handed the host's parsed messages straight to v308's dispatcher. But neither the queue's drain
+`0x893110b0` nor the dispatcher writes a MIDI channel state, and the part only reads them: its bend, pressure and
+controller handlers (v303, v307) pass a state's address to the listeners, whose voices read the values there, and the
+Matrix sources and C's TVA read the controllers. Every write is the OS library's own MIDI task's (entry `0x89314ce0`,
+queue `0x8995ccac`, handler `0x89314e90`). Each message reaches both tasks through a hub (`0x89314d30`), which first
+waits for the OS's queue to empty, so every earlier message's state is written before the next is handed on. The OS
+task's priority, handed to the kernel from the task table, is the more urgent of the two, so it most likely handles a
+message before the part's dispatcher does. That order is inferred: the kernel is outside rom.4. So Vc2Synth runs the
+OS handler on each message, then the dispatcher. The OS handler is now the port's: `Vc2OsMidi` (Vc2OsMidi.cpp, its
+handler and control change in Vc2OsMidiHandler.cpp).
+
+**A channel state**, 0xec bytes (`Vc2ChannelState`; the part reads it at its +2, C):
+- +0 the channel number;
+- C+0 the bend, 14 bits, centre 0x2000;
+- C+2 the channel pressure, C+3 the most of the poly pressures, C+4 + key the poly pressures;
+- C+0x84 + cc the controllers 0…98. CC 96, 97 and 98's bytes are also the bend up, the bend down and the last
+  pressure, so a CC 98 overwrites that pressure, as on the XT;
+- C+0xe7 the template's last byte, which no routine writes.
+
+Its routines:
+- the set-up `0x89317a10`: the channel, then the full reset `0x89317a50`, which copies the 0xe8-byte template at
+  `0x8950d5f0` to C, gives CC 7, 10, 93 and 91 their defaults and resets the controllers;
+- Reset All Controllers `0x89317a90`: 20 controllers' defaults (11 to 127, the rest 0), the bend centred, the
+  pressures cleared;
+- a controller's default `0x89317b30` and its store `0x89317c20` (each below 99);
+- the bend `0x89317c60`: its side's byte the distance from centre over 64, both cleared only at exact centre, so a
+  bend crossing centre leaves the other side's byte stale;
+- the poly pressure `0x89317cc0` and the channel pressure `0x89317cf0`.
+
+**The states and port objects.** rom.4 has 32 states, at `0x8995edf8`: v276's table rows 0 and 1, with sources 1…3
+sharing row 0 and source 4 having row 1. HARDWARE_FIRMWARE.md's "64 channel states" (v292) is put right in place. The
+48 port objects from `0x8995eaf4` (`Vc2MidiPort`, 16 bytes) are found by the source's row (`0x8950d528`) in the table
+`0x8950d530`. Each holds:
+- its state's address;
+- its RPN's and NRPN's numbers (bit 15 not selected, 0x7f7f none);
+- Data Entry;
+- its listeners: the OS's part objects, through nodes.
+
+Their static initializers are `0x89317d00`, which sets each channel up in rows 0 and 1, and `0x89317910`, which puts
+rows 0…2 on the states of sources 1…3 with no numbers and no listeners.
+
+**The handler**, by the status's class (a channel message's status masked to its class, 0x80…0xef):
+- **poly pressure, channel pressure and the bend** stored in the message's channel's state;
+- **control change** `0x893172e0`, by number:
+  - CC 0 and 32 dropped while Receive Bank Select is off;
+  - Data Entry's two halves (CC 6, 38), each told to the listeners with the RPN's number (their +0x24 slot) and the
+    NRPN's (+0x30);
+  - the numbers' halves (CC 98…101), the other kind marked unselected;
+  - CC 121 at 0 resets the controllers and the numbers;
+  - every message but a dropped one is then stored below 99 and told to the listeners (+0x18);
+- **program change** `0x893172a0`: told to the listeners (+0x0c) while Receive Program Change is on;
+- **0x70**: Reset All Controllers on its source's 16 channels (`0x89317780`);
+- **0x40, by its word's kind**:
+  - kind 0: `0x89317fe0`, the full reset of every channel on byte 1's bit 7 (`0x893178a0`, `0x893176d0` through
+    sources 1 and 3), `0x89318420`, `0x89318210`;
+  - kind 4: `0x89318040`, the two Receive flags read from system B's IDs 0x45 and 0x46 (`0x893178d0`), `0x89318450`,
+    `0x893154a0`, `0x8931a420`;
+  - kind 5: `0x8931a460`;
+- **0x01**: SysEx's routine `0x89310640`, while its flag `0x8992e3d1` is set;
+- notes, 0x41 and the system and real-time statuses: nothing.
+
+The OS's part objects, the listeners, are not ported, and nor are the OS's other routines above. They go through
+`Vc2OsMidiParts`. They are what turns a Bank Select and Program Change into a patch change, CC 5 into Portamento Time,
+CC 65 into Portamento Switch, CC 126 and 127 into Mono and Poly, and RPN 0…2 into the bend range and tunes, each as a
+parameter edit that reaches the part later as its own 0x40 message. Those are parameter edits, the plugin's side's to
+decide with the parameters as a host sees them (VC2_MODE_PLAN.md, step 5). Its tables are `Vc2OsMidiTables`, read by
+`loadVc2` through `vc2LoadOsMidi`.
+
+**The check.** `xt_vc2midi` (Vc2OsMidiCheck.cpp, its draws and events in Vc2OsMidiEvents.cpp) runs rom.4's own
+handler and routines on its own states, port objects and flags:
+- **The listeners** are objects in scratch memory with one vtable. Each slot's adjustment is drawn, and its routine is
+  at a hooked address that logs the object it is given and its words.
+- **The OS's nine routines and the parameters' getter** are hooked to log. The getter answers the two Receive flags as
+  drawn, alike on both sides.
+- **Each case** starts both static initializers on both sides, compared, then runs 400 events: the handler on a
+  message of every class (controllers aimed at the ones with a way, bends now and then at centre), the control and
+  program changes alone, each state routine, the resets, the flags' read and the initializers.
+- **Before each event** come now and then a state's bytes, a port's state, numbers, Data Entry and listeners, the
+  flags, SysEx's flag and the answers.
+- **After each event** the ports, the states, the flags and the calls are compared.
+- **Not drawn:** data bytes past 127 (a key there writes past the pressures) and sources past 4 (rom.4 reads past its
+  row table).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of Vc2OsMidiHandler.cpp is reached, and of Vc2OsMidi.cpp but the initializers' tests for a
+  missing state or port object, as rom.4's tables have none in the rows they read.
+- `mutate_vc2.py --midi`: 95 plants, none missed. Not planted, as they change nothing:
+  - the poly pressure's most started at 0;
+  - the real-time return from 0xf0 and the channel mask from 0x90;
+  - Reset All Controllers' second write of the last pressure;
+  - kind 0's reset moved past the OS's next routine;
+  - the template's address a word on.
+- `mutate_panel.py rom4-no-osmidi`, and the three loader plants whose text moved, caught.
+
 ### The VC-2 part's update queue with the static M's node (2026-11-20, v312) {#vc2-queue-static-node}
 
 Step 4.3's fortieth version (VC2_MODE_PLAN.md, step 4.3, item 10's seventeenth part), the first of Vc2Synth's ground:
@@ -2441,7 +2539,9 @@ Every reader the last three call answers 1, so their tests never stop them; the 
 G+0x840 is the word at `0x8999738c` (by `0x893a3010`); otherwise it is the word in the channel states' table
 `0x8950d6e0` at 64 × the byte at `0x8950d6d9` + 4 × Part 1 Receive Channel (ID 72), plus 2. It answers 1. In the image
 that byte is 0 and the table holds 64 channel states' addresses (16 a source; sources 2 and 3 alike), and
-`0x8999738c` is 0. The port takes both words through `Vc2ChannelStates`.
+`0x8999738c` is 0. The port takes both words through `Vc2ChannelStates`. (Put right in v313, "rom.4's MIDI channel
+states": the table's 64 words are four rows of 16, and only rows 0 and 1 are channel states, sources 1…3 sharing row 0
+and source 4 having row 1; rows 2 and 3 point at the OS's 16 part objects.)
 
 **v247's record, put right.** rom.4's `0x893a46f0` and `0x893a51c0` test flag 0 after their reads as well as before,
 and answer 0 if it was set in between. v247's port answered true there, and took the flag as a bool given at the start;

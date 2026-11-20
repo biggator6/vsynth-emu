@@ -73,6 +73,7 @@ VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEve
            Vc2VoiceClassEvents Vc2VoiceQueueCheck Vc2AssignListenersCheck Vc2UpdateTask Vc2UpdateTaskCheck)
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
+VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
          Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck
@@ -196,6 +197,9 @@ VC2PORTS=(
     "vc2keys|Vc2Keys.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
     "vc2nodes|Vc2PartNodes.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
     "vc2keystables|Vc2KeysTables.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
+    "vc2osmidi|Vc2OsMidi.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
+    "vc2osmidihandler|Vc2OsMidiHandler.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
+    "vc2osmiditables|Vc2OsMidiTables.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setcommon|Vc2SetCommon.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

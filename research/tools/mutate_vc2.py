@@ -85,6 +85,8 @@ HARNESSES = {
                                 'XT_VC2NOTES_STOP'), '40'),
     '--keys': (mutlist.Harness('mutate_vc2', 'xt_vc2keys', 'vc2keys_muts.txt', ('vc2keys', '2024'), 'XT_VC2KEYS_STOP'),
                '40'),
+    '--midi': (mutlist.Harness('mutate_vc2', 'xt_vc2midi', 'vc2midi_muts.txt', ('vc2osmidi', '2024'),
+                               'XT_VC2MIDI_STOP'), '40'),
     '--sets': (mutlist.Harness('mutate_vc2', 'xt_vc2sets', 'vc2sets_muts.txt', ('vc2sets', '2024'), 'XT_VC2SETS_STOP'),
                '40'),
     '--settings': (mutlist.Harness('mutate_vc2', 'xt_vc2settings', 'vc2settings_muts.txt', ('vc2settings', '2024'),
