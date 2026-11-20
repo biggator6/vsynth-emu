@@ -71,7 +71,7 @@ constexpr ToneSetter kSetters[] = {
     { 0x893b31a0, Vc2Tone::kLfos, false, &Vc2Tone::setLfoBlock, nullptr, In::kLfos, In::kLfoStride },
     { 0x893b31f0, Vc2Tone::kEnvelopes, false, &Vc2Tone::setEnvelopeBlock, nullptr, In::kEnvelopes,
       In::kEnvelopeStride },
-    { 0x893b3240, 2, true, &Vc2Tone::setCosmBlock, nullptr },
+    { 0x893b3240, 2, true, &Vc2Tone::setCosmBlock, nullptr, In::kCosms[0], In::kCosms[1] - In::kCosms[0] },
     { 0x893b32d0, 0, false, nullptr, &Vc2Tone::setMixBlock },
     { 0x893b3310, 0, false, nullptr, &Vc2Tone::setTvaBlock, In::kTva },
     { 0x893b3350, 0, false, nullptr, &Vc2Tone::setLegato },
@@ -121,17 +121,18 @@ void toneDrawLinks(ToneSides& s, int i, std::mt19937& rng) {
 }
 
 // A block from the input, drawn as its converter writes it, as the settings it reaches are real: the mix's, or (v315) the
-// LFOs' and envelopes'
+// LFOs' and envelopes', (v317) the TVA's, (v318) a COSM's; a COSM's number past 1 reaches none, its block COSM 1's
 std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     const ToneSetter& set = kSetters[rng() % std::size(kSetters)];
     const int i = toneDrawLive(s, rng);
     In& in = s.shared.input;
     toneDrawMixBlock(in, rng);
-    if (set.stride != 0) toneDrawModulatorBlocks(in, rng);
-    if (set.block == In::kTva) toneDrawTvaBlock(in, rng);   // v317: the TVA's new block is real
-    s.fw.cpu.write(kToneInputAt, in.words.data(), sizeof in.words);
     const uint32_t n = set.numbers == 0 ? 0 : (set.bounded ? drawPartNumber(rng, set.numbers) : rng() % set.numbers);
-    const uint32_t offset = set.block + set.stride * n;
+    if (set.numbered == &Vc2Tone::setCosmBlock) toneDrawCosmNewBlock(s, i, n, rng);
+    else if (set.stride != 0) toneDrawModulatorBlocks(in, rng);
+    if (set.block == In::kTva) toneDrawTvaBlock(in, rng);
+    s.fw.cpu.write(kToneInputAt, in.words.data(), sizeof in.words);
+    const uint32_t offset = set.block + set.stride * (n < set.numbers ? n : 0);
     const uint32_t tone = s.pool.addressOf(i), block = kToneInputAt + offset;
     Vc2Tone& t = s.pool.tones[(size_t)i];
     Vc2ToneParts& parts = s.parts[(size_t)i];

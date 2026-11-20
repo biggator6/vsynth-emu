@@ -35,9 +35,10 @@ struct TonePlain {
     uint32_t at;
     void (*act)(Vc2Tone&, Vc2ToneParts&);
 };
+constexpr uint32_t kInstallAt = 0x893b4060;   // [FW] the install pass
 constexpr TonePlain kPlains[] = {
     { 0x893b4050, [](Vc2Tone& t, Vc2ToneParts&) { t.start(); } },
-    { 0x893b4060, [](Vc2Tone& t, Vc2ToneParts& p) { t.install(p); } },
+    { kInstallAt, [](Vc2Tone& t, Vc2ToneParts& p) { t.install(p); } },
 };
 
 uint32_t toneDrawId(std::mt19937& rng) { return rng() % 2 == 0 ? rng() % 16 : (uint32_t)rng(); }
@@ -50,6 +51,7 @@ std::string toneInPlaceOn(ToneSides& s, std::mt19937& rng) {
     std::string what = toneLeaveLists(s, i);
     if (!what.empty()) return what;
     toneDrawLinks(s, i, rng);
+    toneUnnoted(s, i, false);   // v318: built again, its COSMs keep the slots its last note took
     what = toneOn(s, i, kMakeAt, { at, id }, [&] { s.pool.tones[(size_t)i].construct(at, id, partsOf(s, i)); });
     return what.empty() && s.fw.cpu.r[0] != at ? "the constructor's tone where it stands" : what;
 }
@@ -60,6 +62,8 @@ std::string toneUnmakeOn(ToneSides& s, std::mt19937& rng) {
     if (rng() % 3 == 0) toneBothWord(s, i, kToneStateAt, tone.head.state, Vc2Tone::kFromOne);
     const uint32_t flags = (rng() % 8 == 0 ? 0u : 1u) | (rng() % 2 == 0 ? 2u : 0u);   // back but now and then
     std::erase(s.live, i);
+    toneHoldNoStaleSlots(s, i);
+    toneUnnoted(s, i, true);   // v318: its destructor frees its COSMs' slots
     ++s.n.unmakes;
     s.n.back += flags & 1;
     const std::string what = vc2BothOn(
@@ -92,11 +96,17 @@ std::string toneRenderOn(ToneSides& s, std::mt19937& rng) {
     toneDrawOut(s, rng);   // v317: the TVA renders into it
     float* out = s.shared.out.data();
     const std::initializer_list<uint32_t> args = { s.pool.addressOf(i), kToneOutAt };
-    what = rng() % 2 == 0
+    // v318: whole, through COSM 1's sound, only with a note in the tone's life: rom.4's sound runs on the slot its
+    // object names, which a tone unmade has given up
+    const bool whole = s.cosm.noted[(size_t)i];
+    s.n.cosmRenders += whole && tone.tail.renders != 0;
+    s.n.cosmFollowers += whole && tone.tail.renders != 0 && toneCosmFollows(s, i);
+    what = whole
                ? toneOn(s, i, kWholeAt, args, [&] { tone.renderWhole(out, s.shared.buffers, partsOf(s, i)); })
                : toneOn(s, i, kRenderAt, args, [&] { tone.render(out, s.shared.buffers, partsOf(s, i)); });
     s.n.told += vc2CountCalls(s.rom, kOsEvent);
     if (what.empty()) what = toneMixRendered(s, i);
+    if (!what.empty() && whole) what += " (COSM 1's code " + std::to_string(s.parts[(size_t)i].cosms[0].code) + ")";
     return what.empty() ? toneOutDifference(s) : what;
 }
 
@@ -136,6 +146,7 @@ std::string toneAskOn(ToneSides& s, std::mt19937& rng) {
 std::string tonePlainOn(ToneSides& s, std::mt19937& rng) {
     const TonePlain& c = kPlains[rng() % std::size(kPlains)];
     const int i = toneDrawLive(s, rng);
+    if (c.at == kInstallAt) toneKeepCosmMode(s, i);   // v318
     return toneOn(s, i, c.at, { s.pool.addressOf(i) }, [&] { c.act(s.pool.tones[(size_t)i], partsOf(s, i)); });
 }
 
@@ -173,12 +184,14 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
     const std::string left = toneLeaveLists(s, i);
     if (!left.empty()) return left;
     tonePrepareNoteOn(s, i, rng);
+    toneCosmsBeforeNoteOn(s, i);   // v318: the slots freed, or a sounding COSM's mode kept
     Vc2Tone& tone = s.pool.tones[(size_t)i];
     ++s.n.noteOns;
     std::string what = vc2BothOn(
         s.fw, kNoteOnAt, { s.pool.addressOf(i), kToneInputAt }, "the note-on",
         [&] { tone.noteOn(s.shared.input, s.pool, s.owner, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
     if (what.empty()) what = toneMixRingsOf(s, i);
+    toneNoted(s, i);
     s.n.takes += vc2CountCalls(s.rom, kTakePlayer);
     s.n.fixes += s.shared.input.at(In::kOscs[1] + In::kWave) == kFixed && s.shared.input.at(In::kMix) == kFixMix;
     return what;
@@ -237,6 +250,7 @@ std::string toneMakeOn(ToneSides& s, std::mt19937& rng) {
     ++(tone ? s.n.makes : s.n.full);
     if (!what.empty() || !tone) return what;
     s.live.push_back(i);
+    toneUnnoted(s, i, false);   // v318: a tone the pool gave holds no slot: its destructor freed them
     toneBothWord(s, i, kToneEndedWordAt, tone->tail.ended, kToneEndedAt);   // the note-on's end routine
     toneBothWord(s, i, kToneTruncatedWordAt, tone->tail.truncated, kToneTruncatedAt);   // the part's, v273
     return "";

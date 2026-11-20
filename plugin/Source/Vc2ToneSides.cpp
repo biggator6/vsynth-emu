@@ -17,6 +17,8 @@ constexpr uint32_t kLinkAt = 0x2618;
 constexpr int kListed = 3;                     // the most tones the lists hold
 constexpr uint32_t kNoSerial = 0x7ffffff0;      // a serial no tone of a case reaches
 constexpr uint32_t kFixMix = 4, kFixKind = 3, kFixWave = 10, kFixedWave = 2;   // [FW] the note-on's fix-up's case
+// An OSC voice's pitch ratio 0.25…4 and its wave's root 55…1760 Hz, xt_vc2cosm's draws of what its COSMs take
+constexpr float kLeastRatio = 0.25f, kRatioSpan = 3.75f, kLeastRoot = 55.0f, kRootSpan = 1705.0f;
 
 bool drawFlag(std::mt19937& rng) { return rng() % 2 == 0; }
 float drawFloat(std::mt19937& rng) { return 4.0f * vc2Unit(rng) - 2.0f; }
@@ -44,6 +46,7 @@ std::string toneWordsDifference(ToneSides& s, int i) {
     if (what.empty()) what = toneModulatorsDifference(s, i);
     if (what.empty()) what = toneMixDifference(s, i);
     if (what.empty()) what = toneTvaDifference(s, i);
+    if (what.empty()) what = toneCosmDifference(s, i);
     if (what.empty()) what = partWordsDifference(toneReadRom(s.fw, at), s.parts[(size_t)i].words);
     return what.empty() ? what : "tone " + std::to_string(i) + ", " + what;
 }
@@ -53,14 +56,14 @@ ToneWords drawWords(std::mt19937& rng) {
     for (ToneOscWords& o : w.osc) {
         o.kind = rng() % 8;
         o.flag = drawFlag(rng) ? rng() % 2 : (uint32_t)rng();
-        o.value = drawBits(rng);
-        o.other = drawBits(rng);
+        // [FW] +0x1cc the voice's pitch ratio and +0xa80 its wave's root, Hz, as a COSM's set-up reads them (v318)
+        o.value = std::bit_cast<uint32_t>(kLeastRatio + kRatioSpan * vc2Unit(rng));
+        o.other = std::bit_cast<uint32_t>(kLeastRoot + kRootSpan * vc2Unit(rng));
         o.byte = rng() % 256;
         o.wave = rng() % 16;
         std::ranges::generate(o.binds, [&] { return (uint32_t)rng(); });
         o.cost = drawBits(rng);
     }
-    w.cosmCost = drawBits(rng);
     return w;
 }
 
@@ -72,7 +75,7 @@ void drawToneInput(ToneSides& s, std::mt19937& rng) {
     toneDrawModulatorBlocks(in, rng);
     for (uint32_t l = 0; l < Vc2Tone::kLfos; ++l) in.at(In::kLfos + In::kLfoStride * l + In::kKeySync) = rng() % 2;
     for (uint32_t block : In::kOscs) in.at(block + In::kLegato) = rng() % 2;
-    for (uint32_t block : In::kCosms) in.at(block) = rng() % 23;
+    toneDrawCosmBlocks(in, rng);
     toneDrawMixBlock(in, rng);
     in.at(In::kTva) = rng() % Vc2Tone::kEnvelopes;
     toneDrawTvaBlock(in, rng);
@@ -153,6 +156,7 @@ std::string toneDifference(ToneSides& s, int only) {
     const auto& in = s.shared.input.words;
     if (what.empty()) what = vc2FirstDifference(s.fw, kToneInputAt, in.data(), sizeof in, "the input");
     if (what.empty()) what = toneListsDifference(s);
+    if (what.empty()) what = tonePoolsDifference(s);
     if (what.empty() && only < 0) what = toneFreeLfosDifference(s);   // the events that can reach the manager
     return what.empty() ? toneCallsDifference(s.rom, s.shared.calls) : what;
 }
@@ -160,13 +164,13 @@ std::string toneDifference(ToneSides& s, int only) {
 void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     ToneDraws& d = s.shared.draws;
     std::ranges::generate(d.installOsc, [&] { return (uint32_t)rng(); });
-    std::ranges::generate(d.installCosm, [&] { return drawFlag(rng) ? rng() % 2 : (uint32_t)rng(); });
     std::ranges::generate(d.word168, [&] { return (uint32_t)rng(); });
     std::ranges::generate(d.position, [&] { return (uint32_t)rng(); });
     s.parts[(size_t)i].words = drawWords(rng);
     toneWriteRom(s.fw, s.pool.addressOf(i), s.parts[(size_t)i].words);
     toneDrawModulatorWords(s, i, rng);
     toneDrawTva(s, i, rng);
+    toneDrawCosms(s, i, rng);
     s.rom.clear();
     s.shared.calls.clear();
     ++s.n.events;

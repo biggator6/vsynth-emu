@@ -54,7 +54,9 @@ VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck 
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents Vc2ToneModulators
          Vc2ToneEnvelope Vc2ToneLfo Vc2ToneModCheck XtEnvelope XtLfo Vc2ToneMix Vc2ToneMixRender Vc2ToneMixTables
          Vc2ToneMixCheck Vc2FreeLfos Vc2FreeLfoCheck Vc2ToneLists Vc2ToneMethods Vc2ToneMethodCheck Vc2ToneHost
-         Vc2Tva Vc2TvaTables Vc2TvaDraws Vc2ToneTvaCheck)
+         Vc2Tva Vc2TvaTables Vc2TvaDraws Vc2ToneTvaCheck Vc2CosmObject Vc2CosmPools Vc2CosmNoteOn Vc2CosmAdapters
+         Vc2CosmAdapterWords Vc2CosmAdapterBlocks Vc2CosmTbAdapter Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmGrowl
+         Vc2CosmTables Vc2Math XtCosm Vc2CosmNoteOnDraws Vc2ToneCosmCheck Vc2CosmConvert XtOsc)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
         Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub

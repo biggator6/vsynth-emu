@@ -26,7 +26,6 @@ destroy-unfollow-0|    for (int lfo = 1; lfo < kLfos; ++lfo) {   // LFO 0 is nev
 destroy-unfollow-all|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|        parts.unfollow(lfo);|vc2tone
 destroy-unfollow-on|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|        if (parts.lfoOn(lfo)) parts.unfollow(lfo);|vc2tone
 destroy-unlist-sounding|    parts.unlist(head.state == kFromOne);|    parts.unlist(head.state == kSounding);|vc2tone
-destroy-cosm-order|{ Piece::lfos, Piece::cosm2, Piece::cosm1 }|{ Piece::lfos, Piece::cosm1, Piece::cosm2 }|vc2tone
 update-any-state|    if (head.state != kSounding) return;\n||vc2tone
 update-built-state|    if (head.state != kSounding) return;|    if (head.state != kBuilt) return;|vc2tone
 update-no-exts|static_cast<int32_t>(static_cast<int16_t>(n))|n|vc2tone
@@ -67,7 +66,6 @@ start-built|void Vc2Tone::start() { head.state = kSounding; }|void Vc2Tone::star
 install-kind-not|parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);|parts.installMix(parts.oscKind(kVc2ToneOsc1) != kMixKind);|vc2tone
 install-kind-osc2|parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);|parts.installMix(parts.oscFlag(kVc2ToneOsc1) == kMixKind);|vc2tone
 install-kind-2|constexpr int32_t kMixKind = 3;|constexpr int32_t kMixKind = 2;|vc2tone
-install-cosm2-flag|    parts.installCosm(kVc2ToneCosm2, given);|    parts.installCosm(kVc2ToneCosm2, flag);|vc2tone
 install-cosm1-zero|parts.installCosm(kVc2ToneCosm1, flag);|parts.installCosm(kVc2ToneCosm1, 0);|vc2tone
 install-osc2-lost|    parts.installOsc(kVc2ToneOsc2);\n||vc2tone
 install-mix-after|    parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);\n    const uint32_t given|    const uint32_t given|vc2tone
@@ -114,7 +112,6 @@ oscbind-kind6-env|    { 6, { 0x20, 0, 0x30, 0x38 }|    { 6, { 0x20, 0x28, 0x30, 
 numbers-zero-read|        if (offsets[k] != 0) numbers[k] =|        numbers[k] =|vc2tonenoteon
 cosmbind-one|        parts.bindCosm(cosm, bindingOf<2>(in.block(In::kCosms[(size_t)cosm]), kCosmBinds, &CosmBinds::type));|        parts.bindCosm(cosm, bindingOf<2>(in.block(In::kCosms[0]), kCosmBinds, &CosmBinds::type));|vc2tonenoteon
 cosmbind-type20|{ 20, { 0x24, 0x34 }, { 0x2c, 0x3c } },|{ 20, { 0x24, 0x34 }, { 0x2c, 0x38 } },|vc2tonenoteon
-cosmbind-type17|{ 17, { 0x20, 0xc }, { 0x28, 0x14 } },|{ 17, { 0xc, 0x20 }, { 0x14, 0x28 } },|vc2tonenoteon
 cosmbind-type4-envb|{ 4, { 0x10, 0 }, { 0x18, 0 } },|{ 4, { 0x10, 0x24 }, { 0x18, 0 } },|vc2tonenoteon
 cosmbind-type5|{ 4, { 0x10, 0 }, { 0x18, 0 } },|{ 4, { 0x10, 0 }, { 0x18, 0 } }, { 5, { 0x10, 0x24 }, { 0x18, 0x2c } },|vc2tonenoteon
 fixup-lost|    if (in.at(In::kMix) == kFixMix && in.at(In::kOscs[kVc2ToneOsc2]) == kFixKind && fixed == kFixFrom) fixed = kFixTo;|    if (false) fixed = kFixTo;|vc2tonenoteon
@@ -667,7 +664,6 @@ lfo-release-no-fade|    l.fadeStart();   // rom.4's through the vtable's +0x0c, 
 host-build-envelopes|if (piece == Piece::envelopes) mods.buildEnvelopes();|if (piece == Piece::envelopes) buildPart(piece);|vc2tonehost
 host-build-lfos|else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);|else if (piece == Piece::lfos) buildPart(piece);|vc2tonehost
 host-build-mix|else if (piece == Piece::mix) mix.construct(tail());|else if (piece == Piece::mix) buildPart(piece);|vc2tonehost
-host-destroy-lfos|if (piece == Piece::lfos) mods.destroyLfos();|if (piece == Piece::lfos) destroyPart(piece);|vc2tonehost
 host-lfo-follows|return mods.lfos[(size_t)lfo].w.follow != 0; }|return mods.lfos[(size_t)lfo].w.on != 0; }|vc2tonehost
 host-lfo-follow|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[(size_t)lfo].w.follow; }|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[0].w.follow; }|vc2tonehost
 host-lfo-listed|return mods.lfos[(size_t)lfo].w.sync != 0; }|return mods.lfos[(size_t)lfo].w.keySync != 0; }|vc2tonehost
@@ -727,3 +723,32 @@ host-fade-step|{ return c_.fadeStep; }|{ return 0.0f; }|vc2tonehost
 host-os-event|{ osEvent(event, flags); }|{ osEvent(event, 0); }|vc2tonehost
 host-envelope-at|Mods::kEnvelopeBytes * (uint32_t)envelope;|Mods::kEnvelopeBytes * ((uint32_t)envelope / 2);|vc2tonehost
 host-lfo-at|Mods::kLfoBytes * (uint32_t)lfo; }|Mods::kLfoBytes * ((uint32_t)lfo / 2); }|vc2tonehost
+# v318: the COSMs joined into the host (vc2tonehost) and the modulators' word by address (vc2tonemods).  Not planted:
+# the destructor's flags (2, rom.4's tone's; vc2CosmDestroy reads them only for its answer, whether to delete, which the
+# host doesn't take).  Taken out, as the real COSMs made them equivalent or unreachable: v228's destroy-cosm-order (each
+# COSM frees its own pool's slot alone), v228's install-cosm2-flag (COSM 1's install answers 1 for stereo, else whether
+# its code is 10, which no converter writes, so COSM 2 is given OSC 1's flag's either way), v229's cosmbind-type17 (no
+# converter writes code 17) and v316's host-destroy-lfos (with the COSMs the host's, the LFOs' destructor writes only the
+# vtable word the constructor wrote, as v268 found, and no log is left to see it).
+host-build-cosm|else if (isCosmPiece(piece)) vc2CosmConstruct(cosms[cosmOfPiece(piece)]);|else if (isCosmPiece(piece)) buildPart(piece);|vc2tonehost
+host-destroy-cosm-one|else vc2CosmDestroy(cosms[cosmOfPiece(piece)], c_.pools|else vc2CosmDestroy(cosms[0], c_.pools|vc2tonehost
+host-update-cosm-pitch|cosmFrame_.update(cosms[(size_t)cosm], x);|cosmFrame_.update(cosms[(size_t)cosm], 1.0f);|vc2tonehost
+host-update-cosm-sound|    sounds[(size_t)cosm].update(cosms[(size_t)cosm], *this);\n||vc2tonehost
+host-render-cosm-past|render(cosms[(size_t)cosm], buffer, c_.past);|render(cosms[(size_t)cosm], buffer, buffer);|vc2tonehost
+host-render-cosm-none|    sounds[(size_t)cosm].render(cosms[(size_t)cosm], buffer, c_.past);\n||vc2tonehost
+host-install-cosm-flag|const uint32_t given = vc2CosmInstall(cosms[k], flag);|const uint32_t given = vc2CosmInstall(cosms[k], 0);|vc2tonehost
+host-install-no-sound|    if (pending_[k]) sounds[k].noteOn(cosms[k], started_[k], *this, flag != 0);\n||vc2tonehost
+host-install-pending-kept|    pending_[k] = false;\n    return given;|    return given;|vc2tonehost
+host-bind-cosm-envelopes|{ envelopeAt(b.envelopes[0]), envelopeAt(b.envelopes[1]), lfoAt|{ envelopeAt(b.envelopes[1]), envelopeAt(b.envelopes[0]), lfoAt|vc2tonehost
+host-bind-cosm-lfos|lfoAt(b.lfos[0]), lfoAt(b.lfos[1]) });|lfoAt(b.lfos[1]), lfoAt(b.lfos[0]) });|vc2tonehost
+host-bind-cosm-flags|lfoAt(b.lfos[1]) });\n    bindFlags(b.envelopes, b.lfos);|lfoAt(b.lfos[1]) });|vc2tonehost
+host-setup-cosm-byte|{ s.value, s.other, 0, s.byte }|{ s.value, s.other, 0, 0 }|vc2tonehost
+host-setup-cosm-other|{ s.value, s.other, 0, s.byte }|{ s.value, s.value, 0, s.byte }|vc2tonehost
+host-start-cosm-pool|cosmFrame_.noteOn(cosms[k], started_[k], (uint32_t)which);|cosmFrame_.noteOn(cosms[k], started_[k], 0);|vc2tonehost
+host-start-cosm-waits-not|    pending_[k] = true;\n||vc2tonehost
+host-new-block-cosm-frame|    cosmFrame_.newBlock(cosms[(size_t)cosm], b);\n||vc2tonehost
+host-new-block-cosm-sound|    sounds[(size_t)cosm].newBlock(cosms[(size_t)cosm], b, *this);\n||vc2tonehost
+host-cosm-cost|{ return cosms[0].factor; }|{ return cosms[1].factor; }|vc2tonehost
+host-cosm-word|{ return mods.wordAt(self(), at); }|{ return mods.wordAt(self(), at + 4); }|vc2tonehost
+mods-word-at-envelope|envelope % kEnvelopeBytes, word)) return word;|0, word)) return word;|vc2tonemods
+mods-word-at-lfo|boundWordIn(lfos, lfo, kLfoBytes, lfo % kLfoBytes, word);|boundWordIn(lfos, lfo, kLfoBytes, lfo % kEnvelopeBytes, word);|vc2tonemods

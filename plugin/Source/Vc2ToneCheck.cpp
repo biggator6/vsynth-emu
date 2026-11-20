@@ -14,6 +14,8 @@
 #include "Vc2ToneSides.h"
 #include "Vc2ToneMixTables.h"
 #include "Vc2TvaTables.h"
+#include "Vc2CosmTables.h"
+#include "XtCosm.h"
 #include "XtEnvelope.h"
 #include "XtLfo.h"
 #include <algorithm>
@@ -21,22 +23,21 @@
 namespace {
 constexpr uint32_t kHeadAt = 0x8993fb48;   // [FW] the pool's head and serial, cleared at a case's start
 // [FW] rom.4's static initializers the real parts read: the envelope's start coefficient, the LFOs' generator, the mix's
-// member pointers
-constexpr uint32_t kStaticInits[] = { 0x893ac4a0, 0x893ad8d0, 0x893e4960 };
+// member pointers, and (v318) the TB Filter's floats
+constexpr uint32_t kStaticInits[] = { 0x893ac4a0, 0x893ad8d0, 0x893e4960, 0x893b98e0 };
 constexpr int kSteps = 400, kMaxLive = 8;
 
-// Both pools fresh: rom.4's tones' memory, head and serial cleared, the port's pool new and its parts' words with it
+// Both pools fresh: rom.4's tones' memory, head and serial cleared, the port's pool new and every tone's parts made
+// again (v318: a COSM's sound keeps more than its object's words show)
 void toneFreshPools(ToneSides& s) {
     const std::vector<uint8_t> zeros(Vc2TonePool::kTones * Vc2Tone::kSize);
     s.fw.cpu.write(Vc2TonePool::kBase, zeros.data(), zeros.size());
     s.fw.cpu.write(kHeadAt, zeros.data(), 2 * sizeof(uint32_t));
+    s.fw.cpu.write(kToneBufferAt, zeros.data(), sizeof s.shared.buffers);   // v318: no case's renders in the next's
+    s.shared.buffers = {};
     s.pool = Vc2TonePool {};
-    for (TonePortParts& p : s.parts) {
-        p.words = {};
-        p.mods = {};
-        p.mix = {};
-        p.tva = {};
-    }
+    s.parts.clear();
+    for (int tone = 0; tone < Vc2TonePool::kTones; ++tone) s.parts.emplace_back(tone, s.shared);
     toneEmptyLists(s);
     s.live.clear();
 }
@@ -48,6 +49,7 @@ std::string vc2ToneCase(ToneSides& s, std::mt19937& rng) {
     const int most = fills ? Vc2TonePool::kTones + 2 : kMaxLive;
     const std::span<const ToneEvent> events = toneEvents();
     std::string what = toneFreeLfosFresh(s);
+    if (what.empty()) what = toneFreshCosms(s);
     for (int k = 0; k < kSteps && what.empty(); ++k) {
         const bool make = s.live.empty() || ((int)s.live.size() < most && rng() % (fills ? 2 : 6) == 0);
         what = make ? toneMakeOn(s, rng) : events[rng() % events.size()](s, rng);
@@ -61,7 +63,8 @@ bool toneLoadTables(const char* path) {
     std::string rom2 = path;
     const size_t at = rom2.rfind("rom.4");
     if (at != std::string::npos) rom2.replace(at, 5, "rom.2");
-    return vc2LoadToneMix(path) && vc2LoadTva(path) && xtEnvLoadTables(rom2.c_str()) && xtLfoLoadTables(rom2.c_str());
+    return vc2LoadToneMix(path) && vc2LoadTva(path) && vc2LoadCosm(path) && xtEnvLoadTables(rom2.c_str())
+           && xtLfoLoadTables(rom2.c_str()) && xtCosmLoadTables(rom2.c_str());
 }
 } // namespace
 
@@ -75,8 +78,7 @@ int main(int argc, char** argv) {
     Vc2TonePool pool;
     ToneShared shared;
     shared.pool = &pool;
-    std::vector<TonePortParts> parts;
-    parts.reserve(Vc2TonePool::kTones);
+    std::deque<TonePortParts> parts;   // each case makes them again (toneFreshPools)
     for (int tone = 0; tone < Vc2TonePool::kTones; ++tone) parts.emplace_back(tone, shared);
     shared.parts = &parts;
     TonePortOwner owner(shared, parts);
@@ -104,6 +106,9 @@ int main(int argc, char** argv) {
     std::printf("settings and release: %ld envelopes' settings in sustain, %ld LFOs' fades started, %ld released "
                 "envelopes ticked\n", n.sustains, n.releaseFades, n.releaseTicks);
     std::printf("tva: %ld renders whose told fade ended\n", n.told);
+    std::printf("cosm: %ld slots taken, %ld freed before a note-on, %ld stale named none, %ld modes kept, %ld whole "
+                "renders through COSM 1 (%ld a stereo Side Band Filter)\n", n.cosmSlots, n.cosmFreed, n.cosmStale,
+                n.cosmModesKept, n.cosmRenders, n.cosmFollowers);
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

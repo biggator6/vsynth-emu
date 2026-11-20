@@ -1,5 +1,5 @@
-// xt_vc2cosm's sixth part's draws: see Vc2CosmNoteOnDraws.h (v250).
-#ifdef XT_VC2COSM_MAIN
+// xt_vc2cosm's sixth part's draws: see Vc2CosmNoteOnDraws.h (v250; xt_vc2tone's too from v318).
+#if defined(XT_VC2COSM_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2CosmCheck.h"
 #include "Vc2CosmNoteOnDraws.h"
 #include <span>
@@ -220,9 +220,9 @@ void vc2DrawBlockOf(Vc2CosmBlockWords& b, int32_t code, std::mt19937& rng) {
     vc2DrawTypeWords(b, rng);
 }
 
-void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng) {
-    vc2DrawBlockOf(b, kPorted[rng() % kPorted.size()], rng);
-}
+void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng) { vc2DrawBlockOf(b, vc2DrawPortedCode(rng), rng); }
+
+int32_t vc2DrawPortedCode(std::mt19937& rng) { return kPorted[rng() % kPorted.size()]; }
 
 void vc2DrawTypeWords(Vc2CosmBlockWords& b, std::mt19937& rng) {
     for (const Vc2CosmBlockDraw& d : kBlockDraws)

@@ -1546,6 +1546,96 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The COSMs in the tone's parts' host (2026-11-20, v318) {#vc2-tone-host-cosms}
+
+Step 4.3's forty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-third part). `Vc2ToneHost` holds each
+tone's two COSMs: their objects (`Vc2CosmObjectWords`, at +0x1728 and +0x188c), a sound each (`Vc2CosmDsp`, v263's) and
+the note-on frame (`Vc2CosmNoteOn`, v250's). The host is their bound: a float of the tone's envelopes or LFOs by
+address, `Vc2ToneModulators::wordAt`. `Vc2ToneCommon` gains the pools (0x89999290) and the three words after the
+renders' buffer c, which a stereo Side Band Filter's follower reads. At 0x89998e20 those are the part mixer's frames.
+
+**Every call the tone makes on a COSM is its port's:**
+- the constructor `0x893aa030` and the destructor `0x893aa060`; the tone takes down the LFOs and both COSMs alone;
+- the set-up `0x893aa590` and the binding `0x893aa7b0`, the bound parts' addresses;
+- the note-on `0x893aa0e0`, on COSM 1's pool or COSM 2's;
+- the install `0x893aafe0`;
+- the update, COSM 1's vtable's +0x0c (`0x893aa7d0`), with OSC 1's +0x1cc;
+- the new block `0x893aa5d0`;
+- the render, the routine at +0x148, on buffer c;
+- the cost, COSM 1's +0x14c.
+
+**Two things rom.4 decides that the join had to read.**
+- **The set-up's struct.** The tone's note-on builds it on its stack (`0x893b3898…0x893b38c0`): the OSC's +0x1cc and
+  +0xa80 at +0 and +4, and its byte +0x58 at +0xc. +8 the set-up writes as the flag. The three bytes after the byte
+  are whatever the stack held, and the object keeps them at +0xd…+0xf. Nothing reads them: the Growl's view leaves
+  +0x004…+0x00f unread, and no port reads the word.
+- **When a sound takes its note.** The tone's note-on starts its COSMs (for structures 0…2) and only then installs
+  them. Rom.4 keeps a sound's state in the object and its slot, set up at the note-on; the port keeps it in XtCosm's
+  objects, whose note-on wants the install's mono or stereo (v263). So the host keeps a COSM's block from its
+  note-on, and the sound takes its note at the install that follows.
+  - So a sound keeps its note's mode. Rom.4 reaches its install pass from the note-on alone: no word, `bsr` or `bra`
+    names `0x893b4060`, because the note-on holds the pass inline. And the part's structures (0…2) always start the
+    COSMs, so every install in the part comes with a note.
+  - An install with no note of its own would switch a sounding COSM's routine. That needs the install pass run alone
+    or a structure past 2, and the check keeps the mode at both (below). A setter for the sound's mode at every install
+    was tried and taken out: past that, nothing could reach it.
+
+**The check.** xt_vc2tone runs rom.4's own COSMs, nothing of theirs hooked. Its blocks are drawn as each type's
+converter writes them: xt_vc2cosm's draws, shared (`Vc2CosmNoteOnDraws`). Codes come from those the port has a type
+for, every code a converter writes; no converter writes 10, 11 or 17, which the port has no type for. The words the
+type doesn't write keep the bound envelopes' and LFOs' numbers the note-on reads. The OSC words a COSM takes are drawn
+as an OSC gives them: the pitch ratio 0.25…4 and the root 55…1760 Hz.
+
+What the check compares:
+- each object's frame words, but the state its sound keeps, which the port keeps in XtCosm's objects and
+  xt_vc2cosm's seventh part holds to rom.4's;
+- the pools' words;
+- the sound, through buffer c after a whole render.
+
+**Five rules keep the check to what the part can do.** Each came from a difference that was the check's, not the
+port's. The part builds a tone for a note, gives it that note, and takes it down at its end; the check builds, re-notes
+and unmakes tones in any order.
+- **A COSM is bound once.** The check binds a COSM never bound (an update holds its bound levels, and rom.4 would read
+  near address 0). One that is bound keeps its note-on's bindings, as the part binds at the note-on alone.
+- **A tone's slots are freed before a note-on that starts its COSMs again**, on both sides, as the part's destructor
+  would have. A second note-on takes a slot without freeing the first. Run as it would in the check, the pools would
+  run dry, where rom.4 plays on stale stack words (v264).
+- **Before a destructor, a COSM holding no slot by the check's count names none.** A tone's memory starts zeroed, so a
+  COSM never given a note names slot 0 of pool 0, and the destructor frees what the object names. That freed slot 0
+  under another tone's Compressor. The next note-on cleared it, and rom.4's delay line went to 0 where the port's ring
+  played on. This was most of what still differed at seeds 7 and 31337.
+- **A whole render runs only on a tone given a note that started its COSMs.** A COSM from a tone's last use renders
+  on a slot it has given up.
+- **An install with no note of its own keeps a sounding COSM's mode.** Two installs come with no note: the install
+  pass alone, and a note-on whose structure starts no COSMs (past 2, which the part's notes never have). Before
+  either, OSC 1's flag is drawn to agree with the note's. Rom.4's mono routines keep the right channel's state moving
+  where the port's mono sound leaves it, so a switch to stereo mid-note parts them. The first Side Band Filter's
+  D+0x54 showed it, found by holding the sound's state to rom.4's D words before each render (xt_vc2cosm's own
+  compare). The part never makes that switch.
+
+So that what reaches a COSM's sound is seen:
+- every render of a tone with a COSM note is whole;
+- COSM 1's block is a Side Band Filter one time in three, the type whose stereo follower reads the three words past
+  buffer c;
+- those words are drawn up to twice the mix's full scale, as xt_vc2cosm draws them at its frames'. The plant that
+  passes the buffer in their place was missed until then.
+
+Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400). At 40 cases: 730 slots taken, 346 freed before a note-on,
+  355 stale slots named none, 124 modes kept, 269 whole renders through COSM 1, 97 of them a stereo Side Band Filter.
+- Every line, branch and region of `Vc2ToneHost.cpp` reached. With the COSMs the destructor's fall-through went
+  (`destroyPart`): nothing is left for it.
+- 22 new planted errors, 0 missed, and the whole `--tone` and `--cosm` lists. Taken out of the tone's list as the
+  real COSMs left them equivalent or unreachable:
+  - v228's `destroy-cosm-order`: each COSM frees its own pool's slot alone.
+  - v228's `install-cosm2-flag`: COSM 1's install answers 1 for stereo, else whether its code is 10, which no
+    converter writes.
+  - v229's `cosmbind-type17`: no converter writes code 17.
+  - v316's `host-destroy-lfos`: the LFOs' destructor writes only the vtable word, as v268 found, with no log left.
+
+**Next.** The OSC voices join the host, their kinds' routines still by address where rom.2's renders aren't adapted.
+Then Vc2Synth holds 24.
+
 ### The TVA in the tone's parts' host (2026-11-20, v317) {#vc2-tone-host-tva}
 
 Step 4.3's forty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-second part). `Vc2ToneHost` holds each

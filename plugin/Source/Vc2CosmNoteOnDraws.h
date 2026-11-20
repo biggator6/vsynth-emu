@@ -1,8 +1,9 @@
 #pragma once
 // xt_vc2cosm's sixth part's draws (v250, Vc2CosmNoteOnCheck.cpp): where its object, block and bound envelopes and LFOs
 // lie in Vc2Fw's RAM, the codes the port has types for, the Growl's block as its converter gives it, the bound words,
-// and the noise a slot holds before a note-on takes it.  XT_VC2COSM_MAIN only.
-#ifdef XT_VC2COSM_MAIN
+// and the noise a slot holds before a note-on takes it.  XT_VC2COSM_MAIN only, and from v318 XT_VC2TONE_MAIN, which draws
+// a tone's COSM blocks by them.
+#if defined(XT_VC2COSM_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2CheckRig.h"
 #include "Vc2CosmNoteOn.h"
 
@@ -24,6 +25,8 @@ struct Vc2CosmRamBound final : Vc2CosmBound {
 
 // A block of a code the port has a type for, as its converter gives it, for an update to follow (v262)
 void vc2DrawPortedBlock(Vc2CosmBlockWords& b, std::mt19937& rng);
+// A code the port has a type for: every code a converter writes (v318, xt_vc2tone's)
+int32_t vc2DrawPortedCode(std::mt19937& rng);
 // A block of `code`, as its converter gives it (v263)
 void vc2DrawBlockOf(Vc2CosmBlockWords& b, int32_t code, std::mt19937& rng);
 // The block's words as its code's converter gives them, when the port draws its type, for a code given

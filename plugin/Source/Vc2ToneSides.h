@@ -22,10 +22,25 @@ struct ToneCounts {
     // v315: the envelopes' settings in sustain, the LFOs' fades a release starts, the released envelopes an update ticks
     long sustains = 0, releaseFades = 0, releaseTicks = 0;
     long told = 0;   // v317: the renders whose told fade ended, the TVA setting the OS's event
+    long cosmSlots = 0, cosmFreed = 0, cosmRenders = 0;   // v318: slots taken and freed, whole renders through a COSM
+    long cosmStale = 0;   // the stale slots a destructor would have freed, named none first
+    long cosmModesKept = 0;   // the install passes alone that would have switched a sounding COSM's mode
+    long cosmFollowers = 0;   // whole renders through a stereo Side Band Filter, whose follower reads past buffer c
     long starts = 0, started = 0, listMoves = 0, leaves = 0;   // the part's lists: starts, tones started, moves, leaves
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
     std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
+};
+
+// v318: each tone's COSMs' slots (−1 none) its last note-on took and its destructor hasn't freed, and whether it has had
+// a note-on since it was built, which its COSMs' sounds need before a whole render
+struct ToneCosmTrack {
+    std::array<std::array<int32_t, 2>, Vc2TonePool::kTones> slots {};
+    std::array<bool, Vc2TonePool::kTones> noted {};
+    void forget() {
+        for (auto& s : slots) s = { -1, -1 };
+        noted = {};
+    }
 };
 
 // Both sides: rom.4 with its calls' log, the port's pool, its parts (one a tone) and their owner, the tones made
@@ -33,11 +48,12 @@ struct ToneSides {
     Vc2Fw& fw;
     Vc2TonePool& pool;
     ToneShared& shared;
-    std::vector<TonePortParts>& parts;
+    std::deque<TonePortParts>& parts;
     TonePortOwner& owner;
     std::vector<ToneCall>& rom;
     std::vector<int> live {};
     ToneCounts n {};
+    ToneCosmTrack cosm {};   // v318
 };
 
 // The pool's words, the tones' own and part words (every tone's, or tone `only`'s), the note-on's input and the free
@@ -71,6 +87,31 @@ void toneDrawTva(ToneSides& s, int i, std::mt19937& rng);
 void toneDrawTvaBlock(Vc2ToneInput& in, std::mt19937& rng);
 void toneDrawOut(ToneSides& s, std::mt19937& rng);
 std::string toneOutDifference(ToneSides& s);
+
+// The real COSMs (v318, Vc2ToneCosmCheck.cpp): tone i's two objects against rom.4's, but the words their sounds keep (the
+// port keeps those in XtCosm's objects, v263) and the stack bytes the set-up's struct leaves; the pools' words; each
+// event the objects bound to the tone's own envelopes and LFOs and the three words a COSM's render reads past buffer c;
+// a note-on's COSM blocks as their converters write them, and the setter's new block, its code the object's three
+// times in four; before a note-on, the slots the tone's last one took freed on both sides, as the part's destructor
+// would have; after it, its slots and that it has a note; a tone built or unmade, none
+std::string toneCosmDifference(ToneSides& s, int i);
+std::string tonePoolsDifference(ToneSides& s);
+void toneDrawCosms(ToneSides& s, int i, std::mt19937& rng);
+void toneDrawCosmBlocks(Vc2ToneInput& in, std::mt19937& rng);
+void toneDrawCosmNewBlock(ToneSides& s, int i, uint32_t cosm, std::mt19937& rng);
+void toneCosmsBeforeNoteOn(ToneSides& s, int i);
+void toneNoted(ToneSides& s, int i);
+void toneUnnoted(ToneSides& s, int i, bool freed);
+// Before a destructor: a COSM holding no slot by the check's count names none on both sides, so the destructor frees no
+// slot another tone holds (the part destroys only tones it gave a note)
+void toneHoldNoStaleSlots(ToneSides& s, int i);
+// Before the install pass alone: COSM 1's mode kept as its note chose it (rom.4 installs at the note-on alone)
+void toneKeepCosmMode(ToneSides& s, int i);
+// Whether COSM 1's sound is a stereo Side Band Filter, whose follower reads the three words past buffer c
+bool toneCosmFollows(ToneSides& s, int i);
+// A case's start: both sides' pools set up again by rom.4's static initializer and the port's, no tone noted or holding a
+// slot; what differs after the set-up
+std::string toneFreshCosms(ToneSides& s);
 
 // The real OSC mix (v269, Vc2ToneMixCheck.cpp): tone i's mix's words against rom.4's; the delay lines of tone i, or of
 // every tone; the mix's block of a note-on's input; a render's buffers drawn on both sides, with a routine installed

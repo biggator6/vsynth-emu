@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The COSMs in the tone's parts' host v318 (2026-11-20, on claude/vc2-part-4-3 after v317; HARDWARE_FIRMWARE.md, "The
+  COSMs in the tone's parts' host"): step 4.3's forty-sixth version, item 10's twenty-third part. Vc2ToneHost holds
+  each tone's two COSM objects, a Vc2CosmDsp each and the note-on frame, and is their bound
+  (Vc2ToneModulators::wordAt); Vc2ToneCommon gains the pools and the three words past buffer c (the part mixer's
+  frames); every COSM call the tone makes is its port's. A sound takes its note at the install that ends the tone's
+  note-on, and keeps that mode. Found: rom.4's note-on holds the install pass inline (nothing reaches 0x893b4060), so
+  every install in the part comes with a note; the set-up's struct leaves three stack bytes in the object's
+  +0xd…+0xf, which nothing reads. xt_vc2tone runs rom.4's own COSMs, xt_vc2cosm's block draws shared (vc2DrawPortedCode, the codes a
+  converter writes); five rules keep it to what the part does (a COSM bound once; a tone's slots freed before its
+  COSMs start again; a stale slot named none before a destructor; whole renders only after a starting note-on; a
+  sounding COSM's mode kept at an install with no note), each from a difference that was the check's. 0 different at
+  seeds 2024, 7 and 31337; the host and the modulators wholly reached; 22 new planted, 0 missed, and the whole --tone
+  and --cosm lists (destroy-cosm-order, install-cosm2-flag, cosmbind-type17 and host-destroy-lfos taken out as
+  equivalent or unreachable now). Not in the sound yet.
+
 The TVA in the tone's parts' host v317 (2026-11-20, on claude/vc2-part-4-3 after v316; HARDWARE_FIRMWARE.md, "The TVA
   in the tone's parts' host"): step 4.3's forty-fifth version, item 10's twenty-second part. Vc2ToneHost holds each
   tone's Vc2Tva, every call the tone makes on it the TVA's own, its envelope and LFOs the tone's through the modulators,

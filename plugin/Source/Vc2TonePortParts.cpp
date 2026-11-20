@@ -10,19 +10,16 @@
 namespace {
 using Piece = Vc2TonePiece;
 constexpr uint32_t kNoBuffer = 0xff, kByte = 0xff;
-uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 int32_t oscCode(int osc) { return tonePartCode(static_cast<Piece>((int)Piece::osc1 + osc), 0); }
-int32_t cosmCode(int cosm) { return tonePartCode(static_cast<Piece>((int)Piece::cosm1 + cosm), 0); }
 constexpr uint32_t kFadeEvent = 0x1000;   // [FW] 0x893b3be4: the event the truncation's task waits on
-uint32_t byteOf(int32_t x) { return (uint32_t)x & kByte; }
 } // namespace
 
 TonePortParts::TonePortParts(int tone, ToneShared& shared)
-    : Vc2ToneHost(tone, { *shared.pool, shared.lists, shared.rings, shared.frees, shared.chaos, shared.fadeStep }),
+    : Vc2ToneHost(tone, { *shared.pool, shared.lists, shared.rings, shared.frees, shared.chaos, shared.fadeStep,
+                          shared.pools, shared.past.data() }),
       s_(shared) {}
 
 void TonePortParts::buildPart(Vc2TonePiece piece) { log(kBuild, tonePartCode(piece, 0)); }
-void TonePortParts::destroyPart(Vc2TonePiece piece) { log(kDestroy, tonePartCode(piece, 0)); }
 const Vc2ToneHost& TonePortParts::hostOf(int tone) { return (*s_.parts)[(size_t)tone]; }
 
 void TonePortParts::osEvent(uint32_t event, uint32_t flags) {
@@ -40,15 +37,12 @@ uint32_t TonePortParts::freeLfo(uint32_t id, int lfo) {
 }
 
 void TonePortParts::updateOsc(int osc, int32_t n) { log(kUpdateOsc, oscCode(osc), { (uint32_t)n }); }
-void TonePortParts::updateCosm(int cosm, float x) { log(kUpdateCosm, cosmCode(cosm), { bits(x) }); }
 
 void TonePortParts::ended() {
     log(kEnded, kToneNone, { s_.pool ? (uint32_t)s_.pool->tones[(size_t)tone()].head.state : 0u });
 }
 
 void TonePortParts::renderOsc(int osc, float* buffer) { log(kRenderOsc, oscCode(osc), { bufferOf(buffer) }); }
-
-void TonePortParts::renderCosm(int cosm, float* buffer) { log(kRenderCosm, cosmCode(cosm), { bufferOf(buffer) }); }
 
 void TonePortParts::countOsc(int osc, uint32_t x) { log(kCountOsc, oscCode(osc), { x }); }
 void TonePortParts::countOscMatched(int osc, uint32_t x) { log(kCountOscMatched, oscCode(osc), { x }); }
@@ -58,22 +52,10 @@ uint32_t TonePortParts::installOsc(int osc) {
     return s_.draws.installOsc[(size_t)osc];
 }
 
-uint32_t TonePortParts::installCosm(int cosm, uint32_t flag) {
-    log(kInstallCosm, cosmCode(cosm), { flag });
-    return s_.draws.installCosm[(size_t)cosm];
-}
-
 void TonePortParts::bindOsc(int osc, const Vc2ToneBinding<4>& b) {
     auto& binds = words.osc[(size_t)osc].binds;
     std::ranges::transform(b.envelopes, binds.begin(), [&](int32_t e) { return toneEnvelopeAt(self(), e); });
     std::ranges::transform(b.lfos, binds.begin() + 4, [&](int32_t l) { return toneLfoAt(self(), l); });
-    bindFlags(b.envelopes, b.lfos);
-}
-
-void TonePortParts::bindCosm(int cosm, const Vc2ToneBinding<2>& b) {
-    const uint32_t numbers = byteOf(b.envelopes[0]) | byteOf(b.envelopes[1]) << 8 | byteOf(b.lfos[0]) << 16
-                             | byteOf(b.lfos[1]) << 24;
-    log(kBindCosm, cosmCode(cosm), { numbers });
     bindFlags(b.envelopes, b.lfos);
 }
 
@@ -91,18 +73,9 @@ Vc2ToneCosmSetUp TonePortParts::cosmSetUp(int osc) {
     return { std::bit_cast<float>(o.value), std::bit_cast<float>(o.other), (uint8_t)(o.byte & kByte) };
 }
 
-void TonePortParts::setUpCosm(int cosm, const Vc2ToneCosmSetUp& s, uint32_t flag) {
-    log(kSetUpCosm, cosmCode(cosm), { bits(s.value), bits(s.other), s.byte, flag });
-}
-
-void TonePortParts::startCosm(int cosm, const uint32_t* block, int which) {
-    log(kStartCosm, cosmCode(cosm), { blockOf(block), (uint32_t)which });
-}
-
 // v273: the remaining methods' parts, each logged as rom.4's hook reads it; with setOsc, the calls given a block
 void TonePortParts::setOsc(int osc, const uint32_t* block) { logBlock(kSetOsc, oscCode(osc), block); }
 void TonePortParts::settingsOsc(int osc, const uint32_t* block) { logBlock(kSettingsOsc, oscCode(osc), block); }
-void TonePortParts::newBlockCosm(int cosm, const uint32_t* block) { logBlock(kNewBlockCosm, cosmCode(cosm), block); }
 void TonePortParts::legatoOsc(int osc, const uint32_t* ramp) { logBlock(kLegatoOsc, oscCode(osc), ramp); }
 void TonePortParts::keyOffOsc(int osc) { log(kKeyOffOsc, oscCode(osc)); }
 

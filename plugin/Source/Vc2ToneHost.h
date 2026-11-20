@@ -3,10 +3,15 @@
 // parts the port has whole, joined as rom.4's tone reaches them: the tone's envelopes and LFOs (v268, their settings and
 // release v315), its OSC mix (v269), the free LFOs (v271) and the part's two lists of tones (v273), with the flags a
 // binding leaves on them.  The code xt_vc2tone's port side joined them with until v316.  From v317 its TVA (v233), its
-// envelope and LFOs the tone's own, its fade's step the part's word.  The parts not joined yet (the OSC voices, the
-// COSMs), the tail's two routines and the OS's wait and event are a deriving class's: xt_vc2tone's fakes now, the ports
-// as each is joined, then Vc2Synth's 24.  Bit for bit: xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md,
-// "The VC-2 tone's parts' host", "The TVA in the tone's parts' host".  The notes' task and the audio thread, as the tone.
+// envelope and LFOs the tone's own, its fade's step the part's word.  From v318 its two COSMs (v249…v264): their objects,
+// the note-on frame and each one's sound, the host their bound.  The parts not joined yet (the OSC voices), the tail's
+// two routines and the OS's wait and event are a deriving class's: xt_vc2tone's fakes now, the ports as each is joined,
+// then Vc2Synth's 24.  Bit for bit: xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2 tone's
+// parts' host", "The TVA in the tone's parts' host", "The COSMs in the tone's parts' host".  The notes' task and the
+// audio thread, as the tone.
+#include "Vc2CosmDsp.h"
+#include "Vc2CosmObject.h"
+#include "Vc2CosmPools.h"
 #include "Vc2FreeLfos.h"
 #include "Vc2Tone.h"
 #include "Vc2ToneLists.h"
@@ -23,13 +28,19 @@ struct Vc2ToneCommon {
     Vc2FreeLfos& frees;       // 0x8a0c6d84
     float& chaos;             // 0x89999668: the LFOs' constructors' generator
     float& fadeStep;          // 0x8993eb08: the TVAs' truncated fade's step a sample, C's TVA step (v285, v317)
+    Vc2CosmPools& pools;      // 0x89999290: the COSMs' buffer pools (v318)
+    // 0x89998e20: the three words after the renders' buffer c, the part mixer's frames', which a COSM's render reads
+    // past its frames (a stereo Side Band Filter's follower; v318)
+    const float* past;
 };
 
-class Vc2ToneHost : public Vc2ToneParts, private Vc2TvaParts {
+class Vc2ToneHost : public Vc2ToneParts, private Vc2TvaParts, private Vc2CosmBound {
 public:
-    Vc2ToneHost(int tone, const Vc2ToneCommon& common) : tone_(tone), c_(common) {}
+    Vc2ToneHost(int tone, const Vc2ToneCommon& common);
+    Vc2ToneHost(const Vc2ToneHost&) = delete;   // its note-on frame holds the host as its bound
+    Vc2ToneHost& operator=(const Vc2ToneHost&) = delete;
     void build(Vc2TonePiece piece) override;     // the envelopes, LFOs and mix; the other parts buildPart's
-    void destroy(Vc2TonePiece piece) override;   // the LFOs; the other parts destroyPart's
+    void destroy(Vc2TonePiece piece) override;   // the LFOs and (v318) the COSMs, all a tone takes down
     bool lfoFollows(int lfo) override;
     void unfollow(int lfo) override;
     void unlist(bool fromOne) override;
@@ -73,14 +84,24 @@ public:
     void truncateTvaTold() override;
     void truncateTva() override;
     float tvaFade() override;
+    // v318: the COSMs
+    void updateCosm(int cosm, float x) override;
+    void renderCosm(int cosm, float* buffer) override;
+    uint32_t installCosm(int cosm, uint32_t flag) override;
+    void bindCosm(int cosm, const Vc2ToneBinding<2>& b) override;
+    void setUpCosm(int cosm, const Vc2ToneCosmSetUp& s, uint32_t flag) override;
+    void startCosm(int cosm, const uint32_t* block, int which) override;
+    void newBlockCosm(int cosm, const uint32_t* block) override;
+    float cosmCost() override;
 
     Vc2ToneModulators mods {};   // the tone's 14 envelopes and 8 LFOs, at its +0x1b38 and +0x2158
     Vc2ToneMix mix {};           // its OSC mix, at its +0x1ab8
     Vc2Tva tva {};               // its TVA, at its +0x19f0 (v317)
+    std::array<Vc2CosmObjectWords, 2> cosms {};   // its COSMs, at its +0x1728 and +0x188c (v318)
+    std::array<Vc2CosmDsp, 2> sounds;             // each COSM's sound, which rom.4 keeps in the object's D and a slot
 
 protected:
-    virtual void buildPart(Vc2TonePiece piece) = 0;      // a part the host doesn't hold yet
-    virtual void destroyPart(Vc2TonePiece piece) = 0;
+    virtual void buildPart(Vc2TonePiece piece) = 0;      // a part the host doesn't hold yet: the OSC voices
     virtual const Vc2ToneHost& hostOf(int tone) = 0;     // another tone's: a key-unsynced LFO follows its LFO
     virtual void osEvent(uint32_t event, uint32_t flags) = 0;   // 0x89301830, the OS's: a told truncation's fade ended
     // A binding's flags, as the note-on leaves them after each: the bound envelopes on (+0x68 1), the LFOs not (+0x80 0)
@@ -95,8 +116,15 @@ private:
     float lfoOut(uint32_t at) override;
     float fadeStep() override;
     void setEvent(uint32_t event, uint32_t flags) override;
+    // What a COSM's frame and sound read beyond the object (v318): a float of the tone's envelopes or LFOs by address
+    float word(uint32_t at) override;
     uint32_t envelopeAt(int envelope) const;   // a bound part's rom.4 address, as the tone's note-on writes it
     uint32_t lfoAt(int lfo) const;
     int tone_;
     Vc2ToneCommon c_;
+    Vc2CosmNoteOn cosmFrame_;   // the COSMs' note-on frame, on the object given each call
+    // A COSM's note-on's block, its sound's note-on waiting for the install the tone's note-on ends with: the sound
+    // takes the install's choice of mono or stereo (rom.4's frame keeps that state in the object, chosen there)
+    std::array<Vc2CosmBlockWords, 2> started_ {};
+    std::array<bool, 2> pending_ {};
 };

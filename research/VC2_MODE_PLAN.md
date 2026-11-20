@@ -918,6 +918,12 @@ version against rom.4's routines with what it calls hooked:
          fade's step the part's word 0x8993eb08 (`Vc2ToneCommon::fadeStep`), the OS's event the deriving class's; the
          tone's input 0x738 bytes, the TVA's block whole (HARDWARE_FIRMWARE.md, "The TVA in the tone's parts' host").
          The fade step's entry in the interfaces' table is closed. Next: the COSMs, then the OSC voices.
+       - The COSMs joined (v318): the host's two COSM objects, a `Vc2CosmDsp` each and the note-on frame, the host their
+         bound (`Vc2ToneModulators::wordAt`); `Vc2ToneCommon` gains the pools and the three words past buffer c; a
+         sound takes its note at the install the tone's note-on ends with, and keeps that mode (HARDWARE_FIRMWARE.md,
+         "The COSMs in the tone's parts' host"). Found: rom.4's note-on holds the install pass
+         inline, nothing reaching `0x893b4060`, so a COSM's mode never changes mid-note in the part. Next: the OSC
+         voices, then Vc2Synth's 24 hosts.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

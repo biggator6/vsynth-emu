@@ -177,6 +177,10 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2ToneLists.cpp ] && echo Vc2ToneLists.cpp Vc2ToneMethods.cpp Vc2ToneMethodCheck.cpp ) \
    $( [ -f Vc2ToneHost.cpp ] && echo Vc2ToneHost.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
+   $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
+      Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
+      Vc2CosmGrowl.cpp Vc2CosmTables.cpp Vc2Math.cpp XtCosm.cpp Vc2CosmNoteOnDraws.cpp Vc2ToneCosmCheck.cpp \
+      Vc2CosmConvert.cpp XtOsc.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tone" &
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked; its ramps (v236) its own
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
