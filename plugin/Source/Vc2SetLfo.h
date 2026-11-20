@@ -10,7 +10,7 @@
 #include "Vc2SetChildHead.h"
 #include <cstddef>
 
-struct Vc2LfoWords {
+struct Vc2SetLfoWords {
     uint8_t kind {};                // +0x00: the note's
     uint8_t index {};               // +0x01: which of the voice's 5
     uint8_t key {};                 // +0x02: the voice's +0x41
@@ -29,11 +29,11 @@ struct Vc2LfoWords {
 };
 
 // [FW] the pool at 0x899962b0, 5 a voice, placed by 0x8939b690(20, number, index)
-class Vc2SetLfos : public Vc2SetChildPool<Vc2SetLfos, Vc2LfoWords, 5, 0x899962b0, &Vc2SetReads::lfoOf> {
+class Vc2SetLfos : public Vc2SetChildPool<Vc2SetLfos, Vc2SetLfoWords, 5, 0x899962b0, &Vc2SetReads::lfoOf> {
 public:
     // 0x8939b6c0 on the call's object: its kind, index and M, the voice's two bytes, the part's words, then the block
     void construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads);
     // 0x8939b590: the block
-    static void blockOf(const Vc2LfoWords& w, uint32_t* block, Vc2SetReads& reads);
+    static void blockOf(const Vc2SetLfoWords& w, uint32_t* block, Vc2SetReads& reads);
 };
-static_assert(sizeof(Vc2LfoWords) == 20 && offsetof(Vc2LfoWords, wave) == 6, "rom.4's layout, an LFO of C's");
+static_assert(sizeof(Vc2SetLfoWords) == 20 && offsetof(Vc2SetLfoWords, wave) == 6, "rom.4's layout, an LFO of C's");

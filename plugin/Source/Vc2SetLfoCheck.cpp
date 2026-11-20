@@ -42,7 +42,7 @@ int16_t lfoRateDrawn(std::mt19937& rng) {
 // [FW] a depth's byte at the square's edges or any
 constexpr auto lfoDepthDrawn = setsByteDrawn<0, 1, 64, 126, 127, 128, 255>;
 
-void lfoWordsOf(Vc2LfoWords& w, std::mt19937& rng) {
+void lfoWordsOf(Vc2SetLfoWords& w, std::mt19937& rng) {
     setsNoise(w, rng);
     w.index = (uint8_t)(rng() % 4 ? rng() % (Lfos::kPerVoice + 1) : rng());
     w.wave = lfoChoice(rng, 7);

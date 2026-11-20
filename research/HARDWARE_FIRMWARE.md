@@ -1546,6 +1546,70 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part as one object: Vc2Synth's start (2026-11-20, v314) {#vc2-synth-start}
+
+Step 4.3's forty-second version (VC2_MODE_PLAN.md, step 4.3, item 10's nineteenth part), the first of Vc2Synth:
+`Vc2Synth` (Vc2Synth.h, Vc2Synth.cpp) holds every port's object of the part, each as rom.4 lays it out at its own
+address, and starts them as rom.4 does.
+
+**rom.4's start.** C startup copies .data and clears .bss. Then a table of static initializers at 0x898c59c0 runs in
+order: 12-byte rows `{0, routine, 0}`, walked by 0x895063f8 to the first null. The part's rows run from 0x898c5cc0 to
+the one before 0x893f5070, which is a task object's that isn't the tone generator's. The OS MIDI's two rows, its port
+objects' 0x893179d0 and its states' 0x89317db0, come earlier in the table. No row reads a word another writes, so only
+rom.4's order needs keeping. Most rows only write their file's three floats (44100/440, 880/44100, 0.009375), which
+no code reads.
+
+**What Vc2Synth's start does.** The ports' own defaults already give most of rom.4's start, and their own
+initializers the rest:
+- the voices' heads (row 4), the glides (row 7), Time Trip's records (row 11), the update queue (row 14), the reload
+  objects (row 26), the static M (row 37, its channel state by v313's set-up), the COSM pools (row 45), the free LFOs
+  (row 54), Auto Note (row 83) and the mic ring's globals (row 85);
+- the OS MIDI's states and port objects first, as their rows come earlier;
+- the vocoder (row 54's builder) and the tracker (rows 87, 88) by their constructors.
+
+The start sets what no port's defaults give:
+- .data's words: the voices' counts as last read (−1, −1, −1, 0), C's TVA step, the update task's elapsed count (1)
+  and both Receive flags (1);
+- .bss's nodes' channel, 0 until the part's init gives them none (−1 is the port's default);
+- the rows no port runs: the pitch source (−1, 0, 0.0, row 12), the notes' unread float (row 17), robot human depth
+  (1.0, row 42; the port's settings tables start it at 0) and the LFOs' chaos generator (0.7, row 47).
+
+Two things put right on the way:
+- **C's `Vc2LfoWords` and `Vc2MixWords`** shared their names with the tone's LFO's and mix's (v268, v269). The plugin
+  compiled both pairs into different files, two definitions under one name, which C++'s one-definition rule
+  forbids. Vc2Synth, which includes both, was the first to see it. C's are now `Vc2SetLfoWords` and
+  `Vc2SetMixWords`.
+- **The 12 bytes at 0x89997290** have three holders: the static M's levels, the Matrix set-up's and the part
+  mixer's. The start leaves them 0 in all three.
+
+**Not held yet** (the agent's catalog of the rows, research notes):
+- the tones' own parts: their OSC voices, COSMs, TVA, mix and modulators;
+- C's OSC-block and COSM-input children, and Random Pitch's seed (row 32);
+- the notes' task object and its MIDI queue (row 1), the tone generator's object with its Out DC cut flag (row 16),
+  the semitone detector's words (row 89);
+- the unread floats.
+
+**The check.** `xt_vc2synth` (Vc2SynthCheck.cpp) runs rom.4's own initializers in the interpreter on a fresh image
+(the OS MIDI's two, then the part's 94). Then it builds and starts `Vc2Synth` and compares every member with rom.4's
+memory at its address, byte for byte: 133 regions (the whole objects, the settings tables a field at a time, each pool
+tone's head and tail), then the vocoder by v219's shared compares with its engine and hook words. It links every VC-2
+source `Vc2Sources.cmake` lists but rom.4's parameter tables (which lean on rom.2's patch store), with XtLfo,
+XtEnvelope, XtCosm and XtOsc.
+
+The results:
+- 0 different.
+- `mutate_vc2.py --synth`: 30 plants (each start value changed, each step taken out, the static M's set-up broken
+  two ways), none missed. Not planted: the static M's node given to the update queue, which only the queue's routines
+  on that node read, and the start reaches none.
+- `mutate_vc2.py --sets` after the two renames: 374 plants, none missed.
+- **v312's memory cap, put right.** One of those plants, `sets-first-child`, crashes its mutant, which counts as
+  caught. It first read ERROR: `capped` waits on the mutant itself, and the shell says how a background job ended
+  ("Bus error: 10") when it notices. mutlist reads " error" in a run's output as a plant that never ran, where
+  timeout(1) had said nothing. `capped` now watches with the shell's own stderr to /dev/null (`capWatch`); the
+  mutant's own stderr is given before. `mutate_cap_test.sh` adds a run that crashes, which must read as died with no
+  word of the shell's in its output; the plant now reads caught. v313's `port-row`, which had crashed the same way,
+  was changed then to a plant that doesn't.
+
 ### rom.4's MIDI channel states (2026-11-20, v313) {#vc2-os-midi-channel-states}
 
 Step 4.3's forty-first version (VC2_MODE_PLAN.md, step 4.3, item 10's eighteenth part), and a change to Vc2Synth's

@@ -897,6 +897,14 @@ version against rom.4's routines with what it calls hooked:
          Switch by CC 5 and 65, Mono and Poly by CC 126 and 127, the bend range and tunes by RPN 0…2, the scale tunes
          by SysEx. They are not ported. They are the plugin's side's to decide with the parameters as a host sees them
          (step 5), and Vc2Synth gives them through `Vc2OsMidiParts`. Next: Vc2Synth.
+       - Vc2Synth's frame and start done (v314): `Vc2Synth`, every port's object of the part at its address, started
+         as rom.4's static initializers leave them in its table's order, with the .data and .bss words and the rows
+         no port runs; xt_vc2synth (HARDWARE_FIRMWARE.md, "The VC-2 part as one object: Vc2Synth's start"). C's
+         `Vc2LfoWords` and `Vc2MixWords` renamed `Vc2SetLfoWords` and `Vc2SetMixWords`: they shared their names with
+         the tone's. Next: the tones' own parts in Vc2Synth (24 tones' two OSC voices, two COSMs, TVA, mix and
+         modulators), C's OSC-block and COSM-input children (unported: 0x8939fe00 and its kin, Random Pitch's seed),
+         then the tasks' wiring: the OS model of events and waits, the three tasks in one block order, MIDI through
+         v313's handler, then v308's dispatcher.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

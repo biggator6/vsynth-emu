@@ -867,6 +867,9 @@ xt_vc2settings: 0 different
 == xt_vc2midi
 midi: 40 cases, 16000 events: 3063 handled (2862 by status's way), 1511 control changes, 761 program changes, 787 set-ups, 762 full resets, 780 controller resets, 755 defaults, 752 stores, 791 bends, 742 poly pressures, 741 pressures, 739 source resets, 768 channel resets, 784 resets of all, 727 flag reads, 781 and 756 initializers; 1419 listeners told, 462 OS routines, 1518 reads
 xt_vc2midi: 0 different
+== xt_vc2synth
+synth: the start, 96 of rom.4's initializers, 133 regions and the vocoder compared
+xt_vc2synth: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

@@ -74,6 +74,13 @@ VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEve
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
+# xt_vc2synth's (v314): every VC-2 port the plugin's build lists but rom.4's parameter tables, then the rom.2 ports
+# they lean on, the shared compares and the check
+VC2SYNTH=()
+while read -r f; do
+    [ "$f" = Vc2Params ] || VC2SYNTH+=("$f")
+done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\)\.cpp$|\1|p' "$REPO/plugin/Vc2Sources.cmake")
+VC2SYNTH+=(Vc2SynthCheck Vc2CheckWords XtLfo XtEnvelope XtCosm XtOsc)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
          Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck
@@ -200,6 +207,7 @@ VC2PORTS=(
     "vc2osmidi|Vc2OsMidi.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2osmidihandler|Vc2OsMidiHandler.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2osmiditables|Vc2OsMidiTables.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
+    "vc2synth|Vc2Synth.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setcommon|Vc2SetCommon.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

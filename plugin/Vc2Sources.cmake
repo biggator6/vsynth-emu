@@ -135,4 +135,5 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OsMidi.cpp
     Source/Vc2OsMidiHandler.cpp
     Source/Vc2OsMidiTables.cpp
+    Source/Vc2Synth.cpp
 )

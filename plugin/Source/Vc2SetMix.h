@@ -9,7 +9,7 @@
 #include "Vc2SetChildHead.h"
 #include <cstddef>
 
-struct Vc2MixWords {
+struct Vc2SetMixWords {
     uint8_t kind {};                // +0x00: the note's
     uint8_t key {};                 // +0x01: the voice's +0x41
     uint8_t velocity {};            // +0x02: its +0x43
@@ -24,13 +24,13 @@ struct Vc2MixWords {
 };
 
 // [FW] the pool at 0x89996c34, one a voice, the voice's bytes at +1
-class Vc2SetMixes : public Vc2SetChildPool<Vc2SetMixes, Vc2MixWords, 1, 0x89996c34, &Vc2SetReads::mixOf, 1> {
+class Vc2SetMixes : public Vc2SetChildPool<Vc2SetMixes, Vc2SetMixWords, 1, 0x89996c34, &Vc2SetReads::mixOf, 1> {
 public:
     // [FW] 0x8939bd90(32, number): the voice's, its index unread
     uint32_t placeOf(uint32_t number, uint32_t) const { return addressOf(number); }
     // 0x8939bdb0 on the call's object: its kind and M, the voice's two bytes, the part's words, then the block
     void construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads);
     // 0x8939bcc0: the block
-    static void blockOf(const Vc2MixWords& w, uint32_t* block, Vc2SetReads& reads);
+    static void blockOf(const Vc2SetMixWords& w, uint32_t* block, Vc2SetReads& reads);
 };
-static_assert(sizeof(Vc2MixWords) == 32 && offsetof(Vc2MixWords, on) == 6, "rom.4's layout, C's mix");
+static_assert(sizeof(Vc2SetMixWords) == 32 && offsetof(Vc2SetMixWords, on) == 6, "rom.4's layout, C's mix");

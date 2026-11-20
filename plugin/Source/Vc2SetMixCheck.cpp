@@ -28,7 +28,7 @@ uint32_t anyMixBlock(std::mt19937& rng) { return setsNote(rng) + Vc2ToneInput::k
 constexpr auto mixByte = setsByteDrawn<0, 1, 126, 127, 128, 254, 255>;
 
 // A mix's words: on (usually), a type of the four, 0 or 5 (now and then any), the three bytes
-void mixWordsOf(Vc2MixWords& w, std::mt19937& rng) {
+void mixWordsOf(Vc2SetMixWords& w, std::mt19937& rng) {
     setsNoise(w, rng);
     w.on = rng() % 4 ? 1 : rng() % 2 ? 0 : (uint8_t)rng();
     w.type = (uint8_t)(rng() % 4 ? rng() % 6 : rng());

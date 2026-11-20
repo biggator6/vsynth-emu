@@ -20,19 +20,19 @@ void evenGains(uint32_t* block, float gain) {
 }
 
 // Types 1 and 2 (0x8939bbe0, inline): the type, the level by its byte, 1.0 at +0xc and +4
-void levelGains(const Vc2MixWords& w, uint32_t* block, float scale) {
+void levelGains(const Vc2SetMixWords& w, uint32_t* block, float scale) {
     block[0] = w.type;
     block[2] = floatWord(runGain(w.level, scale));
     block[3] = floatWord(kOne);
     block[1] = floatWord(kOne);
 }
 
-void typeOne(const Vc2MixWords& w, uint32_t* block) { levelGains(w, block, mixTables().mixScale); }
+void typeOne(const Vc2SetMixWords& w, uint32_t* block) { levelGains(w, block, mixTables().mixScale); }
 
-void typeTwo(const Vc2MixWords& w, uint32_t* block) { levelGains(w, block, mixTables().mixScaleTwo); }
+void typeTwo(const Vc2SetMixWords& w, uint32_t* block) { levelGains(w, block, mixTables().mixScaleTwo); }
 
 // Type 3, 0x8939bc40: each pair by 127 less its byte and by its byte (a byte past 127 reads the run either side)
-void typeThree(const Vc2MixWords& w, uint32_t* block) {
+void typeThree(const Vc2SetMixWords& w, uint32_t* block) {
     const float scale = mixTables().mixScale;
     block[0] = 0;
     block[1] = floatWord(runGain(kCrossfadeAt + kCrossTop - w.first, scale));
@@ -42,19 +42,19 @@ void typeThree(const Vc2MixWords& w, uint32_t* block) {
 }
 
 // Type 4 (inline): the type and 1.0 at +4
-void typeFour(const Vc2MixWords& w, uint32_t* block) {
+void typeFour(const Vc2SetMixWords& w, uint32_t* block) {
     block[0] = w.type;
     block[1] = floatWord(kOne);
 }
 
-void otherType(const Vc2MixWords&, uint32_t* block) { evenGains(block, mixTables().mixOther); }
+void otherType(const Vc2SetMixWords&, uint32_t* block) { evenGains(block, mixTables().mixOther); }
 
 // [FW] the writer's switch on the type less 1, unsigned (its table 0x8939bd08): types 1…4, else the other gains
-using MixWay = void (*)(const Vc2MixWords&, uint32_t*);
+using MixWay = void (*)(const Vc2SetMixWords&, uint32_t*);
 constexpr std::array<MixWay, 4> kWays { typeOne, typeTwo, typeThree, typeFour };
 } // namespace
 
-void Vc2SetMixes::blockOf(const Vc2MixWords& w, uint32_t* block, Vc2SetReads&) {
+void Vc2SetMixes::blockOf(const Vc2SetMixWords& w, uint32_t* block, Vc2SetReads&) {
     if (w.on == 0) {
         evenGains(block, mixTables().mixOff);
         return;

@@ -43,7 +43,7 @@ uint32_t firstSwitch(uint8_t b) { return b <= kFirstSwitchMost ? b : kFirstSwitc
 uint32_t secondSwitch(uint8_t b) { return b >= 1 && b <= kSecondSwitchMost ? b : 0; }
 } // namespace
 
-void Vc2SetLfos::blockOf(const Vc2LfoWords& w, uint32_t* block, Vc2SetReads& reads) {
+void Vc2SetLfos::blockOf(const Vc2SetLfoWords& w, uint32_t* block, Vc2SetReads& reads) {
     const bool note = w.rate >= kNoteFrom;
     block[5] = note ? 1 : 0;
     block[1] = floatWord(note ? xtf::flt(lfoTables().notes[w.rate - kNoteFrom])
@@ -57,7 +57,7 @@ void Vc2SetLfos::blockOf(const Vc2LfoWords& w, uint32_t* block, Vc2SetReads& rea
 }
 
 void Vc2SetLfos::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads) {
-    Vc2LfoWords& w = at(c.object);
+    Vc2SetLfoWords& w = at(c.object);
     vc2ChildMade(vc2ChildBytes(w), c, reads);
     w.matrix = c.matrix;
     vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::lfoOf, c.call, reads);

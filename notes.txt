@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Vc2Synth's start v314 (2026-11-20, on claude/vc2-part-4-3 after v313; HARDWARE_FIRMWARE.md, "The VC-2 part as one
+  object: Vc2Synth's start"): step 4.3's forty-second version, item 10's nineteenth part. Vc2Synth (Vc2Synth.h/.cpp):
+  every port's object of the part at its rom.4 address, and start(): .data's and .bss's words no port gives, then the
+  static initializers in rom.4's table's order (the OS MIDI's two rows, then the part's), with the rows no port runs
+  (pitch source, the notes' float, robot depth 1.0, the chaos generator 0.7). C's Vc2LfoWords and Vc2MixWords renamed
+  Vc2SetLfoWords and Vc2SetMixWords (the tone's had the same names: two definitions under one name in the plugin).
+  xt_vc2synth (Vc2SynthCheck.cpp, in fcheck): rom.4's 96 initializers in the interpreter against Vc2Synth's start, 133
+  regions and the vocoder: 0 different; mutate_vc2.py --synth 30 planted, 0 missed; --sets after the renames 374
+  planted, 0 missed. v312's capped put right: its watch runs with the shell's stderr to /dev/null (capWatch), as the
+  shell's "Bus error" notice made mutlist read a crashed mutant's plant as ERROR; mutate_cap_test.sh adds a crash. Not
+  in the sound yet.
+
 rom.4's MIDI channel states v313 (2026-11-20, on claude/vc2-part-4-3 after v312; HARDWARE_FIRMWARE.md, "rom.4's MIDI
   channel states"): step 4.3's forty-first version, item 10's eighteenth part. Vc2OsMidi (Vc2OsMidi.cpp, its handler
   and control change in Vc2OsMidiHandler.cpp): the OS library's MIDI task's handler 0x89314e90, which alone writes the
