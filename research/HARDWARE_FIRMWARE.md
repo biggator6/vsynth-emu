@@ -1546,6 +1546,88 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's LITE heads (2026-11-21, v326) {#vc2-osc-lite-heads}
+
+Step 4.3's fifty-fourth version, the second piece of item 11's fourth part's second half. LITE's heads' renders,
+`0x893c6e80` (mono) and `0x893c6e8c` (stereo), are the voice's own (`Vc2OscHeads.cpp`), two more rows of its own
+renders.
+
+**rom.4's heads against rom.2's.** They are rom.2's `0x8950a7f0` and `0x8950a7fc`, which `XtLitePlayer` ports,
+instruction for instruction but for two things:
+- their words lie four bytes up from +0x94: the one base offset the code holds is 0xec where rom.2's is 0xe8;
+- their backward reads take each sample as it is. rom.2 negates it and adds (FNEG, FADD: the head's sample read
+  −s + (s′ − s) × the fraction, s′ the one before it); rom.4 subtracts (FSUB: s + (s′ − s) × the fraction). That holds
+  for all six backward reads, two in the mono kernel and four in the stereo. It is the plan's "the right way up".
+
+**The beat's block first.** Each render starts with rom.4's `0x893c8990`, which is rom.2's `0x8950c280` (under a
+wrapper that keeps MACH, MACL and PR) but for two things:
+- its steer gives up only four steps past the target. A SHLL2 on the step in a branch's delay slot (`0x893c8c30`)
+  makes the compare against four steps, where rom.2's is against one. `XtBeat` gains `pastShift`: rom.2's 0, rom.4's 2.
+- the word a hold's end sets 1, the object's +0xa0 (rom.2's +0x9c), lies four bytes up with the rest.
+
+It reads the loop's positions through the record the object's +0x6c names: LITE's note-on copies the block's +0xe0
+record's pointer there. They are its four loop events' positions, 0xb4 bytes apart from +0x4: the forward loop's start
+and end, then the backward's end and start, ×16.
+
+Its tail, which `XtBeat::block` leaves to its callers, gives the walk step's word (+0x34) by the object's byte 3:
+- with 0x40 the walk is held, the word 0, until it goes the way 0x20 says; then 0x70 is cleared and +0xa0 set to 1;
+- else the walk's word, or one sample's (±2^25 by the walk's way) with 0x01, turned with 0x08 going forward (going
+  back 0x08 is cleared) and with 0x04 going back (going forward 0x08 is cleared, sic), and turned with 0x02.
+
+`XtMbPlayer::blockImpl` ports that tail but for 0x01 and 0x02, and `XtLitePlayer` none of it. On rom.4 a LITE voice's
+byte 3 keeps its 0x01 through the beat's start, so the VC-2's port keeps the whole tail. Whether rom.2's LITE player
+can meet a byte 3 another player left set is not looked at here.
+
+**The port.** `Vc2OscVoice::beatBlock` (`Vc2OscBeat.cpp`) runs XtBeat's block on the voice's words with rom.4's
+shift, the positions read through `Vc2OscParts::boundFloat`, then the tail. `vc2OscHeads` then runs an `XtLitePlayer`
+on the object's words:
+- `XtLitePlayer::words()` lists each word its block reads or writes as an `XtWord`: its place in rom.2's object, its
+  member and its bytes. v325's two copies are now one pair, `vc2OscWordsFrom` and `vc2OscWordsTo`, for the beat and
+  the heads alike.
+- its block takes the step's word it is given (`walkBlock`), its samples are rom.4's halfwords read by the address the
+  SH-4 forms (`XtLiteSamples`), and its backward reads are rom.4's (`setUpright`).
+- its output stage moved, its lines as they were, into a routine of its own (`out`), to keep `frame` within the kit's
+  size. For rom.2's player nothing changes: xt_tone and PluginTest's LITE waves are as they were.
+
+**The checks.** xt_vc2osc no longer hooks the two renders: rom.4's own run in the voice, in xt_vc2tone too. Before a
+render through the heads, the object's words are drawn as a note gives them (`oscDrawHeadsWords`):
+- a range and both loops inside a wave of 8192 frames, each loop 64 frames or more, the walk's position about them
+  and the heads within a period of it, a period of 50…400 frames, a pitch and formant of 0.5…2;
+- the gain and its target 0…0.5 (two heads at full scale give full scale), the beat's factor and its integral 0…2, the
+  beat's position about the loop events', Tempo Sync and Time Trip off three times in four;
+- byte 3 any byte half the time: a hold, a turn, a sample's step. Left as other events had left it, no hold was let go
+  with 0x10 set, which the hold's end clears.
+
+xt_vc2osc's render event gives the voice the heads' render word one time in four, as only LITE's install writes it.
+Its analog draws now give a SQUARE near the root a pitch in one of its edge's steps, each step as likely, and the
+code's copy (+0x248), which the update reads, SQUARE too (`steerSquareSteps`, from the renders' generator; the bounds
+read from rom.4's memory). The update's first step is a semitone of the two octaves drawn: v325's run happened to reach
+it at 40 cases and v326's didn't.
+The records' loop events (`oscDrawLoopEvents`) are drawn from the renders' generator in both checks. Not drawn:
+- a loop of no length: rom.4's wrap never ends;
+- positions far from the loops, where its wrap's sum would stand still;
+- a NaN in the beat's integral: xtf's FTRC of a NaN isn't the SH-4's. The first run at seed 7 met one through the
+  steer into the walk's position.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc renders 240, 2477 and 2504
+  blocks through the heads, xt_vc2tone 21, 251 and 232.
+- `Vc2OscHeads.cpp` and `Vc2OscBeat.cpp` wholly reached, every line and branch, and both of the beat's wraps. In
+  `XtLitePlayer.cpp`, every line the VC-2 runs is reached at 400 cases but the guards against a loop of no length
+  (rom.4 has none, and the draws give none). Its lines for rom.2 alone (the note-on, seek, block update, the negated
+  backward read, the beat's own step) are xt_tone's.
+- `mutate_vc2.py --osc`: 51 new plants on the heads, the beat block, the words' tables and XtLitePlayer's new lines,
+  all caught. `beat-held-keeps` went missed until byte 3 was drawn. `heads-words-last` first dropped a row nothing
+  reads back, so it now drops the rows from the eighteenth. A plant in `XtBeat.h` can't be made by a VC-2 port; its
+  shift is `beat-rom4-past`'s in Vc2OscBeat.cpp, and `reach()` is under `mutate_tone.py`'s `beat-past`. The whole
+  `--osc` (1,428) and `--tone` (754) lists caught.
+- `mutate_tone.py` (XtLitePlayer.cpp and XtMultiBandPlayer.cpp changed): `beat-past`, `beat-past-sign` and `xfg-step`
+  rewritten on the lines they plant, all caught; of the whole 1,191, all caught but `check-pad-cc` (the gap since
+  v189), and the four `plays-` ERRORs v268 found, whose text is in XtSynthOut.cpp from v204.
+
+**Next.** Kind 1's mode 1 (`0x893c9f60`, its set-up `0x893cc760` and its seek `0x893cc830`), with VariPhrase's band
+players, whose routines it calls. With it LITE is whole.
+
 ### The VC-2's players' beat and seeks (2026-11-21, v325) {#vc2-osc-beat-seeks}
 
 Step 4.3's fifty-third version, the first piece of item 11's fourth part's second half. The players' beat, and the two

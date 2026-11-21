@@ -114,6 +114,18 @@ void oscDrawRecords(OscRecords& r, std::mt19937& rng) {
     }
 }
 
+void oscDrawLoopEvents(OscRecords& r, std::mt19937& rng) {
+    // [FW] the four events' positions, 0xb4 bytes apart: the forward loop's start and end, the backward's end and start
+    constexpr std::array<uint32_t, 4> kEvents { 0x4, 0xb8, 0x16c, 0x220 };
+    constexpr int32_t kFrom = 3000 * 16, kOver = 500 * 16, kSpanLeast = 64 * 16, kSpanOver = 800 * 16;
+    for (int k = 0; k < kOscRecords; ++k) {
+        const int32_t fwd = kFrom + (int32_t)(rng() % kOver), bwd = kFrom + (int32_t)(rng() % kOver);
+        const std::array<int32_t, 4> at { fwd, fwd + kSpanLeast + (int32_t)(rng() % kSpanOver),
+                                          bwd + kSpanLeast + (int32_t)(rng() % kSpanOver), bwd };
+        for (size_t e = 0; e < at.size(); ++e) r.bound[oscPairAt(k) + kEvents[e]] = std::bit_cast<float>(at[e]);
+    }
+}
+
 void oscWriteRecords(Vc2Fw& fw, const OscRecords& r) {
     for (int k = 0; k < kOscRecords; ++k) {
         const Vc2OscWaveHeader& h = r.headers[(size_t)k];

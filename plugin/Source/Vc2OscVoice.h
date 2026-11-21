@@ -155,6 +155,8 @@ public:
     // position ×16: the voice's own (Vari off's 0x893c6360, LITE's heads' 0x893c6de0) or, any other, out through parts
     void beatStart();
     void beatReset();
+    // v326: the beat's block, 0x893c8990, its step's word (into +0x190) by the object's byte 3, for a player's render
+    int32_t beatBlock(Vc2OscParts& parts);
     void seekBy(uint32_t routine, int32_t at, Vc2OscParts& parts);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);

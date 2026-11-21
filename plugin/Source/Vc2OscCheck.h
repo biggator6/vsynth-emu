@@ -62,6 +62,9 @@ uint32_t oscEnvelopeAt(int k);
 uint32_t oscLfoAt(int k);
 uint32_t oscPairAt(int k);
 void oscDrawRecords(OscRecords& r, std::mt19937& rng);
+// v326: each +0xe0 record's four loop events' positions, ×16, which the beat's block reads through the object's +0x6c:
+// two loops of 64…863 frames from frame 3000…3499, about the heads' (oscDrawHeadsWords); from the renders' generator
+void oscDrawLoopEvents(OscRecords& r, std::mt19937& rng);
 // Its zeroTunes, read from rom.4's memory once at the start
 void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r);
 // v240: header and loop record `k` drawn again as a real wave's: a rate the converter gives, its cents and the tune

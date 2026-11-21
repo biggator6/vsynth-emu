@@ -56,6 +56,27 @@ void steerSub(Vc2OscVoice& o, std::mt19937& rng) {
     }
 }
 
+// v326: a SQUARE's pitch near the root in one of its edge's steps, each as likely: below the least, below 1, below
+// each of the three rows' bounds, or up to an octave; the update's bounds (the note-on's the same) read from rom.4's
+// memory, not the port's tables, which a plant may change; and the code's copy (+0x248), which the update reads and a
+// note-on writes, SQUARE too.  The update's first row, a semitone of steerPitch's two octaves on a copy a note-on had
+// left SQUARE, came up about once in 40 cases, too rarely to rely on once v326's draws moved the run.  From the renders'
+// generator, so the run's other draws stay
+void steerSquareSteps(OscSides& s, Vc2OscVoice& o) {
+    // [FW] the pitch's word (cents); the least, and the three rows' bounds (0x893c3084…: bound, step, bound, …)
+    constexpr uint32_t kPitch = 0x5c, kLeastAt = 0x893c307c, kRowsAt = 0x893c3084, kRowBytes = 8, kRows = 3;
+    constexpr uint32_t kCodeCopy = 0x248, kSquare = 3;   // [FW]
+    o.setU32(kCodeCopy, kSquare);
+    constexpr float kHalf = 0.5f, kOne = 1.0f, kDouble = 2.0f, kOctave = 1200.0f;
+    std::array<float, kRows + 4> edges { kHalf, std::bit_cast<float>(s.fw.cpu.rd32(kLeastAt)), kOne };
+    for (uint32_t k = 0; k < kRows; ++k) edges[3 + k] = std::bit_cast<float>(s.fw.cpu.rd32(kRowsAt + kRowBytes * k));
+    edges.back() = kDouble;
+    std::mt19937& rng = s.shared.renders;
+    const size_t step = rng() % (edges.size() - 1);
+    const float ratio = edges[step] + (edges[step + 1] - edges[step]) * vc2Unit(rng);
+    o.setF32(kPitch, kOctave * std::log2(ratio));
+}
+
 // v267: one time in two the sub oscillator off, whose note-on otherwise takes the place of LA's, and Fat alone and well
 // below 0, which makes the LA phases' Fat term large: the phase then passes 1, where the note-on sets it to 0.  The
 // moderate draws reached that about once in 40 cases, too rarely to rely on
@@ -92,6 +113,7 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v) {
     if (rng() % 2) {
         steerPitch(o, rng, 0.0f);
         if (rng() % 2) o.setU32(kCode, kSquare);
+        if (o.u32(kCode) == kSquare) steerSquareSteps(s, o);   // v326
     }
     oscAnalogObject(o, rng);
     steerSub(o, rng);

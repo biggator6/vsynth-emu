@@ -118,6 +118,7 @@ void steerVibrato(Vc2OscVoice& o, std::mt19937& rng) {
 void drawBefore(OscSides& s, std::mt19937& rng, bool all) {
     oscDrawAnswers(s.fw, s.shared, rng);
     oscDrawRecords(s.shared.records, rng);
+    oscDrawLoopEvents(s.shared.records, s.shared.renders);   // v326
     oscWriteRecords(s.fw, s.shared.records);
     for (Vc2OscVoice& o : s.voices) {
         steer(o, rng, all);
@@ -211,8 +212,8 @@ int main(int argc, char** argv) {
                 n.carrierSettings, n.kind6Starts, n.kind6Blocks, n.voicedSounding, n.voicedNotFinite);
     std::printf("calls: %ld seeks, %ld kinds' routines, %ld event lookups, %ld object setups; %ld ramps gliding after "
                 "an event\n", n.seeks, n.kindCalls, n.lookups, n.objectCalls, n.gliding);
-    std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's\n", n.extInBlocks,
-                n.variOffBlocks);   // v322, v323
+    std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
+                "heads'\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks);   // v322, v323, v326
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;

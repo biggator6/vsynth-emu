@@ -782,19 +782,19 @@ mixer: 40 cases, 16000 blocks (8387 EXTIN, 7332 bypassed), 7982 carriers, 13598 
 voices' update and schedule: 16000 events
 xt_vc2mixer: 0 different
 == xt_vc2tone
-tone: 40 cases, 16000 events, 874 made, 1030 none, 478 built in place, 468 unmade (408 back), 816 updates, 176 ended, 713 renders, 0 different
-note-on: 1356 note-ons, 220 players taken, 2222 LFOs following, 2539 free LFOs, 241 inputs fixed
-free LFOs: 449 ticks, 450 clocks
-modulators: 466 reads of their bound words
-mix: 959 plays, blocks by routine: 2467 879 240 582 235 882 517 446
-methods: 904 setters, 470 key-offs, 442 truncations (285 waits), 435 costs, 437 getters
-lists: 931 starts (812 tones started), 450 moves alone, 940 left before a rebuild
-settings and release: 46 envelopes' settings in sustain, 736 LFOs' fades started, 630 released envelopes ticked
-tva: 51 renders whose told fade ended
-cosm: 706 slots taken, 314 freed before a note-on, 322 stale named none, 220 modes kept, 261 whole renders through COSM 1 (64 a stereo Side Band Filter)
-osc: note-ons by kind 272 182 603 405 790 138 159 163 (351 OSC 1s steady for a COSM 1 of its pitch), 109 settings, 61 mic blocks; calls beyond the tone: 1479 kinds' routines, 22 settings, 275 renders, 65 seeks, 77 object setups, 227 event lookups
-own renders: 382 renders with an OSC through the EXT IN player's, 97 through Vari off's
-lite: 4 settings on a type with a way; 342 inputs of two VariPhrase OSCs
+tone: 40 cases, 16000 events, 858 made, 1387 none, 452 built in place, 432 unmade (371 back), 757 updates, 150 ended, 723 renders, 0 different
+note-on: 1333 note-ons, 222 players taken, 1982 LFOs following, 2636 free LFOs, 214 inputs fixed
+free LFOs: 454 ticks, 446 clocks
+modulators: 458 reads of their bound words
+mix: 905 plays, blocks by routine: 2139 1061 165 634 255 756 488 409
+methods: 875 setters, 428 key-offs, 441 truncations (292 waits), 421 costs, 460 getters
+lists: 893 starts (813 tones started), 426 moves alone, 926 left before a rebuild
+settings and release: 45 envelopes' settings in sustain, 566 LFOs' fades started, 420 released envelopes ticked
+tva: 61 renders whose told fade ended
+cosm: 659 slots taken, 309 freed before a note-on, 312 stale named none, 199 modes kept, 256 whole renders through COSM 1 (51 a stereo Side Band Filter)
+osc: note-ons by kind 306 169 602 394 716 154 148 177 (319 OSC 1s steady for a COSM 1 of its pitch), 73 settings, 78 mic blocks; calls beyond the tone: 1442 kinds' routines, 9 settings, 224 renders, 54 seeks, 60 object setups, 209 event lookups
+own renders: 397 renders with an OSC through the EXT IN player's, 118 through Vari off's, 21 through LITE's heads'
+lite: 0 settings on a type with a way; 341 inputs of two VariPhrase OSCs
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values
@@ -802,9 +802,9 @@ vari off: 40 cases, 2400 blocks (1201 mono, 1199 stereo, 361 of them folded; 254
 vibrato: 40 cases, 12000 events, 8280 updates (4378 falling, 4099 with a pitch)
 osc: 40 cases, 16000 events, 2546 note-ons (407 with a sample, 1276 without), 1683 updates, 1738 renders, 841 settings, 842 takes, 3389 getters
 kinds 5 and 6: 214 carriers started, 167 carrier blocks, 80 carrier settings, 204 kind 6 starts, 187 kind 6 blocks; 351 of the blocks sounding, 0 not finite
-calls: 109 seeks, 877 kinds' routines, 126 event lookups, 16 object setups; 2954 ramps gliding after an event
-own renders: 353 blocks through the EXT IN player's, 235 through Vari off's
-lite: 72 updates and 52 settings on a type with a way
+calls: 108 seeks, 879 kinds' routines, 126 event lookups, 16 object setups; 2965 ramps gliding after an event
+own renders: 223 blocks through the EXT IN player's, 250 through Vari off's, 240 through LITE's heads'
+lite: 72 updates and 60 settings on a type with a way
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

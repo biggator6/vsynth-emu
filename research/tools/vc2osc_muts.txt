@@ -1447,3 +1447,58 @@ heads-seek-period|mul(v.f32(kPeriod), vc2OscTables().headsSeekHalf)|mul(v.f32(kI
 heads-seek-half|mul(v.f32(kPeriod), vc2OscTables().headsSeekHalf)|mul(v.f32(kPeriod), vc2OscTables().liteFilter)|vc2osclite
 heads-seek-half-pool-at|{ 0x893c6e60, &t.headsSeekHalf }|{ 0x893c6e64, &t.headsSeekHalf }|vc2osctables
 reseek-own|if (routine != 0) seekBy(routine, at, parts);|if (routine != 0) parts.seek(routine, at);|vc2osc
+# v326: LITE's heads' renders (vc2oscheads), the beat's block and its tail (vc2oscbeat), XtLitePlayer's new lines
+# (vc2xtlite: the upright reads, the wave memory, the given step; its table in XtLitePlayer.h planted at its call, as a
+# VC-2 port plants no header) and the voice's rows (vc2osc); XtBeat's reach (XtBeat.h) through rom.4's shift
+# (beat-rom4-past) and tone_muts.txt's beat-past and beat-past-sign
+heads-insert-at|kInsertAt = 0x94|kInsertAt = 0x80|vc2oscheads
+heads-insert|kInsert = 4;|kInsert = 0;|vc2oscheads
+heads-samples-at|kSamplesAt = 0x250|kSamplesAt = 0x254|vc2oscheads
+heads-mono-frame|kMonoFrame = 2|kMonoFrame = 4|vc2oscheads
+heads-stereo-frame|kStereoFrame = 4|kStereoFrame = 2|vc2oscheads
+heads-right-at|kRightAt = 2;|kRightAt = 0;|vc2oscheads
+heads-upright|player.setUpright(true);|player.setUpright(false);|vc2oscheads
+heads-no-words-in|    vc2OscWordsFrom(v, &player, XtLitePlayer::words(), inRom4);\n||vc2oscheads
+heads-no-words-back|    vc2OscWordsTo(v, &player, XtLitePlayer::words(), inRom4);\n||vc2oscheads
+heads-words-first|vc2OscWordsFrom(v, &player, XtLitePlayer::words(), inRom4);|vc2OscWordsFrom(v, &player, XtLitePlayer::words().subspan(1), inRom4);|vc2oscheads
+heads-words-last|vc2OscWordsTo(v, &player, XtLitePlayer::words(), inRom4);|vc2OscWordsTo(v, &player, XtLitePlayer::words().first(17), inRom4);|vc2oscheads
+heads-word|player.walkBlock(out, word);|player.walkBlock(out, word >> 1);|vc2oscheads
+heads-always-stereo|stereo ? channel(wave, first + kRightAt, frame) : XtLiteSamples {}|channel(wave, first + kRightAt, frame)|vc2oscheads
+heads-base|.base = wave.address,|.base = wave.address + 2,|vc2oscheads
+heads-count|.count = wave.count,|.count = wave.count / 4,|vc2oscheads
+heads-own-swapped|{ 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo }|{ 0x893c6e80, headsStereo }, { 0x893c6e8c, headsMono }|vc2osc
+heads-own-at|{ 0x893c6e80, headsMono }|{ 0x893c6e84, headsMono }|vc2osc
+beat-events-at|kEventsAt = 0x1c8|kEventsAt = 0x1cc|vc2oscbeat
+beat-walk-at|kWalk = 0x1d8|kWalk = 0x1d0|vc2oscbeat
+beat-step-at|kStepWord = 0x190|kStepWord = 0x18c|vc2oscbeat
+beat-resumed-at|kResumed = 0x1fc|kResumed = 0x1f8|vc2oscbeat
+beat-events-order|kLoopEvents { 0x4, 0xb8, 0x16c, 0x220 }|kLoopEvents { 0xb8, 0x4, 0x16c, 0x220 }|vc2oscbeat
+beat-events-back|kLoopEvents { 0x4, 0xb8, 0x16c, 0x220 }|kLoopEvents { 0x4, 0xb8, 0x220, 0x16c }|vc2oscbeat
+beat-held|kHeld = 0x40|kHeld = 0x20|vc2oscbeat
+beat-held-back|kHeldBack = 0x20|kHeldBack = 0x10|vc2oscbeat
+beat-held-keeps|kHeldKeeps = 0x8f|kHeldKeeps = 0x9f|vc2oscbeat
+beat-one-sample|kOneSample = 0x01|kOneSample = 0x80|vc2oscbeat
+beat-turn-fwd|kTurnFwd = 0x08|kTurnFwd = 0x10|vc2oscbeat
+beat-turn-bwd|kTurnBwd = 0x04|kTurnBwd = 0x10|vc2oscbeat
+beat-turned|kTurned = 0x02|kTurned = 0x10|vc2oscbeat
+beat-one-step|kOneStep = 0x2000000|kOneStep = 0x1000000|vc2oscbeat
+beat-rom4-past|kRom4Past = 2|kRom4Past = 0|vc2oscbeat
+beat-held-way|(b3 & kHeldBack) != 0 ? 0.0f > w : w > 0.0f|(b3 & kHeldBack) != 0 ? w > 0.0f : 0.0f > w|vc2oscbeat
+beat-held-word|        return 0;\n    }\n    const bool back|        return 1;\n    }\n    const bool back|vc2oscbeat
+beat-held-no-resume|            v.setF32(kResumed, 1.0f);\n||vc2oscbeat
+beat-one-way|word = back ? -kOneStep : kOneStep;|word = back ? kOneStep : -kOneStep;|vc2oscbeat
+beat-turn-fwd-way|if ((b3 & kTurnFwd) != 0 && back) b3|if ((b3 & kTurnFwd) != 0 && !back) b3|vc2oscbeat
+beat-turn-bwd-sic|else if ((b3 & kTurnBwd) != 0) b3 &= (uint8_t)~kTurnFwd;|else if ((b3 & kTurnBwd) != 0) b3 &= (uint8_t)~kTurnBwd;|vc2oscbeat
+beat-tail-no-store|    v.setU8(kByte3, b3);\n    return (b3 & kTurned)|    return (b3 & kTurned)|vc2oscbeat
+beat-turned-not|return (b3 & kTurned) != 0 ? negated(word) : word;|return word;|vc2oscbeat
+beat-block-flags|b.block(u8(kObject), f32(kWalk), lp.data())|b.block(0, f32(kWalk), lp.data())|vc2oscbeat
+beat-block-no-set|    setBeat(*this, b);\n    const int32_t word = beatStep(*this, w);|    const int32_t word = beatStep(*this, w);|vc2oscbeat
+beat-no-step-store|    setU32(kStepWord, (uint32_t)word);\n||vc2oscbeat
+beat-negated|{ return (int32_t)(0u - (uint32_t)x); }|{ return x; }|vc2oscbeat
+words-from-place|std::memcpy(to + member, v.at(place(at)), bytes);|std::memcpy(to + member, v.at(place(at) + 4), bytes);|vc2oscbeat
+words-to-place|(place(at) - Vc2OscVoice::kOwn), from + member, bytes);|(place(at) + 4 - Vc2OscVoice::kOwn), from + member, bytes);|vc2oscbeat
+xtlite-upright-read|        } else if (upright) {   // v326: rom.4's, the sample as it is (FSUB where rom.2 has FNEG and FADD)\n            float d = (float)sample(v, head - 1);\n            d = d - a;|        } else if (upright) {   // v326: rom.4's, the sample as it is (FSUB where rom.2 has FNEG and FADD)\n            float d = (float)sample(v, head - 1);\n            d = d + a;|vc2xtlite
+xtlite-upright-off|} else if (upright) {|} else if (false) {|vc2xtlite
+xtlite-memory-index|const uint32_t index = (first + frame * (uint32_t)i - base) / 2;|const uint32_t index = (first + frame * (uint32_t)i - base) / 2 + 1;|vc2xtlite
+xtlite-memory-first|if (memory != nullptr) {|if (false) {|vc2xtlite
+xtlite-walk-given|(float)(walkGiven ? walkWord : xtf::ftrc(fs))|(float)(walkGiven ? -walkWord : xtf::ftrc(fs))|vc2xtlite

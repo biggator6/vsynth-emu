@@ -33,7 +33,8 @@
 # way vc2oscanalogla's; vc2oscanalogupdate: the analog's install, update and settings, v248, in
 # Vc2OscAnalogUpdate.cpp; vc2oscvibrato: the vibrato, v267, in Vc2OscVibrato.cpp; vc2oscbeat: the players' beat and
 # the voice's own seeks, v325, in Vc2OscBeat.cpp; vc2xtbeat: XtBeat's start and reset, in XtMultiBandPlayer.cpp,
-# which the beat runs), through xt_vc2osc, [cases]
+# which the beat runs; vc2oscheads: LITE's heads' renders, v326, in Vc2OscHeads.cpp; vc2xtlite: XtLitePlayer.cpp's
+# lines the heads run), through xt_vc2osc, [cases]
 # its cases (40).  --tva:
 # vc2tva_muts.txt, in
 # Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases

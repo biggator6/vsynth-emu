@@ -106,9 +106,20 @@ inline constexpr uint32_t kFirst = 0x70, kBytes = 0xc0;   // the object's words 
 // loop's length of 0 or less (rom.4's wrap never ends), a mode past 2 (rom.4 jumps into its table), a pitch of 0 or less
 void oscDrawHalfwords(std::span<int16_t> wave, std::mt19937& rng);
 void oscDrawVariOffWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt);
-// [FW] the renders the voice has as its own (v322, v323): the EXT IN player's two, Vari off's two
+// v326: LITE's heads' words on a voice's object as a note gives them, on the wave at `waveAt` (Vc2OscPartDraws.cpp's
+// OscHeads names them): a range and both loops, each 64 frames or more, from frame 2500 to under 5000, inside a wave
+// of 8192 frames, mono or stereo (a head reads only within the range); the walk's position about them, the heads
+// within a period of it, a period of 50…400 frames, a pitch and formant of 0.5…2 (a head moves at most 1600 frames
+// before its window splices it back); the loops' modes 0…2, their rates 0.5…2; the walk ±0.1…3 and the beat's factor
+// 0…2, Tempo Sync and Time Trip off three times in four; the gain and its target 0…0.5 (two heads at full scale then
+// give full scale), the filter's rate 0…0.05; the loop events' record one of the drawn.  Not drawn: a loop of no
+// length (rom.4's wrap never ends), positions far from the loops (its wrap's sum would stand still)
+void oscDrawHeadsWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt);
+// [FW] the renders the voice has as its own (v322, v323, v326): the EXT IN player's two, Vari off's two, LITE's heads'
+// two
 inline constexpr std::array<uint32_t, 2> kOscExtInRenders { 0x893c62e0, 0x893c61e0 };
 inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c66e0 };
+inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e8c };
 // Whether a voice's render is one of `renders` (its kind renders by +0xa44, and that names one); before a render, a
 // voice's words as the render needs them (`oscPlaysExtIn` and `oscSteerExtIn` until v323):
 // - through the EXT IN player (v322), its level (+0x1e0) and target (+0x1dc) within ±1 as a note gives them (the
@@ -116,7 +127,8 @@ inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c
 //   whose NaN's sign is FSUB's negated; and its output, at most full scale so, is what a tone's delay mix moves its
 //   delay by (v269: past full scale it reads past its lines);
 // - through Vari off (v323), the object's words drawn as v261's are, on the wave at kOscWaveAt, so its reads stay in it
-//   and its wrap ends
+//   and its wrap ends;
+// - through LITE's heads (v326), the object's words drawn by oscDrawHeadsWords, on the same wave
 bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders);
 void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both

@@ -4,6 +4,8 @@
 // are Vc2OscPlayers.cpp's, each the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's players' installs and VariPhrase's
 // note-on", "The VC-2's LITE note-on".  Audio thread.
 #include "Vc2OscVoice.h"
+#include "XtWord.h"
+#include <span>
 
 // Vari off's words in the object (the voice's +0x248…+0x288), as a note-on gives them: the range's first and last,
 // the forward loop and the backward (each span written beside them), the loops' modes and rate factors
@@ -34,6 +36,13 @@ float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths);
 // mode or the forward's
 void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w);
 void vc2OscSetVariOffSide(Vc2OscVoice& v, const Vc2OscVariOff& w, bool backward);
+// v326 (Vc2OscBeat.cpp): a rom.2 port's words from the voice's and back, each row's place in the voice by `place`
+// (XtWord.h: XtBeat's rows the voice's own offsets, XtLitePlayer's rom.2's object's)
+using Vc2OscPlace = uint32_t (*)(uint32_t at);
+void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> words, Vc2OscPlace place);
+void vc2OscWordsTo(Vc2OscVoice& v, const void* port, std::span<const XtWord> words, Vc2OscPlace place);
+// v326 (Vc2OscHeads.cpp): LITE's heads' renders, 0x893c6e80 and 0x893c6e8c, on XtLitePlayer
+void vc2OscHeads(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool stereo);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

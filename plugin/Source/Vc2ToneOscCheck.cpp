@@ -147,6 +147,7 @@ void toneDrawOscRamp(In& in, std::mt19937& rng) {
 void toneDrawOscBlocks(ToneSides& s, std::mt19937& rng) {
     In& in = s.shared.input;
     oscDrawRecords(s.shared.osc.records, rng);
+    oscDrawLoopEvents(s.shared.osc.records, s.shared.osc.renders);   // v326
     for (int k = 0; k < kOscRecords; ++k) oscRealWave(s.shared.osc.records, k, rng);
     for (int osc = 0; osc < 2; ++osc) {
         const std::array<uint32_t, kOscBlockWords> block = oscDrawNoteBlock(rng);
@@ -256,16 +257,18 @@ std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng) {
 }
 
 void toneSteerRenders(ToneSides& s, int i) {
-    bool extIn = false, variOff = false;
+    bool extIn = false, variOff = false, heads = false;
     for (int osc = 0; osc < 2; ++osc) {
         Vc2OscVoice& v = oscOfTone(s, i, osc);
         extIn = extIn || oscRendersBy(v, kOscExtInRenders);
         variOff = variOff || oscRendersBy(v, kOscVariOffRenders);
+        heads = heads || oscRendersBy(v, kOscHeadsRenders);   // v326
         oscSteerRenders(v, s.shared.osc.renders);
         writeToneOsc(s, i, osc);
     }
     s.n.extInBlocks += extIn;
     s.n.variOffBlocks += variOff;
+    s.n.headsBlocks += heads;
 }
 
 void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng) {

@@ -91,10 +91,9 @@ const OscHook kHooks[] = {
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
     { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893b0280, kKindSettings, routineSettings, none },
-    // v238: the players' renders LITE's and VariPhrase's installs write (kind 1's mode 1, LITE's heads, SOLO's,
-    // BACKING's, ENSEMBLE's, the period-jump player's; Vari off's two rom.4's own from v323)
-    { 0x893c9f60, kRenderBy, renderBy, rendered }, { 0x893c6e80, kRenderBy, renderBy, rendered },
-    { 0x893c6e8c, kRenderBy, renderBy, rendered }, { 0x893c9450, kRenderBy, renderBy, rendered },
+    // v238: the players' renders LITE's and VariPhrase's installs write (kind 1's mode 1, SOLO's, BACKING's,
+    // ENSEMBLE's, the period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326)
+    { 0x893c9f60, kRenderBy, renderBy, rendered }, { 0x893c9450, kRenderBy, renderBy, rendered },
     { 0x893cadc0, kRenderBy, renderBy, rendered }, { 0x893ca1f0, kRenderBy, renderBy, rendered },
     { 0x893ca8b0, kRenderBy, renderBy, rendered },
     // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's

@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's LITE heads v326 (2026-11-21, on claude/vc2-part-4-3 after v325; HARDWARE_FIRMWARE.md, "The VC-2's LITE
+  heads"): step 4.3's fifty-fourth version, the second piece of item 11's fourth part's second half. rom.4's heads'
+  renders 0x893c6e80 and 0x893c6e8c are rom.2's 0x8950a7f0 and 0x8950a7fc but for their words, four bytes up from
+  +0x94, and their backward reads, the sample as it is (FSUB where rom.2 has FNEG and FADD). The voice runs rom.4's beat
+  block 0x893c8990 first (Vc2OscVoice::beatBlock: XtBeat's block, its steer giving up four steps past the target where
+  rom.2's gives up past one, XtBeat::pastShift; the loop's positions through the +0xe0 record; the tail's step word by
+  byte 3), then an XtLitePlayer on the object's words (Vc2OscHeads.cpp: XtLitePlayer::words, an XtWord a word; the
+  wave's halfwords, XtLiteSamples; upright reads; walkBlock with the step given). XtLitePlayer's output stage moved
+  into its own routine as it stood. xt_vc2osc no longer hooks the two; the heads' words, the beat's position and the
+  records' loop events drawn as a note gives them, byte 3 any byte half the time; and a SQUARE near the root a pitch
+  in one of its edge's steps with its code's copy SQUARE (steerSquareSteps: upd-pool-steps, caught at v325, went
+  missed once v326's draws moved the run). 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's players' beat and seeks v325 (2026-11-21, on claude/vc2-part-4-3 after v324; HARDWARE_FIRMWARE.md, "The
   VC-2's players' beat and seeks"): step 4.3's fifty-third version, the first piece of item 11's fourth part's second
   half. rom.4's 0x893cbf40 and 0x893cbfe0 are rom.2's beat start and reset (0x8950f860, 0x8950f900) instruction for

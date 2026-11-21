@@ -1,6 +1,7 @@
 // The VC-2's OSC voice's frame: see Vc2OscVoice.h (v230).  Every address is rom.4's; each routine's switch on the kind
 // is a row of Vc2OscVoiceKinds.cpp.  The settings and the getters are Vc2OscVoiceGet.cpp's.
 #include "Vc2OscVoice.h"
+#include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
 #include "Vc2OscVariOffRender.h"
 #include "Vc2OscVoiceKinds.h"
@@ -52,12 +53,16 @@ void extInStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { v.renderExtIn(0, 
 void extInMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { v.renderExtIn(4, 4, out, p); }
 void variOffMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscVariOffMono(v, out, p.waveSamples()); }
 void variOffStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscVariOffStereo(v, out, p.waveSamples()); }
+// v326: LITE's heads', mono and stereo (Vc2OscHeads.cpp), on XtLitePlayer
+void headsMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscHeads(v, out, p, false); }
+void headsStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscHeads(v, out, p, true); }
 struct OwnRender {
     uint32_t at;
     void (*render)(Vc2OscVoice&, float*, Vc2OscParts&);
 };
-constexpr std::array<OwnRender, 4> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
-                                                   { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo } } };
+constexpr std::array<OwnRender, 6> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
+                                                   { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
+                                                   { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo } } };
 } // namespace
 
 bool Vc2OscVoice::renderOwn(uint32_t routine, float* out, Vc2OscParts& parts) {

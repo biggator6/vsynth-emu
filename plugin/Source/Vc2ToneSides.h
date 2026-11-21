@@ -35,6 +35,7 @@ struct ToneCounts {
     std::array<long, 8> oscKinds {};
     long oscSettings = 0, micBlocks = 0, oscSteadied = 0;   // and the OSC 1s steadied for a COSM that takes its pitch
     long extInBlocks = 0, variOffBlocks = 0;   // v322, v323: the tones' renders with an OSC through each own render
+    long headsBlocks = 0;                      // v326: and through LITE's heads'
     long liteSettings = 0, bothVari = 0;   // v324: LITE's settings on a type with a way, tones drawn two VariPhrases
     std::array<long, 6> oscCalls {};
 };

@@ -64,6 +64,7 @@ while read -r f; do
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake)
 [ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2SynthCheck.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
    XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2synth" &
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
@@ -185,6 +186,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
       Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2OscDraws.cpp Vc2OscPartDraws.cpp Vc2OscRecords.cpp Vc2OscFakes.cpp \
       Vc2OscPortParts.cpp Vc2VocoderOsc.cpp XtExtIn.cpp Vc2OscVariOffRender.cpp ) \
    $( [ -f Vc2OscBeat.cpp ] && echo Vc2OscBeat.cpp XtMultiBandPlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
       Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
@@ -200,6 +202,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscPlayers.cpp ] && echo Vc2OscPlayers.cpp Vc2OscRecords.cpp ) \
    $( [ -f Vc2OscLite.cpp ] && echo Vc2OscLite.cpp ) \
    $( [ -f Vc2OscBeat.cpp ] && echo Vc2OscBeat.cpp XtMultiBandPlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
    $( [ -f Vc2OscAnalog.cpp ] && echo Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp ) \
    $( [ -f Vc2OscAnalogSub.cpp ] && echo Vc2OscAnalogSub.cpp ) \
    $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp ) \

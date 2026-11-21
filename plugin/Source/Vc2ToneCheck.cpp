@@ -127,8 +127,8 @@ int main(int argc, char** argv) {
                 "%ld seeks, %ld object setups, %ld event lookups\n", k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7],
                 n.oscSteadied, n.oscSettings, n.micBlocks, c[kKindCall], c[kKindSettings], c[kRenderBy], c[kSeek],
                 c[kObjectCall], c[kEventPosition]);
-    std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's\n",
-                n.extInBlocks, n.variOffBlocks);   // v322, v323
+    std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's, %ld through "
+                "LITE's heads'\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks);   // v322, v323, v326
     std::printf("lite: %ld settings on a type with a way; %ld inputs of two VariPhrase OSCs\n", n.liteSettings,
                 n.bothVari);   // v324
     std::printf("xt_vc2tone: %ld different\n", tally.different);

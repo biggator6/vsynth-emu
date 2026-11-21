@@ -990,6 +990,11 @@ version against rom.4's routines with what it calls hooked:
          the voice's own, its seeks one table by address; mode 1's and the band players' seeks still out
          (HARDWARE_FIRMWARE.md, "The VC-2's players' beat and seeks"). Next: LITE's heads' renders on XtLitePlayer;
          mode 1 with VariPhrase's band players.
+       - LITE's heads (v326): `0x893c6e80` and `0x893c6e8c` on XtLitePlayer (rom.2's, its words four bytes up from
+         +0x94, its backward reads upright), after rom.4's beat block `0x893c8990` (XtBeat's, its steer reaching four
+         steps, then the tail's step word by byte 3, the loop's positions through the +0xe0 record), the voice's own
+         renders' rows; XtLitePlayer runs on the object's words by its table of them (HARDWARE_FIRMWARE.md, "The VC-2's
+         LITE heads"). Next: mode 1, with VariPhrase's band players.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
