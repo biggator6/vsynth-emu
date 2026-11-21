@@ -66,6 +66,18 @@ static_assert(sizeof(Vc2PitchRamp) == 0x64, "rom.4's layout, a ramp's 0x64 bytes
 static_assert(sizeof(Vc2Carrier) == 0x6c, "rom.4's layout, the carrier at the voice's +0xa90");
 static_assert(sizeof(Vc2Kind6) == 0x88, "rom.4's layout, kind 6's object at the voice's +0xafc");
 
+// A wave's halfwords, reached by the addresses rom.4's object holds: `samples` is what rom.4 has at `address`; a read
+// outside them gives 0 (v261, Vari off's renders'; the voice's parts' from v323)
+struct Vc2OscSamples {
+    const int16_t* samples = nullptr;
+    uint32_t address = 0;
+    uint32_t count = 0;
+    int at(uint32_t word) const {
+        const uint32_t index = (word - address) / 2;
+        return index < count ? samples[index] : 0;
+    }
+};
+
 // What the voice calls on its parts and reads from them; a kind's routine by its rom.4 address
 class Vc2OscParts {
 public:
@@ -84,6 +96,8 @@ public:
     // v322: the effect chip's frames as the part reads them ([0x8993eadc], the part mixer's too: a block's 32 of 8
     // words), which the EXT IN player plays
     virtual const int32_t* inputFrames() = 0;
+    // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read
+    virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
     // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
     // player's routine on the object; 0x893cc0d0(the object, event, &position, &…), an event's position ×16
@@ -126,10 +140,13 @@ public:
     // then kind 6's set)
     void updateCarrier(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void updateKind6(Vc2OscParts& parts, const Vc2ToneShared& shared);
-    // v322 (Vc2OscNoteOn.cpp): the EXT IN player's update 0x893c6260 (kinds 4 and 7, and kind 6's first) and its two
-    // renders 0x893c62e0 and 0x893c61e0, run when `routine` is one of them (false, nothing done, for any other)
+    // v322 (Vc2OscNoteOn.cpp): the EXT IN player's update 0x893c6260 (kinds 4 and 7, and kind 6's first) and its
+    // renders 0x893c62e0 and 0x893c61e0 by the frame's words they play on the left and right
     void updateExtIn(Vc2OscParts& parts, const Vc2ToneShared& shared);
-    bool renderExtIn(uint32_t routine, float* out, Vc2OscParts& parts);
+    void renderExtIn(int left, int right, float* out, Vc2OscParts& parts);
+    // v323: the renders the voice has as its own, run when `routine`, the address an install writes, is one of them:
+    // the EXT IN player's two and Vari off's two (v261); false, nothing done, for any other
+    bool renderOwn(uint32_t routine, float* out, Vc2OscParts& parts);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0

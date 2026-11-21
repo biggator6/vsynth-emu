@@ -119,23 +119,60 @@ void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng) {
     shared.positionsTaken = 0;
     shared.calls.clear();
     constexpr uint32_t kFramesPointerAt = 0x8993eadc;   // [FW] where the part reads the effect chip's frames from
-    for (int32_t& w : d.frames) w = (int32_t)shared.extIn();
+    for (int32_t& w : d.frames) w = (int32_t)shared.renders();
     fw.cpu.write(kOscFramesAt, d.frames.data(), sizeof d.frames);
     fw.cpu.wr32(kFramesPointerAt, kOscFramesAt);
 }
 
-bool oscPlaysExtIn(const Vc2OscVoice& o) {
-    constexpr std::array<uint32_t, 2> kExtInRenders { 0x893c62e0, 0x893c61e0 };   // [FW] the installs' two
-    return vc2OscKindRow(o.kind()).renders == Vc2OscRender::byRender
-        && std::ranges::find(kExtInRenders, o.tail.render) != kExtInRenders.end();
+void oscDrawHalfwords(std::span<int16_t> wave, std::mt19937& rng) {
+    constexpr int16_t kEdges[2] = { -32768, 32767 };
+    for (int16_t& h : wave) h = rng() % 16 == 0 ? kEdges[rng() % 2] : (int16_t)rng();
 }
 
-void oscSteerExtIn(Vc2OscVoice& o, std::mt19937& rng) {
+void oscDrawVariOffWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt) {
+    using namespace OscVariOff;
+    constexpr int32_t kFirstFrame = 1024;
+    const auto put = [&](uint32_t at, uint32_t word) { o.setU32(Vc2OscVoice::kObject + at, word); };
+    const auto putReal = [&](uint32_t at, float v) { o.setF32(Vc2OscVoice::kObject + at, v); };
+    for (uint32_t at = kFirst; at < kFirst + kBytes; at += 4) put(at, (uint32_t)rng());
+    const int32_t span = 1 + (int32_t)(rng() % 600);
+    const int32_t start = kFirstFrame + (int32_t)(rng() % 1024);
+    const int32_t end = start + span;
+    const int32_t past = end + (int32_t)(rng() % 64);
+    const int32_t last = rng() % 4 != 0 ? past : start + (int32_t)(rng() % (uint32_t)span);
+    const auto nearLoop = [&] { return start - 32 + (int32_t)(rng() % (uint32_t)(2 * span + 64)); };
+    constexpr uint32_t kModes[8] = { 0, 1, 1, 1, 2, 2, 2, 2 };
+    put(kPosAt, (uint32_t)nearLoop());
+    put(kTurnAt, (uint32_t)nearLoop());
+    put(kLastAt, (uint32_t)last);
+    put(kStartAt, (uint32_t)start);
+    put(kEndAt, (uint32_t)end);
+    put(kSpanAt, (uint32_t)span);
+    put(kSamplesAt, waveAt);
+    put(kModeAt, kModes[rng() % 8]);
+    put(kFoldAt, rng() % 3 == 0 ? (uint32_t)rng() | 1u : 0u);
+    putReal(kPitchAt, 0.05f + 6.0f * vc2Unit(rng) * vc2Unit(rng));
+    putReal(kRateAt, 0.5f + 1.5f * vc2Unit(rng));
+    for (const uint32_t at : { kTargetAt, kGainAt, kFracAt, kFadeAt }) putReal(at, vc2Unit(rng));
+}
+
+bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders) {
+    return vc2OscKindRow(o.kind()).renders == Vc2OscRender::byRender
+        && std::ranges::find(renders, o.tail.render) != renders.end();
+}
+
+void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng) {
     constexpr uint32_t kLevelAt = 0x1e0, kTargetAt = 0x1dc;   // [FW] the object's +0x84 and +0x80
-    if (!oscPlaysExtIn(o)) return;
+    if (oscRendersBy(o, kOscVariOffRenders)) oscDrawVariOffWords(o, rng, kOscWaveAt);   // v323
+    if (!oscRendersBy(o, kOscExtInRenders)) return;
     for (uint32_t at : { kLevelAt, kTargetAt }) {
         if (!(std::fabs(o.f32(at)) <= 1.0f)) o.setF32(at, vc2Unit(rng));
     }
+}
+
+void oscDrawWave(Vc2Fw& fw, OscShared& shared) {
+    oscDrawHalfwords(shared.wave, shared.renders);
+    fw.cpu.write(kOscWaveAt, shared.wave.data(), shared.wave.size() * sizeof(int16_t));
 }
 
 std::string oscRingWordsDifference(const OscRingSides& r) {

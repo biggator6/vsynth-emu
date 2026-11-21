@@ -792,8 +792,8 @@ lists: 875 starts (794 tones started), 435 moves alone, 916 left before a rebuil
 settings and release: 44 envelopes' settings in sustain, 610 LFOs' fades started, 424 released envelopes ticked
 tva: 58 renders whose told fade ended
 cosm: 688 slots taken, 320 freed before a note-on, 305 stale named none, 210 modes kept, 273 whole renders through COSM 1 (62 a stereo Side Band Filter)
-osc: note-ons by kind 321 212 204 446 851 216 186 228 (352 OSC 1s steady for a COSM 1 of its pitch), 96 settings, 85 mic blocks; calls beyond the tone: 592 kinds' routines, 11 settings, 230 renders, 240 seeks, 296 object setups, 66 event lookups
-ext in: 478 renders with an OSC through the EXT IN player's
+osc: note-ons by kind 321 212 204 446 851 216 186 228 (352 OSC 1s steady for a COSM 1 of its pitch), 96 settings, 85 mic blocks; calls beyond the tone: 592 kinds' routines, 11 settings, 200 renders, 240 seeks, 296 object setups, 66 event lookups
+own renders: 478 renders with an OSC through the EXT IN player's, 59 through Vari off's
 xt_vc2tone: 0 different
 == xt_vc2osc
 ramp: 40 cases, 12000 events: 986 built, 1873 started, 943 restarted, 891 legato updates, 4608 ticks (416 gliding, 772 at an end), 1857 values
@@ -802,7 +802,7 @@ vibrato: 40 cases, 12000 events, 8280 updates (4378 falling, 4099 with a pitch)
 osc: 40 cases, 16000 events, 2546 note-ons (407 with a sample, 1276 without), 1683 updates, 1738 renders, 841 settings, 842 takes, 3389 getters
 kinds 5 and 6: 214 carriers started, 167 carrier blocks, 80 carrier settings, 204 kind 6 starts, 187 kind 6 blocks; 351 of the blocks sounding, 0 not finite
 calls: 329 seeks, 1022 kinds' routines, 126 event lookups, 399 object setups; 2935 ramps gliding after an event
-ext in: 464 blocks through the EXT IN player's renders
+own renders: 333 blocks through the EXT IN player's, 275 through Vari off's
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

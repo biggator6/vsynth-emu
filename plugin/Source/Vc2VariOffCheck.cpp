@@ -14,13 +14,10 @@
 namespace {
 constexpr uint32_t kMono = 0x893c63c0, kStereo = 0x893c66e0;   // [FW]
 constexpr uint32_t kObjectAt = 0x8C090000, kOutAt = 0x8C091000, kWaveAt = 0x8C0A0000;   // in Vc2Fw's RAM
-constexpr uint32_t kFirst = 0x70, kBytes = 0xc0;   // the object's words compared
 constexpr uint32_t kHalfwords = 16384;
-constexpr int kOutWords = 64, kBlocks = 60, kFirstFrame = 1024;
-// [FW] the object's words the renders read, as Vc2OscVariOffRender.cpp names them
-constexpr uint32_t kPitchAt = 0x70, kTargetAt = 0x80, kGainAt = 0x84, kFracAt = 0xec, kPosAt = 0xf0, kSamplesAt = 0xf4;
-constexpr uint32_t kLastAt = 0xf8, kStartAt = 0xfc, kEndAt = 0x100, kSpanAt = 0x104, kRateAt = 0x108, kModeAt = 0x10c;
-constexpr uint32_t kFoldAt = 0x124, kFadeAt = 0x128, kTurnAt = 0x12c;
+constexpr int kOutWords = 64, kBlocks = 60;
+// the object's words the renders read, and those drawn and compared, +0x70…+0x130 (Vc2OscDraws.h from v323)
+using namespace OscVariOff;
 
 struct VariCounts {
     long blocks = 0, mono = 0, stereo = 0, folded = 0, silent = 0, loops = 0, turns = 0, ending = 0;
@@ -34,39 +31,13 @@ struct VariRig {
 };
 
 uint32_t objectWordOf(const VariRig& s, uint32_t at) { return s.voice.u32(Vc2OscVoice::kObject + at); }
-void putObjectWord(VariRig& s, uint32_t at, uint32_t word) { s.voice.setU32(Vc2OscVoice::kObject + at, word); }
-void putObjectReal(VariRig& s, uint32_t at, float v) { s.voice.setF32(Vc2OscVoice::kObject + at, v); }
 
+// The wave and the words (v323: their draws Vc2OscPartDraws.cpp's, the voice part's too)
 void drawVariWave(VariRig& s, std::mt19937& rng) {
-    constexpr int16_t kEdges[2] = { -32768, 32767 };
-    for (int16_t& h : s.wave) h = rng() % 16 == 0 ? kEdges[rng() % 2] : (int16_t)rng();
+    oscDrawHalfwords(s.wave, rng);
     s.fw.cpu.write(kWaveAt, s.wave.data(), s.wave.size() * sizeof(int16_t));
 }
-
-// The words: noise under them all; a loop of 1…600 frames; a last sample past its end three times in four, else inside it,
-// where the hold is; the two positions about the loop and its way back; a mode, a fold one time in three
-void drawVariWords(VariRig& s, std::mt19937& rng) {
-    for (uint32_t at = kFirst; at < kFirst + kBytes; at += 4) putObjectWord(s, at, (uint32_t)rng());
-    const int32_t span = 1 + (int32_t)(rng() % 600);
-    const int32_t start = kFirstFrame + (int32_t)(rng() % 1024);
-    const int32_t end = start + span;
-    const int32_t past = end + (int32_t)(rng() % 64);
-    const int32_t last = rng() % 4 != 0 ? past : start + (int32_t)(rng() % (uint32_t)span);
-    const auto nearLoop = [&] { return start - 32 + (int32_t)(rng() % (uint32_t)(2 * span + 64)); };
-    constexpr uint32_t kModes[8] = { 0, 1, 1, 1, 2, 2, 2, 2 };
-    putObjectWord(s, kPosAt, (uint32_t)nearLoop());
-    putObjectWord(s, kTurnAt, (uint32_t)nearLoop());
-    putObjectWord(s, kLastAt, (uint32_t)last);
-    putObjectWord(s, kStartAt, (uint32_t)start);
-    putObjectWord(s, kEndAt, (uint32_t)end);
-    putObjectWord(s, kSpanAt, (uint32_t)span);
-    putObjectWord(s, kSamplesAt, kWaveAt);
-    putObjectWord(s, kModeAt, kModes[rng() % 8]);
-    putObjectWord(s, kFoldAt, rng() % 3 == 0 ? (uint32_t)rng() | 1u : 0u);
-    putObjectReal(s, kPitchAt, 0.05f + 6.0f * vc2Unit(rng) * vc2Unit(rng));
-    putObjectReal(s, kRateAt, 0.5f + 1.5f * vc2Unit(rng));
-    for (const uint32_t at : { kTargetAt, kGainAt, kFracAt, kFadeAt }) putObjectReal(s, at, vc2Unit(rng));
-}
+void drawVariWords(VariRig& s, std::mt19937& rng) { oscDrawVariOffWords(s.voice, rng, kWaveAt); }
 
 void tallyVariBlock(VariRig& s, bool stereo) {
     const uint32_t mode = objectWordOf(s, kModeAt);

@@ -246,15 +246,17 @@ std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng) {
     return oscRingBlock(toneRingSides(s), rng);
 }
 
-void toneSteerExtIn(ToneSides& s, int i) {
-    bool plays = false;
+void toneSteerRenders(ToneSides& s, int i) {
+    bool extIn = false, variOff = false;
     for (int osc = 0; osc < 2; ++osc) {
         Vc2OscVoice& v = oscOfTone(s, i, osc);
-        plays = plays || oscPlaysExtIn(v);
-        oscSteerExtIn(v, s.shared.osc.extIn);
+        extIn = extIn || oscRendersBy(v, kOscExtInRenders);
+        variOff = variOff || oscRendersBy(v, kOscVariOffRenders);
+        oscSteerRenders(v, s.shared.osc.renders);
         writeToneOsc(s, i, osc);
     }
-    s.n.extInBlocks += plays;
+    s.n.extInBlocks += extIn;
+    s.n.variOffBlocks += variOff;
 }
 
 void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng) {
@@ -273,5 +275,8 @@ std::string toneOscSetUp(ToneSides& s) {
     return oscRingSetUp(toneRingSides(s));
 }
 
-std::string toneOscCase(ToneSides& s, std::mt19937& rng) { return oscRingCase(toneRingSides(s), rng); }
+std::string toneOscCase(ToneSides& s, std::mt19937& rng) {
+    oscDrawWave(s.fw, s.shared.osc);   // v323: the wave Vari off's renders play
+    return oscRingCase(toneRingSides(s), rng);
+}
 #endif

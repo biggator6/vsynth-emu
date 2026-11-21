@@ -89,13 +89,38 @@ struct OscRingSides {
 // none taken yet on either side, and the port's log of calls cleared; from v322 the effect chip's frames the EXT IN
 // player plays, from the shared generator of their own, into rom.4's memory with the part's pointer to them
 void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng);
-// v322: whether a voice's render is the EXT IN player's (its kind renders by +0xa44, and that names one of the two);
-// before a render on such a voice, its level (+0x1e0) and target (+0x1dc) within
-// ±1 as a note gives them (the targets' level and gain), each drawn again 0…1 when not: the render takes the level from
-// the target by xtf::sub, whose NaN's sign is FSUB's negated; and its output, at most full scale so, is what a tone's
-// delay mix moves its delay by (v269: past full scale it reads past its lines)
-bool oscPlaysExtIn(const Vc2OscVoice& o);
-void oscSteerExtIn(Vc2OscVoice& o, std::mt19937& rng);
+// Vari off's object words the renders read, by their offsets in the object (the voice's +0x15c on), as
+// Vc2OscVariOffRender.cpp names them: the pitch, the gain's target and the gain; the fraction, the position, the samples'
+// address, the last sample, the loop's first, last and length, its rate factor and mode; the stereo render's fold, the
+// fade at the last sample, the position a turning loop runs on (v261's, Vc2VariOffCheck.cpp's until v323)
+namespace OscVariOff {
+inline constexpr uint32_t kPitchAt = 0x70, kTargetAt = 0x80, kGainAt = 0x84, kFracAt = 0xec, kPosAt = 0xf0;
+inline constexpr uint32_t kSamplesAt = 0xf4, kLastAt = 0xf8, kStartAt = 0xfc, kEndAt = 0x100, kSpanAt = 0x104;
+inline constexpr uint32_t kRateAt = 0x108, kModeAt = 0x10c, kFoldAt = 0x124, kFadeAt = 0x128, kTurnAt = 0x12c;
+inline constexpr uint32_t kFirst = 0x70, kBytes = 0xc0;   // the object's words drawn: +0x70…+0x130
+} // namespace OscVariOff
+// v261's draws (Vc2VariOffCheck.cpp's until v323, the voice part's too): a wave's halfwords, one in 16 at full scale;
+// and Vari off's words on a voice's object, on a wave at `waveAt`: noise under them all, a loop of 1…600 frames from
+// frame 1024…2047, a last sample past its end three times in four (else inside it, where the hold is), the two
+// positions about the loop and its way back, a mode 0…2, a fold one time in three, a pitch above 0.  Not drawn: a
+// loop's length of 0 or less (rom.4's wrap never ends), a mode past 2 (rom.4 jumps into its table), a pitch of 0 or less
+void oscDrawHalfwords(std::span<int16_t> wave, std::mt19937& rng);
+void oscDrawVariOffWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt);
+// [FW] the renders the voice has as its own (v322, v323): the EXT IN player's two, Vari off's two
+inline constexpr std::array<uint32_t, 2> kOscExtInRenders { 0x893c62e0, 0x893c61e0 };
+inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c66e0 };
+// Whether a voice's render is one of `renders` (its kind renders by +0xa44, and that names one); before a render, a
+// voice's words as the render needs them (`oscPlaysExtIn` and `oscSteerExtIn` until v323):
+// - through the EXT IN player (v322), its level (+0x1e0) and target (+0x1dc) within ±1 as a note gives them (the
+//   targets' level and gain), each drawn again 0…1 when not: the render takes the level from the target by xtf::sub,
+//   whose NaN's sign is FSUB's negated; and its output, at most full scale so, is what a tone's delay mix moves its
+//   delay by (v269: past full scale it reads past its lines);
+// - through Vari off (v323), the object's words drawn as v261's are, on the wave at kOscWaveAt, so its reads stay in it
+//   and its wrap ends
+bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders);
+void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng);
+// v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
+void oscDrawWave(Vc2Fw& fw, OscShared& shared);
 std::string oscRingSetUp(const OscRingSides& r);
 std::string oscRingCase(const OscRingSides& r, std::mt19937& rng);
 std::string oscRingBlock(const OscRingSides& r, std::mt19937& rng);

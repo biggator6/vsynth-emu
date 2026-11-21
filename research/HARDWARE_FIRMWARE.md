@@ -1546,6 +1546,49 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's Vari off renders on the voice (2026-11-21, v323) {#vc2-osc-vari-off-joined}
+
+Step 4.3's fifty-first version, item 11's third part: Vari off's two renders, `0x893c63c0` (mono) and `0x893c66e0`
+(stereo), join the OSC voice. Until v323 they went out by address through `Vc2OscParts`. They were ported in v261
+("The VC-2's Vari off") as `vc2OscVariOffMono` and `vc2OscVariOffStereo` and checked alone against rom.4's own.
+LITE's and VariPhrase's installs (v238) write them at +0xa44 for the waves' types and the block's Vari off bit.
+
+**The voice's own renders, one table by address.** rom.4's render (`0x893ae9f0`) calls whatever +0xa44 names, as
+`(out, the object, third)`. The voice keeps the renders it has as rows of the address and its way (`kOwnRenders`,
+`Vc2OscVoice::renderOwn`), and sends any other out by its address, as before:
+- v322's EXT IN renders, `renderExtIn` given the frame's words, kind 4's 0 and 1 and kind 7's 4 and 4;
+- Vari off's two, on the wave its object's +0xf4 points into.
+
+That wave comes through a new `Vc2OscParts::waveSamples()`, a `Vc2OscSamples` of the wave memory (v261's struct,
+moved into the voice's header). The tone host's link passes it to the deriving class, which in the part will give the
+VC-2's own wave memory. Neither render reads the third argument, the object's +0x15c.
+
+**The checks.** xt_vc2osc no longer hooks the two renders: rom.4's own run in the voice.
+- Each case draws a wave of 16,384 halfwords into rom.4's memory and the port's parts (`oscDrawWave`). It comes from
+  the renders' generator of their own (v322's, named `OscShared::renders` from v323), so the run's other draws stay.
+- Before a render through Vari off, the object's words are drawn as v261's part draws them, on that wave
+  (`oscSteerRenders`). That keeps the reads inside the wave, which past it are rom.4's memory, and the wrap's length
+  above 0, where rom.4's loop would never end. v261's draws of the wave and the words moved out of
+  `Vc2VariOffCheck.cpp` into the shared draws (`oscDrawHalfwords`, `oscDrawVariOffWords`), with the object words'
+  offsets (`OscVariOff`). v261's part draws as it did, its line unchanged.
+- Only LITE's and VariPhrase's installs write Vari off's addresses, which left 3 blocks in 40 cases. So one render in
+  four now makes the voice's render word one of the two, from the renders' generator.
+
+xt_vc2tone's voices run the same, the steer before each tone's render (`toneSteerRenders`, v322's `toneSteerExtIn`).
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400):
+  - xt_vc2osc: 275, 2,575 and 2,627 blocks through Vari off's renders;
+  - xt_vc2tone: 59, 492 and 533 tone renders with an OSC through them.
+- Every line of the table, the link and Vari off's port reached. In the port the one branch not taken is v261's: the
+  wrap's guard, which rom.4 has no way to survive.
+- `mutate_vc2.py --osc`: 7 new plants (Vari off's rows' addresses and ways, their wave, the table's render) and 11
+  of v322's rewritten on the table and `renderExtIn`'s words, 0 missed. The whole list, 1,291, and `--tone`, 754 with
+  the link's new plant, all caught.
+
+**Next.** Item 11's fourth part: LITE's own routines, its update `0x893c8280` and settings `0x893c8390`, its object
+routine `0x893cbf40`, its heads' renders on `XtLitePlayer`, kind 1's mode 1 and its seeks.
+
 ### The VC-2's EXT IN player (2026-11-20, v322) {#vc2-osc-ext-in}
 
 Step 4.3's fiftieth version, item 11's second part: the EXT IN player's three routines join the OSC voice

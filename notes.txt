@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's Vari off renders on the voice v323 (2026-11-21, on claude/vc2-part-4-3 after v322; HARDWARE_FIRMWARE.md,
+  "The VC-2's Vari off renders on the voice"): step 4.3's fifty-first version, item 11's third part. rom.4's
+  0x893c63c0 and 0x893c66e0, v261's ports, are the voice's own, on the wave its object's +0xf4 points into, which comes
+  through a new Vc2OscParts::waveSamples (Vc2OscSamples moved into the voice's header); the voice's renders are one
+  table by the address an install writes (kOwnRenders, renderOwn), v322's EXT IN two its rows too, any other still out
+  by its address. xt_vc2osc no longer hooks them: a wave drawn each case into rom.4's memory and the port's, from the
+  renders' generator (v322's, renamed renders); before a render through Vari off its words drawn as v261's part draws
+  them (those draws moved into the shared Vc2OscPartDraws.cpp, v261's line unchanged), and one render in four made
+  Vari off's. 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's EXT IN player v322 (2026-11-20, on claude/vc2-part-4-3 after v321; HARDWARE_FIRMWARE.md, "The VC-2's
   EXT IN player"): step 4.3's fiftieth version, item 11's second part. rom.4's update 0x893c6260 (the ratio and gain
   into the object; kinds 4 and 7, and kind 6's first, a row's flag extInFirst where an address was) and its renders

@@ -975,6 +975,10 @@ version against rom.4's routines with what it calls hooked:
          (HARDWARE_FIRMWARE.md, "The VC-2's EXT IN player"). Found: rom.4's stereo render is rom.2's player's code on
          the frame's words 0 and 1, and the mono one the same on word 4; the player's output must stay within full
          scale for the tone's delay mix, which moves its delay by it. Next: Vari off's renders.
+       - Vari off's renders joined (v323): `0x893c63c0` and `0x893c66e0` (v261's ports) on the wave the object's +0xf4
+         points into, through `Vc2OscParts::waveSamples`; the voice's renders one table by address (`renderOwn`, the
+         EXT IN two its rows too), any other still out; their hooks out of xt_vc2osc, v261's draws of the wave and the
+         words shared (HARDWARE_FIRMWARE.md, "The VC-2's Vari off renders on the voice"). Next: LITE.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -173,8 +173,12 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
         const std::string mic = oscMicBlock(s, rng);
         if (!mic.empty()) return mic;
     }
-    s.n.extInBlocks += oscPlaysExtIn(s.voices[(size_t)v]);   // v322
-    oscSteerExtIn(s.voices[(size_t)v], s.shared.extIn);
+    // v323: one time in four the render word one of Vari off's, which only LITE's and VariPhrase's installs write (3
+    // blocks in 40 cases else), from the renders' generator so the run's other draws stay
+    if (s.shared.renders() % 4 == 0) s.voices[(size_t)v].tail.render = kOscVariOffRenders[s.shared.renders() % 2];
+    s.n.extInBlocks += oscRendersBy(s.voices[(size_t)v], kOscExtInRenders);       // v322
+    s.n.variOffBlocks += oscRendersBy(s.voices[(size_t)v], kOscVariOffRenders);   // v323
+    oscSteerRenders(s.voices[(size_t)v], s.shared.renders);
     oscWriteVoice(s, v);
     std::string what = oscBothSides(s, kRender, { oscVoiceAt(v), kOscOutAt }, Answer::r0, [&] {
         return s.voices[(size_t)v].render(s.shared.out.data(), s.parts[(size_t)v]);

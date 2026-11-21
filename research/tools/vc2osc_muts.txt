@@ -1315,28 +1315,39 @@ extin-update-ratio|setF32(kObjectPitch, targets.ratio());|setF32(kObjectPitch, t
 extin-update-gain|setF32(kObjectGain, targets.gain());\n}|setF32(kObjectGain, targets.level());\n}|vc2oscnoteon
 extin-update-no-pitch|    setF32(kObjectPitch, targets.ratio());\n||vc2oscnoteon
 extin-update-no-gain|    setF32(kObjectGain, targets.gain());\n}|}|vc2oscnoteon
-extin-stereo-left|{ 0x893c62e0, 0, 1 }|{ 0x893c62e0, 4, 1 }|vc2oscnoteon
-extin-stereo-right|{ 0x893c62e0, 0, 1 }|{ 0x893c62e0, 0, 5 }|vc2oscnoteon
-extin-stereo-at|{ 0x893c62e0, 0, 1 }|{ 0x893c62e4, 0, 1 }|vc2oscnoteon
-extin-mono-left|{ 0x893c61e0, 4, 4 }|{ 0x893c61e0, 0, 4 }|vc2oscnoteon
-extin-mono-right|{ 0x893c61e0, 4, 4 }|{ 0x893c61e0, 4, 5 }|vc2oscnoteon
-extin-mono-at|{ 0x893c61e0, 4, 4 }|{ 0x893c61e4, 4, 4 }|vc2oscnoteon
+extin-stereo-left|v.renderExtIn(0, 1, out, p);|v.renderExtIn(4, 1, out, p);|vc2osc
+extin-stereo-right|v.renderExtIn(0, 1, out, p);|v.renderExtIn(0, 5, out, p);|vc2osc
+extin-stereo-at|{ 0x893c62e0, extInStereo }|{ 0x893c62e4, extInStereo }|vc2osc
+extin-mono-left|v.renderExtIn(4, 4, out, p);|v.renderExtIn(0, 4, out, p);|vc2osc
+extin-mono-right|v.renderExtIn(4, 4, out, p);|v.renderExtIn(4, 5, out, p);|vc2osc
+extin-mono-at|{ 0x893c61e0, extInMono }|{ 0x893c61e4, extInMono }|vc2osc
 extin-frames|kFrames = 32, kFrameWords = 8|kFrames = 31, kFrameWords = 8|vc2oscnoteon
 extin-frame-words|kFrames = 32, kFrameWords = 8|kFrames = 32, kFrameWords = 7|vc2oscnoteon
-extin-left-is-right|frames[kFrameWords * i + render->left];|frames[kFrameWords * i + render->right];|vc2oscnoteon
-extin-right-is-left|frames[kFrameWords * i + render->right];|frames[kFrameWords * i + render->left];|vc2oscnoteon
+extin-left-is-right|frames[kFrameWords * i + left];|frames[kFrameWords * i + right];|vc2oscnoteon
+extin-right-is-left|frames[kFrameWords * i + right];|frames[kFrameWords * i + left];|vc2oscnoteon
 extin-start-target|player.noteOn(f32(kObjectLevel), f32(kObjectGain));|player.noteOn(f32(kObjectGain), f32(kObjectGain));|vc2oscnoteon
 extin-target-level|player.noteOn(f32(kObjectLevel), f32(kObjectGain));|player.noteOn(f32(kObjectLevel), f32(kObjectLevel));|vc2oscnoteon
 extin-no-level-back|    setF32(kObjectLevel, player.gainNow());\n||vc2oscnoteon
 extin-level-to-target|setF32(kObjectLevel, player.gainNow());|setF32(kObjectGain, player.gainNow());|vc2oscnoteon
-extin-other-taken|if (render == kExtInRenders.end()) return false;|if (render == kExtInRenders.end()) return true;|vc2oscnoteon
+extin-other-taken|if (own == kOwnRenders.end()) return false;|if (own == kOwnRenders.end()) return true;|vc2osc
 k4-updates-kind6|.ticks = kR0, .updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|.ticks = kR0, .updates = Vc2OscUpdate::kind6, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|vc2osckinds
 k7-updates-analog|.ticks = kR0, .updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|.ticks = kR0, .updates = Vc2OscUpdate::analog, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|vc2osckinds
 k6-first-on-5|{ .installed = 5, .ticks = kR0,|{ .installed = 5, .extInFirst = true, .ticks = kR0,|vc2osckinds
 voice-update-no-extin|case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;|case Vc2OscUpdate::extIn: return;|vc2osc
 voice-update-first-never|if (row.extInFirst) updateExtIn(parts, shared);|if (!row.extInFirst) updateExtIn(parts, shared);|vc2osc
-voice-render-extin-off|if (!renderExtIn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);|parts.renderBy(tail.render, out, kRenderThird);|vc2osc
-voice-render-extin-only|if (!renderExtIn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);|renderExtIn(tail.render, out, parts);|vc2osc
+voice-render-extin-off|if (!renderOwn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);|parts.renderBy(tail.render, out, kRenderThird);|vc2osc
+voice-render-extin-only|if (!renderOwn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);|renderOwn(tail.render, out, parts);|vc2osc
 xtextin-glide|constexpr float kGlide = 0x1p-5f;|constexpr float kGlide = 0x1p-4f;|vc2xtextin
 xtextin-no-glide|        gain_ = add(mul(sub(target_, gain_), kGlide), gain_);|        gain_ = target_;|vc2xtextin
 xtextin-sides|        lr[2 * i + 1] = mul(flt(in[2 * i + 1]), gain_);|        lr[2 * i + 1] = mul(flt(in[2 * i]), gain_);|vc2xtextin
+# v323: Vari off's renders joined, the voice's renders one table by address (vc2osc; v323 rewrote v322's extin-stereo-*,
+# extin-mono-*, extin-other-taken, extin-left-is-right, extin-right-is-left and voice-render-extin-* on the table and
+# renderExtIn's words).  The renders' law itself is v261's, planted as vc2oscvarioff; Vc2OscSamples, in the voice's
+# header from v323, is not planted (a header's plants build from the unplanted sources), as Vc2OscVoice.h's offsets
+own-variOff-mono-at|{ 0x893c63c0, variOffMono }|{ 0x893c63c4, variOffMono }|vc2osc
+own-variOff-stereo-at|{ 0x893c66e0, variOffStereo }|{ 0x893c66e4, variOffStereo }|vc2osc
+own-variOff-mono-as-stereo|{ 0x893c63c0, variOffMono }|{ 0x893c63c0, variOffStereo }|vc2osc
+own-variOff-stereo-as-mono|{ 0x893c66e0, variOffStereo }|{ 0x893c66e0, variOffMono }|vc2osc
+own-variOff-mono-no-wave|vc2OscVariOffMono(v, out, p.waveSamples());|vc2OscVariOffMono(v, out, Vc2OscSamples {});|vc2osc
+own-variOff-stereo-no-wave|vc2OscVariOffStereo(v, out, p.waveSamples());|vc2OscVariOffStereo(v, out, Vc2OscSamples {});|vc2osc
+own-not-rendered|    own->render(*this, out, parts);\n||vc2osc

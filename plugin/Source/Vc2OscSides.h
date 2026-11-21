@@ -13,7 +13,7 @@ struct OscCounts {
     long getters = 0, seeks = 0, kindCalls = 0, gliding = 0, lookups = 0, objectCalls = 0;
     long carrierStarts = 0, carrierBlocks = 0, carrierSettings = 0, kind6Starts = 0, kind6Blocks = 0;   // v266
     long voicedSounding = 0, voicedNotFinite = 0;   // v266: those blocks with a sample that isn't 0, or isn't finite
-    long extInBlocks = 0;                           // v322: the renders through the EXT IN player's
+    long extInBlocks = 0, variOffBlocks = 0;        // v322, v323: the renders through the EXT IN player's, Vari off's
 };
 
 struct OscSides {

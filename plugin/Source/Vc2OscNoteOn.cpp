@@ -9,7 +9,6 @@
 #include "Vc2OscTargets.h"
 #include "Vc2OscVoiceKinds.h"
 #include "XtExtIn.h"
-#include <algorithm>
 
 namespace {
 // [FW] the object's words kinds 0, 4 and 7 set: its pitch (+0x70), its gain (+0x80) and its level (+0x84); from v322
@@ -38,14 +37,7 @@ Params paramsOf(const Vc2OscVoice& v, uint32_t offset = kP) {
     return p;
 }
 
-// [FW] v322: the EXT IN player's renders by the address the install writes, and the frame's words each plays on the
-// left and the right: kind 4's words 0 and 1, kind 7's word 4 to both sides; a block's 32 frames of 32 bytes
-struct ExtInRender {
-    uint32_t at;
-    int left, right;
-};
-constexpr std::array<ExtInRender, 2> kExtInRenders { { { 0x893c62e0, 0, 1 }, { 0x893c61e0, 4, 4 } } };
-constexpr int kFrames = 32, kFrameWords = 8;
+constexpr int kFrames = 32, kFrameWords = 8;   // [FW] v322: a block's 32 frames of 32 bytes
 } // namespace
 
 void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
@@ -117,20 +109,17 @@ void Vc2OscVoice::updateExtIn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
 }
 
 // [FW] 0x893c62e0 and 0x893c61e0 (out, the object), v322: rom.2's EXT IN player's law (0x895097d0, XtExtInPlayer) on
-// the input's frames: each frame's words × the level, which goes 1/32 of the way to the target a sample by FMAC and is
-// left where it ends; the object's pitch unread
-bool Vc2OscVoice::renderExtIn(uint32_t routine, float* out, Vc2OscParts& parts) {
-    const auto* render = std::ranges::find(kExtInRenders, routine, &ExtInRender::at);
-    if (render == kExtInRenders.end()) return false;
+// the input's frames: each frame's words `left` and `right` × the level, which goes 1/32 of the way to the target a
+// sample by FMAC and is left where it ends; the object's pitch unread
+void Vc2OscVoice::renderExtIn(int left, int right, float* out, Vc2OscParts& parts) {
     const int32_t* frames = parts.inputFrames();
     std::array<int32_t, 2 * kFrames> lr {};
     for (int i = 0; i < kFrames; ++i) {
-        lr[(size_t)(2 * i)] = frames[kFrameWords * i + render->left];
-        lr[(size_t)(2 * i + 1)] = frames[kFrameWords * i + render->right];
+        lr[(size_t)(2 * i)] = frames[kFrameWords * i + left];
+        lr[(size_t)(2 * i + 1)] = frames[kFrameWords * i + right];
     }
     XtExtInPlayer player;
     player.noteOn(f32(kObjectLevel), f32(kObjectGain));
     player.block(out, lr.data());
     setF32(kObjectLevel, player.gainNow());
-    return true;
 }

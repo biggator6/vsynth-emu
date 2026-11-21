@@ -2,8 +2,10 @@
 // is a row of Vc2OscVoiceKinds.cpp.  The settings and the getters are Vc2OscVoiceGet.cpp's.
 #include "Vc2OscVoice.h"
 #include "Vc2OscTables.h"
+#include "Vc2OscVariOffRender.h"
 #include "Vc2OscVoiceKinds.h"
 #include "XtFloat.h"
+#include <algorithm>
 
 using xtf::add;
 using xtf::div;
@@ -42,7 +44,28 @@ float installedOf(int which, const Vc2OscTables& t) {
     const std::array<float, 3> constants { t.installed4, t.installed5, t.installed6 };
     return constants[(size_t)(which - 4)];
 }
+
+// [FW] the renders the voice has as its own (v322, v323), by the address an install writes at +0xa44: the EXT IN
+// player's, kind 4's on the frame's words 0 and 1 and kind 7's on word 4 to both sides (Vc2OscNoteOn.cpp), and Vari
+// off's, mono and stereo (Vc2OscVariOffRender.cpp, v261), on the wave its object's +0xf4 points into
+void extInStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { v.renderExtIn(0, 1, out, p); }
+void extInMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { v.renderExtIn(4, 4, out, p); }
+void variOffMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscVariOffMono(v, out, p.waveSamples()); }
+void variOffStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscVariOffStereo(v, out, p.waveSamples()); }
+struct OwnRender {
+    uint32_t at;
+    void (*render)(Vc2OscVoice&, float*, Vc2OscParts&);
+};
+constexpr std::array<OwnRender, 4> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
+                                                   { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo } } };
 } // namespace
+
+bool Vc2OscVoice::renderOwn(uint32_t routine, float* out, Vc2OscParts& parts) {
+    const auto* own = std::ranges::find(kOwnRenders, routine, &OwnRender::at);
+    if (own == kOwnRenders.end()) return false;
+    own->render(*this, out, parts);
+    return true;
+}
 
 void Vc2OscVoice::construct() {
     vibrato.build();
@@ -172,8 +195,8 @@ void Vc2OscVoice::legato(const uint32_t* ramp) {
 uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
     switch (vc2OscKindRow(kind()).renders) {
         case Vc2OscRender::zero: std::fill(out, out + kOut, 0.0f); return 0;
-        case Vc2OscRender::byRender:   // v322: the EXT IN player's two the voice's own, any other by its address
-            if (!renderExtIn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);
+        case Vc2OscRender::byRender:   // v322, v323: the voice's own renders, any other by its address
+            if (!renderOwn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);
             return 0;
         case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
         case Vc2OscRender::carrier: carrier.render(out); return 0;                                  // 0x893ebfa0

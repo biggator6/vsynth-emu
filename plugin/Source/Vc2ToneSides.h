@@ -34,7 +34,7 @@ struct ToneCounts {
     // and the calls they made beyond the tone, by xt_vc2osc's kinds of call
     std::array<long, 8> oscKinds {};
     long oscSettings = 0, micBlocks = 0, oscSteadied = 0;   // and the OSC 1s steadied for a COSM that takes its pitch
-    long extInBlocks = 0;   // v322: the tones' renders with an OSC through the EXT IN player's
+    long extInBlocks = 0, variOffBlocks = 0;   // v322, v323: the tones' renders with an OSC through each own render
     std::array<long, 6> oscCalls {};
 };
 
@@ -142,9 +142,10 @@ void toneMakeOscAnalog(ToneSides& s, int i, int osc, uint32_t code, std::mt19937
 void toneOscBeforeNoteOn(ToneSides& s, int i, std::mt19937& rng);
 void toneHoldOscVibratos(ToneSides& s, int i, int32_t n);
 std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng);
-// v322: before a render, tone i's voices whose render is the EXT IN player's given a level and target as a note gives
-// them (oscSteerExtIn), from the EXT IN's own generator
-void toneSteerExtIn(ToneSides& s, int i);
+// v322: before a render, tone i's voices whose render is one of the voice's own given the words it needs
+// (oscSteerRenders), from the renders' own generator: the EXT IN player's level and target, from v323 Vari off's words
+// on the case's wave (`toneSteerExtIn` until v323)
+void toneSteerRenders(ToneSides& s, int i);
 // Before a getter: a VariPhrase voice's +0x168, and from v321 half the time a LITE's or VariPhrase voice's positions
 // (+0x194, +0x24c, +0x270), which their players' routines write (hooked here, writing none), drawn on both sides, so
 // that the getters tell the voices apart

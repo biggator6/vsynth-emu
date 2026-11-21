@@ -182,7 +182,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
       Vc2RampTables.cpp Vc2OscPlayers.cpp Vc2OscLite.cpp Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp Vc2OscAnalogSub.cpp \
       Vc2OscAnalogShape.cpp Vc2OscAnalogUpdate.cpp Vc2OscVibrato.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp Vc2Kind6.cpp \
       Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2OscDraws.cpp Vc2OscPartDraws.cpp Vc2OscRecords.cpp Vc2OscFakes.cpp \
-      Vc2OscPortParts.cpp Vc2VocoderOsc.cpp XtExtIn.cpp ) \
+      Vc2OscPortParts.cpp Vc2VocoderOsc.cpp XtExtIn.cpp Vc2OscVariOffRender.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
       Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
