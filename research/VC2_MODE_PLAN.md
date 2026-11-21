@@ -735,7 +735,9 @@ version against rom.4's routines with what it calls hooked:
    2. done (v451): rom.4's agreed IDs, 1,332, as host parameters after the 763, by rom.4's names, ranges and text, the
       set fixed in the source and rom.4 brought in before the layout (HARDWARE_FIRMWARE.md, "rom.4's parameters as the
       plugin's").
-   3. The session's state for them, append-only, and a `.p02`'s load into them.
+   3. done (v452): a `.p02`'s load into them, `loadVc2Patch`, and the session's state for them, append-only: the
+      parameters by the processor's state as every other, the patch's store and name beside them (HARDWARE_FIRMWARE.md,
+      "A .p02 onto the VC-2's parameters"). With it the first half is done.
    4. The second half: the mode switch's audio, the wiring to Vc2Synth, the VC-2 pages and cards, the plugin test of a
       played block.
 

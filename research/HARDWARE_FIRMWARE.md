@@ -1546,6 +1546,38 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A .p02 onto the VC-2's parameters (2026-11-21, v452) {#vc2-patch-load}
+
+Step 4.5's third item (research/VC2_MODE_PLAN.md), with which its first half is done. `VSynthEmuProcessor::loadVc2Patch`
+reads a `.p02` by rom.4's own reader (`vc2PatchRead`, v450) and puts its values on the VC-2's parameters (v451): each of
+the 1,314 a patch holds (all but the system's 18) as the store reads it, its ID in its zone (the tone's block, the
+envelopes', LFOs' and COSMs') and COSM, a typed ID through its block's slots, the Start Offsets on the V-Synth's range
+(`vc2PatchValue`, PluginVc2Patch.cpp). Each is set as a host's automation would, and only if it has moved; no V-Synth
+parameter and no VC-2 system one moves. A file rom.4's reader refuses, or none, is refused, the status saying why, and
+nothing moves.
+
+**The session.** The store and the patch's name are kept (`PluginVc2Patch`) and go in the session's state beside the
+parameters, `vc2Store` (the store's 0x13a4 bytes in base64) and `vc2PatchName`, for what the parameters don't hold:
+zones 3–16 and the arpeggio pattern, as a V-Synth patch's store keeps its zones (v195). A session from before v452 has
+neither and leaves none, in a new instance and in one that had a patch loaded; one from before v451 loads its V-Synth
+parameters as saved and the VC-2's at their defaults. Append-only: no earlier property or parameter is touched.
+
+**PluginProcessor.h split.** It was past the kit's 300 lines, which the guard won't let grow, so a part went first,
+moved as it stood: the per-OSC file buffer, `LoadedWave`, is `PluginLoadedWave.h`'s `PluginLoadedWave`, the class
+keeping its name for it. Then the VC-2 patch's three members and its state, 298 lines.
+
+**Not yet:** a `.p02` from the editor (the header's Browse… opens a `.p00`; the VC-2's pages and the mode switch are
+step 4.5's second half), and nothing plays the patch (step 4.3's Vc2Synth).
+
+**The check.** `VSynthEmuArpPluginTest`'s VC-2 patch part (`Vc2PatchPluginTest.cpp`, 16 checks): the disk image's 128
+`.p02`, each written to a file and loaded, every one of the 1,314 parameters as the store reads it (168,192 values), the
+store kept whole and the name its own, no V-Synth parameter and no VC-2 system one moved (those moved to their tops
+first, so a write would show); a V-Synth patch, a text file, four bytes and no file refused, nothing moved; a session
+after a load bringing the parameters, store and name back; and the sessions from before v452 and v451 above.
+`mutate_panel.py` with the 11 `vc2-patch-` plants (the system's read, zone 2 read as zone 1, COSM 2 as COSM 1, the typed
+read as the first bank's, a refused file going on, the store or name not kept, the state not saved, not restored or
+kept from the last patch, the name not saved): 11 caught.
+
 ### rom.4's parameters as the plugin's (2026-11-21, v451) {#vc2-host-params}
 
 Step 4.5's second item (research/VC2_MODE_PLAN.md). rom.4's IDs become host parameters, appended after the V-Synth's 763,

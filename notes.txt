@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A .p02 onto the VC-2's parameters v452 (2026-11-21, after v451; HARDWARE_FIRMWARE.md, "A .p02 onto the VC-2's
+  parameters"; the plan's step 4.5, item 3: its first half done). loadVc2Patch: rom.4's reader's store onto the 1,314
+  VC-2 parameters a patch holds, each by its ID in its zone and COSM (vc2PatchValue, PluginVc2Patch.cpp); the store
+  and name kept and in the session as vc2Store and vc2PatchName, for zones 3-16 and the arpeggio pattern; a session
+  from before has none and leaves none. PluginProcessor.h split first, moved as it stood: LoadedWave into
+  PluginLoadedWave.h. VSynthEmuArpPluginTest's VC-2 patch part: the disk image's 128, 168,192 values, refusals,
+  sessions; 16 checks. mutate_panel.py's 11 vc2-patch- plants 11. Not from the editor yet, not in the sound.
+
 rom.4's parameters as the plugin's v451 (2026-11-21, after v450; HARDWARE_FIRMWARE.md, "rom.4's parameters as the
   plugin's"; the plan's step 4.5, item 2). 1,332 host parameters by rom.4's IDs after the V-Synth's 763, which stay as
   they were (the params listing's first 763 lines byte for byte): a patch's common, effects' Types and levels, Beam to

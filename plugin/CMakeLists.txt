@@ -161,6 +161,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFxInput.cpp
     Source/PluginExtIn.cpp
     Source/PluginVc2Params.cpp
+    Source/PluginVc2Patch.cpp
     Source/PluginRender.cpp
     Source/XtHostInput.cpp
     Source/XtFxValueText.cpp
@@ -220,9 +221,9 @@ vse_add_test(VSynthEmuDiskImageTest Tests/DiskImageTest.cpp Tests/TestMain.cpp)
 vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 # The arpeggio's plugin side: its parameters, a patch's arpeggio, a session's, and a chord through the processor (v190);
 # then the Multi Step Modulator's: its parameters, the image's patches with it on, a note, a patch's load stopping it (v193);
-# the VC-2's parameters against rom.4 (v451)
+# the VC-2's parameters against rom.4 (v451), and a .p02 onto them and the session (v452)
 vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/ZonePluginTest.cpp
-             Tests/Vc2ParamPluginTest.cpp Tests/TestMain.cpp)
+             Tests/Vc2ParamPluginTest.cpp Tests/Vc2PatchPluginTest.cpp Tests/TestMain.cpp)
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp

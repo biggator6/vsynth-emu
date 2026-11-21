@@ -189,16 +189,6 @@ void moveAll(VSynthEmuProcessor& p) {
         }
 }
 
-// The parameters' values by ID: the VC-2's, or the V-Synth's
-std::map<juce::String, float> parameterValues(VSynthEmuProcessor& p, bool vc2) {
-    std::map<juce::String, float> out;
-    for (auto* base : p.getParameters()) {
-        auto* r = dynamic_cast<juce::RangedAudioParameter*>(base);
-        if (r && r->paramID.startsWith(kVc2ParamPrefix) == vc2) out[r->paramID] = r->convertFrom0to1(r->getValue());
-    }
-    return out;
-}
-
 // A session keeps them: saved with every one moved, it comes back so in a new instance; and one saved before them
 // loads as it did, the V-Synth's as saved and the VC-2's at their defaults
 void sessions(TestChecks& check, const juce::File& rom) {

@@ -3954,3 +3954,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `verify.sh`'s build-ID line failed twice on v450. The first time it was mine: I wrote v451's first files into `plugin/Source` during the run, and the ID counts untracked files there. The second, two other sessions' builds had replaced `~/Library`'s AU and VST3 by the end. The AU was this build's again once reinstalled, and auval passed on it.
 - The MSM's and zones' parts of the arpeggio test found their parameters by counting back from the list's end, and broke on the 1,332 after them. They count past the VC-2's now, rather than the constant they used growing in a header that can't grow.
 - My first name check would have passed a name with "COSM " left in it, as it only looked at the end. I made it compare the whole name before planting that error.
+
+### Session 23, continued (2026-11-21) — v452: a .p02 onto the VC-2's parameters
+
+- `PluginProcessor.h` had to shrink before it could take the patch's members: the per-OSC file buffer went to a header of its own, moved as it stood. The kit refused the new header at first because the old copy was still in place; the order is take out, then write.
+- The processor's accessor was first `vc2Store()`, the very name of the store layout's free function, which a member would have shadowed inside the class. It is `vc2PatchStore()`.
+- The test first left the VC-2's system parameters out, as no patch holds them, so a load that wrote them would have passed. It moves them to their tops before the loads now and asks that they stay.

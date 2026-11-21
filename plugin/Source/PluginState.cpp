@@ -12,6 +12,7 @@ void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
         if (v != kFxNoEdit) edits << id << "=" << v << ",";
     }
     state.setProperty("fxEdits", edits, nullptr);
+    vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -48,6 +49,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     }
     patchName_ = apvts.state.getProperty("patchName").toString();
     patchNote_ = apvts.state.getProperty("patchNote").toString();
+    vc2PatchFromState(vc2Patch_, apvts.state);   // v452: none from a session before it
     restoreZones(gone, hadSplits);   // PluginZones.cpp
     // What the session said already is left as it was; anything new goes with it, and in the status line
     juce::StringArray fresh;
