@@ -83,12 +83,13 @@ struct OscHook {
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
 // oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248), the carrier's init,
 // settings and render and kind 6's start and render (v266), the vibrato's four (v267), kinds 5's and 6's updates
-// (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323) and LITE's update and
-// settings (v324): rom.4's own run, and the routines they call hooked
+// (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
+// settings (v324) and the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325): rom.4's own
+// run, and the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893c88b0, kKindCall, kindRoutine, none },
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
-    { 0x893cbf40, kObjectCall, objectRoutine, none }, { 0x893cc0d0, kEventPosition, eventAt, positions },
+    { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893b0280, kKindSettings, routineSettings, none },
     // v238: the players' renders LITE's and VariPhrase's installs write (kind 1's mode 1, LITE's heads, SOLO's,
     // BACKING's, ENSEMBLE's, the period-jump player's; Vari off's two rom.4's own from v323)
@@ -109,8 +110,7 @@ const OscHook kHooks[] = {
     { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
     { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
-    { 0x893c6360, kSeek, seek, seekFlags }, { 0x893cc830, kSeek, seek, seekFlags },
-    { 0x893c6de0, kSeek, seek, seekFlags }, { 0x893cc630, kSeek, seek, seekFlags },
+    { 0x893cc830, kSeek, seek, seekFlags }, { 0x893cc630, kSeek, seek, seekFlags },
     { 0x893cd090, kSeek, seek, seekFlags }, { 0x893cd440, kSeek, seek, seekFlags },
 };
 

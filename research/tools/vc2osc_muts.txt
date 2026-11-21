@@ -86,7 +86,7 @@ reseek-kind-swapped|if (kind() == 1 && type < kSeeks1.size())|if (kind() == 2 &&
 reseek-restore-was|(uint8_t)(now \| kHeld) : (uint8_t)(now & ~kHeld)|(uint8_t)(was \| kHeld) : (uint8_t)(was & ~kHeld)|vc2osc
 reseek-restore-cleared|(was & kHeld) ? (uint8_t)(now \| kHeld) : (uint8_t)(now & ~kHeld)|(uint8_t)(now & ~kHeld)|vc2osc
 reseek-pending-kept|kHeld));\n    tail.seekPending = 0;|kHeld));|vc2osc
-reseek-no-seek|    if (routine != 0) parts.seek(routine, at);\n||vc2osc
+reseek-no-seek|    if (routine != 0) seekBy(routine, at, parts);   // v325: the voice's own seeks too\n||vc2osc
 noteon-copy-short|std::memcpy(own.data(), block, kBlockBytes);|std::memcpy(own.data(), block, kBlockBytes - 4);|vc2osc
 noteon-depth-unscaled|mul(std::bit_cast<float>(block[kDepthWord]), t.depthScale)|std::bit_cast<float>(block[kDepthWord])|vc2osc
 noteon-pending-kept|    tail.seekPending = 0;\n    setU32(kLegato, legato);|    setU32(kLegato, legato);|vc2osc
@@ -601,9 +601,9 @@ fwd-span|w.loopEnd - w.loopStart);|w.loopStart - w.loopEnd);|vc2oscplayers
 ev-mode|const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;|const uint32_t mode = 0;|vc2oscplayers
 ev-mode-bwd|.bwdMode = mode, .fwdRate|.bwdMode = 0, .fwdRate|vc2oscplayers
 ev-rates|.fwdRate = 1.0f, .bwdRate = 1.0f|.fwdRate = 1.0f, .bwdRate = 0.0f|vc2oscplayers
-ev-seek-test|if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek|if (v.u16(kSeekTo) != v.u16(kTo)) parts.seek|vc2oscplayers
-ev-seek-pos|parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));|parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)) >> 4);|vc2oscplayers
-ev-seek-always|    if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));|    parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));|vc2oscplayers
+ev-seek-test|if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy|if (v.u16(kSeekTo) != v.u16(kTo)) v.seekBy|vc2oscplayers
+ev-seek-pos|v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);|v.seekBy(kSeek, parts.eventPosition(v.u16(kTo)), parts);|vc2oscplayers
+ev-seek-always|    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);|    v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);|vc2oscplayers
 sm-start|{ v.u32(kFrom), v.u32(kTo) - 1 }|{ v.u32(kFrom) - 1, v.u32(kTo) - 1 }|vc2oscplayers
 sm-end|{ v.u32(kFrom), v.u32(kTo) - 1 }|{ v.u32(kFrom), v.u32(kTo) }|vc2oscplayers
 sm-fwd|setLoop(v, kLoop, w.loopStart, w.loopEnd,|setLoop(v, kLoop, w.loopEnd, w.loopStart,|vc2oscplayers
@@ -614,8 +614,8 @@ sm-mode-bwd|modes ? (uint32_t)loop.bwdMode : 0|modes ? (uint32_t)loop.fwdMode : 
 sm-rate-scale|vc2OscTables().rateTenths, { v.u32(kFrom)|vc2OscTables().timesTenThousand, { v.u32(kFrom)|vc2oscplayers
 sm-rate-bwd|.bwdRate = vc2OscLoopRate(loop.rateBwd,|.bwdRate = vc2OscLoopRate(loop.rateFwd,|vc2oscplayers
 sm-pair|    w.bwdRate = mul(w.bwdRate, parts.boundFloat(v.u32(kPairAt), kPairWord));\n||vc2oscplayers
-sm-seek-test|if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek|if (v.u32(kSeekTo) != v.u32(kTo)) parts.seek|vc2oscplayers
-sm-seek-always|    if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek(kSeek, (int32_t)v.u32(kSeekTo));|    parts.seek(kSeek, (int32_t)v.u32(kSeekTo));|vc2oscplayers
+sm-seek-test|if (v.u32(kSeekTo) != v.u32(kFrom)) v.seekBy|if (v.u32(kSeekTo) != v.u32(kTo)) v.seekBy|vc2oscplayers
+sm-seek-always|    if (v.u32(kSeekTo) != v.u32(kFrom)) v.seekBy(kSeek, (int32_t)v.u32(kSeekTo), parts);|    v.seekBy(kSeek, (int32_t)v.u32(kSeekTo), parts);|vc2oscplayers
 tables-lite|kLiteInstalled { 0x89542350, 6 }|kLiteInstalled { 0x89542354, 6 }|vc2osctables
 tables-vari|kVariInstalled { 0x89542368, 10 }|kVariInstalled { 0x8954236c, 10 }|vc2osctables
 tables-times|{ 0x893af53c, &t.timesTenThousand }|{ 0x893af7c8, &t.timesTenThousand }|vc2osctables
@@ -647,9 +647,9 @@ lite-bit-01|{ 0x01, 0x138 }|{ 0x01, 0x13c }|vc2osclite
 lite-bit-02|{ 0x02, 0x13c }|{ 0x02, 0x140 }|vc2osclite
 lite-withbit-clear|b & (uint8_t)~bit|b|vc2osclite
 lite-type-words|type < kWays.size()) kWays[type].words(*this, parts, shared);|type < 2) kWays[type].words(*this, parts, shared);|vc2osclite
-lite-reset|    parts.objectCall(kReset);\n||vc2osclite
-lite-reset-at|kReset = 0x893cbf40|kReset = 0x893cc760|vc2osclite
-lite-seek-test|if (u32(way.to) != u32(way.from)) parts.seek|if (u32(way.to) == u32(way.from)) parts.seek|vc2osclite
+lite-reset|    beatStart();   // v325: 0x893cbf40, the voice's own\n||vc2osclite
+lite-reset-at|    beatStart();   // v325: 0x893cbf40, the voice's own\n    if (type >= kWays.size()) return;|    if (type >= kWays.size()) return;\n    beatStart();|vc2osclite
+lite-seek-test|if (u32(way.to) != u32(way.from)) seekBy|if (u32(way.to) == u32(way.from)) seekBy|vc2osclite
 lite-seek-shift|(int32_t)(u32(way.to) << 4)|(int32_t)u32(way.to)|vc2osclite
 lite-way0-seek|{ variOff, 0x893c6360, 0x154, 0x14c }|{ variOff, 0x893c6de0, 0x154, 0x14c }|vc2osclite
 lite-way0-to|{ variOff, 0x893c6360, 0x154, 0x14c }|{ variOff, 0x893c6360, 0x158, 0x14c }|vc2osclite
@@ -1396,3 +1396,54 @@ lite-update-filter-pool-at|{ 0x893c84a0, &t.liteUpdateFilter }|{ 0x893c84a4, &t.
 lite-settings-two32-pool-at|{ 0x893c8650, &t.liteSettingsTwo32 }|{ 0x893c8654, &t.liteSettingsTwo32 }|vc2osctables
 get-lite-way|settingsLite(s + kKindFrom / 4, parts);|settingsLite(s + kKindFrom / 4 + 1, parts);|vc2oscget
 voice-update-lite|case Vc2OscUpdate::lite: updateLite(parts, shared); return;|case Vc2OscUpdate::lite: return;|vc2osc
+# v325: the players' beat on the voice and its own seeks (vc2oscbeat), XtBeat's start and reset it runs (vc2xtbeat),
+# the two seeks' laws (vc2oscplayers, vc2osclite), the heads' seek's pool word (vc2osctables) and the re-seek's way
+# to them (vc2osc); v325 rewrote reseek-no-seek, ev-seek-test, ev-seek-pos, ev-seek-always, sm-seek-test,
+# sm-seek-always, lite-reset, lite-reset-at and lite-seek-test on the calls that replaced parts.seek and objectCall;
+# ev-seek-pos on the event the seek looks up, as the position it gives is written over by Vari off's start after it
+# (vc2OscVariOffStart, rom.4's too), which showed once the seek was the voice's own
+beat-word-clk|{ 0x19c, offsetof(XtBeat, clk)|{ 0x19e, offsetof(XtBeat, clk)|vc2oscbeat
+beat-word-trip|{ 0x19d, offsetof(XtBeat, trip)|{ 0x19e, offsetof(XtBeat, trip)|vc2oscbeat
+beat-word-orig|{ 0x1a4, offsetof(XtBeat, orig)|{ 0x1a0, offsetof(XtBeat, orig)|vc2oscbeat
+beat-word-tempo|{ 0x1a8, offsetof(XtBeat, tempo)|{ 0x1a4, offsetof(XtBeat, tempo)|vc2oscbeat
+beat-word-step|{ 0x1ac, offsetof(XtBeat, step)|{ 0x1b0, offsetof(XtBeat, step)|vc2oscbeat
+beat-word-budget|{ 0x1b0, offsetof(XtBeat, budget)|{ 0x1ac, offsetof(XtBeat, budget)|vc2oscbeat
+beat-word-sync|{ 0x1b4, offsetof(XtBeat, syncPos)|{ 0x1b8, offsetof(XtBeat, syncPos)|vc2oscbeat
+beat-word-trippos|{ 0x1b8, offsetof(XtBeat, tripPos)|{ 0x1bc, offsetof(XtBeat, tripPos)|vc2oscbeat
+beat-word-walkpos|{ 0x1bc, offsetof(XtBeat, walkPos)|{ 0x1c4, offsetof(XtBeat, walkPos)|vc2oscbeat
+beat-word-beatpos|{ 0x1c0, offsetof(XtBeat, beatPos)|{ 0x1c4, offsetof(XtBeat, beatPos)|vc2oscbeat
+beat-word-factor|{ 0x1e8, offsetof(XtBeat, factor)|{ 0x1e4, offsetof(XtBeat, factor)|vc2oscbeat
+beat-word-integ|{ 0x1ec, offsetof(XtBeat, integ)|{ 0x1f0, offsetof(XtBeat, integ)|vc2oscbeat
+beat-word-member|{ 0x1a8, offsetof(XtBeat, tempo)|{ 0x1a8, offsetof(XtBeat, orig)|vc2oscbeat
+beat-word-bytes|{ 0x1c0, offsetof(XtBeat, beatPos), sizeof(XtBeat::beatPos) }|{ 0x1c0, offsetof(XtBeat, beatPos), 2 }|vc2oscbeat
+beat-start-from|b.start(b.tempo, b.orig, (int32_t)u32(kPosition16));|b.start(b.tempo, b.orig, (int32_t)u32(kPosition16 + 4));|vc2oscbeat
+beat-start-args|b.start(b.tempo, b.orig,|b.start(b.orig, b.tempo,|vc2oscbeat
+beat-start-keeps|kStartKeeps = 0x81|kStartKeeps = 0x83|vc2oscbeat
+beat-start-byte3|kByte3 = 0x15f|kByte3 = 0x15e|vc2oscbeat
+beat-start-no-byte3|    setU8(kByte3, u8(kByte3) & kStartKeeps);\n||vc2oscbeat
+beat-start-no-set|    b.start(b.tempo, b.orig, (int32_t)u32(kPosition16));\n    setBeat(*this, b);|    b.start(b.tempo, b.orig, (int32_t)u32(kPosition16));|vc2oscbeat
+beat-trip-bit|kTripBit = 0x04|kTripBit = 0x02|vc2oscbeat
+beat-reset-not|b.reset((u8(kObject) & kTripBit) != 0);|b.reset((u8(kObject) & kTripBit) == 0);|vc2oscbeat
+beat-reset-no-set|    b.reset((u8(kObject) & kTripBit) != 0);\n    setBeat(*this, b);|    b.reset((u8(kObject) & kTripBit) != 0);|vc2oscbeat
+seek-own-vari-at|{ 0x893c6360, vc2OscSeekVariOff }|{ 0x893c6364, vc2OscSeekVariOff }|vc2oscbeat
+seek-own-heads-at|{ 0x893c6de0, vc2OscSeekHeads }|{ 0x893c6de4, vc2OscSeekHeads }|vc2oscbeat
+seek-own-swapped|{ 0x893c6360, vc2OscSeekVariOff }|{ 0x893c6360, vc2OscSeekHeads }|vc2oscbeat
+seek-sample-shift|kSampleShift = 4|kSampleShift = 3|vc2oscbeat
+seek-no-reset|    own->seek(*this, at >> kSampleShift);\n    beatReset();|    own->seek(*this, at >> kSampleShift);|vc2oscbeat
+seek-out-at|        parts.seek(routine, at);|        parts.seek(routine, at + 16);|vc2oscbeat
+xtbeat-start-pos|beatPos = (int32_t)((uint32_t)pos16 << 5);|beatPos = (int32_t)((uint32_t)pos16 << 4);|vc2xtbeat
+xtbeat-start-budget|    budget = (int32_t)((uint32_t)step << 1);\n    clk = trip = 0;|    budget = (int32_t)((uint32_t)step << 2);\n    clk = trip = 0;|vc2xtbeat
+xtbeat-reset-trip|factor = tripOn ? 0.0f :|factor = tripOn ? 1.0f :|vc2xtbeat
+xtbeat-reset-budget|    integ = factor;\n    budget = (int32_t)((uint32_t)step << 1);|    integ = factor;\n    budget = (int32_t)((uint32_t)step << 2);|vc2xtbeat
+xtbeat-reset-integ|    integ = factor;\n    budget|    integ = 1.0f;\n    budget|vc2xtbeat
+seek-vari-pos|    v.setU32(kPosition, (uint32_t)sample);|    v.setU32(kPosition, (uint32_t)sample + 1);|vc2oscplayers
+seek-vari-frac|    v.setU32(kPosition, (uint32_t)sample);\n    v.setF32(kZeroAt, 0.0f);|    v.setU32(kPosition, (uint32_t)sample);\n    v.setF32(kZeroAt, 0.5f);|vc2oscplayers
+heads-seek-walk|    v.setF32(kWalkPos, xtf::flt(sample));|    v.setF32(kWalkPos, xtf::flt(sample + 1));|vc2osclite
+heads-seek-fracs|for (uint32_t at : { kFracA, kFracB }) v.setF32(at, 0.0f);|for (uint32_t at : { kFracA }) v.setF32(at, 0.0f);|vc2osclite
+heads-seek-heads|for (uint32_t at : { kHeadA, kHeadB }) v.setU32(at, (uint32_t)sample);|for (uint32_t at : { kHeadA }) v.setU32(at, (uint32_t)sample);|vc2osclite
+heads-seek-wina|for (uint32_t at : { kWinA, kClkA }) v.setF32(at, 0.0f);|for (uint32_t at : { kWinA }) v.setF32(at, 0.0f);|vc2osclite
+heads-seek-winb|for (uint32_t at : { kWinB, kClkB })|for (uint32_t at : { kWinB })|vc2osclite
+heads-seek-period|mul(v.f32(kPeriod), vc2OscTables().headsSeekHalf)|mul(v.f32(kInvPeriod), vc2OscTables().headsSeekHalf)|vc2osclite
+heads-seek-half|mul(v.f32(kPeriod), vc2OscTables().headsSeekHalf)|mul(v.f32(kPeriod), vc2OscTables().liteFilter)|vc2osclite
+heads-seek-half-pool-at|{ 0x893c6e60, &t.headsSeekHalf }|{ 0x893c6e64, &t.headsSeekHalf }|vc2osctables
+reseek-own|if (routine != 0) seekBy(routine, at, parts);|if (routine != 0) parts.seek(routine, at);|vc2osc

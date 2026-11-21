@@ -64,6 +64,7 @@ struct Vc2OscTables {
     // LITE's update's and settings' own copies (v324): the filter's rate per Hz, 2^32
     float liteUpdateFilter = 0;     // 0x893c84a0
     float liteSettingsTwo32 = 0;    // 0x893c8650
+    float headsSeekHalf = 0;        // 0x893c6e60 (v325): the heads' seek's, the second window at half the period
     // Vari off's renders' (v261): a sample's scale, the folded way's, the gain's glide, the fade's step at the last sample
     float variOffScale = 0;         // 0x893c6420: 65536
     float variOffFold = 0;          // 0x893c6764: 45875, 70% of it

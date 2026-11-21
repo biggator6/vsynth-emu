@@ -53,6 +53,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscTargets.cpp
     Source/Vc2OscPlayers.cpp
     Source/Vc2OscLite.cpp
+    Source/Vc2OscBeat.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp

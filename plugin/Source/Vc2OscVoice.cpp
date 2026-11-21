@@ -123,7 +123,7 @@ void Vc2OscVoice::reseek(Vc2OscParts& parts) {
     if (kind() == 1 && type < kSeeks1.size()) seek = kSeeks1[type];
     if (kind() == 2 && type - 1 < kSeeks2.size()) seek = kSeeks2[type - 1];
     const uint32_t routine = bit ? seek.set : seek.clear;
-    if (routine != 0) parts.seek(routine, at);
+    if (routine != 0) seekBy(routine, at, parts);   // v325: the voice's own seeks too
     const uint8_t now = u8(kFlags);
     setU8(kFlags, (was & kHeld) ? (uint8_t)(now | kHeld) : (uint8_t)(now & ~kHeld));
     tail.seekPending = 0;

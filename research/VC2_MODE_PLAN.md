@@ -984,6 +984,12 @@ version against rom.4's routines with what it calls hooked:
          or type 2's heads' loops through the record the note-on's head names), kind 1's row's ways; the parts they
          share with the note-ons factored out of them (HARDWARE_FIRMWARE.md, "The VC-2's LITE update and settings").
          Next: LITE's object routine, heads' renders, mode 1 and seeks.
+       - The players' beat and seeks (v325): LITE's object routine `0x893cbf40` and the reset `0x893cbfe0` its seeks
+         end in are rom.2's beat start and reset (`0x8950f860`, `0x8950f900`), run as XtBeat's on the object's words;
+         Vari off's seek `0x893c6360` and the heads' `0x893c6de0` (rom.2's `0x89509840`, `0x8950a780`, four bytes up)
+         the voice's own, its seeks one table by address; mode 1's and the band players' seeks still out
+         (HARDWARE_FIRMWARE.md, "The VC-2's players' beat and seeks"). Next: LITE's heads' renders on XtLitePlayer;
+         mode 1 with VariPhrase's band players.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

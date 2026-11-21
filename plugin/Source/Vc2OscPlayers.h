@@ -34,6 +34,10 @@ float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths);
 // mode or the forward's
 void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w);
 void vc2OscSetVariOffSide(Vc2OscVoice& v, const Vc2OscVariOff& w, bool backward);
+// v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
+// off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
+void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);
+void vc2OscSeekHeads(Vc2OscVoice& v, int32_t sample);
 // Then the samples' address, 0 and 1 beside it, the position the walk's sign starts from (the last if it's below 0, else
 // the first) and its copy; the position
 uint32_t vc2OscVariOffStart(Vc2OscVoice& v);

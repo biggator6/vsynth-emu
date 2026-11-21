@@ -150,6 +150,12 @@ public:
     // v323: the renders the voice has as its own, run when `routine`, the address an install writes, is one of them:
     // the EXT IN player's two and Vari off's two (v261); false, nothing done, for any other
     bool renderOwn(uint32_t routine, float* out, Vc2OscParts& parts);
+    // v325 (Vc2OscBeat.cpp): the players' beat, 0x893cbf40 (its start, from the position +0x194) and 0x893cbfe0 (its
+    // reset, where a seek ends), XtBeat's on the object's words; and a seek by the routine's address, given the
+    // position ×16: the voice's own (Vari off's 0x893c6360, LITE's heads' 0x893c6de0) or, any other, out through parts
+    void beatStart();
+    void beatReset();
+    void seekBy(uint32_t routine, int32_t at, Vc2OscParts& parts);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0

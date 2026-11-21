@@ -1546,6 +1546,63 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's players' beat and seeks (2026-11-21, v325) {#vc2-osc-beat-seeks}
+
+Step 4.3's fifty-third version, the first piece of item 11's fourth part's second half. The players' beat, and the two
+seeks with no band player in them, are the voice's own (`Vc2OscBeat.cpp`).
+
+**The beat.** rom.4's `0x893cbf40(object)` is rom.2's `0x8950f860` instruction for instruction, and `0x893cbfe0` is
+rom.2's `0x8950f900`: the beat's start and reset, which `XtBeat` ports (XtMultiBandPlayer.cpp). Their words in the
+object (+0x15c) sit where rom.2's do:
+- the clocks and Time Trip steps not yet taken (+0x40, +0x41: the voice's +0x19c and +0x19d, v324's count and
+  matched count);
+- the wave's Original Tempo and the note's (+0x48, the wave header's +0x1c; +0x4c, the block's +0x60 × 10000);
+- a clock's step and the budget, the sync's, trip's, walk's and beat's positions (+0x50…+0x64);
+- the factor and its integral (+0x8c, +0x90).
+
+The voice copies them into an `XtBeat` (`Vc2OscBeatWord`: each word's place in the voice and in XtBeat), runs its
+routine and writes them back.
+- The start, which LITE's note-on calls after the type's words and before its seek: the factor is the note's tempo
+  over the wave's, a clock's step is 564479918080 over the wave's, the counts and positions are 0, and the beat's
+  position is the player's (+0x38, the voice's +0x194) × 32. It also clears bits 1…6 of the object's byte 3, which
+  XtBeat doesn't hold, so the voice clears them after it.
+- The reset, where both seeks end: the factor is 0 under Time Trip (the object's byte 0's 0x04), else the start's;
+  its integral is the factor, the budget twice the step, and the three positions 0.
+
+rom.4's two pool words there, 2^32 and 564479918080, are rom.2's, which XtBeat holds.
+
+**The seeks.** `0x893c6360(object, at)` is rom.2's `0x89509840` (`XtLinearPlayer::seek`), and `0x893c6de0` is rom.2's
+`0x8950a780` (`XtLitePlayer::seek`). Each runs on rom.4's object, four bytes up, then jumps to the reset.
+- Vari off's: the position (+0x24c) is the sample (`at` >> 4), its fraction (+0x248) 0. LITE's type 0 seeks through
+  it, and VariPhrase's Vari off too, at its note-on (types 1, 6, 7 and 8) and a re-seek (1, 6 and 8).
+- The heads': the walk's position (+0x270) is the sample as a float and both heads (+0x254, +0x258) the sample.
+  Their fractions and the first window's phase and clock are 0. The second window's are the period (+0x2ac) × the
+  seek's own pool word, 0.5 (`0x893c6e60`).
+
+The voice's seeks are now one table by address, as its renders are (`kOwnSeeks`, `Vc2OscVoice::seekBy`). The note-ons
+and the re-seek name their seek by address as before. Any other seek still goes out through `Vc2OscParts`: mode 1's
+`0x893cc830` and the band players' `0x893cc630`, `0x893cd090` and `0x893cd440`. Those call the band players' own
+routines (`0x893cc100`, `0x893ca160`) and will come with them.
+
+**The checks.** xt_vc2osc no longer hooks the three routines: rom.4's own run in the voice, in xt_vc2tone too. The draws
+are unchanged. The words the beat reads were already noise or a note's, and both of the reset's ways come: at 40
+cases, 105 of 221 resets are under Time Trip.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. At 40 cases xt_vc2osc runs the start 383
+  times and the voice's own seeks 221 times: the calls out fell from 399 object calls and 330 seeks to 16 and 109.
+- `Vc2OscBeat.cpp`, `Vc2OscLite.cpp`, `Vc2OscPlayers.cpp` and XtBeat's start and reset wholly reached, every line
+  and branch.
+- `mutate_vc2.py --osc`: 45 new plants (the beat's words, start and reset, the own seeks' table and shift, XtBeat's
+  two routines, both seeks' laws, the half period's pool word, the re-seek's way), and 9 rewritten on the calls that
+  replaced the hooked ones, all caught. One of them, `ev-seek-pos`, now plants the event the seek looks up. The
+  position a VariPhrase note-on gives its Vari off seek is written over by Vari off's start right after it
+  (`vc2OscVariOffStart`), in rom.4 too, so shifting it changes nothing; that showed once the seek was the voice's own.
+  The whole `--osc` list (1,377) and `--tone` list (754) caught.
+
+**Next.** LITE's heads' renders, `0x893c6e80` and `0x893c6e8c`, on `XtLitePlayer`. Kind 1's mode 1 (`0x893c9f60`, its
+set-up `0x893cc760` and its seek `0x893cc830`) comes with VariPhrase's band players, whose routines it calls.
+
 ### The VC-2's LITE update and settings (2026-11-21, v324) {#vc2-osc-lite-update}
 
 Step 4.3's fifty-second version, the first half of item 11's fourth part: LITE's update and settings, kind 1's, are

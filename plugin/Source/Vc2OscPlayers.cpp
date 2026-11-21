@@ -73,7 +73,7 @@ void byEvents(Vc2OscVoice& v, Vc2OscParts& parts) {
     const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;
     vc2OscSetVariOff(v, { .start = a, .end = b, .loopStart = a, .loopEnd = b, .bwdEnd = b, .bwdStart = a,
                           .fwdMode = mode, .bwdMode = mode, .fwdRate = 1.0f, .bwdRate = 1.0f });
-    if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));
+    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);
 }
 
 // [FW] 0x893af660…: the range in samples, the end's less 1, with the loop record's words; the backward's rate factor
@@ -82,7 +82,7 @@ void bySamples(Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared) 
     Vc2OscVariOff w = vc2OscVariOffOf(v, parts, shared, vc2OscTables().rateTenths, { v.u32(kFrom), v.u32(kTo) - 1 });
     w.bwdRate = mul(w.bwdRate, parts.boundFloat(v.u32(kPairAt), kPairWord));
     vc2OscSetVariOff(v, w);
-    if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek(kSeek, (int32_t)v.u32(kSeekTo));
+    if (v.u32(kSeekTo) != v.u32(kFrom)) v.seekBy(kSeek, (int32_t)v.u32(kSeekTo), parts);
 }
 } // namespace
 
@@ -192,4 +192,10 @@ uint32_t vc2OscVariOffStart(Vc2OscVoice& v) {
     v.setU32(kPosition, 0.0f > v.f32(kWalk) ? v.u32(kEnd) : v.u32(kStart));
     v.setU32(kPositionCopy, v.u32(kPosition));
     return v.u32(kPosition);
+}
+
+// [FW] 0x893c6360 (rom.2's 0x89509840, XtLinearPlayer::seek, four bytes up): the position the sample, its fraction 0
+void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample) {
+    v.setU32(kPosition, (uint32_t)sample);
+    v.setF32(kZeroAt, 0.0f);
 }

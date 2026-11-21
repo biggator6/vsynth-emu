@@ -2,7 +2,8 @@
 // row (Vc2OscNoteOn::lite).  The object's head and the targets' words, the object's byte 0 from the block, then by the
 // wave's type: 0 Vari off's words (what VariPhrase's note-on writes, Vc2OscPlayers.h), 1 the mode-1 player's range,
 // 2 the two heads' words (rom.2's XtLitePlayer's, four bytes up in rom.4's object); then 0x893cbf40 on the object and
-// the type's seek.  The players' own routines stay rom.4's by address through Vc2OscParts.  Every address is rom.4's;
+// the type's seek (from v325 the beat's start, Vari off's seek and the heads' the voice's own, Vc2OscBeat.cpp, the
+// heads' here).  The players' other routines stay rom.4's by address through Vc2OscParts.  Every address is rom.4's;
 // every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's LITE note-on".  Audio thread.
 #include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
@@ -43,7 +44,6 @@ constexpr uint32_t kFilterRate = 0x25c, kFilterL = 0x260, kFilterR = 0x264, kFra
 constexpr uint32_t kWalkPos = 0x270, kWinA = 0x274, kClkA = 0x278, kWinB = 0x27c, kClkB = 0x280, kLast = 0x284;
 constexpr uint32_t kFwdLoop = 0x288, kFwdRate = 0x294, kFirstF = 0x298, kBwdLoop = 0x29c, kBwdRate = 0x2a8;
 constexpr uint32_t kPeriod = 0x2ac, kInvPeriod = 0x2b0;
-constexpr uint32_t kReset = 0x893cbf40;   // [FW] the players' routine on the object before the seek
 // [FW] the object's byte 0: 0x10 cleared, 0x40 the flag's (+0xa40) bit 0, and three bits each a block word's bit 0;
 // 0x01 then takes the loop record's modes, and type 1's 0x80 says its range is in samples
 constexpr uint8_t kCleared = 0x10, kFlagBit = 0x40, kLoopModes = 0x01, kSamplesBit = 0x80;
@@ -174,10 +174,10 @@ void Vc2OscVoice::noteOnLite(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     setU8(kObject, b);
     const uint32_t type = u32(kWave);
     if (type < kWays.size()) kWays[type].words(*this, parts, shared);
-    parts.objectCall(kReset);
+    beatStart();   // v325: 0x893cbf40, the voice's own
     if (type >= kWays.size()) return;
     const Vc2OscLiteWay& way = kWays[type];
-    if (u32(way.to) != u32(way.from)) parts.seek(way.seek, (int32_t)(u32(way.to) << 4));
+    if (u32(way.to) != u32(way.from)) seekBy(way.seek, (int32_t)(u32(way.to) << 4), parts);
 }
 
 namespace {
@@ -232,4 +232,14 @@ void Vc2OscVoice::settingsLite(const uint32_t* from, Vc2OscParts& parts) {
         vc2OscSetVariOffSide(*this, w, 0.0f > f32(kWalk));
     }
     if (type == kHeadsType) headsLoops(*this, loop, vc2OscTables().liteSettingsTwo32);
+}
+
+// [FW] 0x893c6de0 (v325; rom.2's 0x8950a780, XtLitePlayer::seek, four bytes up): the walk and both heads to the sample,
+// the fractions and the first window's phase and clock 0, the second's half the period by its own pool word
+void vc2OscSeekHeads(Vc2OscVoice& v, int32_t sample) {
+    v.setF32(kWalkPos, xtf::flt(sample));
+    for (uint32_t at : { kFracA, kFracB }) v.setF32(at, 0.0f);
+    for (uint32_t at : { kHeadA, kHeadB }) v.setU32(at, (uint32_t)sample);
+    for (uint32_t at : { kWinA, kClkA }) v.setF32(at, 0.0f);
+    for (uint32_t at : { kWinB, kClkB }) v.setF32(at, mul(v.f32(kPeriod), vc2OscTables().headsSeekHalf));
 }

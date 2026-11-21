@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's players' beat and seeks v325 (2026-11-21, on claude/vc2-part-4-3 after v324; HARDWARE_FIRMWARE.md, "The
+  VC-2's players' beat and seeks"): step 4.3's fifty-third version, the first piece of item 11's fourth part's second
+  half. rom.4's 0x893cbf40 and 0x893cbfe0 are rom.2's beat start and reset (0x8950f860, 0x8950f900) instruction for
+  instruction: the voice runs XtBeat's on the object's words (Vc2OscBeat.cpp, each word's place a row of
+  Vc2OscBeatWord) and clears the byte-3 bits the start clears, which XtBeat doesn't hold. Vari off's seek 0x893c6360
+  and LITE's heads' 0x893c6de0 (rom.2's 0x89509840 and 0x8950a780 on rom.4's object four bytes up) are the voice's
+  own, ending in the reset; its seeks are one table by address (kOwnSeeks, seekBy), any other still out. xt_vc2osc no
+  longer hooks the three. 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's LITE update and settings v324 (2026-11-21, on claude/vc2-part-4-3 after v323; HARDWARE_FIRMWARE.md, "The
   VC-2's LITE update and settings"): step 4.3's fifty-second version, item 11's fourth part's first half. rom.4's
   0x893c8280 (the tuned ratio, walk, formant and gain into the object by the wave's type, type 0 the targets, type 2's
