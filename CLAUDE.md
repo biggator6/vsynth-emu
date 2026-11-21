@@ -79,7 +79,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`; its se
   `PORT=toneknobs`, `toneenvknobs`, `toneupdate`, `tonezones`, `tonenotes`: xt_tone, XtSynth's parts; `tonestart`, `toneoscstart`, `tonetrip`, `toneblock`, `tonetva`, `toneclock`, `toneconsts` (a header's), `toneextin`: v203's; `toneout` (XtSynthOut.cpp, v204); `tonefwcpp`, `tonefwh`, `tonecases`, `tonecarry`, `tonepatchids`: xt_tone's own;
   `PORT=wire…`: xt_tone's MSM mode, [cases] its cases (`wiremsm` XtSynthMsm.cpp, `wirecheck` XtToneMsm.cpp, `wirefwmsm` XtToneFwMsm.h, the rest as the tone ports); a header's plant builds every part from a copy of the sources)
   and runs it, to show the check catches it (a run the error crashes counts, and one it hangs, stopped after MUT_TIMEOUT seconds, default 1500, and from v312 one that grows past MUT_MEM_MB of resident memory, default 2048, killed: `mutate_cap.sh`'s `capped`, polled every 0.1 s, after two plant runs whose mutants grew without end took the machine's memory; the clean checks peak under 300 MB; `mutate_cap_test.sh` proves it, when `mutate_cap.sh` changes; macOS refuses `ulimit -v`). The objects it keeps between runs are built again when older than their source or any header (`harnessParts`, in `mutate_parts.sh` with `fxParts` from v208; the fx ports' by `objects.sh`'s `keptObject`, v197). `mutate_tone.py [cases]`: the list in
-  `tone_muts.txt` (`name|old|new[|port[|seed[|mode]]]`; port `solo` for what only `solocmp` reaches; seed for what the default seed's cases don't reach; mode `extin` for what only the EXT IN mode draws, v203), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those.
+  `tone_muts.txt` (`name|old|new[|port[|seed[|mode]]]`; port `solo` for what only `solocmp` reaches; seed for what the default seed's cases don't reach; mode `extin` for what only the EXT IN mode draws, v203), each run stopping at its first difference (`XT_TONE_STOP`); `[cases] name ...`: only those. Each plant's line is said as soon as it and those before it are in, in the list's order, flushed, so a run's file shows how far it is (2026-11-21: v326's whole run had said nothing after 40 minutes).
 - `xt_tone <rom> [cases] [seed] [inputs]` (in fcheck; `build/tools/fcheck/bin`): XtSynth's wiring
   against a whole firmware tone. `XT_TONE_FIRST=1`: each case's first difference, `XT_TONE_DUMP=<case>|a`:
   its settings. A new `Controls` field needs its ID in `patchOf` and a draw in `drawControls`, and a field
@@ -132,7 +132,7 @@ firmware itself, run in an SH-4 interpreter (`plugin/Source/Sh4Interp.*`; its se
 ## What to run when
 - While working: the harness of the code you changed, at a few hundred cases (`xt_tone` at 300
   takes about 10 s), and `mutate_tone.py 2000 <new names>` for the planted errors just added.
-- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (about 15 minutes) if
+- Each version: `verify.sh` (1–2 minutes). The whole of `mutate_tone.py` (over an hour: 1,191 plants at v326, about 18 a minute, 8 at a time; the 15 minutes this said dates from 2026-11-04, when the list held 843) if
   `XtSynth.cpp`, `XtToneCheck.cpp` or a port changed: a planted error can stop meaning anything
   when the code under it changes (v107), and only re-running the list shows it.
 - Extra seeds and larger case counts: when a version changes what `xt_tone` draws or when chasing

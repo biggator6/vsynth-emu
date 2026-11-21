@@ -58,10 +58,11 @@ with cf.ThreadPoolExecutor(8) as ex:
             how = f'{c[3]}, seed {c[4] or "default"}' + (f', mode {c[5]}' if c[5] else '')
             sys.exit(f'mutate_tone: the run with nothing planted ({how}) says {t or "nothing"}, '
                      'so no plant would mean anything')
-    res = list(ex.map(run, muts))
-missed = errors = 0
-for n, t in res:
-    if t is None: errors += 1
-    elif t.startswith('tone: 0 '): missed += 1
-    print(('ERROR  ' if t is None else 'MISSED ' if t.startswith('tone: 0 ') else 'caught ') + n.ljust(20), t or '')
-print('planted', len(res), 'missed', missed, 'errors', errors)
+    # each line said as soon as it and those before it are in, in the list's order, so a long run shows how far it is
+    missed = errors = 0
+    for n, t in ex.map(run, muts):
+        if t is None: errors += 1
+        elif t.startswith('tone: 0 '): missed += 1
+        print(('ERROR  ' if t is None else 'MISSED ' if t.startswith('tone: 0 ') else 'caught ') + n.ljust(20), t or '',
+              flush=True)
+print('planted', len(muts), 'missed', missed, 'errors', errors)
