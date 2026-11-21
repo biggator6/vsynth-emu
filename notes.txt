@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's MFX sends by CC 91 and 93 v402 (2026-11-21, after v401 on its branch, not merged; HARDWARE_FIRMWARE.md, "rom.4's
+  MFX sends by CC 91 and 93"; the plan's step 4.4, item 5). rom.4's effect driver's MIDI receiver (0x89360b90, at its
+  +0x54) keeps CC 91 and 93 on any channel (0x893608a0) and its event 0x10 (0x89360930) scales the MFX's Reverb Send by
+  CC 91 and its Chorus Send by CC 93 (send × CC / 127), both from 127 at the start; rom.2 has nothing of the kind.
+  XtFxControl::controller(number, value) runs the store and the event (XtFxImage's controllerStore and controllerEvent,
+  rom.2's none); nothing calls it yet (step 4.5). xt_fx <rom.4> vc2 gains two parts: control changes against the
+  receiver run by hand, the chip's words and the driver's object; the sends' law through the queue; 0 different at
+  seeds 2024, 7 and 31337. mutate_fx.py --vc2 82 of 82, --control 184 of 184; fxthreads no races.
+
 rom.4's Matrix MFX-PRMs v401 (2026-11-21, after v400 on its branch, not merged; HARDWARE_FIRMWARE.md, "rom.4's Matrix
   MFX-PRMs"; the plan's step 4.4, item 4). rom.4 sends its Matrix's MFX-PRM1…3 (group 2) through 0x893a2e50 to the
   part mixer's offsets, Direct Sound's, MFX Send's and the consonants' (ported in v209, v227, v247), not to the effects:

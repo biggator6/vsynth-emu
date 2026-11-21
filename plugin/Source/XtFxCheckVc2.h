@@ -30,5 +30,7 @@ void handInput(const char* rom);                                  // XtFxCheckVc
 void vc2RoutingLaw(const char* rom, uint32_t seed);
 void unitInputVc2(const char* rom, uint32_t seed);
 void vc2MatrixThroughQueue(const char* rom);                      // XtFxCheckQueue.cpp, v401
+void handControllers(const char* rom, int events, uint32_t seed); // XtFxCheckVc2Sends.cpp, v402
+void sendsLaw(const char* rom, uint32_t seed);
 } // namespace xtfxcheck
 #endif

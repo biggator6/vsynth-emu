@@ -3570,6 +3570,16 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 23, the VC-2's effects (2026-11-21) — v402: rom.4's MFX sends by CC 91 and 93
+
+- The receiver is an object inside the driver, so the check could run it whole with real MIDI bytes. The port only
+  needs the store and the event, and the check holds one to the other.
+- The first law check read the driver's own copy of the words, so a control change the queue never sent would have
+  passed. The check now plays the queue into a chip and compares what the chip has. The unflushed plant is caught only
+  there.
+- The MFX's block reader uses the scales last applied, not the controllers just received. So a patch keeps CC 91's
+  effect until the next control change, and both sides of the check agree because both run the firmware.
+
 ### Session 23, the VC-2's effects (2026-11-21) — v401: rom.4's Matrix MFX-PRMs
 
 - The plan asked where rom.4 sends them. The answer was in our own port: v247's `Vc2MatrixLevels` reads group 2 into

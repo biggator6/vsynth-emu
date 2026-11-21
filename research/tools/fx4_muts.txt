@@ -82,3 +82,12 @@ route-none|if (!image_.inputRequest \|\| !call(image_.inputRequest)) return;|ret
 # v401: the Matrix's MFX-PRMs, which rom.4 sends to the part mixer: its MFX object's dead pair given to setMatrix
 matrix-dead-pair|kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };|kMatrixTake { 0x894ad4e0, 0x89361d50 }, kMatrixApply { 0x894ad4f0, 0x89361de0 };|fx4i
 matrix-dead-take|kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };|kMatrixTake { 0x894ad4e0, 0x89361d50 }, kMatrixApply { 0x894ad4f0, 0x89361d40 };|fx4i
+# v402: the MFX's sends by CC 91 and 93: the store and its event in XtFxImage.cpp, XtFxControl::controller
+cc-store-none|kControllerStore { 0, 0x893608a0 }|kControllerStore { 0, 0 }|fx4i
+cc-store-event|kControllerStore { 0, 0x893608a0 }|kControllerStore { 0, 0x89360930 }|fx4i
+cc-event-chorus|kControllerEvent { 0, 0x89360930 }|kControllerEvent { 0, 0x893603a0 }|fx4i
+cc-no-event|    call(image_.controllerEvent, { image_.self });\n||fx4c
+cc-unflushed|    call(image_.controllerEvent, { image_.self });\n    flush(0);|    call(image_.controllerEvent, { image_.self });|fx4c
+cc-number-value|{ image_.self, (uint32_t)number & 0xff, (uint32_t)value & 0xff }|{ image_.self, (uint32_t)value & 0xff, (uint32_t)number & 0xff }|fx4c
+cc-object|{ image_.self, (uint32_t)number & 0xff,|{ image_.message, (uint32_t)number & 0xff,|fx4c
+cc-number-low|(uint32_t)number & 0xff,|(uint32_t)number & 0x3f,|fx4c

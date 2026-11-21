@@ -1546,6 +1546,60 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's MFX sends by CC 91 and 93 (2026-11-21, v402) {#vc2-fx-cc}
+
+Step 4.4's fifth item (research/VC2_MODE_PLAN.md), found in v401. rom.4's effect driver takes two MIDI controllers of
+its own: CC 91 on the MFX's Reverb Send and CC 93 on its Chorus Send. rom.2's has nothing of the kind.
+
+**The receiver.** The driver holds a MIDI receiver at its +0x54 (`0x89980f78`): its vtable `0x898cb3a8`, set by
+`0x89360c40`. The front delivers messages to its slot 1, `0x89360b90`, which switches on the status byte, masked to its
+upper half from 0x80 to 0xef:
+
+| Status | What the receiver does |
+|---|---|
+| 0x40 | `0x8935fab0(driver, message, …)`, then event 2 posted |
+| 0x41 | `0x8935fc00(driver, message, …)`, then event 2 posted |
+| 0xb0…0xbf, a control change on any channel | `0x893608a0(driver, number, value)`, then event 0x10 posted |
+| anything else | nothing |
+
+Which messages the front hands this receiver is the front's, step 4.3's.
+
+**The store**, `0x893608a0`, switches on number − 91:
+- CC 91 goes to the driver's +0x18;
+- CC 92 does nothing;
+- CC 93 goes to +0x1a.
+
+Any other number stores nothing, but its event is still posted.
+
+**The event**, 0x10, runs `0x89360930` in the effect task's loop:
+- It reads MFX Chorus Send (0x1b9) through the typed read and takes +0x1a. If either differs from what it last applied
+  (+0x0e, +0x14), it keeps both and writes the Chorus send at send × CC / 127. That is the integer quotient, by the magic
+  multiply 0x81020409 and a shift of 6. It goes through the level table `0x89365e80` into `0x89363450`.
+- It does the same for MFX Reverb Send (0x1ba) with +0x18 (+0x10, +0x16), into `0x89363460`.
+- The MFX's block reader (`0x8935f4e0…`) sets the two sends through `0x893603a0` and `0x893603f0`. Those take the scales
+  last applied (+0x14, +0x16), so a patch keeps the controllers' effect.
+- The MFX's part of the driver's start (`0x89360300`) sets all four words to 127. Nothing else writes them.
+
+**In the plugin.** `XtFxControl::controller(number, value)` is a control change as the receiver takes it: rom.4's store
+`0x893608a0` with the two data bytes, then its event's routine `0x89360930`. That is how `routeInput` runs a request and
+its event. The image holds the two addresses (`controllerStore`, `controllerEvent`); rom.2's are 0, so nothing happens
+there. Nothing calls it yet: which of the host's controllers reach the VC-2's effects is the plugin's wiring (step 4.5),
+as the front's is the part's (step 4.3).
+
+**The checks** (`xt_fx <rom.4> vc2`, two new parts):
+
+| Part | Against | Samples | Different |
+|---|---|---|---|
+| Control changes by hand | rom.4's own receiver given each message's three bytes (status 0xb0 on a channel drawn, CC 91, 93 or any number, any value), then its event's routine, run from the check's own addresses; MFX sends edited and patches of any MFX type loaded between; the chip's words and the driver's object after each. Some control change must move a word | 202 | 0 |
+| The sends' law | 96 pairs a send: the chip's words through the queue after a send and a control change on a fresh start, the same for the same send × CC / 127; a send with no control change the same send at 127; the lowest and highest levels apart | 194 | 0 |
+
+Both are 0 different at seeds 2024, 7 and 31337.
+
+**Plants.** `mutate_fx.py --vc2`: 82 of 82 caught, 8 of them new: the store gone or the event in its place, the event
+another routine, the event not run or not flushed, the number and value swapped, the wrong object, the number cut to 6
+bits. `--control`: 184 of 184. fxthreads.sh: no races. A control change left unflushed shows only in the law's part:
+the driver's own copy of the words has it, and the chip never gets it.
+
 ### rom.4's Matrix MFX-PRMs (2026-11-21, v401) {#vc2-fx-matrix}
 
 Step 4.4's fourth item (research/VC2_MODE_PLAN.md). rom.4 sends its Matrix's MFX-PRM1…3 to the part mixer, not to the
@@ -1576,7 +1630,8 @@ driver's +8, and posts the effect task's event 0x10. The event runs the stub `0x
 - None of this pairs by shape with anything in rom.2.
 
 So rom.4 took the Matrix's MFX parameters off the effects and gave the effects CC 91 and CC 93 on the MFX's sends.
-`XtFxControl` doesn't run that event yet; the plan has it as a new item, 4.4.5.
+~~`XtFxControl` doesn't run that event yet; the plan has it as a new item, 4.4.5.~~ (v402: it does, "rom.4's MFX sends
+by CC 91 and 93".)
 
 **The check.** `xt_fx <rom.4> vc2` has a new part, the Matrix through the queue. It is `xt_fx control`'s routine
 (XtFxCheckQueue.cpp), now run on an image. rom.2's run and its line are as they were: all three PRMs are moved on each of

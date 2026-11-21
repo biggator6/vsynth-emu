@@ -25,6 +25,9 @@ constexpr Place kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };
 // The EXT IN request and its event's routine (v400: rom.4's 0x8935b050 pairs rom.2's by what it does, External In Type to
 // the routing's wanted byte 6, with no Source byte; its event 0x893620e0 is the effect task's event 0x40, as rom.2's)
 constexpr Place kInputRequest { 0x894a7dd0, 0x8935b050 }, kInputEvent { 0x894aee80, 0x893620e0 };
+// A control change (v402): rom.4's driver keeps CC 91 and 93 (0x893608a0, from its receiver 0x89360b90) and posts its
+// event 0x10, whose routine (0x89360930) scales the MFX's Reverb and Chorus Sends by them.  rom.2's driver takes none
+constexpr Place kControllerStore { 0, 0x893608a0 }, kControllerEvent { 0, 0x89360930 };
 constexpr Place kSleep { 0x894b26a0, 0x89365e50 }, kPutWord { 0x894af400, 0x89362490 };
 constexpr Place kGetWord { 0x894af510, 0x89362610 }, kPutCoefficient { 0x894af610, 0x893626d0 };
 constexpr Place kPutOffset { 0x894af6a0, 0x893627f0 };
@@ -79,6 +82,7 @@ constexpr XtFxImage imageOn(Side s, const Facts& f) {
         .takeMessage = kTakeMessage.*s, .clockPoll = kClockPoll.*s,
         .matrixTake = kMatrixTake.*s, .matrixApply = kMatrixApply.*s,
         .inputRequest = kInputRequest.*s, .inputEvent = kInputEvent.*s,
+        .controllerStore = kControllerStore.*s, .controllerEvent = kControllerEvent.*s,
         .sleep = kSleep.*s, .putWord = kPutWord.*s, .getWord = kGetWord.*s,
         .putCoefficient = kPutCoefficient.*s, .putOffset = kPutOffset.*s,
         .reads = { kRead.*s, kReadTyped.*s },

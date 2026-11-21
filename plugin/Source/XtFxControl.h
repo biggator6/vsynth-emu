@@ -65,6 +65,11 @@ public:
     // changed and the type assigns it, and a new type starts from nothing, so it wants calling as often as the firmware does.
     void setMatrix(int prm1, int prm2, int prm3);
 
+    // Control thread.  A control change as the driver's receiver takes it, on any channel (v402): rom.4's keeps CC 91 and
+    // 93 and, for any number, runs the event it posts, which scales the MFX's Reverb Send by CC 91 and its Chorus Send by
+    // CC 93 (value / 127), from 127 at the start, a patch keeping them.  An image whose driver takes none does nothing.
+    void controller(int number, int value);
+
     // Control thread.  The firmware's poll of an outside clock (0x894acb10): with Clock Source (ID 0x41) at 1 and sent, the tempo as the clock reads it, 150000 / its ms over the last six clocks,
     // reaches the effects if it has moved by more than 2.5 BPM plus 1%.
     void outsideClock(int sixClocksMs);

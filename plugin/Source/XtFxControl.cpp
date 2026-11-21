@@ -166,6 +166,15 @@ void XtFxControl::setMatrix(int prm1, int prm2, int prm3) {
     flush(0);
 }
 
+// rom.4's receiver (0x89360b90) on a control change: the message's two data bytes to the store (0x893608a0: CC 91 to
+// the driver's +0x18, CC 93 to +0x1a, the rest nothing), then event 0x10 posted, which the task runs (0x89360930)
+void XtFxControl::controller(int number, int value) {
+    if (!error_.empty() || !image_.controllerStore) return;
+    call(image_.controllerStore, { image_.self, (uint32_t)number & 0xff, (uint32_t)value & 0xff });
+    call(image_.controllerEvent, { image_.self });
+    flush(0);
+}
+
 // The clock's object: +0x40 its source, +0x48 the ms over six clocks.  The task runs this on its event 0x20, and it does nothing unless the system's reader has seen Clock Source.
 void XtFxControl::outsideClock(int sixClocksMs) {
     if (!error_.empty() || sixClocksMs <= 0) return;

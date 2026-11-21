@@ -24,6 +24,8 @@ struct XtFxImage {
     uint32_t takeMessage, clockPoll;        // (self): the message's readers; the poll of an outside clock
     uint32_t matrixTake, matrixApply;       // (self, values), (self): the Matrix's MFX-PRMs; 0 where nothing reaches them
     uint32_t inputRequest, inputEvent;      // the outside input's routing, () each; 0 where it isn't mapped
+    uint32_t controllerStore;               // (self, number, value): a control change as the driver keeps it (v402)
+    uint32_t controllerEvent;               // (self): the event that store posts; both 0 where the image takes none
     uint32_t sleep, putWord, getWord;       // the bus's primitives, each hooked with what it sends, byte for byte
     uint32_t putCoefficient, putOffset;
     std::array<uint32_t, 2> reads;          // (section or 0, id) → the value

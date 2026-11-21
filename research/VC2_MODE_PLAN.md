@@ -734,9 +734,11 @@ version against rom.4's routines with what it calls hooked:
       v209, v227, v247), not to the effects, so `setMatrix` doing nothing on rom.4 is rom.4's way: checked, no MFX type
       answering and the driver's object untouched. The MFX object's take and apply (`0x89361d50`, `0x89361de0`) have no
       caller.
-   5. The MFX's sends by CC 91 and 93: rom.4's effect task's event 0x10 (`0x89360c10` → `0x893608a0`, then
-      `0x89360930`) scales the MFX's Reverb Send by CC 91 and its Chorus Send by CC 93, rom.4's own (no pair in rom.2).
-      Not run by XtFxControl: a message of the controllers to the driver, against rom.4 by hand as v259's.
+   5. done (v402): the MFX's sends by CC 91 and 93 (HARDWARE_FIRMWARE.md, "rom.4's MFX sends by CC 91 and 93"). rom.4's
+      driver's receiver (`0x89360b90`) keeps CC 91 and 93 (`0x893608a0`) and its event 0x10 (`0x89360930`) scales the
+      MFX's Reverb and Chorus Sends by them, rom.4's own. `XtFxControl::controller(number, value)` runs both, checked
+      against the receiver run by hand. For step 4.5: which of the host's controllers reach it is the plugin's to wire,
+      as which MIDI the front hands the receiver is step 4.3's.
 5. The plugin: the mode switch, rom.4's IDs as parameters appended, the session, a `.p02`'s load, the tab of cards, the
    plugin test, verify.sh lines and plants.
 
