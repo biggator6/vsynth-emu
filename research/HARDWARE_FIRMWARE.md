@@ -1546,6 +1546,81 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's patch store and a .p02 (2026-11-21, v450) {#vc2-patch-store}
+
+Step 4.5's first half (research/VC2_MODE_PLAN.md), its `.p02` first: the parameters' load (v452) reads a patch through
+it. A `.p02` is read as rom.4 reads one, and its store by rom.4's own pointing routines, as `XtFiles` and
+`XtPatchStore` read a `.p00` by rom.2's ("V-Synth's files").
+
+**The reader.** rom.4's patch load `0x89341de0` calls the reader `0x893419a0(file image, path)` and takes any answer
+from 0 up as read (`0x89341e76`). The reader goes through the OS's file wrappers, each sending on by the path's drive
+or the handle's kind to the kernel outside the image: open `0x89336c60`, read `0x89336cf0`, seek `0x89336db0` (from the
+start only), close `0x89336ca0`. Its tests, in its order:
+- 16 bytes from 0: not `SVD0` at +2 (a V-Synth patch, refused), the first word big-endian 0x001e, `VC20` at +2;
+- 16 more: `PATa` at +0x10, `VC_2` at +0x14, the data's place big-endian at +0x18, sought, the seek's answer that place;
+- the version, 7 bytes at +6: `Rev000`…`Rev005` refused (−90);
+- the default patch laid out as a file (`0x89324b10`, from the default patch `0x89325300(1)` builds at `0x89971cdd`),
+  then the data over it, its length at +0x1c but at most 0x13a4 bytes, read whole (a short read is refused);
+- `Rev006` and `Rev007` upgraded in the file's layout (`0x89341bda`…`0x89341c8e`, `0x89341ce2`…`0x89341d3c`): by the
+  Patch Category (0x12c), 7–9 or not, zone 2's TVA Switch (0x2d9) to 1 or 0, its Env 13 Attack Time (0x42c) to 3 and
+  Velocity Sens (0x433) to 0, and on `Rev006` the file's bytes 0x1370 and 0x1371 rewritten (a 6-bit field, at most 50).
+  Any other version is read as it stands: all 128 of the disk image's (`Internal.vc2/Patch`) are `Rev008`.
+
+A file under 32 bytes reads short at its first or second test, and the reader answers that count, which its caller
+takes as read with nothing laid out. The plugin refuses such a file itself.
+
+**The store.** rom.4's conversion `0x89324b20(store, file)` copies the file's blocks into the store's layout: the file
+holds the tone's 8 blocks 78 bytes apart from +0xe6, the store 128 bytes apart from +0xfe (the VOCODER OSC's IDs at
++0x52…+0x7b); MFX, Chorus and Reverb go from +0x54, +0x98 and +0xb4 to +0x6c, +0xb0 and +0xcc, the 16 envelope blocks
+from +0x356 to +0x4fe. The store is 0x13a4 bytes, the file's data's size. A section starts where rom.4's routine aims a
+read object at the part's store (`0x8950d8e0`'s entry +8: obj+4 = the store + the place; the routine beside each takes
+the store at +4, and aims at the same place):
+
+| IDs | What | Routine | At | Each block |
+|---|---|---|---|---|
+| 0x120…0x1b5 | the common: name, tune, keys, the zones' splits, Scale Tune, the Matrix, the vocoder block, the patch EQ | `0x893207b0` | 0 | |
+| 0x1b6…0x23b | MFX: Activity, Type, levels, slots | `0x893208d0` | 0x6c | |
+| 0x23c…0x26f | Chorus | `0x89320950` | 0xb0 | |
+| 0x270…0x2d2 | Reverb | `0x893209d0` | 0xcc | |
+| 0x2d3…0x38f | the tone: Structure, MOD, TVA, both OSCs with the VOCODER OSC's | `0x89320a50` | 0xfe | +0x80, 8 |
+| 0x390…0x438 | the 13 envelopes | `0x89320ad0` | 0x4fe | +0x70, 16 |
+| 0x439…0x461 | the 5 LFOs | `0x89320b70` | 0xbfe | +0x14, 16 |
+| 0x462…0x4a5 | a COSM's Switch, Type and slots (r7 the COSM; COSM 2 0x220 on) | `0x89320c10` | 0xd3e | +0x22, 16 |
+| 0x4a6…0x4b3 | Beam Type, Pad Mode and Hold, the arpeggio | `0x89320d10` | 0x117e | |
+| 0x4b4…0x4f6 | the arpeggio pattern's line | `0x89320da0` | 0x1184 | +0x22, 16 |
+
+The typed IDs read through their block's slots, the slot base the block's Type ID + 4, 3, 2 and 1: MFX's from 0x56a
+(slots from 0x1bb), Chorus's from 0x7ce (0x23f), Reverb's from 0x819 (0x272), with the 14 IDs in no table after its
+types, and a COSM's from 0x926 (0x464). rom.4's reads (`0x89328580` the bits, `0x8932b050` the value, `0x8932b460` a
+typed one) are rom.2's code on rom.4's descriptors, so one set of reads serves both images: `XtStoreLayout` (XtFiles.h)
+holds an image's sections, its COSMs and its descriptors, and rom.2's `xtPatchRaw`, `xtPatchValue` and `xtPatchTyped`
+are those reads on rom.2's, unchanged.
+
+**In the plugin.** `Vc2PatchStore` is rom.4's layout (`vc2Store()`, `vc2StoreTyped`), `Vc2PatchFile` the read
+(`vc2PatchRead`): rom.4's reader in the interpreter on the file's bytes, its four file calls served from them, then
+the conversion, as `xtFwPatchStore` runs rom.2's; the image's path kept by `loadVc2` (`vc2LoadPatchFiles`, the loader's
+new last). A seek past the file's end is taken, as a disk's, and reads nothing, so a patch whose data is none reads as
+the defaults. Nothing plays it yet: the parameters it goes into are v451's.
+
+**The check** (`xt_vc2patch <rom.4> [cases] [seed]`, `Vc2PatchStoreCheck.cpp` and `Vc2PatchFileCheck.cpp`, in fcheck at
+40, about 3 s): each section's first ID found by rom.4's names (Patch Name 1, Activity, Chorus Type, Reverb Type,
+Structure Type, Env 1 Attack Time, LFO 1 Waveform, COSM Switch, Beam Type, Control Switch, and its last the ID before
+Sampling Template Name 1), each place by calling rom.4's routine and the one beside it at every block, so the check's
+numbers are none of the port's: 8,972 placements; every ID's bits and value by rom.4's readers at every block, on the
+disk image's 128 patches as `vc2PatchRead` stores them and 40 stores of random bits: 1,439,592; every typed ID at every
+zone and COSM, its block by rom.4's type tables, its slot base by its block's Parameter 1: 880,992; the 128 files against
+rom.4's routines on their data straight, and each name against rom.4's own reading (`0x89320810`); and 21 copies of a
+file made otherwise against what the reader's code takes of them (the tags, the versions, a data length short and long,
+data further on, none, the headers alone, a byte short of them): 0 different. `mutate_vc2.py --patch` (40 plants in
+`vc2patch_muts.txt`, in `Vc2PatchStore.cpp`, `Vc2PatchFile.cpp` and the shared reads in `XtPatchStore.cpp`): 40 caught.
+The first plant on the Reverb's first typed ID moved 0x819 alone, Reverb Off's one ID, whose range is one value: it
+reads its default from any slot, so the plant moves two. rom.2's reads being the shared code now, their plants ran
+too: `mutate_files.py`'s 22 in `XtPatchStore.cpp`, 22 caught, and `xt_files` and every other fcheck section as their
+baseline; `mutate_tone.py --changed HEAD` finds no tone plant in the files changed; the loader's
+`mutate_panel.py rom4-no-patchfiles rom4-no-tables rom4-no-voices`, 3 caught. `verify.sh`: every line held but the build
+ID's, as two other sessions' builds overwrote `~/Library`'s AU and VST3 during the run; installed again, the AU is this
+build's and auval passes on it.
+
 ### rom.4's frame through the unit (2026-11-19, v274) {#vc2-fx-frame}
 
 Step 4.4's second item (research/VC2_MODE_PLAN.md). `XtFxUnit` takes an image: rom.4's runs rom.4's driver, with the frame

@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's patch store and a .p02 v450 (2026-11-21, on its own branch from vc2-mode's 00f4163, not merged; the number
+  block v450-v499 the plugin side's; HARDWARE_FIRMWARE.md, "rom.4's patch store and a .p02"; the plan's step 4.5, first
+  half). Vc2PatchFile reads a .p02 by rom.4's own reader (0x893419a0) in the interpreter, its four file calls served
+  from the file's bytes, then rom.4's conversion into the store (0x89324b20); Vc2PatchStore is the store's layout by
+  rom.4's ten pointing routines. The reads are one code on either image's layout (XtStoreLayout, XtPatchStore.cpp):
+  rom.2's xtPatch* reads are those on rom.2's, unchanged. loadVc2 keeps the image's path (vc2LoadPatchFiles). New check
+  xt_vc2patch (in fcheck): placements against the routines, 1.44 M values and 881 k typed values against rom.4's
+  readers on the disk image's 128 patches and random stores, the files and 21 made otherwise against the reader's
+  tests: 0 different. mutate_vc2.py --patch 40 of 40; mutate_files.py's 22 XtPatchStore.cpp plants 22, the three
+  rom4- loader plants 3; verify.sh every line but the build ID (other sessions' installs mid-run; the AU this build's
+  again after, auval passing). The user's decisions on the parameters (2026-11-21): a patch's
+  zones 1 and 2, the system settings the V-Synth's are, held apart in the editor test, IDs by rom.4's hex ID.
+
 rom.4's frame through the unit v274 (2026-11-19, on its own branch after vc2-mode's 8052ad3, not merged;
   HARDWARE_FIRMWARE.md, "rom.4's frame through the unit"; the plan's step 4.4, item 2). XtFxUnit's code split out of
   XtFxControl.cpp into XtFxUnit.cpp as it stood, its plants to the port fxu. XtFxUnit takes an image; its frame's gain

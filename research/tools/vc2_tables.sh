@@ -26,6 +26,7 @@ VC2_TABLES=(
     Vc2LibMathTables            # the library's logf and powf
     Vc2ToneMixTables            # the tone's OSC mix's (v269)
     Vc2PartVoicesTables         # the part's voices' (v272)
+    "Vc2PatchFile Vc2PatchStore"   # the image a .p02's read runs on, and the store it reads into (v450)
 )
 
 # vc2Tables <source dir> [suffix]: the rows' files the tree has, one a line, each with the suffix (.cpp for a source).

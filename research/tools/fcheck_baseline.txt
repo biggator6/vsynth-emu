@@ -815,6 +815,13 @@ xt_vc2libm: 0 different
 == xt_vc2voices
 voices: 40 cases, 16000 events, 701 inits, 2649 takes (2479 from free, 78 stolen, 92 none), 2700 moves, 1318 reserves, 1367 ended scans (6235 end tests), 647 stop alls, 1967 stops, 1992 costs, 2699 budgets; 12863 destroys; 5264 splices, 554 lists dealt
 xt_vc2voices: 0 different
+== xt_vc2patch
+sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)
+sections: 8972 IDs placed, at every block, against rom.4's pointing routines, 0 different
+reads: 1439592 values in every block, bits and value, over 128 patches and 40 random, 0 different
+typed reads: 880992 typed values in every zone, over 128 patches and 40 random, 0 different
+files: 149 read, 128 of them the disk image's, the rest made otherwise, 0 different
+xt_vc2patch: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

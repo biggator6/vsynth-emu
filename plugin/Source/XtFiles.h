@@ -96,6 +96,21 @@ const XtTypedDesc* xtTypedDesc(int id);
 XtParamDesc xtParamDescOf(const uint8_t* p);
 XtTypedDesc xtTypedDescOf(const uint8_t* p);
 int xtPatchTyped(const std::vector<uint8_t>& store, int base, int id, int zone = 0, int cosm = 0);
+// An image's store (v450): its sections, its COSMs' IDs and COSM 2's offset, and its two banks of descriptors.  The reads
+// above are these on rom.2's (xtVSynthStore); rom.4's is Vc2PatchStore.h's, its readers being rom.2's code on its own
+// descriptors (0x89328580, 0x8932b050, 0x8932b460).  A section, a raw read and a value as xtPatchSection, xtPatchRaw and
+// xtPatchValue give them, a typed one as xtPatchTyped.
+struct XtStoreLayout {
+    std::span<const XtPatchSectionDef> sections;
+    int cosmFirst, cosmLast, cosmStride;
+    const XtParamDesc* (*desc)(int id);
+    const XtTypedDesc* (*typed)(int id);
+};
+const XtStoreLayout& xtVSynthStore();
+int xtStoreSection(const XtStoreLayout& l, int id, int zone = 0, int cosm = 0);
+int xtStoreRaw(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone = 0, int cosm = 0);
+int xtStoreValue(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone = 0, int cosm = 0);
+int xtStoreTyped(const XtStoreLayout& l, const std::vector<uint8_t>& store, int base, int id, int zone = 0, int cosm = 0);
 // A type's IDs, first and last, from rom.2 (block 0 MFX, 1 Chorus, 2 Reverb, 3 COSM; the tables at 0x897a8218, 0x897a82e4, 0x897a8310, 0x897cebd8).  False past its types.
 bool xtEffectTypeIds(int block, int type, int& first, int& last);
 int xtEffectTypes(int block);

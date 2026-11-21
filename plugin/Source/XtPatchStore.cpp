@@ -98,11 +98,13 @@ const XtTypedDesc* xtTypedDesc(int id) {
     return entryAt(romTable<XtTypedDesc, 0x897a56d8, kTypedIds, 8, xtTypedDescOf>(), id - kXtDescIds);
 }
 
+const XtStoreLayout& xtVSynthStore() {
+    static constexpr XtStoreLayout kVSynth { kSections, kCosmFirst, kCosmLast, kCosmStride, xtParamDesc, xtTypedDesc };
+    return kVSynth;
+}
+
 int xtPatchTyped(const std::vector<uint8_t>& store, int base, int id, int zone, int cosm) {
-    const XtTypedDesc* d = xtTypedDesc(id);
-    if (!d) return 0;
-    const int v = xtPatchValue(store, base + d->slot, zone, cosm);
-    return v < d->min || v > d->max ? d->def : v;
+    return xtStoreTyped(xtVSynthStore(), store, base, id, zone, cosm);
 }
 
 int xtEffectTypes(int block) { return block >= 0 && block < 4 ? kTypes[block] : 0; }
@@ -122,16 +124,27 @@ int xtPatchZones(const std::vector<uint8_t>& store) {
     return 16;
 }
 
-int xtPatchSection(int id, int zone, int cosm) {
-    for (const XtPatchSectionDef& s : kSections)
+int xtPatchSection(int id, int zone, int cosm) { return xtStoreSection(xtVSynthStore(), id, zone, cosm); }
+
+int xtPatchRaw(const std::vector<uint8_t>& store, int id, int zone, int cosm) {
+    return xtStoreRaw(xtVSynthStore(), store, id, zone, cosm);
+}
+
+int xtPatchValue(const std::vector<uint8_t>& store, int id, int zone, int cosm) {
+    return xtStoreValue(xtVSynthStore(), store, id, zone, cosm);
+}
+
+// An image's reads (v450): rom.2's above, rom.4's (Vc2PatchStore.cpp) on its own layout
+int xtStoreSection(const XtStoreLayout& l, int id, int zone, int cosm) {
+    for (const XtPatchSectionDef& s : l.sections)
         if (id >= s.first && id <= s.last)
-            return s.at + s.zoneStride * zone + (xtPatchIsCosm(id) ? kCosmStride * cosm : 0);
+            return s.at + s.zoneStride * zone + (id >= l.cosmFirst && id <= l.cosmLast ? l.cosmStride * cosm : 0);
     return -1;
 }
 
-int xtPatchRaw(const std::vector<uint8_t>& store, int id, int zone, int cosm) {
-    const XtParamDesc* d = xtParamDesc(id);
-    const int section = xtPatchSection(id, zone, cosm);
+int xtStoreRaw(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone, int cosm) {
+    const XtParamDesc* d = l.desc(id);
+    const int section = xtStoreSection(l, id, zone, cosm);
     if (!d || section < 0) return 0;
     const int width = std::abs(d->width), total = width + d->bit, bytes = (total + 7) / 8, at = section + d->offset;
     if (at < 0 || at + bytes > (int)store.size()) return 0;
@@ -141,10 +154,17 @@ int xtPatchRaw(const std::vector<uint8_t>& store, int id, int zone, int cosm) {
     return (int)(width >= 32 ? v : v & ((1u << width) - 1));   // 0x2c6 and 0x2fa are 32 bits wide
 }
 
-int xtPatchValue(const std::vector<uint8_t>& store, int id, int zone, int cosm) {
-    const XtParamDesc* d = xtParamDesc(id);
+int xtStoreValue(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone, int cosm) {
+    const XtParamDesc* d = l.desc(id);
     if (!d) return 0;
-    int v = xtPatchRaw(store, id, zone, cosm);
+    int v = xtStoreRaw(l, store, id, zone, cosm);
     if (d->min != d->max && (v < d->min || v > d->max)) v = d->def;
     return v - d->centre;
+}
+
+int xtStoreTyped(const XtStoreLayout& l, const std::vector<uint8_t>& store, int base, int id, int zone, int cosm) {
+    const XtTypedDesc* d = l.typed(id);
+    if (!d) return 0;
+    const int v = xtStoreValue(l, store, base + d->slot, zone, cosm);
+    return v < d->min || v > d->max ? d->def : v;
 }
