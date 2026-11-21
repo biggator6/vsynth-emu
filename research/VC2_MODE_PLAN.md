@@ -732,7 +732,9 @@ version against rom.4's routines with what it calls hooked:
    Type), held apart in `VSynthEmuEditorTest` and counted until the VC-2 pages come, their IDs by rom.4's hex ID.
    1. done (v450): a `.p02` read by rom.4's own reader and its store by rom.4's pointing routines, `Vc2PatchFile` and
       `Vc2PatchStore`, against rom.4 in `xt_vc2patch` (HARDWARE_FIRMWARE.md, "rom.4's patch store and a .p02").
-   2. rom.4's agreed IDs as host parameters, appended after the 763, by rom.4's names, ranges and text.
+   2. done (v451): rom.4's agreed IDs, 1,332, as host parameters after the 763, by rom.4's names, ranges and text, the
+      set fixed in the source and rom.4 brought in before the layout (HARDWARE_FIRMWARE.md, "rom.4's parameters as the
+      plugin's").
    3. The session's state for them, append-only, and a `.p02`'s load into them.
    4. The second half: the mode switch's audio, the wiring to Vc2Synth, the VC-2 pages and cards, the plugin test of a
       played block.

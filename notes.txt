@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's parameters as the plugin's v451 (2026-11-21, after v450; HARDWARE_FIRMWARE.md, "rom.4's parameters as the
+  plugin's"; the plan's step 4.5, item 2). 1,332 host parameters by rom.4's IDs after the V-Synth's 763, which stay as
+  they were (the params listing's first 763 lines byte for byte): a patch's common, effects' Types and levels, Beam to
+  the arpeggio, zones 1 and 2's tone, envelopes, LFOs and both COSMs by type, and the system's 18 the V-Synth has. IDs
+  vc2_<hex>, vc2z2_ (zone 2), vc2c2_ (COSM 2); rom.4's names, ranges, defaults and text when rom.4 is in as they are
+  made, which createParameterLayout now sees to first (vc2FindRomEarly); a fixed set either way, stand-ins without
+  rom.4. PluginVc2Params.cpp; VSynthEmuArpPluginTest's VC-2 part (16 checks) against rom.4, child runs with and without
+  an image, sessions; VSynthEmuEditorTest holds them apart. findRom leaves rom.4 to the layout's search when it finds
+  no rom.2; VSynthEmuRomTest asks for rom.4 as the first instance opens rom.2. mutate_panel.py: the 19 vc2-param-
+  plants 19, the 29 rom- and rom4- 29. Not in the sound yet.
+
 rom.4's patch store and a .p02 v450 (2026-11-21, on its own branch from vc2-mode's 00f4163, not merged; the number
   block v450-v499 the plugin side's; HARDWARE_FIRMWARE.md, "rom.4's patch store and a .p02"; the plan's step 4.5, first
   half). Vc2PatchFile reads a .p02 by rom.4's own reader (0x893419a0) in the interpreter, its four file calls served

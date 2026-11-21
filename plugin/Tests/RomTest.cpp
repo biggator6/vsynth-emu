@@ -129,6 +129,9 @@ int romTest(const juce::File& rom, const juce::File& work) {
     vc2Alone(check, rom);
     VSynthEmuProcessor playing;
     check(playing.setRomFile(rom), "the ROM should load");
+    // before any other instance's search could (v451: the parameters' own, vc2FindRomEarly, now finds it from the
+    // places this one keeps)
+    check(playing.hasVc2Rom(), "rom.4 should be found beside the rom.2 an instance opens, as it opens it");
     const std::string inUse = xtFwRomPath();
     const auto before = attackNote();
     const juce::File same = work.getChildFile("the same image.bin");

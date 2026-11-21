@@ -1546,6 +1546,69 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's parameters as the plugin's (2026-11-21, v451) {#vc2-host-params}
+
+Step 4.5's second item (research/VC2_MODE_PLAN.md). rom.4's IDs become host parameters, appended after the V-Synth's 763,
+whose IDs and order are as they were: `VSynthEmuArpPluginTest <rom> params` gives its first 763 lines byte for byte as
+v450's. The scope is the user's (2026-11-21, put with the counts below): a patch's zones 1 and 2, as a VC-2 patch edits
+two (rom.4's Current Zone, 0x140, is ZONE1–ZONE2; 42 of the 64 factory patches put the mic's EXT IN in zone 2), and the
+system settings the V-Synth's parameters are.
+
+| Part | rom.4's IDs | Each | Parameters |
+|---|---|---|---|
+| The common: tune, keys, portamento, tempo, bend, the effects' switches, Current Zone, the zones' splits, Scale Tune, the Matrix, the vocoder block, the patch EQ | 0x12c…0x1b4 with a range | once | 112 |
+| The effects' Types and levels | 0x1b7…0x1ba, 0x23c…0x23e, 0x270, 0x271 | once | 9 |
+| Beam Type, Pad Mode and Hold, the arpeggio | 0x4a6…0x4b2 | once | 13 |
+| The tone (both OSCs, the VOCODER OSC's IDs with them) | 0x2d3…0x38f with a range, and the Start Offsets 0x306, 0x33a | zones 1, 2 | 2 × 155 |
+| The 13 envelopes | 0x390…0x438 with a range | zones 1, 2 | 2 × 130 |
+| The 5 LFOs | 0x439…0x461 with a range | zones 1, 2 | 2 × 35 |
+| COSM 1 and 2: Switch and Type, then the types' own IDs | 0x462, 0x463, 0x927…0x9ab | zones 1, 2, each COSM | 4 × 135 |
+| The system: Master Level, Clock Source, Output Gain, External In Type, the controller assigns | 0x40, 0x43, 0x78, 0x7a, 0x89…0x96 | once | 18 |
+
+1,332 in all. Left out: the patch's name (its data, as the V-Synth's), the dummies and reserved areas (rom.4 names them
+`(dummy)`, `Reserv area`, `reserved` or `Dummy`, or gives a range of one value), the effects' and COSMs' slots, which
+their types' own IDs are read through, zones 3–16 and the arpeggio pattern (the patch's data, v452), and the effect
+types' own parameters (edits by ID, as the V-Synth's). The Start Offsets have a range of one value in rom.4's descriptors,
+as rom.2's have, and are there by the V-Synth's rule, 0 to 2^24 − 1 (v152).
+
+**What a host sees.** An ID by rom.4's hex ID (the user's choice): `vc2_193` "VC-2 Vocoder Sw", zone 2's `vc2z2_2e5`
+"VC-2 Z2 OSC 1 Type", COSM 2's `vc2c2_927`, both `vc2z2c2_927`; a COSM's name with its "COSM n" before rom.4's, whose own
+"COSM " is dropped. Each an integer over rom.4's range (the value less the descriptor's centre; a typed ID's own range),
+its default rom.4's, its text rom.4's routine's (Vc2Params' `vc2ValueText`, the screens' form) and read back by that
+text. rom.4's names repeat across the COSM types (Drive, Tone, Output Level) and twice within two (type 14's "Filter 1
+Q", a Side Band Filter's "Side Band Width"): rom.4's own, kept, the ID telling them apart.
+
+**rom.4 before the parameters.** A processor makes its parameters in its initializer, before its search for the images
+(`findRom`), so a process's first instance had no rom.4 tables for them. Now `createParameterLayout` first brings rom.4
+in from where an instance finds it (`vc2FindRomEarly`, PluginRom.cpp: beside each place rom.2 is sought, then rom.4's
+own places), quietly; `findRom`'s places and `findVc2Rom`'s take are shared with it, their order as before. `findRom`
+no longer seeks rom.4 itself when it finds no rom.2, as the layout's search has just looked in the same places; an image
+chosen by hand still finds rom.4 beside it (`openRom`). That made three of `VSynthEmuRomTest`'s plants (`rom4-not-beside`,
+`rom4-not-sought`, `rom4-not-alone`) miss at first: rom.4 was in by a later instance's early search before the test
+asked. The test now asks right after the instance opens rom.2, and `rom4-not-alone` plants in the early search. The set is
+fixed in the source (`PluginVc2Params.cpp`: runs of rom.4's IDs, no names or ranges), so a host's list is the same with
+rom.4 or without: an instance made without it has each a stand-in, named by its hex ID, its range −32768…32767 (every
+value rom.4's descriptors give the set but the Start Offsets'), so a session's values survive it.
+
+**The editor.** The VC-2's pages need the user's look, so `VSynthEmuEditorTest` holds the 1,332 apart (the user's
+decision): each one of the set, in its order, none reached by a control, the set whole. The tests that found their
+parameters by counting from the list's end (the MSM's and the zones' parts of `VSynthEmuArpPluginTest`) count past the
+VC-2's now.
+
+**Not yet:** nothing reads them into a sound (step 4.3's Vc2Synth, then the mode switch); a `.p02`'s load into them and
+the patch's data in the session are v452's.
+
+**The checks.** `VSynthEmuArpPluginTest`'s VC-2 part (`Vc2ParamPluginTest.cpp`, 16 checks): the set against rom.4 (every
+ID of the agreed sections, the test's own spans, that rom.4 gives a range and a name not a dummy's, each in its zones and
+COSMs: 1,332) and the agreed form of four IDs; on a processor made with rom.4 in, every parameter from the 764th the
+set's, each its exact name, range, default, its text at five values and that text read back rom.4's; a fresh run of the
+program with no image to find, the same IDs in order, each stand-in holding rom.4's range; the same with VSE_XT_ROM
+naming rom.2, rom.4 found before the parameters and each range rom.4's; a session with every VC-2 parameter moved, back
+as saved, and one from before them (the VC-2's taken out) loading the V-Synth's as saved and the VC-2's at their
+defaults. `VSynthEmuEditorTest`: 2,602 checks, the 1,332 held apart. `VSynthEmuRomTest` 19 of 19. `mutate_panel.py`: the
+19 `vc2-param-` plants (in `PluginVc2Params.cpp`, the layout and the early search) 19 caught, and every `rom-` and `rom4-`
+plant, 29, caught after the change above.
+
 ### rom.4's patch store and a .p02 (2026-11-21, v450) {#vc2-patch-store}
 
 Step 4.5's first half (research/VC2_MODE_PLAN.md), its `.p02` first: the parameters' load (v452) reads a patch through

@@ -219,7 +219,8 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
   panels showing their faces; at the smallest, default and largest sizes the drawing filling the window, scaled whole; on
   each page, and on SYNTH with each block selected, no control outside its parent, over another, without a size or with
   its text cut short; every control moved, each instance's (each OSC, COSM, MSM track, Matrix Control and zone) moving its
-  own parameters alone, and every parameter with a control but the 17 below; each page's name, block and effect pressed;
+  own parameters alone, and every parameter with a control but the 17 below and the VC-2 mode's, held apart (v451);
+  each page's name, block and effect pressed;
   the header's build, Browse…, ROM… and each PCM OSC's Load…, and a patch's note; a curve's points dragged, a route on its
   block, the list's and the overviews' presses; the FX page on every effect type, its list's text whole with room for 15
   rows, its left cards level with its list, and its page buttons both ways; an OSC's display (v200, `EditorWaveTest.cpp`):
@@ -243,12 +244,16 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
 
 ### Not shown anywhere
 
-17 of the 761 parameters have no control; only a host reaches them:
+17 of the V-Synth's 763 parameters have no control; only a host reaches them:
 
 - Scale Tune (13).
 - The engine's Pitch, Time and Formant (3): unread since v191, kept for old sessions.
 - The Time Trip circle (`timeTrip`, 1): a finger going round the rim, for a host's automation; the pad sends the XT's
   controllers instead (v202, the user's choice).
+
+The VC-2 mode's 1,332 (v451, `vc2…`, after the 763) have none yet either: its pages need the user's look. Until they
+come `VSynthEmuEditorTest` holds them apart (the user's decision, 2026-11-21): each one of the set in its order, none
+reached by a control, and the set whole. The pages will be made from their IDs by tables, as every other.
 
 ### Still to do
 

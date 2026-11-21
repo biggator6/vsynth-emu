@@ -13,6 +13,7 @@
 #include "TestControls.h"
 #include "TestSnapshot.h"
 #include "../Source/PluginParamIds.h"
+#include "../Source/PluginVc2Params.h"
 #include "../Source/UiBlocks.h"
 #include "../Source/UiEditor.h"
 #include "../Source/XtBuildId.h"
@@ -142,16 +143,30 @@ void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
 
 // Every parameter with a control that has moved it, but those no editor has shown (the engine's three, unread and kept
 // for old sessions, and Scale Tune) and the Time Trip circle, left to a host's automation where the pad sends the XT's
-// controllers (v202); with `list`, the parameters no control reaches, said.  How many have one.
+// controllers (v202); with `list`, the parameters no control reaches, said.  The VC-2 mode's (v451) are held apart until
+// its pages come (the user's decision, 2026-11-21): each one of its set in order, none with a control, the set whole;
+// `list` says how many.  How many have one.
 int coverage(LayoutCheck& l, TestChecks& check, bool list) {
     const juce::StringArray unshown { "pitchShift", "timeStretch", "formantShift", "timeTrip" };
+    const auto& vc2 = vc2HostParams();
+    size_t apart = 0;
     int have = 0;
     for (auto* r : l.params) {
         const juce::String& id = r->paramID;
-        if (l.reached.count(id) != 0) ++have;
-        else if (list) std::printf("no control: %s\n", id.toRawUTF8());
-        else check(unshown.contains(id) || id.startsWith("scaleTune"), ("no control sets " + id).toStdString());
+        if (id.startsWith(kVc2ParamPrefix)) {
+            const bool inOrder = apart < vc2.size() && vc2[apart++].paramId == id;
+            check(inOrder && l.reached.count(id) == 0,
+                  ("the VC-2's " + id + ": its set's, with no control yet").toStdString());
+        } else if (l.reached.count(id) != 0) {
+            ++have;
+        } else if (list) {
+            std::printf("no control: %s\n", id.toRawUTF8());
+        } else {
+            check(unshown.contains(id) || id.startsWith("scaleTune"), ("no control sets " + id).toStdString());
+        }
     }
+    check(apart == vc2.size(), "the VC-2 mode's, held apart, should be its set's " + std::to_string(vc2.size()));
+    if (list) std::printf("held apart: the VC-2 mode's %zu, no page yet\n", apart);
     return have;
 }
 
@@ -179,8 +194,9 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
         snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
     check(l.errors == 0, std::to_string(l.errors) + " layout errors (said above)");
     return check.summary(std::to_string(l.states) + " states, " + std::to_string(l.checked) + " placements, " +
-                         std::to_string(reached) + " of " + std::to_string(l.params.size()) +
-                         " parameters have a control");
+                         std::to_string(reached) + " of " + std::to_string(l.params.size() - vc2HostParams().size()) +
+                         " parameters have a control, the VC-2's " + std::to_string(vc2HostParams().size()) +
+                         " held apart");
 }
 
 }
