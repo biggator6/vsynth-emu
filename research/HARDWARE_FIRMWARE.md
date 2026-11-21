@@ -1546,6 +1546,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's Matrix MFX-PRMs (2026-11-21, v401) {#vc2-fx-matrix}
+
+Step 4.4's fourth item (research/VC2_MODE_PLAN.md). rom.4 sends its Matrix's MFX-PRM1…3 to the part mixer, not to the
+effects. So `setMatrix` doing nothing on rom.4 (v259) is rom.4's own way, and this version checks that it is.
+
+**Where they go.** rom.4's Matrix destinations 75…77 keep rom.2's names, "MFX-PRM1…3" (the list at `0x898c22b0`). M
+numbers them 9…11, group 2 (v247's table). Group 2's reader `0x893a24d0` has two callers: `0x893a2e50` and its copy in
+M's init `0x893a2ee0` (v247's `Vc2MatrixLevels`). Each takes the three sums × 1/127 into the part mixer's offsets:
+- PRM1 into `0x89997290`, Direct Sound Level's offset;
+- PRM2 into `0x89997294`, MFX Send's offset, the vocoder's level into MULTI;
+- PRM3 into `0x89997298`, which the consonants' output stage reads (`0x893ed56a`, `0x893ed6ea`; v209's `Vc2Consonants`).
+
+Then each calls the targets' routine `0x893b1ee0`. All of that is ported (v209, v227, v247), and step 4.3 wires it.
+
+**What's left in the effects.** rom.2's path (HARDWARE_FIRMWARE.md, "XtFxControl") runs from the tone's `0x894e7aa0` to
+`0x894abe50`. That calls the stub `0x894ad4e0`, which is the MFX object's take `0x894ae7e0` on the object at the
+driver's +8, and posts the effect task's event 0x10. The event runs the stub `0x894ad4f0`, the MFX object's apply
+`0x894ae870`. On rom.4:
+- The MFX object's take and apply are still there, `0x89361d50` and `0x89361de0`; they do what rom.2's do. Nothing
+  reaches them: no literal, no word in the image, no bsr or bra (a scan of every branch in its code), and no stub like
+  rom.2's two.
+- The effect task's event 0x10 (in its loop, `0x89360ac0`) runs `0x89360930` instead. It scales the MFX's Chorus Send
+  (0x1b9) by CC 93 and its Reverb Send (0x1ba) by CC 91: each × value / 127 through the level table `0x89365e80`, into
+  `0x89363450` and `0x89363460`.
+- The controllers come in through the task's message handler `0x89360b90`. A control change goes to `0x89360c10`,
+  which hands CC 91…93 to `0x893608a0` and posts event 0x10. `0x893608a0` keeps CC 91 at the driver's +0x18 and CC 93 at
+  +0x1a; CC 92 does nothing.
+- None of this pairs by shape with anything in rom.2.
+
+So rom.4 took the Matrix's MFX parameters off the effects and gave the effects CC 91 and CC 93 on the MFX's sends.
+`XtFxControl` doesn't run that event yet; the plan has it as a new item, 4.4.5.
+
+**The check.** `xt_fx <rom.4> vc2` has a new part, the Matrix through the queue. It is `xt_fx control`'s routine
+(XtFxCheckQueue.cpp), now run on an image. rom.2's run and its line are as they were: all three PRMs are moved on each of
+the 42 types, and 28 types answer. On rom.4 no type answers, the chip has every word the driver sent each time, and the
+driver's object, from `0x89980f24` to its message's flags, is byte for byte as it was. 128 samples, 0 different at seeds
+2024, 7 and 31337.
+
+**Plants.** `mutate_fx.py --vc2`: 74 of 74 caught. `--control`: 184 of 184, rom.2's as before. fxthreads.sh: no races.
+The two new plants give `setMatrix` rom.4's dead pair, whole or with the apply elsewhere. That moves no chip word, so in
+the new part only the object's bytes show them.
+
 ### rom.4's outside input (2026-11-21, v400) {#vc2-fx-input}
 
 Step 4.4's third item (research/VC2_MODE_PLAN.md). The 2026-11-17 map found no reader of External In Type (0x7a) in
@@ -2254,7 +2296,7 @@ Step 4.4's first part (research/VC2_MODE_PLAN.md, which has the map). rom.4's dr
 - **The patch EQ is read with the switches.** EQ 1 and EQ 2 (IDs 0x1af…0x1b4) are in the switches' reader, so a live edit of one goes as a switches message. The system's reader has no mid bands on rom.4 (0x67, 0x68, 0x6f…0x72).
 - **A patch of Category 10 or 11 posts an event.** The switches' routine calls `0x89391e50`, which posts event 0x200 on the object `0x8994fec8` through the kernel. No chip word moves at any Category. `XtFxControl` answers it with nothing, as it does rom.2's post of event 0x40; what the event does in the tone generator is for step 4.3. The first version faulted here: it took a check that loads a patch of every Category to show it.
 - **Seven MFX parameters don't take a live edit alone**, the seven rom.2 has, at the same types and places (0x588, 0x5c4, 0x5ea, 0x641, 0x6c8, 0x6ca, 0x72b).
-- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4. ~~No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.~~ (v400: the EXT IN request reads it, outside the driver as on rom.2, and moves no chip word: "rom.4's outside input".)
+- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4 (v401: rom.4's own way, as it sends them to the part mixer: "rom.4's Matrix MFX-PRMs"). ~~No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.~~ (v400: the EXT IN request reads it, outside the driver as on rom.2, and moves no chip word: "rom.4's outside input".)
 
 **The check**, `xt_fx <rom.4> vc2`. Comparing the chip with JE-8086's is blind to what the driver is asked, as both chips hear the same words, so most of it is about the driver:
 

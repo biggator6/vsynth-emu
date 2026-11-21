@@ -3570,6 +3570,15 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 23, the VC-2's effects (2026-11-21) — v401: rom.4's Matrix MFX-PRMs
+
+- The plan asked where rom.4 sends them. The answer was in our own port: v247's `Vc2MatrixLevels` reads group 2 into
+  the part mixer's offsets. That's the same three sums, under the same names rom.2 gives the MFX's parameters.
+- The event rom.2 uses for the Matrix, 0x10, is still in rom.4's task. It now carries CC 91 and CC 93 onto the MFX's
+  sends, a feature rom.2 doesn't have. It goes in the plan as an item of its own rather than here.
+- A check that something does nothing needs something it would show. Giving `setMatrix` rom.4's dead MFX pair moves no
+  chip word, so the check reads the driver's object as well. That is the only place the plant shows.
+
 ### Session 23, the VC-2's effects (2026-11-21) — v400: rom.4's outside input
 
 - The 2026-11-17 map said no reader in rom.4's driver reads External In Type. That was true, and it misled. rom.2's EXT

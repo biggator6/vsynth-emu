@@ -79,3 +79,6 @@ in-usb-left|chip.setGram(kUsbL, feedsUsb_ ? l : 0);|chip.setGram(kUsbL, l);|fx4i
 in-usb-right|chip.setGram(kUsbR, feedsUsb_ ? r : 0);|chip.setGram(kUsbR, r);|fx4in
 route-no-event|    call(image_.inputEvent);\n||fx4in
 route-none|if (!image_.inputRequest \|\| !call(image_.inputRequest)) return;|return;|fx4in
+# v401: the Matrix's MFX-PRMs, which rom.4 sends to the part mixer: its MFX object's dead pair given to setMatrix
+matrix-dead-pair|kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };|kMatrixTake { 0x894ad4e0, 0x89361d50 }, kMatrixApply { 0x894ad4f0, 0x89361de0 };|fx4i
+matrix-dead-take|kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };|kMatrixTake { 0x894ad4e0, 0x89361d50 }, kMatrixApply { 0x894ad4f0, 0x89361d40 };|fx4i

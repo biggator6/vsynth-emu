@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's Matrix MFX-PRMs v401 (2026-11-21, after v400 on its branch, not merged; HARDWARE_FIRMWARE.md, "rom.4's Matrix
+  MFX-PRMs"; the plan's step 4.4, item 4). rom.4 sends its Matrix's MFX-PRM1…3 (group 2) through 0x893a2e50 to the
+  part mixer's offsets, Direct Sound's, MFX Send's and the consonants' (ported in v209, v227, v247), not to the effects:
+  its MFX object's take and apply have no caller, and its effect task's event 0x10 is the MFX's Reverb and Chorus sends
+  by CC 91 and 93 instead (rom.4's own; the plan's new item 5). So setMatrix rightly does nothing on rom.4. xt_fx's
+  Matrix-through-the-queue check is one routine over an image: rom.2's as before, rom.4's under vc2 with no type
+  answering and the driver's object byte for byte; 0 different at seeds 2024, 7 and 31337. mutate_fx.py --vc2 74 of
+  74, --control 184 of 184; fxthreads no races.
+
 rom.4's outside input v400 (2026-11-21, on its own branch from vc2-mode's 00f4163, not merged; HARDWARE_FIRMWARE.md,
   "rom.4's outside input"; the plan's step 4.4, item 3). rom.4's EXT IN request (0x8935b050, rom.2's 0x894a7dd0 less
   its Source) reads External In Type (0x7a) and its event (0x893620e0) stores it, moving no chip word: now routeInput's

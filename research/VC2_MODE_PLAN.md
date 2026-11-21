@@ -706,7 +706,8 @@ version against rom.4's routines with what it calls hooked:
    - **The types:** 42 MFX and 9 Chorus as on rom.2, 15 Reverb Types against 11, each type's IDs from tables at
      `0x895164ec`, `0x895165b8`, `0x895165e4`.
    - **Not mapped, so not run:** rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`) has no literal or
-     branch reaching it, though MFX-PRM1…3 are Matrix destinations; ~~and no reader reads External In Type (0x7a), where
+     branch reaching it, though MFX-PRM1…3 are Matrix destinations (v401: rom.4 sends those to the part mixer's levels);
+     ~~and no reader reads External In Type (0x7a), where
      rom.2's EXT IN request reads its own~~ (v400: its EXT IN request `0x8935b050` reads it, outside the driver as rom.2's
      is, and moves no chip word).
    - **XtFxControl** needs only where these are: `XtFxImage` holds them, one row of addresses an image, rom.2's as the
@@ -728,7 +729,14 @@ version against rom.4's routines with what it calls hooked:
       For step 4.3 and step 5: the part mixer reads frame words 1 and 5, and by v204's slot mapping word 1 is slot 0x92,
       which no input reaches on rom.4; which slot the mic comes back on wants a capture, and `returned()` hands the part
       nothing yet.
-   4. The Matrix's MFX-PRMs: where rom.4 sends them, then `setMatrix` on rom.4.
+   4. done (v401): the Matrix's MFX-PRMs (HARDWARE_FIRMWARE.md, "rom.4's Matrix MFX-PRMs"). rom.4 sends them to the part
+      mixer's levels through `0x893a2e50` (Direct Sound's and MFX Send's offsets and the consonants' level, ported in
+      v209, v227, v247), not to the effects, so `setMatrix` doing nothing on rom.4 is rom.4's way: checked, no MFX type
+      answering and the driver's object untouched. The MFX object's take and apply (`0x89361d50`, `0x89361de0`) have no
+      caller.
+   5. The MFX's sends by CC 91 and 93: rom.4's effect task's event 0x10 (`0x89360c10` → `0x893608a0`, then
+      `0x89360930`) scales the MFX's Reverb Send by CC 91 and its Chorus Send by CC 93, rom.4's own (no pair in rom.2).
+      Not run by XtFxControl: a message of the controllers to the driver, against rom.4 by hand as v259's.
 5. The plugin: the mode switch, rom.4's IDs as parameters appended, the session, a `.p02`'s load, the tab of cards, the
    plugin test, verify.sh lines and plants.
 

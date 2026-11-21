@@ -159,6 +159,7 @@ void vc2Control(const char* rom, int events, uint32_t seed) {
     handInput(rom);   // v400: the outside input
     vc2RoutingLaw(rom, seed);
     unitInputVc2(rom, seed);
+    vc2MatrixThroughQueue(rom);   // v401: the Matrix's MFX-PRMs, which rom.4's effects don't take
     unitConversion(rom, seed, vc2Way());   // v274: the frame's way through the unit
     unitLevels(rom, false, vc2Way());
     unitAgainstReference(rom, events, seed, vc2Way());

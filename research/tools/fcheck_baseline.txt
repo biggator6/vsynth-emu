@@ -932,6 +932,7 @@ vc2 control's patch EQ on the bus: 6 samples, 0 different
 vc2 control's input routing against the driver by hand: 6 samples, 0 different
 vc2 control's input routing on the chip: 40 samples, 0 different
 vc2 control's input through the unit: 5 samples, 0 different
+vc2 control's Matrix through the queue: 128 samples, 0 different
 vc2's frame into the chip against the firmware's truncation: 51200 samples, 0 different
 vc2's frame through the unit: 9 samples, 0 different
 vc2's frame through the unit against the reference: 311519 samples, 0 different

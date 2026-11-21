@@ -29,5 +29,6 @@ void handOutsideClock(const char* rom);
 void handInput(const char* rom);                                  // XtFxCheckVc2Input.cpp, v400
 void vc2RoutingLaw(const char* rom, uint32_t seed);
 void unitInputVc2(const char* rom, uint32_t seed);
+void vc2MatrixThroughQueue(const char* rom);                      // XtFxCheckQueue.cpp, v401
 } // namespace xtfxcheck
 #endif

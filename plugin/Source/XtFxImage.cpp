@@ -18,8 +18,9 @@ constexpr Place kRevIds { 0x897a8310, 0x895165e4 };
 constexpr Place kStaticInit { 0x894b4a60, 0x89368280 }, kStart { 0x894ac6a0, 0x8935f9a0 };
 constexpr Place kStartTask { 0x894ac780, 0x8935fa80 }, kTakeMessage { 0x894ac970, 0x8935fc40 };
 constexpr Place kClockPoll { 0x894acb10, 0x8935fde0 };
-// No literal or branch in rom.4 reaches its pair of the Matrix's two (0x89361d50, 0x89361de0), and External In Type isn't
-// among what its driver's readers read: research/VC2_MODE_PLAN.md, step 4.4's map
+// rom.4 has none (v401): it sends its Matrix's MFX-PRM1…3 to the part mixer's levels (0x893a2e50), and no literal, word
+// or branch reaches its MFX object's pair of rom.2's two (0x89361d50, 0x89361de0); its effect task's event 0x10 is the
+// MFX sends by CC 91 and 93 (HARDWARE_FIRMWARE.md, "rom.4's Matrix MFX-PRMs")
 constexpr Place kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };
 // The EXT IN request and its event's routine (v400: rom.4's 0x8935b050 pairs rom.2's by what it does, External In Type to
 // the routing's wanted byte 6, with no Source byte; its event 0x893620e0 is the effect task's event 0x40, as rom.2's)
