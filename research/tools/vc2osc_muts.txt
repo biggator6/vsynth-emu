@@ -197,12 +197,12 @@ k0-renders|{ .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one 
 k0-flag|{ .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },|{ .renders = Render::zero, .noteOn = NoteOn::one },|vc2osckinds
 k1-install|{ .installs = Install::lite,|{ .installs = Install::vari,|vc2osckinds
 k1-waits|.installs = Install::lite, .waits = true,|.installs = Install::lite,|vc2osckinds
-k1-ticks|.ticks = kR0 \| kR2, .update = 0x893c8280|.ticks = kR0, .update = 0x893c8280|vc2osckinds
-k1-update|.update = 0x893c8280|.update = 0x893c88b0|vc2osckinds
-k1-records|      .records = Records::fromBlock, .ramp = true, .settings = 0x893c8390|      .ramp = true, .settings = 0x893c8390|vc2osckinds
-k1-ramp|.records = Records::fromBlock, .ramp = true, .settings = 0x893c8390|.records = Records::fromBlock, .settings = 0x893c8390|vc2osckinds
-k1-settings|.settings = 0x893c8390|.settings = 0x893b0280|vc2osckinds
-k1-pitch|.settings = 0x893c8390, .pitch = Pitch::tuned|.settings = 0x893c8390, .pitch = Pitch::bounded|vc2osckinds
+k1-ticks|.ticks = kR0 \| kR2, .updates = Vc2OscUpdate::lite|.ticks = kR0, .updates = Vc2OscUpdate::lite|vc2osckinds
+k1-update|.updates = Vc2OscUpdate::lite|.updates = Vc2OscUpdate::routine|vc2osckinds
+k1-records|      .records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::lite|      .ramp = true, .settingsWay = Vc2OscSettings::lite|vc2osckinds
+k1-ramp|.records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::lite|.records = Records::fromBlock, .settingsWay = Vc2OscSettings::lite|vc2osckinds
+k1-settings|.settingsWay = Vc2OscSettings::lite|.settingsWay = Vc2OscSettings::routine|vc2osckinds
+k1-pitch|.settingsWay = Vc2OscSettings::lite, .pitch = Pitch::tuned|.settingsWay = Vc2OscSettings::lite, .pitch = Pitch::bounded|vc2osckinds
 k2-install|{ .installs = Install::vari,|{ .installs = Install::lite,|vc2osckinds
 k2-waits|.installs = Install::vari, .waits = true,|.installs = Install::vari,|vc2osckinds
 k2-ticks|.ticks = kR0 \| kR1 \| kR2|.ticks = kR0 \| kR2|vc2osckinds
@@ -680,8 +680,8 @@ lite-copy16-at|kCopy16 = 0x170|kCopy16 = 0x16c|vc2osclite
 lite-copy32-at|kCopy32 = 0x174;|kCopy32 = 0x178;|vc2osclite
 lite-from-at|kFrom = 0x150;|kFrom = 0x14c;|vc2osclite
 lite-th-offset|v.setU32(kSamples, v.u32(kSamplesFrom));|v.setU32(kSamples, v.u32(kSamplesFrom + 4));|vc2osclite
-lite-th-firstf|v.setF32(kFirstF, unsignedFloat(v.u32(kFirst)));|v.setF32(kFirstF, xtf::flt((int32_t)v.u32(kFirst)));|vc2osclite
-lite-th-last|v.setF32(kLast, unsignedFloat(v.u32(kFrames) - 1));|v.setF32(kLast, unsignedFloat(v.u32(kFrames)));|vc2osclite
+lite-th-firstf|v.setF32(kFirstF, unsignedFloatBy(v.u32(kFirst), two32));|v.setF32(kFirstF, xtf::flt((int32_t)v.u32(kFirst)));|vc2osclite
+lite-th-last|v.setF32(kLast, unsignedFloatBy(v.u32(kFrames) - 1, two32));|v.setF32(kLast, unsignedFloatBy(v.u32(kFrames), two32));|vc2osclite
 lite-th-fwdrate|vc2OscLoopRate(loop.rateFwd, shared, t.liteHeadsTenths)|vc2OscLoopRate(loop.rateBwd, shared, t.liteHeadsTenths)|vc2osclite
 lite-th-bwdrate|vc2OscLoopRate(loop.rateBwd, shared, t.liteHeadsTenths)|vc2OscLoopRate(loop.rateFwd, shared, t.liteHeadsTenths)|vc2osclite
 lite-th-period|div(t.litePeriod, v.tail.hz)|div(v.tail.hz, t.litePeriod)|vc2osclite
@@ -708,7 +708,7 @@ lite-th-at-last|unsignedFloat(v.u32(kFrames) - 1), half)|unsignedFloat(v.u32(kFr
 lite-th-heada|v.setU32(kHeadA, (uint32_t)xtf::ftrc(at));|v.setU32(kHeadA, 0);|vc2osclite
 lite-th-headb|v.setU32(kHeadB, (uint32_t)xtf::ftrc(v.f32(kWalkPos)));|v.setU32(kHeadB, (uint32_t)xtf::ftrc(v.f32(kPeriod)));|vc2osclite
 lite-th-pos16|v.setU32(kPosition16, (uint32_t)xtf::ftrc(v.f32(kWalkPos)) << 4);|v.setU32(kPosition16, (uint32_t)xtf::ftrc(v.f32(kWalkPos)));|vc2osclite
-lite-unsigned|(int32_t)x < 0 ? add(f, vc2OscTables().liteTwo32) : f|f|vc2osclite
+lite-unsigned|(int32_t)x < 0 ? add(f, two32) : f|f|vc2osclite
 lite-fraction|sub(x, xtf::flt(xtf::ftrc(x)))|x|vc2osclite
 lite-period-at|kPeriod = 0x2ac|kPeriod = 0x2a8|vc2osclite
 lite-walkpos-at|kWalkPos = 0x270|kWalkPos = 0x274|vc2osclite
@@ -1351,3 +1351,48 @@ own-variOff-stereo-as-mono|{ 0x893c66e0, variOffStereo }|{ 0x893c66e0, variOffMo
 own-variOff-mono-no-wave|vc2OscVariOffMono(v, out, p.waveSamples());|vc2OscVariOffMono(v, out, Vc2OscSamples {});|vc2osc
 own-variOff-stereo-no-wave|vc2OscVariOffStereo(v, out, p.waveSamples());|vc2OscVariOffStereo(v, out, Vc2OscSamples {});|vc2osc
 own-not-rendered|    own->render(*this, out, parts);\n||vc2osc
+# v324: LITE's update and settings (vc2osclite), the Vari off side they share with VariPhrase's note-on
+# (vc2oscplayers), their pool words (vc2osctables), the rows (vc2osckinds: v324 rewrote k1-ticks, k1-update,
+# k1-records, k1-ramp, k1-settings and k1-pitch on the rows' ways) and the voice's ways to them (vc2osc, vc2oscget);
+# v324 rewrote lite-th-firstf, lite-th-last and lite-unsigned on the 2^32 each routine gives
+lite-up-past|if (type >= kWays.size()) return;\n    const Vc2OscTargets targets|if (type > kWays.size()) return;\n    const Vc2OscTargets targets|vc2osclite
+lite-up-type0|type == 0 ? std::span(kTargets).first(kUpdated)|type == 1 ? std::span(kTargets).first(kUpdated)|vc2osclite
+lite-up-count|constexpr size_t kUpdated = 4;|constexpr size_t kUpdated = 3;|vc2osclite
+lite-up-pitch|kUpdateTargets { { { kPitch, &Vc2OscTargets::tunedRatio }|kUpdateTargets { { { kPitch, &Vc2OscTargets::ratio }|vc2osclite
+lite-up-walk|{ kWalk, &Vc2OscTargets::walk }|{ kWalk, &Vc2OscTargets::walkTarget }|vc2osclite
+lite-up-formant|{ kFormant, &Vc2OscTargets::formant }|{ kFormant, &Vc2OscTargets::formantTarget }|vc2osclite
+lite-up-gain|{ kGain, &Vc2OscTargets::gain } } };\nconstexpr size_t kUpdated|{ kGain, &Vc2OscTargets::level } } };\nconstexpr size_t kUpdated|vc2osclite
+lite-up-filter-type|if (type == kHeadsType) setF32(kFilterRate,|if (type != kHeadsType) setF32(kFilterRate,|vc2osclite
+lite-up-filter-pool|vc2OscTables().liteUpdateFilter)|vc2OscTables().liteHalf)|vc2osclite
+lite-up-filter-pitch|mul(mul(tail.hz, f32(kPitch)), vc2OscTables().liteUpdateFilter)|mul(tail.hz, vc2OscTables().liteUpdateFilter)|vc2osclite
+lite-set-ask|givenWord(from, kAskSeek) != 0 && held|givenWord(from, kAskSeek) == 0 && held|vc2osclite
+lite-set-ask-held|!= 0 && held && givenWord|!= 0 && !held && givenWord|vc2osclite
+lite-set-ask-hold|held && givenWord(from, kHoldFrom) == 0) {|held && givenWord(from, kHoldFrom) != 0) {|vc2osclite
+lite-set-no-pending|        tail.seekPending = 1;\n||vc2osclite
+lite-set-no-gain|        setF32(kGain, 0.0f);\n||vc2osclite
+lite-set-matched|setU8(kMatchedByte, 1);|setU8(kMatchedByte, 0);|vc2osclite
+lite-set-matched-held|if (!held && givenWord(from, kHoldFrom) != 0)|if (givenWord(from, kHoldFrom) != 0)|vc2osclite
+lite-set-count|(flags & kCountBit) == 0 && givenWord|(flags & kCountBit) != 0 && givenWord|vc2osclite
+lite-set-count-byte|setU8(kCountByte, 0);|setU8(kCountByte, 1);|vc2osclite
+lite-set-bytes-at|kCountByte = 0x19c, kMatchedByte = 0x19d|kCountByte = 0x19d, kMatchedByte = 0x19c|vc2osclite
+lite-set-ask-at|kAskSeek = 0x40|kAskSeek = 0x44|vc2osclite
+lite-set-hold-at|kHoldFrom = 0x3c|kHoldFrom = 0x38|vc2osclite
+lite-set-count-at|kCountFrom = 0x38|kCountFrom = 0x34|vc2osclite
+lite-set-bits|b = withBit(b, bit, givenWord(from, at - kWave));|b = withBit(b, bit, givenWord(from, at - kWave + 4));|vc2osclite
+lite-set-no-bits|    setU8(kObject, b);\n    const Vc2OscLoopRecord loop|    const Vc2OscLoopRecord loop|vc2osclite
+lite-set-type-voice|const uint32_t type = from[0];|const uint32_t type = u32(kWave);|vc2osclite
+lite-set-loop-at|parts.loopRecord(u32(kLoopAt));\n    const uint32_t type = from[0];|parts.loopRecord(u32(kPairAt));\n    const uint32_t type = from[0];|vc2osclite
+lite-set-vo-type|if (type == kVariOffType) {|if (type == 1) {|vc2osclite
+lite-set-vo-range|{ u32(kFirst), u32(kFrames) - 1 }|{ u32(kFirst), u32(kFrames) }|vc2osclite
+lite-set-vo-sign|vc2OscSetVariOffSide(*this, w, 0.0f > f32(kWalk));|vc2OscSetVariOffSide(*this, w, f32(kWalk) > 0.0f);|vc2osclite
+lite-set-vo-both|vc2OscSetVariOffSide(*this, w, 0.0f > f32(kWalk));|vc2OscSetVariOff(*this, w);|vc2osclite
+lite-set-heads-type|if (type == kHeadsType) headsLoops|if (type == 1) headsLoops|vc2osclite
+lite-set-heads-two32|headsLoops(*this, loop, vc2OscTables().liteSettingsTwo32);|headsLoops(*this, loop, vc2OscTables().liteHalf);|vc2osclite
+side-start|    v.setU32(kStart, w.start);\n    v.setU32(kEnd, w.end);\n    if (backward)|    v.setU32(kStart, w.end);\n    v.setU32(kEnd, w.end);\n    if (backward)|vc2oscplayers
+side-bwd-mode|v.setU32(kBwdMode, w.bwdMode);|v.setU32(kBwdMode, w.fwdMode);|vc2oscplayers
+side-fwd-mode|v.setU32(kFwdMode, w.fwdMode);|v.setU32(kFwdMode, w.bwdMode);|vc2oscplayers
+side-both|    vc2OscSetVariOffSide(v, w, true);\n||vc2oscplayers
+lite-update-filter-pool-at|{ 0x893c84a0, &t.liteUpdateFilter }|{ 0x893c84a4, &t.liteUpdateFilter }|vc2osctables
+lite-settings-two32-pool-at|{ 0x893c8650, &t.liteSettingsTwo32 }|{ 0x893c8654, &t.liteSettingsTwo32 }|vc2osctables
+get-lite-way|settingsLite(s + kKindFrom / 4, parts);|settingsLite(s + kKindFrom / 4 + 1, parts);|vc2oscget
+voice-update-lite|case Vc2OscUpdate::lite: updateLite(parts, shared); return;|case Vc2OscUpdate::lite: return;|vc2osc

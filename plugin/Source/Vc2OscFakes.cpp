@@ -83,13 +83,13 @@ struct OscHook {
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
 // oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248), the carrier's init,
 // settings and render and kind 6's start and render (v266), the vibrato's four (v267), kinds 5's and 6's updates
-// (v321), the EXT IN player's update and two renders (v322) and Vari off's two renders (v323): rom.4's own run, and the
-// routines they call hooked
+// (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323) and LITE's update and
+// settings (v324): rom.4's own run, and the routines they call hooked
 const OscHook kHooks[] = {
-    { 0x893c8280, kKindCall, kindRoutine, none }, { 0x893c88b0, kKindCall, kindRoutine, none },
+    { 0x893c88b0, kKindCall, kindRoutine, none },
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
     { 0x893cbf40, kObjectCall, objectRoutine, none }, { 0x893cc0d0, kEventPosition, eventAt, positions },
-    { 0x893c8390, kKindSettings, routineSettings, none }, { 0x893b0280, kKindSettings, routineSettings, none },
+    { 0x893b0280, kKindSettings, routineSettings, none },
     // v238: the players' renders LITE's and VariPhrase's installs write (kind 1's mode 1, LITE's heads, SOLO's,
     // BACKING's, ENSEMBLE's, the period-jump player's; Vari off's two rom.4's own from v323)
     { 0x893c9f60, kRenderBy, renderBy, rendered }, { 0x893c6e80, kRenderBy, renderBy, rendered },

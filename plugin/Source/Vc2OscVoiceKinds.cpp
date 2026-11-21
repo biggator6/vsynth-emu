@@ -16,11 +16,12 @@ constexpr uint8_t kR0 = kVc2OscRamp0, kR1 = kVc2OscRamp1, kR2 = kVc2OscRamp2;
 // kind 3's (0x893c22e0) from v242 (Vc2OscAnalog.cpp), kinds 5's and 6's updates (0x893afff0, 0x893b0150) from v321
 // (Vc2OscNoteOn.cpp), kind 3's install, update and settings (0x893c2ad0, 0x893c2ce0,
 // 0x893c3460) from v248 (Vc2OscAnalogUpdate.cpp), the EXT IN player's update (0x893c6260; kinds 4 and 7, and kind 6's
-// first) and the two renders kinds 4's and 7's installs write (0x893c62e0, 0x893c61e0) from v322 (Vc2OscNoteOn.cpp)
+// first) and the two renders kinds 4's and 7's installs write (0x893c62e0, 0x893c61e0) from v322 (Vc2OscNoteOn.cpp),
+// kind 1's update and settings (0x893c8280, 0x893c8390) from v324 (Vc2OscLite.cpp)
 constexpr std::array<Vc2OscKindRow, kVc2OscKinds + 1> kRows { {
     { .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },
-    { .installs = Install::lite, .waits = true, .ticks = kR0 | kR2, .update = 0x893c8280,
-      .records = Records::fromBlock, .ramp = true, .settings = 0x893c8390, .pitch = Pitch::tuned,
+    { .installs = Install::lite, .waits = true, .ticks = kR0 | kR2, .updates = Vc2OscUpdate::lite,
+      .records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::lite, .pitch = Pitch::tuned,
       .noteOn = NoteOn::lite },
     { .installs = Install::vari, .waits = true, .ticks = kR0 | kR1 | kR2, .update = 0x893c88b0,
       .records = Records::fromBlock, .settings = 0x893b0280, .pitch = Pitch::tuned, .noteOn = NoteOn::vari },

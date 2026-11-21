@@ -129,6 +129,8 @@ int main(int argc, char** argv) {
                 c[kObjectCall], c[kEventPosition]);
     std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's\n",
                 n.extInBlocks, n.variOffBlocks);   // v322, v323
+    std::printf("lite: %ld settings on a type with a way; %ld inputs of two VariPhrase OSCs\n", n.liteSettings,
+                n.bothVari);   // v324
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

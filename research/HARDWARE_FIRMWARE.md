@@ -1546,6 +1546,71 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's LITE update and settings (2026-11-21, v324) {#vc2-osc-lite-update}
+
+Step 4.3's fifty-second version, the first half of item 11's fourth part: LITE's update and settings, kind 1's, are
+the voice's own (`Vc2OscVoice::updateLite`, `settingsLite`, in `Vc2OscLite.cpp` beside v240's note-on). They are its
+row's ways, `Vc2OscUpdate::lite` and `Vc2OscSettings::lite`. Until v324 they went out by address through `Vc2OscParts`.
+
+**The update, `0x893c8280(voice)`.** By the wave's type (+0x104); past 2 it does nothing. It writes into the object:
+- the tuned ratio (`0x893afb80`) into +0x1cc;
+- for type 0, the walk's and formant's targets (`0x893afc30`, `0x893afca0`) into +0x1d8 and +0x1d0; for types 1 and
+  2, the walk and the formant themselves (`0x893afdf0`, `0x893afeb0`);
+- the gain (`0x893aff30`) into +0x1dc;
+- for type 2 only, the heads' filter rate (+0x25c): the root's Hz × the pitch × its own pool word (`0x893c84a0`,
+  the note-on's value).
+
+Type 0's four are the note-on's first four targets, so the update takes those rows (`kTargets`).
+
+**The settings, `0x893c8390(voice, the settings' +0xb0)`.** The settings' words from there are the block's from +0xb0.
+- With +0x40 set, the object's 0x04 held and +0x3c clear: a seek pending (+0xa8c) and the gain's target (+0x1dc) 0.
+- With 0x04 clear and +0x3c set: the matched count's byte (+0x19d) 1.
+- With 0x02 clear and +0x38 set: the count's byte (+0x19c) 0.
+- The object's bits 0x04, 0x02 and 0x01 from +0x3c, +0x38 and +0x34, as the note-on takes them from the block
+  (`kBits`). None of these stores touches the flags byte, so rom.4's three re-reads of it read the same.
+- Then, by the settings' own type word, not the voice's, through the loop record. rom.4 reads it through the head the
+  note-on leaves at +0x1a0: the voice's own +0x108's address, so +0x28 there is the voice's +0x130. It reads it
+  whatever the type.
+  - Type 0: Vari off's range (+0x26c, +0x254) and one side. With the walk below 0, the backward loop and its mode;
+    else the forward's. The mode is the loop record's by the object's 0x01, where the note-on takes the block's
+    +0x148 for the backward one.
+  - Type 2: the heads' range and loops as floats with their modes, its own 2^32 (`0x893c8650`) for the unsigned
+    ones.
+  - Type 1 and past 2: nothing.
+
+The shared parts are factored out of the note-ons, not copied:
+- `headsLoops`, from v240's `twoHeads`;
+- `vc2OscVariOffLoops`, v238's `vc2OscVariOffOf` without the rate factors;
+- `vc2OscSetVariOffSide`, the range and one side, which `vc2OscSetVariOff` now calls for both.
+
+**The checks.** xt_vc2osc no longer hooks the two routines: rom.4's own run in the voice. Before a settings on a LITE
+voice (`oscSteerLiteSettings`, from the renders' generator):
+- the head's address is the voice's own +0x108's, as its note-on leaves it. rom.4 reads through it, so noise there
+  read rom.4's memory;
+- half the time the settings' type 0…2;
+- each of its four switches 0 or 1 half the time. As noise they were never 0, which left the seek's path unreached.
+
+xt_vc2tone does the same before an OSC settings. It also draws one note-on input in four with both OSCs VariPhrase
+(`toneOscBlockOfKind` on kind 2 and a type its install has a render for, from the renders' generator). With LITE's
+update its own, only VariPhrase's update (`0x893c88b0`, `0x893c8670`) still calls out, and a voice's update writes
+only its own words. So the tone's order of its two OSC updates shows only in the calls of a tone whose OSCs are both
+VariPhrase. Without the draw, v322's plant `update-osc-order` went unseen at 40 cases. The run's other counts move
+with the draw: what a note-on leaves decides later draws.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400):
+  - xt_vc2osc: 72, 592 and 599 LITE updates and 52, 591 and 601 settings on a type with a way;
+  - xt_vc2tone: 4, 18 and 22 settings; 342, 3214 and 3351 inputs of two VariPhrase OSCs.
+- `Vc2OscLite.cpp` and `Vc2OscPlayers.cpp` wholly reached, every line and branch.
+- `mutate_vc2.py --osc`: 41 new plants (the update's types, targets and filter rate, the settings' bits, side effects
+  and both types' ways, the shared sides and loops, the two pool words, the rows' ways) and 9 of v240's and the
+  kinds' rows rewritten on the new names; all 50 caught. The whole `--osc` list (1,332) and `--tone` list (754) caught,
+  `update-osc-order` among them again with the two-VariPhrase draw.
+
+**Next.** The second half of item 11's fourth part: LITE's object routine `0x893cbf40`, its heads' renders
+`0x893c6e80` and `0x893c6e8c` on `XtLitePlayer`, kind 1's mode 1 (`0x893c9f60`, its set-up `0x893cc760`) and its
+seeks.
+
 ### The VC-2's Vari off renders on the voice (2026-11-21, v323) {#vc2-osc-vari-off-joined}
 
 Step 4.3's fifty-first version, item 11's third part: Vari off's two renders, `0x893c63c0` (mono) and `0x893c66e0`

@@ -68,6 +68,9 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
     oscWriteVoice(s, v);
     ++s.n.updates;
+    constexpr uint32_t kLite = 1, kLiteTypes = 3;   // [FW] v324: LITE's kind and the wave types its update has ways for
+    const Vc2OscVoice& o = s.voices[(size_t)v];
+    s.n.liteUpdates += o.kind() == kLite && o.u32(Vc2OscVoice::kWave) < kLiteTypes;
     return oscBothSides(s, kUpdate, { oscVoiceAt(v), n }, Answer::none, [&] {
         s.voices[(size_t)v].update((int32_t)n, s.parts[(size_t)v], s.romShared);
         return 0u;
@@ -145,6 +148,8 @@ std::string onCount(OscSides& s, std::mt19937& rng, int v) {
 
 std::string onSettings(OscSides& s, std::mt19937& rng, int v) {
     oscDrawSettingsBlock(s.shared.settings, rng, s.voices[(size_t)v].u8(kOscBlockByte));
+    s.n.liteSettings += oscSteerLiteSettings(s.voices[(size_t)v], s.shared.settings, oscVoiceAt(v), s.shared.renders);
+    oscWriteVoice(s, v);   // v324
     s.fw.cpu.write(kOscSettingsAt, s.shared.settings.data(), sizeof s.shared.settings);
     ++s.n.settings;
     s.n.carrierSettings += s.voices[(size_t)v].kind() == kCarrierKind;

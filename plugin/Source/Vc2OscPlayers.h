@@ -26,10 +26,14 @@ struct Vc2OscFrames {
 // 0x01 (else 0) and its rate factors, exp2(rate / `tenths`)
 Vc2OscVariOff vc2OscVariOffOf(const Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared, float tenths,
                               Vc2OscFrames range);
+// Those words but the rate factors, from a loop record already read (v324: LITE's settings' type 0 too)
+Vc2OscVariOff vc2OscVariOffLoops(const Vc2OscVoice& v, const Vc2OscLoopRecord& loop, Vc2OscFrames range);
 // A loop's rate factor: exp2(rate / `tenths`), its rate in tenths of a cent
 float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths);
-// `w` into the object's words
+// `w` into the object's words; and (v324, LITE's settings' type 0) the range with one side, the backward loop and its
+// mode or the forward's
 void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w);
+void vc2OscSetVariOffSide(Vc2OscVoice& v, const Vc2OscVariOff& w, bool backward);
 // Then the samples' address, 0 and 1 beside it, the position the walk's sign starts from (the last if it's below 0, else
 // the first) and its copy; the position
 uint32_t vc2OscVariOffStart(Vc2OscVoice& v);

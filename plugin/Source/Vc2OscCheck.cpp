@@ -213,6 +213,7 @@ int main(int argc, char** argv) {
                 "an event\n", n.seeks, n.kindCalls, n.lookups, n.objectCalls, n.gliding);
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's\n", n.extInBlocks,
                 n.variOffBlocks);   // v322, v323
+    std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;
 }

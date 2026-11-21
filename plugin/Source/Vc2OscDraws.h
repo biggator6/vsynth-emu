@@ -121,6 +121,11 @@ bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders);
 void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
 void oscDrawWave(Vc2Fw& fw, OscShared& shared);
+// v324: before a settings on a LITE voice (kind 1), the head's address (+0x1a0) the voice's own +0x108's at `voiceAt`,
+// as its note-on leaves it (LITE's settings read the loop record through it, whatever the type), and the settings'
+// type word (+0xb0) 0…2 half the time, the types with a way, and each of its four switches (+0x34…+0x40 from there) 0
+// or 1 half the time, as a converter gives them; whether it is LITE's and its type has one
+bool oscSteerLiteSettings(Vc2OscVoice& o, std::span<uint32_t> settings, uint32_t voiceAt, std::mt19937& rng);
 std::string oscRingSetUp(const OscRingSides& r);
 std::string oscRingCase(const OscRingSides& r, std::mt19937& rng);
 std::string oscRingBlock(const OscRingSides& r, std::mt19937& rng);

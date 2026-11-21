@@ -17,8 +17,8 @@ enum class Vc2OscNoteOn : uint8_t { none, one, extIn, carrier, kind6, vari, lite
 enum class Vc2OscInstall : uint8_t { frame, lite, vari, analog };
 // 0x893ae1c0's and 0x893ae780's last steps (v248): the kind's update and settings by their addresses, or the analog's
 // ported; from v321 kinds 5's and 6's updates ported too, from v322 the EXT IN player's
-enum class Vc2OscUpdate : uint8_t { routine, analog, carrier, kind6, extIn };
-enum class Vc2OscSettings : uint8_t { routine, analog };
+enum class Vc2OscUpdate : uint8_t { routine, analog, carrier, kind6, extIn, lite };   // lite from v324
+enum class Vc2OscSettings : uint8_t { routine, analog, lite };
 
 struct Vc2OscKindRow {
     Vc2OscInstall installs = Vc2OscInstall::frame;   // 0x893ae0f0: its own install in the frame's place, or none

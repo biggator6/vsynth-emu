@@ -86,9 +86,9 @@ constexpr uint32_t kSubOn = 0x138;   // [FW] the sub oscillator's switch, a floa
 // VariPhrase's 1, 3, 5, 6 and 8 (0x893af7a0's, 0x893af870's), the analog's codes 0…10 (0x893c2ad0's; xt_vc2osc's draws
 // pass them now and then, for its routines' defaults).  On the others an install writes none, and rom.4 would render
 // through the word the voice's last use left, 0 in a fresh one
+constexpr std::array<uint32_t, 5> kVariTypes { 1, 3, 5, 6, 8 };
 void installedWave(In& in, int osc, std::mt19937& rng) {
     constexpr uint32_t kLiteTypes = 3, kCodes = 11;
-    constexpr std::array<uint32_t, 5> kVariTypes { 1, 3, 5, 6, 8 };
     uint32_t* b = oscBlockIn(in, osc);
     if (b[0] == kLite) b[kWaveWord] = rng() % kLiteTypes;
     if (b[0] == kVari) b[kWaveWord] = kVariTypes[rng() % kVariTypes.size()];
@@ -154,6 +154,15 @@ void toneDrawOscBlocks(ToneSides& s, std::mt19937& rng) {
         installedWave(in, osc, rng);
         bindNumbersOfKind(in, osc, rng);
         headsOnRealWave(s, in, osc, rng);
+    }
+    // v324: with LITE's update its own, a tone's two OSC updates call out only on VariPhrase, so the order of the two
+    // shows only where both are; one note-on in four makes them so, from the renders' generator (the run's draws stay)
+    std::mt19937& renders = s.shared.osc.renders;
+    if (renders() % 4 == 0) {
+        for (int osc = 0; osc < 2; ++osc) {
+            toneOscBlockOfKind(s, osc, kVari, kVariTypes[renders() % kVariTypes.size()], renders);
+        }
+        ++s.n.bothVari;
     }
     oscWriteRecords(s.fw, s.shared.osc.records);
     toneDrawOscRamp(in, rng);
@@ -261,10 +270,16 @@ void toneSteerRenders(ToneSides& s, int i) {
 
 void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng) {
     std::array<uint32_t, kOscBlockWords>& settings = s.shared.osc.settings;
-    const Vc2OscVoice& v = oscOfTone(s, i, osc < 2 ? (int)osc : 0);
+    const int which = osc < 2 ? (int)osc : 0;
+    Vc2OscVoice& v = oscOfTone(s, i, which);
     oscDrawSettingsBlock(settings, rng, v.u8(kOscBlockByte));
     if (osc < 2 && v.kind() == kAnalog) {   // v248: its settings read the analog's words, as its converter gives them
         for (const auto& [at, bits] : oscAnalogWords(rng)) settings[(at - Vc2OscVoice::kOwn) / 4] = bits;
+    }
+    if (osc < 2) {   // v324: LITE's settings read the loop record through the head its note-on leaves
+        const uint32_t at = toneOscAt(s.pool.addressOf(i), which);
+        s.n.liteSettings += oscSteerLiteSettings(v, settings, at, s.shared.osc.renders);
+        writeToneOsc(s, i, which);
     }
     s.fw.cpu.write(kOscSettingsAt, settings.data(), sizeof settings);
     s.n.oscSettings += osc < 2;

@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's LITE update and settings v324 (2026-11-21, on claude/vc2-part-4-3 after v323; HARDWARE_FIRMWARE.md, "The
+  VC-2's LITE update and settings"): step 4.3's fifty-second version, item 11's fourth part's first half. rom.4's
+  0x893c8280 (the tuned ratio, walk, formant and gain into the object by the wave's type, type 0 the targets, type 2's
+  filter rate on its own pool word) and 0x893c8390 (the object's bits 0x04, 0x02, 0x01 from the settings with their
+  side effects, then by the settings' type Vari off's range and one side by the walk's sign, or the heads' range and
+  loops) are the voice's own (Vc2OscLite.cpp), kind 1's row's ways Vc2OscUpdate::lite and Vc2OscSettings::lite; what
+  they share with the note-ons factored out (headsLoops, vc2OscVariOffLoops, vc2OscSetVariOffSide). xt_vc2osc no
+  longer hooks them; before a LITE settings the head's address the voice's own +0x108's (rom.4 reads the loop record
+  through it), the settings' type 0…2 and its four switches 0 or 1 half the time; xt_vc2tone the same, and one input
+  in four with both OSCs VariPhrase, the only kind whose update still calls out, so the order of a tone's two OSC
+  updates shows (v322's update-osc-order went unseen without it). 0 different at seeds 2024, 7 and 31337. Not in the
+  sound yet.
+
 The VC-2's Vari off renders on the voice v323 (2026-11-21, on claude/vc2-part-4-3 after v322; HARDWARE_FIRMWARE.md,
   "The VC-2's Vari off renders on the voice"): step 4.3's fifty-first version, item 11's third part. rom.4's
   0x893c63c0 and 0x893c66e0, v261's ports, are the voice's own, on the wave its object's +0xf4 points into, which comes

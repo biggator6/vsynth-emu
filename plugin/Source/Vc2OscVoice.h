@@ -130,6 +130,9 @@ public:
     void installVari();
     void noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void noteOnLite(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c7c30 (v240, Vc2OscLite.cpp)
+    // v324 (Vc2OscLite.cpp): LITE's update 0x893c8280 and settings 0x893c8390 (given the settings' +0xb0)
+    void updateLite(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void settingsLite(const uint32_t* from, Vc2OscParts& parts);
     void noteOnAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)
     // v248 (Vc2OscAnalogUpdate.cpp): the analog's install 0x893c2ad0, update 0x893c2ce0 and settings 0x893c3460
     // (given the settings' +0xb0)

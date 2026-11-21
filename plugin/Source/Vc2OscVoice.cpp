@@ -107,6 +107,7 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
         case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;
         case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;
         case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;
+        case Vc2OscUpdate::lite: updateLite(parts, shared); return;   // v324
         case Vc2OscUpdate::routine: break;
     }
     if (row.update != 0) parts.kindCall(row.update);

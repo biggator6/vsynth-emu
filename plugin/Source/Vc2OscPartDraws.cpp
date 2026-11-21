@@ -170,6 +170,19 @@ void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng) {
     }
 }
 
+bool oscSteerLiteSettings(Vc2OscVoice& o, std::span<uint32_t> settings, uint32_t voiceAt, std::mt19937& rng) {
+    constexpr uint32_t kLite = 1, kHeadAt = 0x1a0, kHeadOf = 0x108, kTypeWord = 0xb0 / 4, kTypes = 3;   // [FW]
+    // [FW] the settings' switches LITE's settings test, from its +0xb0: the three bits' and the seek's ask
+    constexpr std::array<uint32_t, 4> kSwitches { 0x34, 0x38, 0x3c, 0x40 };
+    if (o.kind() != kLite) return false;
+    o.setU32(kHeadAt, voiceAt + kHeadOf);
+    if (rng() % 2) settings[kTypeWord] = (uint32_t)(rng() % kTypes);
+    for (uint32_t at : kSwitches) {
+        if (rng() % 2) settings[kTypeWord + at / 4] = rng() % 2;
+    }
+    return settings[kTypeWord] < kTypes;
+}
+
 void oscDrawWave(Vc2Fw& fw, OscShared& shared) {
     oscDrawHalfwords(shared.wave, shared.renders);
     fw.cpu.write(kOscWaveAt, shared.wave.data(), shared.wave.size() * sizeof(int16_t));

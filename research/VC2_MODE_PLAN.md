@@ -979,6 +979,11 @@ version against rom.4's routines with what it calls hooked:
          points into, through `Vc2OscParts::waveSamples`; the voice's renders one table by address (`renderOwn`, the
          EXT IN two its rows too), any other still out; their hooks out of xt_vc2osc, v261's draws of the wave and the
          words shared (HARDWARE_FIRMWARE.md, "The VC-2's Vari off renders on the voice"). Next: LITE.
+       - LITE's update and settings (v324): `0x893c8280` (the targets into the object by the wave's type, type 2's
+         filter rate) and `0x893c8390` (the object's three bits and their side effects, then type 0's Vari off side
+         or type 2's heads' loops through the record the note-on's head names), kind 1's row's ways; the parts they
+         share with the note-ons factored out of them (HARDWARE_FIRMWARE.md, "The VC-2's LITE update and settings").
+         Next: LITE's object routine, heads' renders, mode 1 and seeks.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -27,7 +27,7 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893c7f64, &t.liteTenths }, { 0x893c81ec, &t.liteHeadsTenths }, { 0x893c81e4, &t.liteTwo32 },
         { 0x893c81f0, &t.litePeriod }, { 0x893c81f4, &t.liteHalf }, { 0x893c81f8, &t.liteFilter },
         { 0x893c6420, &t.variOffScale }, { 0x893c6764, &t.variOffFold }, { 0x893c6424, &t.variOffGlide },
-        { 0x893c6428, &t.variOffFade },
+        { 0x893c6428, &t.variOffFade }, { 0x893c84a0, &t.liteUpdateFilter }, { 0x893c8650, &t.liteSettingsTwo32 },
     });
 }
 // [FW] each word where its routine reads it; an address of 0 is a word the routine doesn't read, left 0

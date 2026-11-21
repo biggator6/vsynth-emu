@@ -150,24 +150,37 @@ float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths) {
     return shared.exp2(div(xtf::flt(rate), tenths));
 }
 
-Vc2OscVariOff vc2OscVariOffOf(const Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared, float tenths,
-                              Vc2OscFrames range) {
-    const Vc2OscLoopRecord loop = parts.loopRecord(v.u32(kLoopAt));
+Vc2OscVariOff vc2OscVariOffLoops(const Vc2OscVoice& v, const Vc2OscLoopRecord& loop, Vc2OscFrames range) {
     const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;
     return { .start = range.first, .end = range.last, .loopStart = (uint32_t)loop.loopStart,
              .loopEnd = (uint32_t)loop.loopEnd, .bwdEnd = (uint32_t)loop.bwdEnd, .bwdStart = (uint32_t)loop.bwdStart,
-             .fwdMode = modes ? (uint32_t)loop.fwdMode : 0, .bwdMode = modes ? (uint32_t)loop.bwdMode : 0,
-             .fwdRate = vc2OscLoopRate(loop.rateFwd, shared, tenths),
-             .bwdRate = vc2OscLoopRate(loop.rateBwd, shared, tenths) };
+             .fwdMode = modes ? (uint32_t)loop.fwdMode : 0, .bwdMode = modes ? (uint32_t)loop.bwdMode : 0 };
+}
+
+Vc2OscVariOff vc2OscVariOffOf(const Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared, float tenths,
+                              Vc2OscFrames range) {
+    const Vc2OscLoopRecord loop = parts.loopRecord(v.u32(kLoopAt));
+    Vc2OscVariOff w = vc2OscVariOffLoops(v, loop, range);
+    w.fwdRate = vc2OscLoopRate(loop.rateFwd, shared, tenths);
+    w.bwdRate = vc2OscLoopRate(loop.rateBwd, shared, tenths);
+    return w;
+}
+
+void vc2OscSetVariOffSide(Vc2OscVoice& v, const Vc2OscVariOff& w, bool backward) {
+    v.setU32(kStart, w.start);
+    v.setU32(kEnd, w.end);
+    if (backward) {
+        setLoop(v, kBwd, w.bwdEnd, w.bwdStart, w.bwdEnd - w.bwdStart);
+        v.setU32(kBwdMode, w.bwdMode);
+    } else {
+        setLoop(v, kLoop, w.loopStart, w.loopEnd, w.loopEnd - w.loopStart);
+        v.setU32(kFwdMode, w.fwdMode);
+    }
 }
 
 void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w) {
-    v.setU32(kStart, w.start);
-    v.setU32(kEnd, w.end);
-    setLoop(v, kLoop, w.loopStart, w.loopEnd, w.loopEnd - w.loopStart);
-    setLoop(v, kBwd, w.bwdEnd, w.bwdStart, w.bwdEnd - w.bwdStart);
-    v.setU32(kFwdMode, w.fwdMode);
-    v.setU32(kBwdMode, w.bwdMode);
+    vc2OscSetVariOffSide(v, w, false);
+    vc2OscSetVariOffSide(v, w, true);
     v.setF32(kRateFwd, w.fwdRate);
     v.setF32(kRateBwd, w.bwdRate);
 }
