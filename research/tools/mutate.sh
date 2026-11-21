@@ -34,51 +34,7 @@ N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 IMAGE="$ROM"   # what the planted binary runs on: rom.2, but rom.4 for PORT=vc2params (v199) and vc2in (v208)
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
 source "$(dirname "$0")/objects.sh"   # keptObject: the fx ports' objects, by their source and every header
-# A tone port's file, planted under xt_tone; nothing for any other port
-tonefile() {
-    case "$1" in
-        tone) echo XtSynth.cpp ;;
-        tonecosm) echo XtCosm.cpp ;;
-        toneanalog) echo XtAnalog.cpp ;;
-        toneband) echo XtMultiBandPlayer.cpp ;;
-        tonecheck) echo XtToneCheck.cpp ;;
-        tonefw) echo XtFirmware.cpp ;;
-        toneosc) echo XtOsc.cpp ;;
-        tonelfo) echo XtLfo.cpp ;;
-        toneenv) echo XtEnvelope.cpp ;;
-        tonesolo) echo XtSoloVoice.cpp ;;
-        tonelin) echo XtLinearPlayer.cpp ;;
-        tonelite) echo XtLitePlayer.cpp ;;
-        tonepatch) echo XtPatch.cpp ;;
-        tonefiles) echo XtFiles.cpp ;;
-        tonewave) echo XtWaveFile.cpp ;;
-        tonestore) echo XtPatchStore.cpp ;;
-        tonearp) echo XtSynthArp.cpp ;;
-        toneknobs | wireknobs) echo XtSynthKnobs.cpp ;;
-        toneenvknobs | wireenvknobs) echo XtSynthEnvKnobs.cpp ;;
-        toneupdate | wireupdate) echo XtSynthUpdate.cpp ;;
-        tonezones | wirezones) echo XtSynthZones.cpp ;;
-        tonenotes | wirenotes) echo XtSynthNotes.cpp ;;
-        wiremsm) echo XtSynthMsm.cpp ;;
-        wirearp) echo XtSynthArp.cpp ;;
-        wirecheck) echo XtToneMsm.cpp ;;
-        wirefwmsm) echo XtToneFwMsm.h ;;
-        tonefwcpp) echo XtToneFirmware.cpp ;;
-        tonefwh) echo XtToneFirmware.h ;;
-        tonecases) echo XtToneCases.cpp ;;
-        tonepatchids) echo XtTonePatchIds.cpp ;;
-        tonecarry) echo XtToneCarry.cpp ;;
-        tonestart) echo XtSynthStart.cpp ;;
-        toneoscstart) echo XtSynthOscStart.cpp ;;
-        tonetrip) echo XtSynthTrip.cpp ;;
-        toneblock) echo XtSynthBlock.cpp ;;
-        tonetva) echo XtSynthTva.cpp ;;
-        toneclock) echo XtSynthClock.cpp ;;
-        toneconsts) echo XtSynthConstants.h ;;
-        toneextin) echo XtExtIn.cpp ;;
-        toneout) echo XtSynthOut.cpp ;;   # its output, busOut and render (v204)
-    esac
-}
+source "$(dirname "$0")/mutate_tonefile.sh"   # tonefile: a tone port's file (moved as it stood, so mutate_tone.py reads it too)
 source "$(dirname "$0")/mutate_parts.sh"   # harnessParts, fxParts: a harness's kept objects (moved as they stood, v208)
 source "$(dirname "$0")/mutate_vc2ports.sh"   # vc2Port: rom.4's ports and their checks (moved as they stood, v220)
 source "$(dirname "$0")/vc2_tables.sh"   # vc2Tables: rom.4's tables, which XtSynthRom.cpp loads (v231)
