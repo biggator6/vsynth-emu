@@ -75,7 +75,7 @@ update-waits-always|    if (row.waits && tail.seekPending != 0) {|    if (tail.s
 update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTables().waitLevel|vc2osc
 update-wait-no-return|vc2OscTables().waitLevel) return;|vc2OscTables().waitLevel) {}|vc2osc
 update-no-reseek|        reseek(parts);\n||vc2osc
-update-first-after|    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);\n    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }|    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }\n    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);|vc2osc
+update-first-after|    if (row.extInFirst) updateExtIn(parts, shared);   // v322: 0x893c6260\n    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }|    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }\n    if (row.extInFirst) updateExtIn(parts, shared);|vc2osc
 update-no-update|    if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
 reseek-no-hold|setU8(kFlags, (uint8_t)(was \| kHeld));|setU8(kFlags, was);|vc2osc
 reseek-at-unsigned|(int32_t)u32(kSeekAt) >> kSeekShift|(int32_t)(u32(kSeekAt) >> kSeekShift)|vc2osc
@@ -132,7 +132,7 @@ render-zero-short|std::fill(out, out + kOut, 0.0f)|std::fill(out, out + kOut / 2
 render-third-sync|parts.renderBy(tail.render, out, kRenderThird)|parts.renderBy(tail.render, out, tail.sync)|vc2osc
 render-analog-sync|parts.renderBy(tail.renderAnalog, out, tail.sync)|parts.renderBy(tail.renderAnalog, out, kRenderThird)|vc2osc
 render-analog-answer|return parts.renderBy(tail.renderAnalog, out, tail.sync);|parts.renderBy(tail.renderAnalog, out, tail.sync); return 0;|vc2osc
-render-by-answer|parts.renderBy(tail.render, out, kRenderThird); return 0;|return parts.renderBy(tail.render, out, kRenderThird);|vc2osc
+render-by-answer|parts.renderBy(tail.render, out, kRenderThird);\n            return 0;|return parts.renderBy(tail.render, out, kRenderThird);\n            return 0;|vc2osc
 take-gate-ignored|if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;|if (u32(kTakeGate) == 0) return;|vc2osc
 take-legato-ignored|if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;|if (false) return;|vc2osc
 take-source-ignored|    if (from.u8(kObject + kSourceByte) == 1) return;\n||vc2osc
@@ -219,8 +219,8 @@ k3-pitch|.renders = Render::byAnalog, .pitch = Pitch::bounded|.renders = Render:
 k4-render|.render = 0x893c62e0|.render = 0x893c61e0|vc2osckinds
 k4-installed|.render = 0x893c62e0, .installed = 4|.render = 0x893c62e0, .installed = 5|vc2osckinds
 k4-ticks|.render = 0x893c62e0, .installed = 4, .ticks = kR0,|.render = 0x893c62e0, .installed = 4,|vc2osckinds
-k4-update|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893c6260|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893afff0|vc2osckinds
-k4-flag|.update = 0x893c6260, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|.update = 0x893c6260,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|vc2osckinds
+k4-update|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::routine|vc2osckinds
+k4-flag|.updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|.updates = Vc2OscUpdate::extIn,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|vc2osckinds
 k5-installed|{ .installed = 5|{ .installed = 6|vc2osckinds
 k5-update|.updates = Vc2OscUpdate::carrier|.updates = Vc2OscUpdate::routine|vc2osckinds
 k5-ramp|.updates = Vc2OscUpdate::carrier, .ramp = true,|.updates = Vc2OscUpdate::carrier,|vc2osckinds
@@ -228,7 +228,7 @@ k5-carrier|.ramp = true, .carrier = true,|.ramp = true,|vc2osckinds
 k5-renders|.renders = Render::carrier|.renders = Render::kind6|vc2osckinds
 k5-pitch|.renders = Render::carrier, .pitch = Pitch::bounded|.renders = Render::carrier, .pitch = Pitch::none|vc2osckinds
 k6-installed|{ .installed = 6|{ .installed = 5|vc2osckinds
-k6-first|.updateFirst = 0x893c6260, ||vc2osckinds
+k6-first|.extInFirst = true, ||vc2osckinds
 k6-ticks|.ticks = kR0 \| kR1, .updates = Vc2OscUpdate::kind6|.ticks = kR0, .updates = Vc2OscUpdate::kind6|vc2osckinds
 k6-update|.updates = Vc2OscUpdate::kind6|.updates = Vc2OscUpdate::routine|vc2osckinds
 k6-ramp|.updates = Vc2OscUpdate::kind6, .ramp = true,|.updates = Vc2OscUpdate::kind6,|vc2osckinds
@@ -236,8 +236,8 @@ k6-renders|.renders = Render::kind6|.renders = Render::carrier|vc2osckinds
 k6-pitch|.renders = Render::kind6, .pitch = Pitch::bounded|.renders = Render::kind6, .pitch = Pitch::tuned|vc2osckinds
 k7-render|.render = 0x893c61e0|.render = 0x893c62e0|vc2osckinds
 k7-installed|.render = 0x893c61e0, .installed = 4|.render = 0x893c61e0, .installed = 6|vc2osckinds
-k7-update|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .update = 0x893c6260|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .update = 0x893afff0|vc2osckinds
-k7-flag|.update = 0x893c6260, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|.update = 0x893c6260,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|vc2osckinds
+k7-update|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::routine|vc2osckinds
+k7-flag|.updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|.updates = Vc2OscUpdate::extIn,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|vc2osckinds
 beyond-flag|{ .clearsFlag = true, .records = Records::atZero }|{ .records = Records::atZero }|vc2osckinds
 beyond-renders|{ .clearsFlag = true, .records = Records::atZero }|{ .clearsFlag = true, .records = Records::atZero, .renders = Render::zero }|vc2osckinds
 row-beyond-index|kind < (uint32_t)kVc2OscKinds ? kind : kVc2OscKinds|kind < (uint32_t)kVc2OscKinds ? kind : 0|vc2osckinds
@@ -1305,3 +1305,38 @@ k6-updates-carrier|.updates = Vc2OscUpdate::kind6|.updates = Vc2OscUpdate::carri
 voice-update-no-carrier|case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;|case Vc2OscUpdate::carrier: return;|vc2osc
 voice-update-no-kind6|case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;|case Vc2OscUpdate::kind6: return;|vc2osc
 voice-update-swapped|case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;|case Vc2OscUpdate::carrier: updateKind6(parts, shared); return;|vc2osc
+# v322: the EXT IN player, its update 0x893c6260 and renders 0x893c62e0 and 0x893c61e0 (vc2oscnoteon), its rows
+# (vc2osckinds: v322 rewrote k4-update, k4-flag, k6-first, k7-update and k7-flag on the rows' `.updates` and
+# `.extInFirst`) and the voice's way to them (vc2osc: v322 rewrote update-first-after and render-by-answer).  The
+# player's law itself is rom.2's XtExtInPlayer (v203, tone_muts.txt's extin plants), and three of its own here through
+# xt_vc2osc (vc2xtextin, XtExtIn.cpp).  Not planted: the analog's render word (+0xa48) through the EXT IN's way, which
+# only the analog's installs write, with its own renders
+extin-update-ratio|setF32(kObjectPitch, targets.ratio());|setF32(kObjectPitch, targets.tunedRatio());|vc2oscnoteon
+extin-update-gain|setF32(kObjectGain, targets.gain());\n}|setF32(kObjectGain, targets.level());\n}|vc2oscnoteon
+extin-update-no-pitch|    setF32(kObjectPitch, targets.ratio());\n||vc2oscnoteon
+extin-update-no-gain|    setF32(kObjectGain, targets.gain());\n}|}|vc2oscnoteon
+extin-stereo-left|{ 0x893c62e0, 0, 1 }|{ 0x893c62e0, 4, 1 }|vc2oscnoteon
+extin-stereo-right|{ 0x893c62e0, 0, 1 }|{ 0x893c62e0, 0, 5 }|vc2oscnoteon
+extin-stereo-at|{ 0x893c62e0, 0, 1 }|{ 0x893c62e4, 0, 1 }|vc2oscnoteon
+extin-mono-left|{ 0x893c61e0, 4, 4 }|{ 0x893c61e0, 0, 4 }|vc2oscnoteon
+extin-mono-right|{ 0x893c61e0, 4, 4 }|{ 0x893c61e0, 4, 5 }|vc2oscnoteon
+extin-mono-at|{ 0x893c61e0, 4, 4 }|{ 0x893c61e4, 4, 4 }|vc2oscnoteon
+extin-frames|kFrames = 32, kFrameWords = 8|kFrames = 31, kFrameWords = 8|vc2oscnoteon
+extin-frame-words|kFrames = 32, kFrameWords = 8|kFrames = 32, kFrameWords = 7|vc2oscnoteon
+extin-left-is-right|frames[kFrameWords * i + render->left];|frames[kFrameWords * i + render->right];|vc2oscnoteon
+extin-right-is-left|frames[kFrameWords * i + render->right];|frames[kFrameWords * i + render->left];|vc2oscnoteon
+extin-start-target|player.noteOn(f32(kObjectLevel), f32(kObjectGain));|player.noteOn(f32(kObjectGain), f32(kObjectGain));|vc2oscnoteon
+extin-target-level|player.noteOn(f32(kObjectLevel), f32(kObjectGain));|player.noteOn(f32(kObjectLevel), f32(kObjectLevel));|vc2oscnoteon
+extin-no-level-back|    setF32(kObjectLevel, player.gainNow());\n||vc2oscnoteon
+extin-level-to-target|setF32(kObjectLevel, player.gainNow());|setF32(kObjectGain, player.gainNow());|vc2oscnoteon
+extin-other-taken|if (render == kExtInRenders.end()) return false;|if (render == kExtInRenders.end()) return true;|vc2oscnoteon
+k4-updates-kind6|.ticks = kR0, .updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|.ticks = kR0, .updates = Vc2OscUpdate::kind6, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|vc2osckinds
+k7-updates-analog|.ticks = kR0, .updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|.ticks = kR0, .updates = Vc2OscUpdate::analog, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|vc2osckinds
+k6-first-on-5|{ .installed = 5, .ticks = kR0,|{ .installed = 5, .extInFirst = true, .ticks = kR0,|vc2osckinds
+voice-update-no-extin|case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;|case Vc2OscUpdate::extIn: return;|vc2osc
+voice-update-first-never|if (row.extInFirst) updateExtIn(parts, shared);|if (!row.extInFirst) updateExtIn(parts, shared);|vc2osc
+voice-render-extin-off|if (!renderExtIn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);|parts.renderBy(tail.render, out, kRenderThird);|vc2osc
+voice-render-extin-only|if (!renderExtIn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);|renderExtIn(tail.render, out, parts);|vc2osc
+xtextin-glide|constexpr float kGlide = 0x1p-5f;|constexpr float kGlide = 0x1p-4f;|vc2xtextin
+xtextin-no-glide|        gain_ = add(mul(sub(target_, gain_), kGlide), gain_);|        gain_ = target_;|vc2xtextin
+xtextin-sides|        lr[2 * i + 1] = mul(flt(in[2 * i + 1]), gain_);|        lr[2 * i + 1] = mul(flt(in[2 * i]), gain_);|vc2xtextin

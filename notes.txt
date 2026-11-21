@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's EXT IN player v322 (2026-11-20, on claude/vc2-part-4-3 after v321; HARDWARE_FIRMWARE.md, "The VC-2's
+  EXT IN player"): step 4.3's fiftieth version, item 11's second part. rom.4's update 0x893c6260 (the ratio and gain
+  into the object; kinds 4 and 7, and kind 6's first, a row's flag extInFirst where an address was) and its renders
+  0x893c62e0 (words 0 and 1) and 0x893c61e0 (word 4 on both sides) are the voice's (Vc2OscNoteOn.cpp), the renders on
+  v203's XtExtInPlayer, rom.2's player's law, found by the address the install writes (renderExtIn); the frames come
+  through Vc2OscParts::inputFrames ([0x8993eadc], the part mixer's input), the tone host's link the deriving class's.
+  xt_vc2osc no longer hooks them; the frames are drawn from a generator of their own, so the run's other draws stay,
+  and a level or target past ±1 is drawn again within 0…1 before a render through the player (a NaN's sign is
+  xtf::sub's otherwise, and the tone's delay mix reads past its lines on an OSC 2 past full scale: seed 7 crashed
+  there). 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's kinds 5 and 6 updates on the voice v321 (2026-11-20, on claude/vc2-part-4-3 after v320; HARDWARE_FIRMWARE.md,
   "The VC-2's kinds 5 and 6 updates on the voice"): step 4.3's forty-ninth version, item 11's first part (the OSC
   kinds' routines still by rom.4's address, before Vc2Synth's 24 hosts: the user's choice). Kind 5's update

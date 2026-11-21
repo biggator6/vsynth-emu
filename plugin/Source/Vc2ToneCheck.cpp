@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
     }
     Vc2TonePool pool;
     ToneShared shared;
+    shared.osc.extIn.seed(~(uint32_t)run->seed);   // v322: the EXT IN's generator of its own, from the run's seed
     shared.pool = &pool;
     const ToneMath math(fw);   // v319: the OSC voices' shared routines, rom.4's own
     shared.math = &math;
@@ -126,6 +127,7 @@ int main(int argc, char** argv) {
                 "%ld seeks, %ld object setups, %ld event lookups\n", k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7],
                 n.oscSteadied, n.oscSettings, n.micBlocks, c[kKindCall], c[kKindSettings], c[kRenderBy], c[kSeek],
                 c[kObjectCall], c[kEventPosition]);
+    std::printf("ext in: %ld renders with an OSC through the EXT IN player's\n", n.extInBlocks);   // v322
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

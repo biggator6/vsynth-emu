@@ -968,6 +968,13 @@ version against rom.4's routines with what it calls hooked:
          kinds 5 and 6 updates on the voice"). Found: those words lie over the block's record pointers a player's
          note-on reads; the pitch ramp's gain factor is 1 in the part, nothing calling the restart that gives it a
          depth. Next: the EXT IN player.
+       - The EXT IN player (v322): its update `0x893c6260` (the ratio and gain into the object; kinds 4 and 7, and
+         kind 6's first, a row's flag `extInFirst` where an address was) and its renders `0x893c62e0` and `0x893c61e0`
+         on v203's `XtExtInPlayer`, found by the address the install writes (`renderExtIn`), the frames through
+         `Vc2OscParts::inputFrames` (`[0x8993eadc]`, the part mixer's input); their hooks out of xt_vc2osc
+         (HARDWARE_FIRMWARE.md, "The VC-2's EXT IN player"). Found: rom.4's stereo render is rom.2's player's code on
+         the frame's words 0 and 1, and the mono one the same on word 4; the player's output must stay within full
+         scale for the tone's delay mix, which moves its delay by it. Next: Vari off's renders.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -173,6 +173,9 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
         const std::string mic = oscMicBlock(s, rng);
         if (!mic.empty()) return mic;
     }
+    s.n.extInBlocks += oscPlaysExtIn(s.voices[(size_t)v]);   // v322
+    oscSteerExtIn(s.voices[(size_t)v], s.shared.extIn);
+    oscWriteVoice(s, v);
     std::string what = oscBothSides(s, kRender, { oscVoiceAt(v), kOscOutAt }, Answer::r0, [&] {
         return s.voices[(size_t)v].render(s.shared.out.data(), s.parts[(size_t)v]);
     });

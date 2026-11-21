@@ -97,6 +97,7 @@ std::string toneRenderOf(ToneSides& s, int i, std::mt19937& rng) {
     std::string what = toneMixPrepareRender(s, i, rng);
     if (what.empty()) what = toneFeedMic(s, i, rng);   // v319
     if (!what.empty()) return what;
+    toneSteerExtIn(s, i);   // v322
     toneDrawOut(s, rng);   // v317: the TVA renders into it
     float* out = s.shared.out.data();
     const std::initializer_list<uint32_t> args = { s.pool.addressOf(i), kToneOutAt };

@@ -72,6 +72,7 @@ int32_t Vc2ToneOscLink::osClock() { return outside().osClock(); }
 Vc2MicRing& Vc2ToneOscLink::micRing() { return outside().micRing(); }
 const float* Vc2ToneOscLink::unvoiced() { return outside().unvoiced(); }
 float Vc2ToneOscLink::inputPeak() { return outside().inputPeak(); }
+const int32_t* Vc2ToneOscLink::inputFrames() { return outside().inputFrames(); }
 
 // A bound part in the tone, its envelopes' and LFOs', the host's; any other address, a wave's record, outside it
 float Vc2ToneOscLink::boundFloat(uint32_t part, uint32_t offset) {

@@ -61,13 +61,13 @@ VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePor
          Vc2PitchRamp Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa
          Vc2OscAnalogSub Vc2OscAnalogShape Vc2OscAnalogUpdate Vc2OscVibrato Vc2Carrier Vc2CarrierTables Vc2Kind6
          Vc2Kind6Core Vc2Kind6Tables Vc2OscDraws Vc2OscPartDraws Vc2OscRecords Vc2OscFakes Vc2OscPortParts
-         Vc2VocoderOsc)
+         Vc2VocoderOsc XtExtIn)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
         Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub
         Vc2OscAnalogShape Vc2OscAnalogDraws Vc2OscAnalogUpdate Vc2OscVariOffRender Vc2VariOffCheck Vc2OscKindsCheck
         Vc2Carrier Vc2CarrierTables Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2OscVibrato Vc2OscVibratoCheck
-        Vc2OscDraws Vc2OscPartDraws Vc2VocoderOsc)
+        Vc2OscDraws Vc2OscPartDraws Vc2VocoderOsc XtExtIn)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes Vc2TvaDraws)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
@@ -89,7 +89,7 @@ VC2SYNTH=()
 while read -r f; do
     [ "$f" = Vc2Params ] || VC2SYNTH+=("$f")
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\)\.cpp$|\1|p' "$REPO/plugin/Vc2Sources.cmake")
-VC2SYNTH+=(Vc2SynthCheck Vc2CheckWords XtLfo XtEnvelope XtCosm XtOsc)
+VC2SYNTH+=(Vc2SynthCheck Vc2CheckWords XtLfo XtEnvelope XtCosm XtOsc XtExtIn)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
          Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck
@@ -171,6 +171,7 @@ VC2PORTS=(
     "vc2oscanalogupdate|Vc2OscAnalogUpdate.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscvarioff|Vc2OscVariOffRender.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscvibrato|Vc2OscVibrato.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtextin|XtExtIn.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptables|Vc2RampTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"

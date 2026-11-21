@@ -28,6 +28,8 @@ inline constexpr uint32_t kOscBlockWords = Vc2OscVoice::kBlockBytes / 4, kOscOth
 
 inline constexpr uint32_t kOscKindPAt = 0x8C05f000;      // P as a case's start gives the carrier and kind 6 (v266)
 inline constexpr uint32_t kOscMicAt = 0x8C05f800;        // a block of the mic on its way into the ring (v266)
+inline constexpr uint32_t kOscFramesAt = 0x8C057000;     // the effect chip's frames the EXT IN player plays (v322)
+inline constexpr int kOscFrameWords = 32 * 8;            // [FW] a block's 32 frames of 8 words
 
 enum OscKind : int32_t { kKindCall, kKindSettings, kRenderBy, kSeek, kObjectCall, kEventPosition };
 
@@ -75,12 +77,16 @@ struct OscDraws {
     mutable size_t romTaken = 0;
     int32_t clock = 0;           // the OS's millisecond word a carrier's init reads (v266)
     float peak = 0.0f;           // the input stage's peak (0x899d9a5c), which kind 5's update reads (v321)
+    std::array<int32_t, kOscFrameWords> frames {};   // the effect chip's frames, the EXT IN player's (v322)
 };
 
 // What the port's parts share: the answers, the records, the blocks' words, the output and the calls; the mic ring and
 // the unvoiced decision kind 6 reads (v266)
 struct OscShared {
     OscDraws draws {};
+    // v322: the EXT IN player's draws, the frames and its level's, from a generator of their own, so the run's other
+    // draws stay as they were; seeded from the run's
+    std::mt19937 extIn {};
     size_t positionsTaken = 0;   // the port's side of the event lookup's positions (v238)
     Vc2MicRing ring {};
     std::array<float, Vc2Kind6::kBlock> unvoiced {};
@@ -106,6 +112,7 @@ public:
     Vc2MicRing& micRing() override { return s_.ring; }
     const float* unvoiced() override { return s_.unvoiced.data(); }
     float inputPeak() override { return s_.draws.peak; }
+    const int32_t* inputFrames() override { return s_.draws.frames.data(); }
     float boundFloat(uint32_t part, uint32_t offset) override;
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;

@@ -1546,6 +1546,65 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's EXT IN player (2026-11-20, v322) {#vc2-osc-ext-in}
+
+Step 4.3's fiftieth version, item 11's second part: the EXT IN player's three routines join the OSC voice
+(`Vc2OscNoteOn.cpp`, beside kinds 4–7's note-ons, on the object's words those set). Until v322 they went out by
+address through `Vc2OscParts`.
+
+**The update, `0x893c6260(voice)`:**
+- the ratio (`0x893afb40`) into the object's pitch (+0x1cc);
+- the gain (`0x893aff30`) into its target (+0x1dc), with the level left to go to it.
+
+Kinds 4 and 7 run it after ramp 0's tick, as their row's update (`Vc2OscUpdate::extIn`). Kind 6 runs it before its
+ramps, then its own `0x893b0150`. The row's address for that, `updateFirst`, becomes a flag (`extInFirst`), as no
+other kind has one.
+
+**The renders, `0x893c62e0` (kind 4's install's) and `0x893c61e0` (kind 7's), each `(out, the object)`:**
+- 32 frames of 32 bytes from `[0x8993eadc]`, the pointer the part mixer reads its input by (its mic is the frame's
+  word 1, the input stage's word 5);
+- kind 4's render plays words 0 and 1, kind 7's word 4 on both sides, each as an integer times the level (+0x1e0);
+- after each sample the level goes 1/32 of the way to the target by FMAC: (target − level) × 1/32, rounded, then
+  added. Kind 4's keeps it in a register and stores it at the end, kind 7's at every sample: the same words.
+
+That is rom.2's player's law, `0x895097d0`, which reads its own pointer's first two words. So both renders run on
+v203's `XtExtInPlayer`, seeded from the object's level and target and the level written back. Neither reads the
+object's pitch.
+
+The voice's render finds them by the address its install wrote at +0xa44 (`Vc2OscVoice::renderExtIn`), as rom.4
+calls through it. Any other address still goes out to its parts. The analog's render word (+0xa48) only ever holds
+the analog's renders, so it keeps going out. The frames come through a new `Vc2OscParts::inputFrames()`. The tone
+host's link passes it to the deriving class, which in the part will give the mixer's own input.
+
+**The checks.** xt_vc2osc no longer hooks the three routines: rom.4's own run in the voice, compared whole after every
+event, the render's output after each render.
+- The frames are drawn before every event into rom.4's memory, with `[0x8993eadc]` aimed at them, and given to the
+  port's parts (`oscDrawAnswers`).
+- They come from a generator of their own, seeded from the run's (`OscShared::extIn`), so the run's other draws stay
+  as v321 drew them. xt_vc2osc's osc and kinds lines are unchanged.
+- Before a render through the player (`oscPlaysExtIn`), a level or target past ±1 is drawn again within 0…1, as a
+  note gives them (`oscSteerExtIn`). There are two reasons:
+  - The render takes the level from the target by `xtf::sub`, whose NaN's sign is FSUB's negated.
+  - In xt_vc2tone the player's output is OSC 2's into the tone's delay mix (v269), which moves its delay by it. Past
+    full scale the delay reads past the mix's lines: with levels up to ±1000, seed 7 crashed in the mix's
+    `delayedSample`.
+
+xt_vc2tone's tones' voices run the same, through the host's link.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400):
+  - xt_vc2osc: 464, 4,449 and 4,548 blocks through the player's renders;
+  - xt_vc2tone: 478, 4,442 and 4,024 tone renders with an OSC through them.
+- Every line and branch of the three routines and the link reached in both checks.
+- `mutate_vc2.py --osc`: 29 new plants and 7 rewritten on the new code, 0 missed. The new ones are the update's
+  targets, the renders' words, addresses and frame shape, the level's start, target and write-back, the rows' ways and
+  the voice's way to them, and three on `XtExtInPlayer` itself through xt_vc2osc (`vc2xtextin`). The rewritten ones
+  are five row plants, the first update's order and the render's answer. The whole list, 1,284, and `--tone`, 753 with
+  the link's new plant, all caught.
+
+**Next.** Item 11's third part: Vari off's renders (`0x893c63c0`, `0x893c66e0`, v261's ports) joined, with the wave's
+samples through the voice's parts.
+
 ### The VC-2's kinds 5 and 6 updates on the voice (2026-11-20, v321) {#vc2-osc-kind-updates}
 
 Step 4.3's forty-ninth version, item 11's first part (VC2_MODE_PLAN.md, step 4.3): the OSC kinds' routines the voice

@@ -81,6 +81,9 @@ public:
     virtual Vc2MicRing& micRing() = 0;
     virtual const float* unvoiced() = 0;
     virtual float inputPeak() = 0;   // v321: the input stage's peak (0x899d9a5c), kind 5's update's Dynamics
+    // v322: the effect chip's frames as the part reads them ([0x8993eadc], the part mixer's too: a block's 32 of 8
+    // words), which the EXT IN player plays
+    virtual const int32_t* inputFrames() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
     // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
     // player's routine on the object; 0x893cc0d0(the object, event, &position, &…), an event's position ×16
@@ -123,6 +126,10 @@ public:
     // then kind 6's set)
     void updateCarrier(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void updateKind6(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    // v322 (Vc2OscNoteOn.cpp): the EXT IN player's update 0x893c6260 (kinds 4 and 7, and kind 6's first) and its two
+    // renders 0x893c62e0 and 0x893c61e0, run when `routine` is one of them (false, nothing done, for any other)
+    void updateExtIn(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    bool renderExtIn(uint32_t routine, float* out, Vc2OscParts& parts);
     // 0x893ae610: ramp 0's start, given the ramp's six words (Vc2RampSettings; the tone's input + 0xc)
     void start(const uint32_t* ramp, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void count(uint32_t x);                                // 0x893ae6c0

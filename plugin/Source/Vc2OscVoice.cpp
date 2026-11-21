@@ -75,14 +75,15 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
         if (f32(kLevel) > vc2OscTables().waitLevel) return;
         reseek(parts);
     }
-    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);
+    if (row.extInFirst) updateExtIn(parts, shared);   // v322: 0x893c6260
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
         if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
-    switch (row.updates) {   // the port's (v248, v321), or the kind's by its address
+    switch (row.updates) {   // the port's (v248, v321, v322), or the kind's by its address
         case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;
         case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;
         case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;
+        case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;
         case Vc2OscUpdate::routine: break;
     }
     if (row.update != 0) parts.kindCall(row.update);
@@ -171,7 +172,9 @@ void Vc2OscVoice::legato(const uint32_t* ramp) {
 uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
     switch (vc2OscKindRow(kind()).renders) {
         case Vc2OscRender::zero: std::fill(out, out + kOut, 0.0f); return 0;
-        case Vc2OscRender::byRender: parts.renderBy(tail.render, out, kRenderThird); return 0;
+        case Vc2OscRender::byRender:   // v322: the EXT IN player's two the voice's own, any other by its address
+            if (!renderExtIn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);
+            return 0;
         case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
         case Vc2OscRender::carrier: carrier.render(out); return 0;                                  // 0x893ebfa0
         case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;   // 0x893ec730

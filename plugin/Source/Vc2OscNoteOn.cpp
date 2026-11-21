@@ -1,14 +1,19 @@
 // The OSC voice's note-on by its kind (v232): rom.4's 0x893af0b0, which the note-on (0x893ae370) ends in.  Each kind's
 // way is its row's (Vc2OscVoiceKinds.cpp): VariPhrase's, LITE's and the analog's own note-ons (0x893af420, v238;
 // 0x893c7c30, v240; 0x893c22e0, v242) are ported in their own files; kinds 4, 5, 6 and 7 are inline here.  From v321
-// kinds 5's and 6's updates too, which write the same P.  Every address is rom.4's.  HARDWARE_FIRMWARE.md, "The VC-2's
-// OSC voice's note-on and targets", "The VC-2's kinds 5 and 6 updates".
+// kinds 5's and 6's updates too, which write the same P; from v322 the EXT IN player's update (kinds 4 and 7, and kind
+// 6's first) and the two renders kinds 4's and 7's installs write, on the object's words the note-on sets.  Every
+// address is rom.4's.  HARDWARE_FIRMWARE.md, "The VC-2's OSC voice's note-on and targets", "The VC-2's kinds 5 and 6
+// updates", "The VC-2's EXT IN player".
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"
 #include "Vc2OscVoiceKinds.h"
+#include "XtExtIn.h"
+#include <algorithm>
 
 namespace {
-// [FW] the object's words kinds 0, 4 and 7 set: its pitch (+0x70), its gain (+0x80) and its level (+0x84)
+// [FW] the object's words kinds 0, 4 and 7 set: its pitch (+0x70), its gain (+0x80) and its level (+0x84); from v322
+// the EXT IN player's
 constexpr uint32_t kObjectPitch = 0x1cc, kObjectGain = 0x1dc, kObjectLevel = 0x1e0;
 // [FW] P at +0x104: the carrier's gain and pitch (Vc2CarrierParams); kind 6's ratio, rate, gain, level
 // (Vc2Kind6Params), its level the block's +0x18
@@ -32,6 +37,15 @@ Params paramsOf(const Vc2OscVoice& v, uint32_t offset = kP) {
     std::memcpy(&p, v.at(offset), sizeof p);
     return p;
 }
+
+// [FW] v322: the EXT IN player's renders by the address the install writes, and the frame's words each plays on the
+// left and the right: kind 4's words 0 and 1, kind 7's word 4 to both sides; a block's 32 frames of 32 bytes
+struct ExtInRender {
+    uint32_t at;
+    int left, right;
+};
+constexpr std::array<ExtInRender, 2> kExtInRenders { { { 0x893c62e0, 0, 1 }, { 0x893c61e0, 4, 4 } } };
+constexpr int kFrames = 32, kFrameWords = 8;
 } // namespace
 
 void Vc2OscVoice::kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
@@ -92,4 +106,31 @@ void Vc2OscVoice::updateKind6(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     setF32(kPc, f32(kKind6Level));
     const Vc2Kind6Params p = paramsOf<Vc2Kind6Params>(*this);
     kind6.set(&p);
+}
+
+// [FW] 0x893c6260 (v322): the ratio (0x893afb40) to the object's pitch and the gain (0x893aff30) to its target, the
+// level left to go to it
+void Vc2OscVoice::updateExtIn(Vc2OscParts& parts, const Vc2ToneShared& shared) {
+    const Vc2OscTargets targets(*this, parts, shared);
+    setF32(kObjectPitch, targets.ratio());
+    setF32(kObjectGain, targets.gain());
+}
+
+// [FW] 0x893c62e0 and 0x893c61e0 (out, the object), v322: rom.2's EXT IN player's law (0x895097d0, XtExtInPlayer) on
+// the input's frames: each frame's words × the level, which goes 1/32 of the way to the target a sample by FMAC and is
+// left where it ends; the object's pitch unread
+bool Vc2OscVoice::renderExtIn(uint32_t routine, float* out, Vc2OscParts& parts) {
+    const auto* render = std::ranges::find(kExtInRenders, routine, &ExtInRender::at);
+    if (render == kExtInRenders.end()) return false;
+    const int32_t* frames = parts.inputFrames();
+    std::array<int32_t, 2 * kFrames> lr {};
+    for (int i = 0; i < kFrames; ++i) {
+        lr[(size_t)(2 * i)] = frames[kFrameWords * i + render->left];
+        lr[(size_t)(2 * i + 1)] = frames[kFrameWords * i + render->right];
+    }
+    XtExtInPlayer player;
+    player.noteOn(f32(kObjectLevel), f32(kObjectGain));
+    player.block(out, lr.data());
+    setF32(kObjectLevel, player.gainNow());
+    return true;
 }

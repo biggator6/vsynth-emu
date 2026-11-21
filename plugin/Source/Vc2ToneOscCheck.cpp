@@ -246,6 +246,17 @@ std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng) {
     return oscRingBlock(toneRingSides(s), rng);
 }
 
+void toneSteerExtIn(ToneSides& s, int i) {
+    bool plays = false;
+    for (int osc = 0; osc < 2; ++osc) {
+        Vc2OscVoice& v = oscOfTone(s, i, osc);
+        plays = plays || oscPlaysExtIn(v);
+        oscSteerExtIn(v, s.shared.osc.extIn);
+        writeToneOsc(s, i, osc);
+    }
+    s.n.extInBlocks += plays;
+}
+
 void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng) {
     std::array<uint32_t, kOscBlockWords>& settings = s.shared.osc.settings;
     const Vc2OscVoice& v = oscOfTone(s, i, osc < 2 ? (int)osc : 0);

@@ -187,6 +187,7 @@ int main(int argc, char** argv) {
     if (!run) return 1;
     std::array<Vc2OscVoice, kOscVoices> voices {};
     OscShared shared;
+    shared.extIn.seed(~(uint32_t)run->seed);   // v322: a generator of its own, from the run's seed
     oscFindZeroTunes(fw, shared.records);
     std::vector<OscPortParts> parts;
     for (int v = 0; v < kOscVoices; ++v) parts.emplace_back(v, shared, voices[(size_t)v]);
@@ -209,6 +210,7 @@ int main(int argc, char** argv) {
                 n.carrierSettings, n.kind6Starts, n.kind6Blocks, n.voicedSounding, n.voicedNotFinite);
     std::printf("calls: %ld seeks, %ld kinds' routines, %ld event lookups, %ld object setups; %ld ramps gliding after "
                 "an event\n", n.seeks, n.kindCalls, n.lookups, n.objectCalls, n.gliding);
+    std::printf("ext in: %ld blocks through the EXT IN player's renders\n", n.extInBlocks);   // v322
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;
 }

@@ -16,8 +16,8 @@ enum class Vc2OscNoteOn : uint8_t { none, one, extIn, carrier, kind6, vari, lite
 // kind's own install by its address)
 enum class Vc2OscInstall : uint8_t { frame, lite, vari, analog };
 // 0x893ae1c0's and 0x893ae780's last steps (v248): the kind's update and settings by their addresses, or the analog's
-// ported; from v321 kinds 5's and 6's updates ported too
-enum class Vc2OscUpdate : uint8_t { routine, analog, carrier, kind6 };
+// ported; from v321 kinds 5's and 6's updates ported too, from v322 the EXT IN player's
+enum class Vc2OscUpdate : uint8_t { routine, analog, carrier, kind6, extIn };
 enum class Vc2OscSettings : uint8_t { routine, analog };
 
 struct Vc2OscKindRow {
@@ -26,7 +26,7 @@ struct Vc2OscKindRow {
     int installed = 0;             // the install's +0xa88: its constant's kind (4, 5, 6), 0 none
     bool clearsFlag = false;       // the install's default: +0xa40 to 0
     bool waits = false;            // 0x893ae1c0: the update waits on a pending seek
-    uint32_t updateFirst = 0;      // a routine before the ramps' ticks; 0 none
+    bool extInFirst = false;       // the EXT IN player's update (0x893c6260) before the ramps' ticks (v322; kind 6's)
     uint8_t ticks = 0;             // the ramps the update ticks, by bit
     uint32_t update = 0;           // its update after them; 0 none
     Vc2OscUpdate updates = Vc2OscUpdate::routine;       // that by its address, or the port's (v248)

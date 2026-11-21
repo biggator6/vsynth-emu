@@ -3,6 +3,7 @@
 // Vc2OscKindsCheck.cpp).  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
 #if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2OscDraws.h"
+#include "Vc2OscVoiceKinds.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -117,6 +118,24 @@ void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng) {
     d.romTaken = 0;
     shared.positionsTaken = 0;
     shared.calls.clear();
+    constexpr uint32_t kFramesPointerAt = 0x8993eadc;   // [FW] where the part reads the effect chip's frames from
+    for (int32_t& w : d.frames) w = (int32_t)shared.extIn();
+    fw.cpu.write(kOscFramesAt, d.frames.data(), sizeof d.frames);
+    fw.cpu.wr32(kFramesPointerAt, kOscFramesAt);
+}
+
+bool oscPlaysExtIn(const Vc2OscVoice& o) {
+    constexpr std::array<uint32_t, 2> kExtInRenders { 0x893c62e0, 0x893c61e0 };   // [FW] the installs' two
+    return vc2OscKindRow(o.kind()).renders == Vc2OscRender::byRender
+        && std::ranges::find(kExtInRenders, o.tail.render) != kExtInRenders.end();
+}
+
+void oscSteerExtIn(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr uint32_t kLevelAt = 0x1e0, kTargetAt = 0x1dc;   // [FW] the object's +0x84 and +0x80
+    if (!oscPlaysExtIn(o)) return;
+    for (uint32_t at : { kLevelAt, kTargetAt }) {
+        if (!(std::fabs(o.f32(at)) <= 1.0f)) o.setF32(at, vc2Unit(rng));
+    }
 }
 
 std::string oscRingWordsDifference(const OscRingSides& r) {

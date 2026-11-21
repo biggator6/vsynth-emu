@@ -86,8 +86,16 @@ struct OscRingSides {
 // The hooks' answers before an event, xt_vc2osc's and xt_vc2tone's (v321, the two checks' copies made one): the OS's
 // clock, the input stage's peak (kind 5's update's Dynamics: 0 now and then, else a level, into rom.4's word
 // 0x899d9a5c too), what a render answers, the flags a seek leaves, the event lookup's positions and its second word;
-// none taken yet on either side, and the port's log of calls cleared
+// none taken yet on either side, and the port's log of calls cleared; from v322 the effect chip's frames the EXT IN
+// player plays, from the shared generator of their own, into rom.4's memory with the part's pointer to them
 void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng);
+// v322: whether a voice's render is the EXT IN player's (its kind renders by +0xa44, and that names one of the two);
+// before a render on such a voice, its level (+0x1e0) and target (+0x1dc) within
+// ±1 as a note gives them (the targets' level and gain), each drawn again 0…1 when not: the render takes the level from
+// the target by xtf::sub, whose NaN's sign is FSUB's negated; and its output, at most full scale so, is what a tone's
+// delay mix moves its delay by (v269: past full scale it reads past its lines)
+bool oscPlaysExtIn(const Vc2OscVoice& o);
+void oscSteerExtIn(Vc2OscVoice& o, std::mt19937& rng);
 std::string oscRingSetUp(const OscRingSides& r);
 std::string oscRingCase(const OscRingSides& r, std::mt19937& rng);
 std::string oscRingBlock(const OscRingSides& r, std::mt19937& rng);

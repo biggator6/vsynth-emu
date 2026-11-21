@@ -803,3 +803,5 @@ link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHea
 link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc
 # v321: the input stage's peak, which kind 5's update (ported in the voice) asks of the link (vc2tonehostosc)
 link-input-peak|{ return outside().inputPeak(); }|{ return 0.0f; }|vc2tonehostosc
+# v322: the effect chip's frames, which the EXT IN player (ported in the voice) asks of the link (vc2tonehostosc)
+link-input-frames|{ return outside().inputFrames(); }|{ return outside().inputFrames() + 1; }|vc2tonehostosc
