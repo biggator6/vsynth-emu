@@ -13,13 +13,13 @@ constexpr Pair kSelf { 0x89ced1b4, 0x89980f24 }, kMessageAt { 0x89ced200, 0x8998
 constexpr Pair kClockAt { 0x89979bfc, 0x8995cb40 };
 constexpr Pair kLow { 0x897a167c, 0x8950f0b0 }, kHigh { 0x897a56d8, 0x895131a8 };
 constexpr Pair kInit { 0x894b4a60, 0x89368280 }, kTake { 0x894ac970, 0x8935fc40 }, kPoll { 0x894acb10, 0x8935fde0 };
-constexpr Pair kRequest { 0x894a7dd0, 0 }, kRouting { 0x894aee80, 0 };
+constexpr Pair kRequest { 0x894a7dd0, 0x8935b050 }, kRouting { 0x894aee80, 0x893620e0 };   // rom.4's from v400
 constexpr Pair kNap { 0x894b26a0, 0x89365e50 }, kPut { 0x894af400, 0x89362490 }, kGet { 0x894af510, 0x89362610 };
 constexpr Pair kCoefficient { 0x894af610, 0x893626d0 }, kOffset { 0x894af6a0, 0x893627f0 };
 constexpr Pair kReadA { 0x8947d310, 0x89324350 }, kReadB { 0x8947d330, 0x89324370 };
 constexpr Pair kSpin1 { 0x894af3a0, 0x89362430 }, kSpin2 { 0x894af3c0, 0x89362450 };
 constexpr Pair kList1 { 0x894d9230, 0x893951b0 }, kList2 { 0x894d90c0, 0x89395040 }, kList3 { 0x894d9020, 0x89394fa0 };
-constexpr Pair kEnd { 0x89301680, 0x89301610 }, kPost { 0x894aee70, 0x89391e50 };
+constexpr Pair kEnd { 0x89301680, 0x89301610 }, kPost { 0x894aee70, 0x893620d0 }, kPostCategory { 0, 0x89391e50 };
 
 // [FW] The task (rom.2's 0x894ad560).  On its way to its loop it calls the driver's start, then its start task, and between
 // them what isn't the driver's or isn't run here: two calls to the OS, one not traced that takes two of the task's
@@ -39,7 +39,7 @@ constexpr HandImage handOn(Side s, int firstHigh, int ids) {
             .sleep = kNap.*s, .putWord = kPut.*s, .getWord = kGet.*s,
             .putCoefficient = kCoefficient.*s, .putOffset = kOffset.*s,
             .reads = { kReadA.*s, kReadB.*s },
-            .answered = { kSpin1.*s, kSpin2.*s, kList1.*s, kList2.*s, kList3.*s, kEnd.*s, kPost.*s },
+            .answered = { kSpin1.*s, kSpin2.*s, kList1.*s, kList2.*s, kList3.*s, kEnd.*s, kPost.*s, kPostCategory.*s },
         },
         .task = { kEntry.*s, kEventWait.*s,
                   { kOsFirst.*s, kObjects.*s, kHandler.*s, kSettings.*s, kOsSecond.*s } },
@@ -74,6 +74,10 @@ HandDriver::HandDriver(const char* rom, const HandImage& hand, std::vector<uint3
     call(im.staticInit);
     runTask(hand.task);
     message(kSystem, kPatch);
+    route();
+}
+
+void HandDriver::route() {
     if (!im.inputRequest) return;
     call(im.inputRequest);
     call(im.inputEvent);

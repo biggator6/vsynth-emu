@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.4's outside input v400 (2026-11-21, on its own branch from vc2-mode's 00f4163, not merged; HARDWARE_FIRMWARE.md,
+  "rom.4's outside input"; the plan's step 4.4, item 3). rom.4's EXT IN request (0x8935b050, rom.2's 0x894a7dd0 less
+  its Source) reads External In Type (0x7a) and its event (0x893620e0) stores it, moving no chip word: now routeInput's
+  on rom.4, its post 0x893620d0 answered. 0x893a1000 also reads it into the tone generator's system words (+0x10203),
+  where STEREO sets the EXTIN converter's block +0xb0: step 4.3's. USB External In Type is the system reader's (v259):
+  the USB pair added to the analog one by its law, checked on the chip. The unit gives the plugin's input to rom.4's
+  analog pair alone (XtFxImage::feedsUsb, rom.2's as before). xt_fx <rom.4> vc2 gains three parts: the routing against
+  the driver by hand, byte for byte; the routing's law on the chip; the input through the unit; 0 different at seeds
+  2024, 7 and 31337. Found, not settled: the part mixer reads frame words 1 and 5 as the mic and the tracker's input,
+  and by v204's slot mapping word 1 is slot 0x92, which no input reaches on rom.4; a capture is to say.
+  mutate_fx.py --vc2 72 of 72, --control 184 of 184; fxthreads no races.
+
 rom.4's frame through the unit v274 (2026-11-19, on its own branch after vc2-mode's 8052ad3, not merged;
   HARDWARE_FIRMWARE.md, "rom.4's frame through the unit"; the plan's step 4.4, item 2). XtFxUnit's code split out of
   XtFxControl.cpp into XtFxUnit.cpp as it stood, its plants to the port fxu. XtFxUnit takes an image; its frame's gain

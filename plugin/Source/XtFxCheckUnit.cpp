@@ -158,22 +158,12 @@ void unitLevels(const char* rom, bool print, const UnitWay& way) {
 // own for MONO MIX, and at a delay the chip gives.  Noise on both sides, a quarter of full scale.  The frames off the law at
 // the best delay; 0 when one fits them all.
 int inputLaw(const char* rom, int type, int source) {
-    auto u = std::make_unique<XtFxUnit>(rom);
-    u->control().set(0x78, type);
-    u->control().set(0x7c, source);
-    u->control().update();
-    u->settle();
+    const auto u = settledUnit(rom, xtVSynthFx(), { { 0x78, type }, { 0x7c, source } });
     constexpr int kFrames = 2048, kLatest = 4;
-    std::vector<int32_t> in(2 * kFrames), back(2 * kFrames);
+    std::vector<int32_t> in(2 * kFrames);
     Rng r((uint32_t)(1 + 2 * type + source));
     for (int32_t& x : in) x = ((int32_t)r.next() >> 10) * 256;                  // whole chip words, the chip's ±2^21
-    float frame[8] = {}, lr[2] = {};
-    for (size_t i = 0; i < kFrames; ++i) {
-        u->pushInput(&in[2 * i], 1);
-        u->process(frame, lr, 1);
-        back[2 * i] = u->returned()[0];
-        back[2 * i + 1] = u->returned()[1];
-    }
+    const std::vector<int32_t> back = handedBack(*u, in);
     const auto law = [&](size_t i, int side) {
         const int64_t left = in[2 * i], right = in[2 * i + 1], mix = (left + right) / 2;
         const int64_t laws[4][2] = { { left, right }, { mix, mix }, { left, left }, { right, right } };

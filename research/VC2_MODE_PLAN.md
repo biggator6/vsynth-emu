@@ -706,8 +706,9 @@ version against rom.4's routines with what it calls hooked:
    - **The types:** 42 MFX and 9 Chorus as on rom.2, 15 Reverb Types against 11, each type's IDs from tables at
      `0x895164ec`, `0x895165b8`, `0x895165e4`.
    - **Not mapped, so not run:** rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`) has no literal or
-     branch reaching it, though MFX-PRM1…3 are Matrix destinations; and no reader reads External In Type (0x7a), where
-     rom.2's EXT IN request reads its own.
+     branch reaching it, though MFX-PRM1…3 are Matrix destinations; ~~and no reader reads External In Type (0x7a), where
+     rom.2's EXT IN request reads its own~~ (v400: its EXT IN request `0x8935b050` reads it, outside the driver as rom.2's
+     is, and moves no chip word).
    - **XtFxControl** needs only where these are: `XtFxImage` holds them, one row of addresses an image, rom.2's as the
      class held them.
 
@@ -719,8 +720,14 @@ version against rom.4's routines with what it calls hooked:
       sixteenth, and out as the mix, DIR going nowhere; against rom.4's truncation and JE-8086's chip
       (HARDWARE_FIRMWARE.md, "rom.4's frame through the unit"). For step 4.3: the VC-2's tones take rom.4's Out Gain
       for TG (ID 0x533, −24 dB by default) in the TVA's block, as rom.4 does (`0x893a670c`), since the unit doesn't.
-   3. The outside input: what reads External In Type and USB External In Type, the routing, and the words back to the
-      SH-4 that the mic path takes.
+   3. done (v400): the outside input (HARDWARE_FIRMWARE.md, "rom.4's outside input"). External In Type is read by rom.4's
+      EXT IN request `0x8935b050`, which moves no chip word (its event `0x893620e0` only stores it), now routeInput's on
+      rom.4; and by `0x893a1000` into the tone generator's system words (+0x10203), whose STEREO sets the EXTIN
+      converter's block +0xb0 (`0x8939ee30`): step 4.3's. USB External In Type is the system reader's (v259), its law on
+      the chip checked; the unit gives the plugin's input to rom.4's analog pair alone, as rom.4 adds its USB pair on top.
+      For step 4.3 and step 5: the part mixer reads frame words 1 and 5, and by v204's slot mapping word 1 is slot 0x92,
+      which no input reaches on rom.4; which slot the mic comes back on wants a capture, and `returned()` hands the part
+      nothing yet.
    4. The Matrix's MFX-PRMs: where rom.4 sends them, then `setMatrix` on rom.4.
 5. The plugin: the mode switch, rom.4's IDs as parameters appended, the session, a `.p02`'s load, the tab of cards, the
    plugin test, verify.sh lines and plants.

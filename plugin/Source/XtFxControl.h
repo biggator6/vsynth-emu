@@ -83,6 +83,10 @@ public:
     using ReadObserver = void (*)(void* context, int id);
     void observeReads(ReadObserver observer, void* context) { readObserver_ = observer; readContext_ = context; }
 
+    // For the check, control thread: a byte of the driver's own memory (the input routing's bytes, which move no chip word
+    // on rom.4; v400)
+    uint8_t driverByte(uint32_t address) const;
+
     // Control thread: has the chip got everything?  And the driver's copy of a word.
     bool drained() const { return (!ok() || (backlog_.empty() && open_->words.empty())) && read_.load(std::memory_order_acquire) == write_.load(std::memory_order_relaxed); }
     uint32_t word(unsigned index) const { return shadow_[index & 2047]; }
@@ -161,7 +165,8 @@ public:
     // rom.4's frame goes in as the VC-2 makes it, and its DIR words reach no output (v274).  At most 32 frames a call, the bus's block.
     void process(const float* frame, float* lr, int frames) override;
     // Audio thread: the outside input as the converter hands it, int32 L then R a frame at the XT's full scale (±2^31),
-    // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204)
+    // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204); on an
+    // image that adds its USB pair to the analog one, the analog pair alone (XtFxImage::feedsUsb, v400)
     void pushInput(const int32_t* lr, int frames) override;
     // What the chip handed back for the EXT IN OSCs in the last process() (XtBus.h): words 4 and 5 of each frame
     const int32_t* returned() const override { return back_; }
@@ -178,6 +183,7 @@ private:
     std::unique_ptr<XtFxChip> chip_;
     XtFxControl control_;
     float frameGain_;                         // the image's (XtFxImage.h)
+    bool feedsUsb_;                           // and whether its USB pair hears the input
     XtExtInput in_;
     int32_t back_[64] = {};
 };

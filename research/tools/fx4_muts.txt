@@ -1,5 +1,5 @@
 # Planted errors for rom.4's effect driver, for mutate_fx.py --vc2: name|old|new|port.  Port fx4i: XtFxImage.cpp, fx4c:
-# XtFxControl.cpp, each under "xt_fx <rom.4> vc2".
+# XtFxControl.cpp, fx4u: XtFxUnit.cpp (v274), fx4in: XtFxInput.cpp (v400), each under "xt_fx <rom.4> vc2".
 # Where rom.4's routines are
 self|kSelf { 0x89ced1b4, 0x89980f24 }|kSelf { 0x89ced1b4, 0x89980f64 }|fx4i
 message|kMessage { 0x89ced200, 0x89980f84 }|kMessage { 0x89ced200, 0x89980f88 }|fx4i
@@ -17,14 +17,14 @@ read-typed|kReadTyped { 0x8947d330, 0x89324370 }|kReadTyped { 0x8947d330, 0x8932
 clock-poll|kClockPoll { 0x894acb10, 0x8935fde0 }|kClockPoll { 0x894acb10, 0x8935fc40 }|fx4i
 system-end|kSystemEnd { 0x89301680, 0x89301610 }|kSystemEnd { 0x89301680, 0x89301620 }|fx4i
 clock-object|kClock { 0x89979bfc, 0x8995cb40 }|kClock { 0x89979bfc, 0x8995cb44 }|fx4i
-post-event|kPostEvent { 0x894aee70, 0x89391e50 }|kPostEvent { 0x894aee70, 0 }|fx4i
+post-event|kPostCategory { 0, 0x89391e50 }|kPostCategory { 0, 0 }|fx4i
 list-a|kListA { 0x894d9230, 0x893951b0 }|kListA { 0x894d9230, 0x893951b4 }|fx4i
 # rom.4's descriptors and types
 desc-low|kDescLow { 0x897a167c, 0x8950f0b0 }|kDescLow { 0x897a167c, 0x8950f0bc }|fx4i
 desc-high|kDescHigh { 0x897a56d8, 0x895131a8 }|kDescHigh { 0x897a56d8, 0x895131b0 }|fx4i
-first-high|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, 0x55d, 0x9ac, 15, kVc2Rows,|fx4i
-ids-short|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, 0x56a, 0x8d0, 15, kVc2Rows,|fx4i
-rev-types|imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, 0x56a, 0x9ac, 11, kVc2Rows,|fx4i
+first-high|imageOn(&Place::vc2, { 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, { 0x55d, 0x9ac, 15, kVc2Rows,|fx4i
+ids-short|imageOn(&Place::vc2, { 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, { 0x56a, 0x8d0, 15, kVc2Rows,|fx4i
+rev-types|imageOn(&Place::vc2, { 0x56a, 0x9ac, 15, kVc2Rows,|imageOn(&Place::vc2, { 0x56a, 0x9ac, 11, kVc2Rows,|fx4i
 mfx-table|kMfxIds { 0x897a8218, 0x895164ec }|kMfxIds { 0x897a8218, 0x895164f0 }|fx4i
 cho-table|kChoIds { 0x897a82e4, 0x895165b8 }|kChoIds { 0x897a82e4, 0x895165bc }|fx4i
 rev-table|kRevIds { 0x897a8310, 0x895165e4 }|kRevIds { 0x897a8310, 0x895165e8 }|fx4i
@@ -63,3 +63,19 @@ unit-left-right|lr[2 * i] = fromChip(chip.gram(0xa1))|lr[2 * i] = fromChip(chip.
 unit-no-service|    for (int i = 0; i < frames; ++i) {\n        control_.service(chip);\n|    for (int i = 0; i < frames; ++i) {\n|fx4u
 boot-no-start-task|    call(image_.startTask, { image_.self });\n||fx4c
 boot-task-first|    call(image_.start, { image_.self });\n    call(image_.startTask, { image_.self });|    call(image_.startTask, { image_.self });\n    call(image_.start, { image_.self });|fx4c
+# v400: the outside input on rom.4: the EXT IN request and its event (XtFxImage.cpp), the input's routing (fx4in,
+# XtFxInput.cpp), and the unit giving the input to the analog pair alone
+input-request-none|kInputRequest { 0x894a7dd0, 0x8935b050 }|kInputRequest { 0x894a7dd0, 0 }|fx4i
+input-request-setter|kInputRequest { 0x894a7dd0, 0x8935b050 }|kInputRequest { 0x894a7dd0, 0x893622b0 }|fx4i
+input-event-init|kInputEvent { 0x894aee80, 0x893620e0 }|kInputEvent { 0x894aee80, 0x89361ed0 }|fx4i
+post-input|kPostInput { 0x894aee70, 0x893620d0 }|kPostInput { 0x894aee70, 0 }|fx4i
+row-input-gone|    { 0x7a, 0x7a, BlockInput },\n||fx4i
+row-input-id|{ 0x7a, 0x7a, BlockInput }|{ 0x79, 0x79, BlockInput }|fx4i
+row-input-block|{ 0x7a, 0x7a, BlockInput }|{ 0x7a, 0x7a, BlockSystem }|fx4i
+feeds-usb|kVc2FrameGain, false })|kVc2FrameGain, true })|fx4i
+unit-feeds-usb|feedsUsb_(image.feedsUsb)|feedsUsb_(true)|fx4u
+route-send-vc2|if (blocks & BlockInput) routeInput();||fx4c
+in-usb-left|chip.setGram(kUsbL, feedsUsb_ ? l : 0);|chip.setGram(kUsbL, l);|fx4in
+in-usb-right|chip.setGram(kUsbR, feedsUsb_ ? r : 0);|chip.setGram(kUsbR, r);|fx4in
+route-no-event|    call(image_.inputEvent);\n||fx4in
+route-none|if (!image_.inputRequest \|\| !call(image_.inputRequest)) return;|return;|fx4in

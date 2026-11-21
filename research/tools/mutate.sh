@@ -71,14 +71,14 @@ elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
     F=XtFxChip.cpp
     fxParts XtFxControl XtFxUnit XtFxImage XtFxValueText XtFxInput XtExtIn
-elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu|fx4c|fx4i|fx4u)$ ]]; then
+elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu|fx4c|fx4i|fx4u|fx4in)$ ]]; then
     # XtFxControl (fxv: its values' text, XtFxValueText.cpp, v199; fxi: the input's way in, XtFxInput.cpp, v204; fxe: the input's ring and its copy without the chip, XtExtIn.cpp,
     # v205; fxim: each image's driver, XtFxImage.cpp) against its checks in xt_fx; [cases] is the events of "xt_fx control";
     # fx4c and fx4i: XtFxControl.cpp and XtFxImage.cpp under "xt_fx <rom.4> vc2"; fxu and fx4u: the unit, XtFxUnit.cpp
-    # (v274), under each; the others are kept objects
+    # (v274), under each; fx4in: XtFxInput.cpp under "xt_fx <rom.4> vc2" (v400); the others are kept objects
     case "$PORT" in
         fxv) F=XtFxValueText.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxInput XtExtIn) ;;
-        fxi) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxValueText XtExtIn) ;;
+        fxi | fx4in) F=XtFxInput.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxValueText XtExtIn) ;;
         fxe) F=XtExtIn.cpp; KEEP=(XtFxControl XtFxUnit XtFxImage XtFxValueText XtFxInput) ;;
         fxim | fx4i) F=XtFxImage.cpp; KEEP=(XtFxControl XtFxUnit XtFxValueText XtFxInput XtExtIn) ;;
         fxu | fx4u) F=XtFxUnit.cpp; KEEP=(XtFxControl XtFxImage XtFxValueText XtFxInput XtExtIn) ;;

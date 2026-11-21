@@ -3570,6 +3570,21 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `TEST_ROM_SEARCH` runs on a plain program, where JUCE's path to "the plugin" is the program's. To see it from inside a bundle, a throwaway host in my scratchpad loaded the installed AU through AudioToolbox and a copy of the VST3 through its factory, and read where each had found the image from its saved state. Reaper itself is still the user's to try.
 - The user's 1stchoice project settled where the preset waves are, which I'd left open an hour earlier: 224 of its 250 waves match streams after the disk image's FAT partition, byte for byte.
 
+### Session 23, the VC-2's effects (2026-11-21) — v400: rom.4's outside input
+
+- The 2026-11-17 map said no reader in rom.4's driver reads External In Type. That was true, and it misled. rom.2's EXT
+  IN request isn't in its driver either. Searching for the ID as an immediate at a read's call site found three readers,
+  all outside the driver.
+- The request and its event are there, setter for setter, and the event stores the Type and sends the chip nothing. So
+  this version ports something that, on rom.4, changes only seven bytes of the driver's memory. Comparing chip words
+  could never check it, so the check reads those bytes, and the plants that move them are caught only that way.
+- The probes first said slot 0x92 carried nothing because they wrote one input pair and left the others. GRAM rotates,
+  so an unwritten slot holds a neighbour's old value. Writing every pair each sample, as the unit does, fixed that.
+- zsh doesn't split a quoted variable into words, and a loop of byte settings ran every case as setting 0. The runs went
+  through bash after that.
+- The mic's slot is still open. The part mixer reads words 1 and 5, v204's mapping puts word 1 on slot 0x92, and nothing
+  I could find on rom.4 reaches 0x92. I wrote it up rather than pick a mapping that makes the VC-2 hear its mic.
+
 ### Session 22, continued (2026-11-14) — v202: the Time Trip pad as the XT's
 
 - The user was right that it made no sense: the column drew a pad, but under it was a horizontal slider on one 0–127 parameter, a finger going round the rim. CONTROLLERS.md says what the XT's pad is: an X-Y surface in polar terms, where touching freezes the wave and circling scrubs it. The plugin's synth already took the XT's pad controllers, firmware-checked since v132, so the pad sends those, through the queue the keyboard uses.

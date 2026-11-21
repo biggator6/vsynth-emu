@@ -13,7 +13,7 @@
 
 namespace xtfxcheck {
 namespace {
-constexpr size_t kFixedRows = 13;                    // kIdBlocks' rows before the types' own
+constexpr size_t kFixedRows = 14;                    // kIdBlocks' rows before the types' own
 constexpr int kEveryMessage[] = { 0, 1, 2, 0x34 };   // [FW] every message reads Part 1's bank and program, and this
 constexpr int kMfxMaster = 0x1b8;                    // [FW] Attenuation's reader reads MFX Master Level as well
 constexpr int kChorusReads = 10, kReverbReads = 24;  // [FW] how many IDs from a type's first its reader reads
@@ -137,10 +137,11 @@ void editOne(XtFxControl& c, int id, int value, bool asPatch) {
 
 const FxIds& vc2Ids() {
     // [FW] rom.4's IDs: the MFX's, Chorus's and Reverb's levels and sends, Master Level, Output Gain, Attenuation, the
-    // Patch Tempo, the three switches, the system's EQ as rom.4's reader reads it, USB External In Type, the patch EQ
+    // Patch Tempo, the three switches, the system's EQ as rom.4's reader reads it, USB External In Type, the patch EQ,
+    // and External In Type (v400)
     static constexpr int kLevels[] = { 0x1b8, 0x1b9, 0x1ba, 0x23d, 0x23e, 0x271, 0x40, 0x78, 0x52b, 0x13a, 0x13d, 0x13e,
                                        0x13f, 0x67, 0x68, 0x6f, 0x70, 0x71, 0x72, 0x7f,
-                                       0x1af, 0x1b0, 0x1b1, 0x1b2, 0x1b3, 0x1b4 };
+                                       0x1af, 0x1b0, 0x1b1, 0x1b2, 0x1b3, 0x1b4, 0x7a };
     // [FW] rom.2's seven of the same types and places (rom2Ids): the firmware's own update takes none of them alone
     static constexpr int kAlone[] = { 0x588, 0x6c8, 0x6ca, 0x5c4, 0x5ea, 0x641, 0x72b };
     static const FxIds ids = { vc2Fx(), "vc2 control", 0x1b7, 0x23c, 0x270, 0x43, 0x13a, kLevels, kAlone };
@@ -155,6 +156,9 @@ void vc2Control(const char* rom, int events, uint32_t seed) {
     handOutsideClock(rom);
     blocksRead(rom);
     patchEq(rom);
+    handInput(rom);   // v400: the outside input
+    vc2RoutingLaw(rom, seed);
+    unitInputVc2(rom, seed);
     unitConversion(rom, seed, vc2Way());   // v274: the frame's way through the unit
     unitLevels(rom, false, vc2Way());
     unitAgainstReference(rom, events, seed, vc2Way());

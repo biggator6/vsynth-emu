@@ -923,12 +923,15 @@ the frame through the unit against the reference: 184755 samples, 0 different
 the input through the unit: 8 samples, 0 different
 the copy without the chip against the chip: 9 samples, 0 different
 vc2 control's start against the firmware's task: 59052 samples, 0 different
-vc2 control against the reference: 493298 samples, 0 different
+vc2 control against the reference: 479645 samples, 0 different
 vc2 control's live edits against a patch: 12 samples, 0 different
 vc2 control's messages against the driver by hand: 1311 samples, 0 different
 vc2 control's outside clock against the driver by hand: 8 samples, 0 different
-vc2 control's blocks' IDs against their readers: 988 samples, 0 different
+vc2 control's blocks' IDs against their readers: 989 samples, 0 different
 vc2 control's patch EQ on the bus: 6 samples, 0 different
+vc2 control's input routing against the driver by hand: 6 samples, 0 different
+vc2 control's input routing on the chip: 40 samples, 0 different
+vc2 control's input through the unit: 5 samples, 0 different
 vc2's frame into the chip against the firmware's truncation: 51200 samples, 0 different
 vc2's frame through the unit: 9 samples, 0 different
-vc2's frame through the unit against the reference: 289442 samples, 0 different
+vc2's frame through the unit against the reference: 311519 samples, 0 different

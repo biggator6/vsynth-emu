@@ -21,18 +21,22 @@ constexpr Place kClockPoll { 0x894acb10, 0x8935fde0 };
 // No literal or branch in rom.4 reaches its pair of the Matrix's two (0x89361d50, 0x89361de0), and External In Type isn't
 // among what its driver's readers read: research/VC2_MODE_PLAN.md, step 4.4's map
 constexpr Place kMatrixTake { 0x894ad4e0, 0 }, kMatrixApply { 0x894ad4f0, 0 };
-constexpr Place kInputRequest { 0x894a7dd0, 0 }, kInputEvent { 0x894aee80, 0 };
+// The EXT IN request and its event's routine (v400: rom.4's 0x8935b050 pairs rom.2's by what it does, External In Type to
+// the routing's wanted byte 6, with no Source byte; its event 0x893620e0 is the effect task's event 0x40, as rom.2's)
+constexpr Place kInputRequest { 0x894a7dd0, 0x8935b050 }, kInputEvent { 0x894aee80, 0x893620e0 };
 constexpr Place kSleep { 0x894b26a0, 0x89365e50 }, kPutWord { 0x894af400, 0x89362490 };
 constexpr Place kGetWord { 0x894af510, 0x89362610 }, kPutCoefficient { 0x894af610, 0x893626d0 };
 constexpr Place kPutOffset { 0x894af6a0, 0x893627f0 };
 constexpr Place kRead { 0x8947d310, 0x89324350 }, kReadTyped { 0x8947d330, 0x89324370 };
 // What returns 0 here: the two spins between bus cycles; the tone generator's lists, which the driver's start takes
-// from; the end of the system's reader, an ID to the kernel; and a post of an event to another task, which nothing here
-// runs: rom.2's EXT IN request's 0x40 (routeInput runs that event), rom.4's 0x200 for a patch of Category 10 or 11
+// from; the end of the system's reader, an ID to the kernel; and the posts of an event to another task, which nothing here
+// runs: the EXT IN request's 0x40 to the effect task (routeInput runs that event), and rom.4's 0x200 for a patch of
+// Category 10 or 11
 constexpr Place kSpinA { 0x894af3a0, 0x89362430 }, kSpinB { 0x894af3c0, 0x89362450 };
 constexpr Place kListA { 0x894d9230, 0x893951b0 }, kListB { 0x894d90c0, 0x89395040 };
 constexpr Place kListC { 0x894d9020, 0x89394fa0 };
-constexpr Place kSystemEnd { 0x89301680, 0x89301610 }, kPostEvent { 0x894aee70, 0x89391e50 };
+constexpr Place kSystemEnd { 0x89301680, 0x89301610 }, kPostInput { 0x894aee70, 0x893620d0 };
+constexpr Place kPostCategory { 0, 0x89391e50 };
 
 constexpr Row kVSynthRows[] = {
     { 0x11d, 0x11d, BlockSwitches }, { 0x120, 0x122, BlockSwitches },
@@ -43,22 +47,33 @@ constexpr Row kVSynthRows[] = {
     { 0x177, 0x17a, BlockMfx }, { 0x1fc, 0x1fe, BlockChorus }, { 0x230, 0x231, BlockReverb },
 };
 
-// The patch EQ, EQ 1 and EQ 2 (0x1af…0x1b4), is read with the switches: rom.4's own, in program A's two mid bands
+// The patch EQ, EQ 1 and EQ 2 (0x1af…0x1b4), is read with the switches: rom.4's own, in program A's two mid bands.
+// External In Type (0x7a) is the EXT IN request's alone; USB External In Type (0x7f) the system reader's (v400)
 constexpr Row kVc2Rows[] = {
     { 0x13a, 0x13a, BlockSwitches }, { 0x13d, 0x13f, BlockSwitches }, { 0x1af, 0x1b4, BlockSwitches },
     { 0x52b, 0x52b, BlockAttenuation },
     { 0x40, 0x40, BlockSystem }, { 0x43, 0x43, BlockSystem }, { 0x78, 0x78, BlockSystem },
     { 0x67, 0x68, BlockSystem }, { 0x6f, 0x72, BlockSystem }, { 0x7f, 0x7f, BlockSystem },
+    { 0x7a, 0x7a, BlockInput },
     { 0x1b7, 0x1ba, BlockMfx }, { 0x23c, 0x23e, BlockChorus }, { 0x270, 0x271, BlockReverb },
 };
 
-// An image's driver from its side of the places, and its frame's gain into the chip
-constexpr XtFxImage imageOn(Side s, int firstHigh, int ids, int revTypes, std::span<const Row> rows, float frameGain) {
+// What an image is besides its places: its descriptors' IDs, the Reverb Types a patch can choose, which IDs each block's
+// reader reads, its frame's gain into the chip and whether its USB pair hears the outside input
+struct Facts {
+    int firstHigh, ids, revTypes;
+    std::span<const Row> rows;
+    float frameGain;
+    bool feedsUsb;
+};
+
+// An image's driver from its side of the places and its facts
+constexpr XtFxImage imageOn(Side s, const Facts& f) {
     return {
         .self = kSelf.*s, .message = kMessage.*s, .clock = kClock.*s,
-        .descLow = kDescLow.*s, .descHigh = kDescHigh.*s, .firstHigh = firstHigh, .ids = ids,
+        .descLow = kDescLow.*s, .descHigh = kDescHigh.*s, .firstHigh = f.firstHigh, .ids = f.ids,
         .mfxIds = kMfxIds.*s, .choIds = kChoIds.*s, .revIds = kRevIds.*s,
-        .mfxTypes = 42, .choTypes = 9, .revTypes = revTypes,
+        .mfxTypes = 42, .choTypes = 9, .revTypes = f.revTypes,
         .staticInit = kStaticInit.*s, .start = kStart.*s, .startTask = kStartTask.*s,
         .takeMessage = kTakeMessage.*s, .clockPoll = kClockPoll.*s,
         .matrixTake = kMatrixTake.*s, .matrixApply = kMatrixApply.*s,
@@ -66,18 +81,21 @@ constexpr XtFxImage imageOn(Side s, int firstHigh, int ids, int revTypes, std::s
         .sleep = kSleep.*s, .putWord = kPutWord.*s, .getWord = kGetWord.*s,
         .putCoefficient = kPutCoefficient.*s, .putOffset = kPutOffset.*s,
         .reads = { kRead.*s, kReadTyped.*s },
-        .answered = { kSpinA.*s, kSpinB.*s, kListA.*s, kListB.*s, kListC.*s, kSystemEnd.*s, kPostEvent.*s },
-        .idRows = rows,
-        .frameGain = frameGain,
+        .answered = { kSpinA.*s, kSpinB.*s, kListA.*s, kListB.*s, kListC.*s, kSystemEnd.*s, kPostInput.*s,
+                      kPostCategory.*s },
+        .idRows = f.rows,
+        .frameGain = f.frameGain,
+        .feedsUsb = f.feedsUsb,
     };
 }
 
 // [FW] each image's descriptors' IDs, and the Reverb Types a patch can choose (rom.4's descriptor: 0…14).  The frame's
 // gains are XtFxImage.h's: rom.2's Out Gain for TG at its default, −24 dB, which the firmware's powf gives as exactly
-// 1/16; rom.4's tones take theirs in the TVA's block (0x893a670c, as rom.2's 0x894ea380), so its frame goes in whole
+// 1/16; rom.4's tones take theirs in the TVA's block (0x893a670c, as rom.2's 0x894ea380), so its frame goes in whole.
+// The USB pair: XtFxImage.h's feedsUsb
 constexpr float kVSynthFrameGain = 0.0625f, kVc2FrameGain = 1.0f;
-constexpr XtFxImage kVSynth = imageOn(&Place::vSynth, 0x55d, 0x8d0, 11, kVSynthRows, kVSynthFrameGain);
-constexpr XtFxImage kVc2 = imageOn(&Place::vc2, 0x56a, 0x9ac, 15, kVc2Rows, kVc2FrameGain);
+constexpr XtFxImage kVSynth = imageOn(&Place::vSynth, { 0x55d, 0x8d0, 11, kVSynthRows, kVSynthFrameGain, true });
+constexpr XtFxImage kVc2 = imageOn(&Place::vc2, { 0x56a, 0x9ac, 15, kVc2Rows, kVc2FrameGain, false });
 } // namespace
 
 const XtFxImage& xtVSynthFx() { return kVSynth; }

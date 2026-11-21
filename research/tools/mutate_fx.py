@@ -15,7 +15,7 @@ samples = args.pop(0) if args and args[0].isdigit() else ('60' if control or vc2
 port, listing, source, tag = (('fx4c', 'fx4_muts.txt', 'XtFxControl::boot', 'fx4_') if vc2 else
                               ('fxc', 'fxc_muts.txt', 'XtFxControl::boot', 'fxc_') if control else
                               ('fx', 'fx_muts.txt', 'XtFxChip::reset', 'fx_'))
-parts = 10 if vc2 else 13 if control else 1   # the result lines a whole run prints
+parts = 13 if vc2 else 13 if control else 1   # the result lines a whole run prints (vc2's three input parts, v400)
 env = dict(os.environ, PORT=port, XT_FX_STOP='1')
 muts = mutlist.plants(D + '/' + listing, args, 'mutate_fx', (port,))   # a line's fourth field its port (fxv, v199)
 def results(out): return [l for l in out.splitlines() if re.search(r': \d+ (samples|edits), \d+ different', l)]

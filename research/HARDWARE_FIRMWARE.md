@@ -1546,6 +1546,133 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's outside input (2026-11-21, v400) {#vc2-fx-input}
+
+Step 4.4's third item (research/VC2_MODE_PLAN.md). The 2026-11-17 map found no reader of External In Type (0x7a) in
+rom.4's effect driver. There is one outside the driver, as rom.2's EXT IN request is outside rom.2's. On rom.4 it moves
+no chip word.
+
+**What reads External In Type.** Three places in rom.4 read 0x7a through the parameter read `0x89324350`. The scan
+covered every `mov #0x7a, r5` in its code, 0x89300000…0x89540000; the other seven are screens' coordinates.
+- **The EXT IN request `0x8935b050`.** It is rom.2's `0x894a7dd0` without the Source. It runs the setters of the
+  routing's wanted bytes at `0x89980fa9` (rom.2's `0x89ced225`): byte 1 to 0, byte 6 to the Type, byte 5 to 0. Then it
+  posts event 0x40 to the effect task: `0x893620d0`, the kernel's post `0x89301830` on `0x8994fefc`. rom.4 has no setter
+  of byte 7 and no External Input Source (its ID 0x7b is USB Mode). Nothing in rom.4 holds the request's address, as
+  nothing in rom.2 holds `0x894a7dd0`'s.
+- **Two inline copies of it:** case 4 of an internal message 0x40 (at `0x8935b300`, in `0x8935b090`, a method of the
+  vtable at `0x898cac48`), and the sampling object's `0x89359e60`. The second makes an OS call first, and calls
+  `0x89395740(0)` and `0x893957f0(0)` after.
+- **`0x893a1000`**, from the system's reader `0x8939b0d0`. It puts Master Tune, Master Key Shift and External In Type
+  into the tone generator's system words, at `0x89e371e0` + 0x10200 (+0, +2, +3). The EXTIN converter (`0x8939e9e0`,
+  OSC Type 2) writes its block's +0xb0 from that byte (`0x8939ee30`): 1 when it is 0, STEREO, else 0. That is the SH-4's
+  side, step 4.3's.
+
+**The event, `0x893620e0`.** It is rom.4's event 0x40. The effect task's loop (`0x89360ac0`) runs it, as does event 0x08's
+`0x8935ef40`, which first sets byte 1 to 2 when `0x89934540` is 1, as rom.2's does. It compares the wanted bytes with
+the applied ones at `0x89980fb0`: seven of them, where rom.2 has eight at `0x89ced22d`. What a change of each does:
+
+| Byte | What a change does |
+|---|---|
+| 4, with 3 | `0x89362070`: the fades at 0x238, with 50 ms waits; then coefficient 0x34 at 0xffe0 (byte 4 = 0), or at 0x20 after 50 ms (byte 4 = 1) |
+| 1, 0 | coefficient 0x34 at 0x20 after 50 ms, when byte 4 is set |
+| 3 | `0x89362040`, a fade at 0x238, when byte 4 is clear |
+| 2 | `0x89361fd0`: coefficients at words 0x8f and 0x93, from the gain table `0x895166f8` |
+| 6, the Type | stored; nothing is sent |
+| 5 | not read |
+
+Nothing else in rom.4 reads the applied bytes. Their loads are the init `0x89361ed0`, the start `0x89361f00`, two
+getters and the event. So **External In Type moves no chip word on rom.4.** Run through XtFxControl's queue at each
+Type: no word is sent, and the chip routes as before.
+
+**USB External In Type (0x7f)** belongs to the system reader (`0x8935feb0`; one of v259's rows). On a change the reader
+calls `0x893638b0`, which writes the USB pair's gains: four coefficients through `0x89362940`, at words 0x85…0x88. Run
+on the chip with noise into one pair at a time (`xt_fx <rom.4> vc2`'s new part):
+
+| Pair and USB External In Type | Slots 0x90, 0x94, 0x98 (left) | Slot 0x9a (right) | 0x92, 0x96 |
+|---|---|---|---|
+| analog, whatever either Type says | L | R | nothing |
+| USB, OFF | nothing | nothing | nothing |
+| USB, STEREO | L | R | nothing |
+| USB, MONO-L+R | (L + R)/2 | (L + R)/2 | nothing |
+| USB, MONO-L | (L + R)/2 | nothing | nothing |
+| USB, MONO-R | nothing | (L + R)/2 | nothing |
+
+The chip halves each side on its own, and 0x90 comes a sample later than 0x94 and 0x98. Program A also reads a third
+pair, 0x14 and 0x16, which reaches nothing at the defaults on either image. By its place it is the digital input; not
+traced.
+
+**The unit.** rom.2 hears either the analog pair or the USB pair, by External Input Source. rom.4 always hears the
+analog pair, and adds the USB pair to it by USB External In Type. The unit has given the plugin's one input to both pairs
+since v204, so on rom.4 the input would be heard twice under any USB type but OFF. `XtFxImage::feedsUsb` is rom.2's
+true, as before, and rom.4's false: on rom.4 the input goes to the analog pair alone, and the USB pair stays silent.
+
+**The words back.**
+- rom.4's audio task points `0x8993eadc` at the start of the received block (`0x8cc3f800` + 1024·i, invalidated first).
+  rom.2's `0x8987c7a0` points at the block + 16.
+- The part mixer reads frame words 1 and 5 (+4, +0x14) as the mic and the tracker's input.
+- `0x89396170` copies words 0…3 to `0x89989d00`, as rom.2's `0x894db220` does. A peak meter (`0x8935ae70`, on
+  `0x8997f630`) reads words 1, 2 and 3 of that copy.
+
+v204 took word k as what program A writes at slot 0x90 + 2k. That made words 4 and 5 rom.2's EXT IN pair, which
+External Input Type routes. Applied to rom.4, it puts the mic on slot 0x92, and no input reaches 0x92:
+- Program A writes it at pc 0x1e3 (rom.2 at 0x5f), from a chain that no GRAM word reaches. That covers the 2026-11-13
+  scan of all 256 words as an impulse with the three effects on, and these runs: a tone into the analog, USB and third
+  pairs and into the frame's eight words, at every External In Type and USB type, with each of the routing's bytes 0…4
+  set in turn and the event run (`0x89361fd0`'s gains among them).
+- Setting each coefficient of core 0 to 0x40 in turn opens no path to it.
+- Every instruction form the chain uses also occurs in rom.2's programs. Four forms occur in rom.4's alone, all after
+  the chain, at pc 0x216…0x2e5.
+
+So either word 1 isn't slot 0x92, or the chip does something with that chain that neither XtFxChip nor JE-8086's
+interpreter does. Which slot goes to which word is set by the bridge (IC37, TC200E06) and the kernel's set-up of it, and
+neither image holds that. A capture can settle it (step 5): on the VC-2, whether the direct sound follows a tone on L
+alone, then on R alone; in V-Synth mode, whether an EXT IN OSC follows External Input Type at MONO L and MONO R, as
+v204's mapping says. A bridge that reads a slot partway through the sample would explain part of it, not all: read
+after pc 0x5f and before 0x1e3, rom.4's word 1 would be 0x90's L, but no single read time gives both images their pairs.
+Nothing here hands rom.4's words 1 and 5 to the part yet. `returned()` is still words 4 and 5 by v204's mapping, on both
+images.
+
+**In the plugin** (XtFxImage.cpp, XtFxInput.cpp):
+- rom.4's request `0x8935b050` and event `0x893620e0` are routeInput's.
+- Its post `0x893620d0` is answered, as rom.2's `0x894aee70` is. The Category's post `0x89391e50` becomes an eighth
+  answered address.
+- External In Type is a BlockInput row.
+- `feedsUsb` decides whether the unit gives the input to the USB pair.
+- `XtFxControl::driverByte` lets the check read the routing's bytes.
+
+rom.2's unit, driver and words are as they were.
+
+**The checks** (`xt_fx <rom.4> vc2`, three new parts):
+
+| Part | Against | Samples | Different |
+|---|---|---|---|
+| The input routing by hand | rom.4's request and event run from the check's own addresses (`HandDriver::route`), comparing the 14 routing bytes and every word, at the start and at each Type. Held to the firmware's own way: no chip word moves, the Type lands in applied byte 6, ID 0x7a is read | 6 | 0 |
+| The input routing on the chip | the table above: noise into each pair at every External In Type × USB External In Type, each slot at its best delay within a word's last bit, 0x92 and 0x96 silent | 40 | 0 |
+| The input through the unit | words 4 and 5 take the analog pair's way alone, under each USB type | 5 | 0 |
+
+External In Type is also among the edits of the queue, live-edit and hand parts, with the hand side routing it, and among
+the IDs that must each count as a change. The start against the firmware's task now runs the request and the event on
+both sides. With 0x7a drawn, the queue part's count is 479,645 samples and the unit's against the reference 311,519
+(v274: 493,298 and 289,442), both 0 different. Every part is 0 different at seeds 2024, 7 and 31337. rom.2's
+`xt_fx control` prints its lines as before, line for line.
+
+**Plants.**
+- `mutate_fx.py --vc2`: 72 of 72 caught. 14 are new: the request, event and post gone or elsewhere, External In Type's
+  row gone, on another ID or in another block, the USB pair fed (in the image, the unit and both of XtFxInput.cpp's
+  lines, the port `fx4in`), the routing not sent or not run. Four old ones were moved with the code they quote.
+- `mutate_fx.py --control`: 184 of 184 caught: rom.2's `route-post` and `in-usb` moved with their lines, and a new
+  `feeds-usb-rom2`.
+- fxthreads.sh: no races.
+
+**Split first.** template-law refused a third copy of the unit's set-up, so it is one factory, `settledUnit`
+(XtFxCheckUnit.h). The input's frames through the unit are one function, `handedBack`. v204's input law and v205's copy
+check now use both.
+
+**Not done.**
+- The mic's slot, above.
+- The third pair, 0x14 and 0x16.
+- What `0x89359e60`'s two calls (`0x89395740`, `0x893957f0`) do.
+
 ### rom.4's frame through the unit (2026-11-19, v274) {#vc2-fx-frame}
 
 Step 4.4's second item (research/VC2_MODE_PLAN.md). `XtFxUnit` takes an image: rom.4's runs rom.4's driver, with the frame
@@ -2127,7 +2254,7 @@ Step 4.4's first part (research/VC2_MODE_PLAN.md, which has the map). rom.4's dr
 - **The patch EQ is read with the switches.** EQ 1 and EQ 2 (IDs 0x1af…0x1b4) are in the switches' reader, so a live edit of one goes as a switches message. The system's reader has no mid bands on rom.4 (0x67, 0x68, 0x6f…0x72).
 - **A patch of Category 10 or 11 posts an event.** The switches' routine calls `0x89391e50`, which posts event 0x200 on the object `0x8994fec8` through the kernel. No chip word moves at any Category. `XtFxControl` answers it with nothing, as it does rom.2's post of event 0x40; what the event does in the tone generator is for step 4.3. The first version faulted here: it took a check that loads a patch of every Category to show it.
 - **Seven MFX parameters don't take a live edit alone**, the seven rom.2 has, at the same types and places (0x588, 0x5c4, 0x5ea, 0x641, 0x6c8, 0x6ca, 0x72b).
-- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4. No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.
+- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4. ~~No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.~~ (v400: the EXT IN request reads it, outside the driver as on rom.2, and moves no chip word: "rom.4's outside input".)
 
 **The check**, `xt_fx <rom.4> vc2`. Comparing the chip with JE-8086's is blind to what the driver is asked, as both chips hear the same words, so most of it is about the driver:
 

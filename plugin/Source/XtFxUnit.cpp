@@ -6,7 +6,8 @@
 
 // ------------------------------------------------------------------ the unit
 XtFxUnit::XtFxUnit(const char* romPath, const XtFxImage& image)
-    : chip_(std::make_unique<XtFxChip>()), control_(romPath, nullptr, image), frameGain_(image.frameGain) {}
+    : chip_(std::make_unique<XtFxChip>()), control_(romPath, nullptr, image), frameGain_(image.frameGain),
+      feedsUsb_(image.feedsUsb) {}
 XtFxUnit::~XtFxUnit() = default;
 
 void XtFxUnit::settle() {
