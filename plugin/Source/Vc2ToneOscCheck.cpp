@@ -263,7 +263,7 @@ void toneSteerRenders(ToneSides& s, int i) {
         extIn = extIn || oscRendersBy(v, kOscExtInRenders);
         variOff = variOff || oscRendersBy(v, kOscVariOffRenders);
         heads = heads || oscRendersBy(v, kOscHeadsRenders);   // v326
-        oscSteerRenders(v, s.shared.osc.renders);
+        oscSteerRenders(v, s.shared.osc);
         writeToneOsc(s, i, osc);
     }
     s.n.extInBlocks += extIn;

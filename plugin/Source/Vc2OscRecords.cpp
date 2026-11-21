@@ -120,9 +120,22 @@ void oscDrawLoopEvents(OscRecords& r, std::mt19937& rng) {
     constexpr int32_t kFrom = 3000 * 16, kOver = 500 * 16, kSpanLeast = 64 * 16, kSpanOver = 800 * 16;
     for (int k = 0; k < kOscRecords; ++k) {
         const int32_t fwd = kFrom + (int32_t)(rng() % kOver), bwd = kFrom + (int32_t)(rng() % kOver);
-        const std::array<int32_t, 4> at { fwd, fwd + kSpanLeast + (int32_t)(rng() % kSpanOver),
-                                          bwd + kSpanLeast + (int32_t)(rng() % kSpanOver), bwd };
+        std::array<int32_t, 4> at { fwd, fwd + kSpanLeast + (int32_t)(rng() % kSpanOver),
+                                    bwd + kSpanLeast + (int32_t)(rng() % kSpanOver), bwd };
+        // v327: one time in four one of them at an event of the case's events' table, where a crossing meets both
+        const std::vector<int32_t>& events = r.events.positions;
+        if (!events.empty() && rng() % 4 == 0) {
+            const size_t which = rng() % at.size();
+            at[which] = events[rng() % events.size()];
+        }
         for (size_t e = 0; e < at.size(); ++e) r.bound[oscPairAt(k) + kEvents[e]] = std::bit_cast<float>(at[e]);
+        // v327: the word before each, an event's number and (at the forward loop's end and the backward's start) the
+        // loop's mode: none, One Way, Alternate, hold, or past them
+        constexpr std::array<int16_t, 6> kModes { 0, 1, 2, 3, -1, 5 };
+        for (size_t e = 0; e < at.size(); ++e) {
+            const uint32_t mode = e % 2 == 1 ? (uint16_t)kModes[rng() % kModes.size()] : rng() & 0xffff;
+            r.bound[oscPairAt(k) + kEvents[e] - 4] = std::bit_cast<float>((rng() & 0xffff) | mode << 16);
+        }
     }
 }
 

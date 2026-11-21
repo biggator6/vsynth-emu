@@ -201,6 +201,7 @@ int main(int argc, char** argv) {
     oscVariOffPart(fw, *run, tally);
     oscVibratoPart(fw, *run, tally);
     oscInstallRom(fw, shared.draws, rom, oscVoiceNumber);
+    oscModeOnePart(s, *run, tally);   // v327
     const std::string setUp = oscKindsSetUp(s);
     vc2RunCases(*run, tally, setUp, s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
     const OscCounts& n = s.n;
@@ -213,7 +214,8 @@ int main(int argc, char** argv) {
     std::printf("calls: %ld seeks, %ld kinds' routines, %ld event lookups, %ld object setups; %ld ramps gliding after "
                 "an event\n", n.seeks, n.kindCalls, n.lookups, n.objectCalls, n.gliding);
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
-                "heads'\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks);   // v322, v323, v326
+                "heads', %ld through mode 1's\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks,
+                n.modeOneBlocks);   // v322, v323, v326, v327
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;

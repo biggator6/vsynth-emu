@@ -60,9 +60,11 @@ struct OwnRender {
     uint32_t at;
     void (*render)(Vc2OscVoice&, float*, Vc2OscParts&);
 };
-constexpr std::array<OwnRender, 6> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
+// v327: kind 1's mode 1's (Vc2OscModeOne.cpp), one routine for mono and stereo
+constexpr std::array<OwnRender, 7> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
                                                    { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
-                                                   { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo } } };
+                                                   { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo },
+                                                   { 0x893c9f60, vc2OscModeOne } } };
 } // namespace
 
 bool Vc2OscVoice::renderOwn(uint32_t routine, float* out, Vc2OscParts& parts) {

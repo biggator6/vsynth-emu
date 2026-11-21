@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's mode 1 v327 (2026-11-21, on claude/vc2-part-4-3 after v326; HARDWARE_FIRMWARE.md, "The VC-2's mode 1"):
+  step 4.3's fifty-fifth version, the third piece of item 11's fourth part's second half. Kind 1's mode 1's render
+  0x893c9f60 (rom.2's 0x8950d880, which nothing ported, on rom.4's object) is the voice's own (Vc2OscModeOne.cpp), a row
+  of kOwnRenders: the beat block's step × the pitch × the rate factor, 32 frames of half the step, linear reads mono or
+  stereo, the gain's glide. Under it the players' event walk (Vc2OscWalk.cpp, Vc2OscWalkEvents.cpp): the event load,
+  the next crossing, the two crossings' loops' part one routine over a row, each loop mode a row, the events' ways by
+  kind (byte 2's), mode 1's two jumps; a player's index a row, Vc2WalkWay. Found: mode 1's cached jump writes the
+  event's number through the render's mask 0xfffff (0x0010000b, an address error on the XT); its other jump reads the
+  next event 8 bytes on; the searches step by an event's own offset. xt_vc2osc no longer hooks it: an events' table each
+  case, the records' cached events and modes, mode 1's words drawn as a note gives them, a page mapped for the stray
+  write, and a mode 1 part of its own before the voice part (Vc2OscModeOneCheck.cpp: runs of 8 blocks on words drawn
+  once, 10240 blocks at 40 cases, where the first plant run without it missed 19 of 161). 0 different at seeds 2024, 7
+  and 31337. Its set-up 0x893cc760 and seek 0x893cc830 still out. Not in the sound
+  yet.
+
 The VC-2's LITE heads v326 (2026-11-21, on claude/vc2-part-4-3 after v325; HARDWARE_FIRMWARE.md, "The VC-2's LITE
   heads"): step 4.3's fifty-fourth version, the second piece of item 11's fourth part's second half. rom.4's heads'
   renders 0x893c6e80 and 0x893c6e8c are rom.2's 0x8950a7f0 and 0x8950a7fc but for their words, four bytes up from

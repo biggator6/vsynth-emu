@@ -70,7 +70,10 @@ struct Vc2OscTables {
     float variOffFold = 0;          // 0x893c6764: 45875, 70% of it
     float variOffGlide = 0;         // 0x893c6424: 1/32
     float variOffFade = 0;          // 0x893c6428
-    Vc2OscAnalogPool analog;        // the analog note-on's (v242, Vc2OscAnalogPool.h)
+    // kind 1's mode 1's render (v327): the fraction's scale, a sample's
+    float modeOneFraction = 0;      // 0x893ca150: 2^−24
+    float modeOneScale = 0;         // 0x893ca154: 65536
+    Vc2OscAnalogPool analog;       // the analog note-on's (v242, Vc2OscAnalogPool.h)
     Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };
 

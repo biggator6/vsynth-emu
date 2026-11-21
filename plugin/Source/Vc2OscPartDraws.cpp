@@ -173,6 +173,18 @@ float drawHeadsRange(Vc2OscVoice& o, std::mt19937& rng) {
 }
 } // namespace
 
+void oscDrawBeatWords(Vc2OscVoice& o, std::mt19937& rng) {
+    using namespace OscHeads;
+    const auto put = [&](uint32_t at, uint32_t word) { o.setU32(Vc2OscVoice::kObject + at, word); };
+    const auto putReal = [&](uint32_t at, float v) { o.setF32(Vc2OscVoice::kObject + at, v); };
+    putReal(kWalkAt, (rng() % 2 ? 1.0f : -1.0f) * oscWithin(rng, 0.1f, 3.0f));
+    for (uint32_t at : { kFactorAt, kFactorAt + 4 }) putReal(at, oscWithin(rng, 0.0f, 2.0f));   // and its integral
+    constexpr float kBeatUnits = 512.0f;   // [FW] the beat's position in 1/512 sample, about the loop events'
+    put(kBeatPosAt, (uint32_t)(int32_t)(oscWithin(rng, 2400.0f, 5500.0f) * kBeatUnits));
+    if (rng() % 4 != 0) o.setU8(Vc2OscVoice::kObject, o.u8(Vc2OscVoice::kObject) & (uint8_t)~kBeatBits);
+    if (rng() % 2 != 0) o.setU8(Vc2OscVoice::kObject + kTailBitsAt, (uint8_t)rng());   // a hold, a turn, a sample
+}
+
 void oscDrawHeadsWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt) {
     using namespace OscHeads;
     const auto put = [&](uint32_t at, uint32_t word) { o.setU32(Vc2OscVoice::kObject + at, word); };
@@ -189,12 +201,7 @@ void oscDrawHeadsWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt) {
     for (uint32_t k = 0; k < 4; ++k) putReal(kWindowsAt + 4 * k, period * vc2Unit(rng));
     for (uint32_t at : { kFwdModeAt, kBwdModeAt }) put(at, rng() % 3);
     for (uint32_t at : { kFwdRateAt, kBwdRateAt, kPitchAt, kFormantAt }) putReal(at, oscWithin(rng, 0.5f, 2.0f));
-    putReal(kWalkAt, (rng() % 2 ? 1.0f : -1.0f) * oscWithin(rng, 0.1f, 3.0f));
-    for (uint32_t at : { kFactorAt, kFactorAt + 4 }) putReal(at, oscWithin(rng, 0.0f, 2.0f));   // and its integral
-    constexpr float kBeatUnits = 512.0f;   // [FW] the beat's position in 1/512 sample, about the loop events'
-    put(kBeatPosAt, (uint32_t)(int32_t)(oscWithin(rng, 2400.0f, 5500.0f) * kBeatUnits));
-    if (rng() % 4 != 0) o.setU8(Vc2OscVoice::kObject, o.u8(Vc2OscVoice::kObject) & (uint8_t)~kBeatBits);
-    if (rng() % 2 != 0) o.setU8(Vc2OscVoice::kObject + kTailBitsAt, (uint8_t)rng());   // a hold, a turn, a sample
+    oscDrawBeatWords(o, rng);
     for (uint32_t at : { kTargetAt, kGainAt }) putReal(at, oscWithin(rng, 0.0f, 0.5f));
     putReal(kRateAt, oscWithin(rng, 0.0f, 0.05f));
     for (uint32_t at : { kFilterAt, kFilterAt + 4 }) putReal(at, oscWithin(rng, -2.0e8f, 2.0e8f));
@@ -234,10 +241,12 @@ bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders) {
         && std::ranges::find(renders, o.tail.render) != renders.end();
 }
 
-void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng) {
+void oscSteerRenders(Vc2OscVoice& o, OscShared& shared) {
     constexpr uint32_t kLevelAt = 0x1e0, kTargetAt = 0x1dc;   // [FW] the object's +0x84 and +0x80
+    std::mt19937& rng = shared.renders;
     if (oscRendersBy(o, kOscVariOffRenders)) oscDrawVariOffWords(o, rng, kOscWaveAt);   // v323
     if (oscRendersBy(o, kOscHeadsRenders)) oscDrawHeadsWords(o, rng, kOscWaveAt);       // v326
+    if (oscRendersBy(o, kOscModeOneRenders)) oscDrawModeOneWords(o, rng, shared.records, kOscWaveAt);   // v327
     if (!oscRendersBy(o, kOscExtInRenders)) return;
     for (uint32_t at : { kLevelAt, kTargetAt }) {
         if (!(std::fabs(o.f32(at)) <= 1.0f)) o.setF32(at, vc2Unit(rng));
@@ -260,6 +269,7 @@ bool oscSteerLiteSettings(Vc2OscVoice& o, std::span<uint32_t> settings, uint32_t
 void oscDrawWave(Vc2Fw& fw, OscShared& shared) {
     oscDrawHalfwords(shared.wave, shared.renders);
     fw.cpu.write(kOscWaveAt, shared.wave.data(), shared.wave.size() * sizeof(int16_t));
+    oscDrawEventTable(fw, shared);   // v327
 }
 
 std::string oscRingWordsDifference(const OscRingSides& r) {

@@ -1546,6 +1546,119 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's mode 1 (2026-11-21, v327) {#vc2-osc-mode-one}
+
+Step 4.3's fifty-fifth version, the third piece of item 11's fourth part's second half. Kind 1's mode 1, the render
+LITE's install writes for a wave of type 1, `0x893c9f60`, is the voice's own (`Vc2OscModeOne.cpp`), with the players'
+event walk it runs (`Vc2OscWalk.cpp`, `Vc2OscWalkEvents.cpp`). Its set-up `0x893cc760` and its seek `0x893cc830` still
+go out.
+
+**The render.** It is rom.2's `0x8950d880`, which nothing ported (rom.2's converter never makes mode 1), on rom.4's
+object: the words four bytes up from +0x94 (the rate factor +0xa0, the samples +0xec), one routine for mono and stereo
+(the object's 0x40). It runs the beat's block (`0x893c89a0`, v326's `beatBlock`). It scales the step's word by the pitch
+(+0x70) × the rate factor, then finds the next crossing. Then each of its 32 frames:
+- moves by half the step, the fraction 20 bits under the position ×16, inside the range (+0x18 to +0x1c);
+- crossing the next crossing (+0x2c), walks the events and loops that way, then finds the next;
+- at the range's end, holds there, its fraction 0, the end byte +4 set to 1 or −1;
+- reads between two samples by the 24 bits below the position's whole samples. Mono reads half words, stereo left and
+  right ones. The gain at the voice's +0xe0 glides to its target (+0xdc) by its rate (+0xe4), the object's −0x80…, and
+  is ×65536 from rom.4's pool.
+
+Walking back, rom.4 then compares the range's start with the next crossing just found (r1, as `0x893c9380` leaves it),
+not with the position: the forward path reads the position again, this one doesn't.
+
+**The walk.** Its routines are SOLO's walk (rom.2's `0x8950c7e0`, `0x8950ccc0`, `0x8950c880`, `0x8950ca70`; XtSoloVoice
+ports them on its own state, without what follows byte 2), on the object's words. The loop points and modes are read
+through the record at +0x6c, as v326's beat block reads the positions:
+- the event load (`0x893c8f00`): the entry at the table (+0x10) + (number × stride + first) half words, as the SH-4
+  forms it (MULU.W on the low halves). Its kind (flags & 0x0b) goes to +5 and its position to +0x24.
+- the next crossing (`0x893c9380`) is XtSoloVoice's `crossings`;
+- a crossing (`0x893c8f50` forward, `0x893c9140` back) first does the loops' part. A bounce's end turns the walk round.
+  A loop's last point leaves the loop when the loops are off (byte 0's 0x01); otherwise it loops by the mode in its
+  record (One Way, Alternate, hold). Past mode 3, the forward way keeps the loop's bit and rate and the backward way
+  clears them, as XtSoloVoice has it.
+- then, at the event, its kind's way: forward at the next event, back at the current one. A mark (1) gives a sample's
+  step under byte 2's 0x05. A return (2) or a turn (3) acts only when byte 2 opens it (0x01 set; 0x02 set passes one
+  and is cleared). Walking forward, a return goes back to the last mark and jumps there, and a turn turns the walk.
+  Walking back, a mark searches forward to the first return or turn and acts on it. LITE's note-on clears byte 2, and
+  nothing sets it, so these ways wait on a byte nothing writes, as XtSoloVoice notes for rom.2.
+- each player passes its index, r5: 0 mode 1, 4 and 8 SOLO's, 12 and 16 two others. It picks the two event jumps from
+  the tables at `0x893c9350` and `0x893c9364`, and at 16 a turn leaves the step's sign. A row, `Vc2WalkWay`, mode 1's
+  alone so far.
+
+**Found in rom.4's code, kept as it is:**
+- the searches step by an event's own offset, (n × stride + first) half words, not by the stride. A return's search
+  back visits the current event, then the table's start, then below it. A mark's search forward visits the next event,
+  then beyond it.
+- mode 1's jump to the current event (`0x893ca190`) takes the −8 meant for its entry off r4 (which nothing reads after
+  it) where its cached twin (`0x893ca1a0`) takes it off r6. So it reads the next event 8 bytes past where it is.
+- mode 1's jump to a loop's cached event (`0x893ca1a0`) writes the event's number to r4 + 0xc before it sets r4. From
+  the render, r4 is its mask 0xfffff, so the half word goes to 0x0010000b, an odd address: an address error on the XT,
+  at every One Way or hold loop point mode 1 meets. The object's +0xc keeps its number. The port writes it nowhere. The
+  check maps a page there, so the rest of the jump is compared.
+- One Way's, a hold's and a return's writes of the position are written again by mode 1's jumps, so for mode 1 they
+  are dead.
+
+**The port.** The object's words are read and written through `Vc2WalkWords` (`Vc2OscWalk.h`). The events' table and
+the record are read through `Vc2OscParts::boundFloat` by address: a word aligned, as an SH-4 MOV.L must be (so a real
+table's stride and first are even), and a half word as its aligned word's low or high half (`memoryHalf`; the loops'
+modes sit 2 bytes into theirs). The loops' part of the two crossings is one routine over a row (`Crossing`), each mode's way
+a row. The events' ways are rows by kind, each way its own table, since they don't mirror. The render's pool words
+(2^−24, 65536) are in `Vc2OscTables`.
+
+**The checks.** xt_vc2osc no longer hooks `0x893c9f60`, so rom.4's own runs in the voice, in xt_vc2tone too. A part
+of its own runs first (`oscModeOnePart`, `Vc2OscModeOneCheck.cpp`), after the hooks' install and before the voice part.
+It calls rom.4's `0x893c9f60` on voice 0's object against `vc2OscModeOne`. Each case draws a wave and a table, then
+plays 32 runs of 8 blocks, the words drawn before each run, so the walk goes on through its events and loops: 10240
+blocks at 40 cases, where the voice part, drawing the words before every block, gives about 240. It draws from a
+generator of its own and puts the renders' back after. The first plant run, without the part, missed 19 of 161 at 40
+cases. With 8 runs a case, each move of the draws lost a few others, caught by one or two cases; at 32 all but one of
+the 161 are caught at 20 cases too. The draws, the voice part's and the part's alike:
+- each case at the wave's draw, an events' table at 0x8C0C0000 (`oscDrawEventTable`, `Vc2OscWalkDraws.cpp`): 4…12
+  events of a stride of 4, 6 or 8 half words from a first of 0 or 2, rising through frames 2500…4900 about the loop
+  events'. Their kinds are a mark, a return or a turn three times in four, the first a mark half the time, where a
+  return's search ends. The region about the table is zeros, which the searches reach. It goes into rom.4's memory and
+  the records (`OscRecords::events`), which the port's parts read (`OscPortParts::boundFloat`).
+- the +0xe0 records gain their cached events' numbers and the two loops' modes, 0…3 or past them, and one loop point
+  in four lies at an event (`oscDrawLoopEvents`);
+- before a render through mode 1, the object's words as a note gives them about the table (`oscDrawModeOneWords`):
+  the beat's words (`oscDrawBeatWords`, the heads' lines moved), the range about the events and the position in it,
+  the current and the last event, the pitch and rates 0.5…2, the gain's three. Byte 2 opens returns and turns three
+  times in four. Then one of four steers (`steerWalk`, a row each):
+  - bouncing as an Alternate loop leaves it, the walk forward: in the forward loop (byte 3's 0x08 alone, the step
+    back, at a mark with byte 2 open) or the backward one (0x04). The event it goes to is put at the loop's last point
+    (the backward loop's start, the forward's end), the position whole samples before it, where a crossing meets the
+    point while bouncing. The beat's tail clears 0x08 when the walk goes back or with 0x04.
+  - a sample's step (byte 3's 0x01, the pitch and rate 1, the fraction 0) from whole samples before the event ahead,
+    so that a frame lands on the crossing;
+  - at a loop point ahead, near or far: a sample's step onto it, or the position on it, in both loops. Only a start on
+    the point shows a crossing found there as the walk stands on it (`walk-past`): from a landing, its second
+    crossing repeats its first.
+  - or none.
+- xt_vc2osc's render event gives the voice mode 1's render word one render in four (`oscSteerRenders`, given the
+  shared draws from v327);
+- `oscInstallRom` maps a page at 0x80100000 for the cached jump's stray write.
+
+Not drawn:
+- an odd stride or first, whose entries' positions would be MOV.Ls off their alignment (an address error on the XT,
+  which the interpreter reads anyway), and a stride or first past 0x7f, whose sign extension rom.4 takes;
+- positions outside the case's wave, where rom.4 reads unmapped memory;
+- a cached jump from a player other than mode 1, which has no row yet.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. The mode 1 part plays 10240, 102400 and
+  102400 blocks; the voice part renders 233, 2355 and 2466 through mode 1. xt_vc2tone reaches it too: 9 renders at 40
+  cases, by coverage, as its steer file (at the kit's 300 lines) has no room for a count.
+- at 400 cases, `Vc2OscModeOne.cpp`, `Vc2OscWalk.cpp` and `Vc2OscWalkEvents.cpp` are wholly reached, every line and
+  branch, but a turn's `keepsSign`, which only index 16's row would set.
+- `mutate_vc2.py --osc`: 161 new plants on the render, the walk, its events' ways, the pool words and the row, all
+  caught; at 20 cases all but `ev-back-mark-last`. Not planted, as nothing can show them: `keepsSign`, and the
+  position One Way, a hold and a return write before mode 1's jump writes it again. The whole `--osc` (1,589) and
+  `--tone` (754) lists caught. No rom.2 port changed, so no `mutate_tone.py` plants run, by the rule from v327.
+
+**Next.** Mode 1's set-up `0x893cc760` (SOLO's start `0x893cc1a0`, `0x893ccf50`, then the beat's start) and its seek
+`0x893cc830` (the event lookup `0x893cc100`, the jump `0x893ca160`, the beat's reset), which SOLO's walk shares.
+
 ### The VC-2's LITE heads (2026-11-21, v326) {#vc2-osc-lite-heads}
 
 Step 4.3's fifty-fourth version, the second piece of item 11's fourth part's second half. LITE's heads' renders,

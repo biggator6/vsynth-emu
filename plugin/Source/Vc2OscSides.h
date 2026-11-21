@@ -15,6 +15,7 @@ struct OscCounts {
     long voicedSounding = 0, voicedNotFinite = 0;   // v266: those blocks with a sample that isn't 0, or isn't finite
     long extInBlocks = 0, variOffBlocks = 0;        // v322, v323: the renders through the EXT IN player's, Vari off's
     long headsBlocks = 0;                           // v326: and through LITE's heads'
+    long modeOneBlocks = 0;                         // v327: and through kind 1's mode 1's
     long liteUpdates = 0, liteSettings = 0;         // v324: LITE's update and settings on a type with a way
 };
 
@@ -75,6 +76,8 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v);
 void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same
 void oscWriteVoice(OscSides& s, int v);
+// v327 (Vc2OscModeOneCheck.cpp): the mode 1 part, after the hooks' install and before the voice part
+void oscModeOnePart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
 // v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them
 void oscVibratoPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);
 void oscDrawVibratoWords(Vc2VibratoWords& w, std::mt19937& rng);

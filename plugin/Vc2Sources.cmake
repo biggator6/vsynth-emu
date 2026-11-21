@@ -55,6 +55,9 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscLite.cpp
     Source/Vc2OscBeat.cpp
     Source/Vc2OscHeads.cpp
+    Source/Vc2OscModeOne.cpp
+    Source/Vc2OscWalk.cpp
+    Source/Vc2OscWalkEvents.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp

@@ -120,6 +120,7 @@ void oscDrawHeadsWords(Vc2OscVoice& o, std::mt19937& rng, uint32_t waveAt);
 inline constexpr std::array<uint32_t, 2> kOscExtInRenders { 0x893c62e0, 0x893c61e0 };
 inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c66e0 };
 inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e8c };
+inline constexpr std::array<uint32_t, 1> kOscModeOneRenders { 0x893c9f60 };   // v327: mono and stereo alike
 // Whether a voice's render is one of `renders` (its kind renders by +0xa44, and that names one); before a render, a
 // voice's words as the render needs them (`oscPlaysExtIn` and `oscSteerExtIn` until v323):
 // - through the EXT IN player (v322), its level (+0x1e0) and target (+0x1dc) within ±1 as a note gives them (the
@@ -128,11 +129,28 @@ inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e
 //   delay by (v269: past full scale it reads past its lines);
 // - through Vari off (v323), the object's words drawn as v261's are, on the wave at kOscWaveAt, so its reads stay in it
 //   and its wrap ends;
-// - through LITE's heads (v326), the object's words drawn by oscDrawHeadsWords, on the same wave
+// - through LITE's heads (v326), the object's words drawn by oscDrawHeadsWords, on the same wave;
+// - through kind 1's mode 1 (v327), by oscDrawModeOneWords, about the case's events' table and on the same wave.
+// From the renders' generator, the shared draws' (`renders`, and from v327 the records' events' table)
 bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders);
-void oscSteerRenders(Vc2OscVoice& o, std::mt19937& rng);
+void oscSteerRenders(Vc2OscVoice& o, OscShared& shared);
+// v327: the beat's block's words, as LITE's heads' and mode 1's draws give them (oscDrawHeadsWords' lines, moved): the
+// walk ±0.1…3, the factor and its integral 0…2, the beat's position about the loop events', Tempo Sync and Time Trip
+// off three times in four, byte 3 any byte half the time
+void oscDrawBeatWords(Vc2OscVoice& o, std::mt19937& rng);
+// v327 (Vc2OscWalkDraws.cpp): mode 1's object's words as a note gives them, about the case's events' table: the range
+// and the position about its events, the current event and those beside it, the step's words (the beat's), the
+// pitch and rates, the gain's three (the voice's +0xdc…), the flags (stereo, the loops), the walk's and events' bits;
+// then one of four steers (Vc2OscWalkDraws.cpp's steerWalk): bouncing in either loop with the event ahead at the
+// loop's last point, a sample's step landing on the event ahead, at a loop point ahead or on it, or none
+void oscDrawModeOneWords(Vc2OscVoice& o, std::mt19937& rng, const OscRecords& r, uint32_t waveAt);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
 void oscDrawWave(Vc2Fw& fw, OscShared& shared);
+// v327 (Vc2OscWalkDraws.cpp), at the wave's draw: a case's events' table at kOscEventsAt, 4…12 events of a stride of
+// 4, 6 or 8 half words from a first of 0 or 2 (even, as an entry's position is a MOV.L, which must be aligned), their
+// positions rising through frames 2500…4900 about the loop events', their kinds a mark, a return or a turn three times
+// in four; the region about it zeros, into rom.4's memory and the records' events both
+void oscDrawEventTable(Vc2Fw& fw, OscShared& shared);
 // v324: before a settings on a LITE voice (kind 1), the head's address (+0x1a0) the voice's own +0x108's at `voiceAt`,
 // as its note-on leaves it (LITE's settings read the loop record through it, whatever the type), and the settings'
 // type word (+0xb0) 0…2 half the time, the types with a way, and each of its four switches (+0x34…+0x40 from there) 0

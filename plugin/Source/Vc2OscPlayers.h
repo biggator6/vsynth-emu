@@ -43,6 +43,8 @@ void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> w
 void vc2OscWordsTo(Vc2OscVoice& v, const void* port, std::span<const XtWord> words, Vc2OscPlace place);
 // v326 (Vc2OscHeads.cpp): LITE's heads' renders, 0x893c6e80 and 0x893c6e8c, on XtLitePlayer
 void vc2OscHeads(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool stereo);
+// v327 (Vc2OscModeOne.cpp): kind 1's mode 1's render, 0x893c9f60, mono or stereo by the object's byte 0, on the walk
+void vc2OscModeOne(Vc2OscVoice& v, float* out, Vc2OscParts& p);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

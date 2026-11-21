@@ -995,6 +995,13 @@ version against rom.4's routines with what it calls hooked:
          steps, then the tail's step word by byte 3, the loop's positions through the +0xe0 record), the voice's own
          renders' rows; XtLitePlayer runs on the object's words by its table of them (HARDWARE_FIRMWARE.md, "The VC-2's
          LITE heads"). Next: mode 1, with VariPhrase's band players.
+       - Mode 1's render (v327): `0x893c9f60` (rom.2's `0x8950d880` on rom.4's object, mono and stereo) the voice's
+         own, on the players' event walk it runs: the event load `0x893c8f00`, the next crossing `0x893c9380`, the
+         crossings `0x893c8f50` and `0x893c9140` with the events' ways byte 2 opens, mode 1's two jumps `0x893ca190`
+         and `0x893ca1a0`, a player's index a row (`Vc2WalkWay`) (HARDWARE_FIRMWARE.md, "The VC-2's mode 1"). Found:
+         mode 1's cached jump writes through the render's mask, an address error on the XT at every One Way or hold
+         loop point; the walk's searches step by an event's own offset. Next: mode 1's set-up `0x893cc760` and seek
+         `0x893cc830`, with SOLO's start `0x893cc1a0` and the lookup `0x893cc100`, which SOLO's walk shares.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -84,16 +84,16 @@ struct OscHook {
 // oscillator's (v244) with its shape (v246), the analog's install, update and settings (v248), the carrier's init,
 // settings and render and kind 6's start and render (v266), the vibrato's four (v267), kinds 5's and 6's updates
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
-// settings (v324) and the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325): rom.4's own
-// run, and the routines they call hooked
+// settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
+// renders (v326) and kind 1's mode 1's (v327): rom.4's own run, and the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893c88b0, kKindCall, kindRoutine, none },
     { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
     { 0x893cc0d0, kEventPosition, eventAt, positions },
     { 0x893b0280, kKindSettings, routineSettings, none },
-    // v238: the players' renders LITE's and VariPhrase's installs write (kind 1's mode 1, SOLO's, BACKING's,
-    // ENSEMBLE's, the period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326)
-    { 0x893c9f60, kRenderBy, renderBy, rendered }, { 0x893c9450, kRenderBy, renderBy, rendered },
+    // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's, BACKING's, ENSEMBLE's, the
+    // period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327)
+    { 0x893c9450, kRenderBy, renderBy, rendered },
     { 0x893cadc0, kRenderBy, renderBy, rendered }, { 0x893ca1f0, kRenderBy, renderBy, rendered },
     { 0x893ca8b0, kRenderBy, renderBy, rendered },
     // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
@@ -134,6 +134,11 @@ void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log, 
         });
     }
     fw.cpu.hook(kOsClock, [&draws](Sh4& cpu) { cpu.ret((uint32_t)draws.clock); });
+    // v327: a page where mode 1's jump to a loop's cached event (0x893ca1a0) writes the event's number, through the
+    // render's mask 0xfffff in r4 (0x0010000b: on the XT a half word to an odd address, an address error), so that the
+    // rest of the jump runs; nothing reads it
+    constexpr uint32_t kStrayAt = 0x80100000, kStrayBytes = 0x1000;
+    if (fw.cpu.ptr(kStrayAt, 1) == nullptr) fw.cpu.mapRam(kStrayAt, kStrayBytes);
 }
 
 std::string oscCallsDifference(const std::vector<OscCall>& rom, const std::vector<OscCall>& port) {

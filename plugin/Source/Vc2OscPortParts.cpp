@@ -27,6 +27,8 @@ void OscPortParts::seek(uint32_t routine, int32_t at) {
 }
 
 float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
+    const OscEventTable& events = s_.records.events;   // v327: mode 1's events' table, as rom.4's memory holds it
+    if (events.holds(part + offset)) return std::bit_cast<float>(events.wordAt(part + offset));
     const auto word = s_.records.bound.find(part + offset);
     return word == s_.records.bound.end() ? 0.0f : word->second;
 }

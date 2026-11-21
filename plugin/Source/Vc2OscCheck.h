@@ -6,6 +6,7 @@
 #include "Vc2OscVoice.h"
 #include <array>
 #include <bit>
+#include <cstring>
 #include <map>
 #include <vector>
 
@@ -32,6 +33,7 @@ inline constexpr uint32_t kOscFramesAt = 0x8C057000;     // the effect chip's fr
 inline constexpr int kOscFrameWords = 32 * 8;            // [FW] a block's 32 frames of 8 words
 inline constexpr uint32_t kOscWaveAt = 0x8C0B0000;       // the wave Vari off's renders play (v323)
 inline constexpr uint32_t kOscWaveHalfwords = 16384;
+inline constexpr uint32_t kOscEventsAt = 0x8C0C0000;     // the events' table mode 1 walks (v327)
 
 enum OscKind : int32_t { kKindCall, kKindSettings, kRenderBy, kSeek, kObjectCall, kEventPosition };
 
@@ -44,14 +46,30 @@ struct OscCall {
     bool operator==(const OscCall&) const = default;
 };
 
+// v327: the events' table mode 1 walks, at kOscEventsAt: its events' count, stride and first half word (the object's
+// +0x8, +0x7) and each event's position ×16; the region about it as rom.4's memory holds it, from `from`
+struct OscEventTable {
+    int count = 0;
+    uint8_t stride = 0, first = 0;
+    std::vector<int32_t> positions {};
+    uint32_t from = 0;
+    std::vector<uint8_t> bytes {};
+    bool holds(uint32_t at) const { return at - from < bytes.size(); }
+    uint32_t wordAt(uint32_t at) const {
+        uint32_t w = 0;
+        std::memcpy(&w, bytes.data() + (at - from), sizeof w);
+        return w;
+    }
+};
 // The records the voice reads at the addresses its words name: the wave headers and loop records (Vc2OscVoice.h's
-// offsets), and the bound envelopes' and LFOs' words by address
+// offsets), and the bound envelopes' and LFOs' words by address (from v327 the events' table's too)
 struct OscRecords {
     std::array<Vc2OscWaveHeader, kOscRecords> headers {};
     std::array<Vc2OscLoopRecord, kOscRecords> loops {};
     std::map<uint32_t, float> bound {};
     // v240: the octaves n past exp2's table whose word rom.4 reads there is 0 or a NaN (Vc2OscRecords.cpp's drawTune)
     std::vector<int32_t> zeroTunes {};
+    OscEventTable events {};
 };
 uint32_t oscVoiceAt(int voice);
 // The records' addresses and draws (Vc2OscRecords.cpp, v238; v230's, moved): the headers, loop records, envelopes,
@@ -63,7 +81,8 @@ uint32_t oscLfoAt(int k);
 uint32_t oscPairAt(int k);
 void oscDrawRecords(OscRecords& r, std::mt19937& rng);
 // v326: each +0xe0 record's four loop events' positions, ×16, which the beat's block reads through the object's +0x6c:
-// two loops of 64…863 frames from frame 3000…3499, about the heads' (oscDrawHeadsWords); from the renders' generator
+// two loops of 64…863 frames from frame 3000…3499, about the heads' (oscDrawHeadsWords); from the renders' generator.
+// From v327 also the four events' numbers and the two loops' modes before each position
 void oscDrawLoopEvents(OscRecords& r, std::mt19937& rng);
 // Its zeroTunes, read from rom.4's memory once at the start
 void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r);
