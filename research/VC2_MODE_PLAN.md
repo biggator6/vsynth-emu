@@ -1095,3 +1095,75 @@ version against rom.4's routines with what it calls hooked:
 
 Recordings of the user's XT in VC-2 mode with a known signal into the mic input: for what the firmware can't show (the input's
 levels, the effect chip).
+
+Prepared 2026-11-22 (tools and the guide, no number): RECORDING_GUIDE.md, "VC-2 captures", for the user at the XT. Nothing is
+recorded yet, and none of it has been tried on an XT. **What the recordings settle**, each with where it was asked and the takes
+that answer it (`vc2takes.py`, `vc2vsynth.py`; every take's settings in the panel's words in `vc2_takes.csv`):
+
+1. **The input's level into the VC-2.** Asked here (above: "the input's levels"), and by VC2_VOCAL_DESIGNER.md, "The part mixer,
+   run" (the direct sound at Direct Sound 127 is 0.025 of the frame's full scale, its target ÷127, eased 3% a block) and
+   HARDWARE_FIRMWARE.md, "rom.4's frame through the unit" (rom.4's frame at a gain of 1, "nothing here is checked against one").
+   Run 1's `main`, `direct_64`, `direct_16`, `master_100`, `gain_plus6`, and the input's 1 kHz steps, which say where the input
+   clips. Holds the plugin's input scale into the mic word and the part mixer's Direct Sound law to the XT, in dB against the
+   input (in volts too, if the interface's output level is known: question d-4).
+2. **Which slot the mic comes back on.** Asked at step 4.4.3 above ("which slot the mic comes back on wants a capture, and
+   `returned()` hands the part nothing yet") and HARDWARE_FIRMWARE.md, "rom.4's outside input" (by v204's mapping the part
+   mixer's word 1 is slot 0x92, which no input reaches). Run 1's direct sound against the input's left-only and right-only clicks;
+   the EXT IN tone at each External In Type (`extin_*`); and V-Synth mode's EXT IN OSC at each External In Type (`vc2_vsynth`),
+   held to v204's mapping, as that section proposes. Holds `XtFxUnit::returned()` on rom.4, and v204's mapping on rom.2.
+3. **The EXTIN flag.** HARDWARE_FIRMWARE.md, "The part mixer" (v227: zone 0's or 1's OSC 1 Type, or OSC 2's too, by how
+   `0x89320a50` reads its arguments; unsettled). Run 1's `direct_pcm` and `direct_osc2`.
+4. **The tracker's input and Auto Note.** VC2_VOCAL_DESIGNER.md, "Open" (which inputs the frame's words at +4, kind 6's ring,
+   and +0x14, the tracker, are) and "Kind 6's pitch source, run" (Auto Note's mode 1 against 2 in the tone generator, read and not
+   run). Run 1's `autonote` and `autonote_retrig` on the input's sides (a vowel at 220 Hz left, 330 Hz right) and its pitch
+   staircase (with steps 30 and 50 cents off a note), and `extin_key67` (the key's move, kind 6's P).
+5. **The vocoder engines and the Direct Sound at known settings.** Steps 3 and 4 above hold HIRESO and LEGACY to rom.4 bit for
+   bit; VC2_VOCAL_DESIGNER.md, "Open", leaves the engines' delays against HIRESO's 128-sample input latency and the vocoder's
+   output scale. Run 2: each engine at its defaults and repeated, then each of Formant Shift, Formant Template, Vocoder Depth and
+   Sound Level, Unvoice Level and Detect, Env Attack and Release, Stereo Process, Unvoice Spread, Direct Sound and the key against
+   its base. Each of its takes is marked: Direct Sound Level 127 for the input's first 11.5 s (its clicks and sweep), then the
+   take's own, and the key down only then, so every take is placed by its own clicks and the vocoder is measured on the input's
+   voice, from 17.5 s. Holds Vc2Synth's vocoder path end to end, through the real input and chip, once step 4.3 renders it.
+6. **The carrier.** VC2_VOCAL_DESIGNER.md, "The VOCODER OSC's IDs, run" (left: the Dynamics' law, which reads the input's
+   peak). Run 2's `carrier_analog`, `carrier_vocosc`, and `carrier_vocosc_quiet` (the same with the input silent).
+7. **rom.4's program A.** VC2_VOCAL_DESIGNER.md, "Program A's routing" (rewritten: the system EQ's defaults, the patch's EQ 1 and
+   EQ 2 on MULTI alone, the Reverb's stereo input) and HARDWARE_FIRMWARE.md, "rom.4's frame through the unit". Run 3's `main`
+   (the EXT IN tone through MFX Thru), `feed_off`, `sys_eq_off`, `peq1_plus15`, `peq2_plus15`, `direct`, `peq1_direct`. DIR
+   isn't recorded.
+8. **rom.4's 41 MFX.** VC2_VOCAL_DESIGNER.md, "The effect chip's programs" (rom.2's programs with their registers renumbered;
+   "not run: rom.4's MFX types loading their programs"). Run 3's `mfx01`…`mfx41` at their defaults, against `XtFxChip` on
+   rom.4's programs.
+9. **The Chorus and the seven stereo reverbs.** VC2_VOCAL_DESIGNER.md, "The new reverbs on XtFxChip" ("that the VC-2 sounds so
+   is not checked against a real one"; Room Size, Repeat Time, the pre-EQ and the Pre Delay's law not measured) and "The Chorus's
+   sides" (the other Chorus types). Run 4's `cho01`…`cho08` and `rev01`…`rev14` at their defaults, wet.
+
+**The tools** (`research/tools/`): `vc2capture.py` writes the input signal (`vc2probe.py`: fxprobe's 16.8 s, then a synthetic
+voice), the runs and the take list into `analysis/test_files/vc2/` (gitignored: the runs hold rom.4's typed defaults); fxplay
+plays a run's input at its cues beside its MIDI (`--audio`, `fxaudio.h`) and prints what the XT sends (`--in`, `fxmidiin.h`);
+`vc2cut.py` checks a recording and cuts it, on the shared parts it now has with `fxcut.py` (`caprec.py`, `capbase.py`,
+`capclick.py`, `caplayout.py`, `capmeasure.py`, `cappath.py`, `capreport.py`); `vc2cut_test.py` holds it to a simulated XT
+(`vc2sim.py`, on `capsim.py`) with faults planted; `fxplay_test.sh` holds fxplay's input to the take list's own.
+
+**The address map is inferred** (`vc2map.py`): the V-Synth's map on rom.4's own IDs. Nothing in rom.4 that receives or sends
+SysEx has been read. Block by block, rom.4's IDs from each block's first are rom.2's name for name: the system's 72 but the two
+rom.4 gave to MIDI MODE for VariOS and USB External In Type, the common's 114 with the vocoder block appended at +0x73, the MFX,
+Chorus and Reverb heads, zone 1's 128. The guide's step "Learn the map" asks the XT itself (Transmit Edit Data, `fxplay --in`,
+`vc2capture.py --learn`) before any long run. The VOCODER OSC's own IDs, past a zone's 128, aren't written.
+
+Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
+second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
+
+**The user's to answer** (2026-11-22; asked, not yet answered), each with the recommendation:
+- **d-1. The audio interface**: its name, its line outputs and inputs, whether it has an S/PDIF (coaxial or optical) input,
+  and whether it runs at 44.1 kHz. Recommended: two line outputs into the XT's INPUT jacks and two inputs back, at 44.1 kHz and
+  24 bits; with an S/PDIF input, the XT's COAXIAL or OPTICAL OUT recorded there as well.
+- **d-2. How the input is fed**: the rear INPUT jacks, L and R, from the interface's line outputs (recommended: both sides at a
+  fixed gain, INPUT Jack Gain 0 dB, and the slot question needs L and R apart); the front MIC jack (one side, at the INPUT
+  knob's unmarked gain); or USB audio from the Mac (an exact level, if a current Mac sees the XT as an audio device at all).
+- **d-3. How the XT is recorded**: USB, the digital outs, or analog MAIN OUT. Recommended: what the effects captures use. Analog
+  is enough for runs 1 and 2 (levels, sides, pitches, the vocoder's settings); runs 3 and 4 want USB or digital to be held
+  sample by sample to `XtFxChip`.
+- **d-4. The input's level in volts**: the interface's output at 0 dBFS, in dBu (its spec, or a fixed line-level setting).
+  Recommended: a fixed or marked output level, written down; without it the input's level is known only against the input.
+- **d-5. MIDI both ways**: USB-MIDI, or a MIDI interface's IN and OUT. Recommended: USB-MIDI if the Mac sees the XT, else a MIDI
+  interface both ways: the map check (the guide's step 4) needs the XT's own messages.

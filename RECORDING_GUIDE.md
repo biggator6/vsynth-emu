@@ -1,4 +1,5 @@
 # V-Synth Test Recording Guide
+<!-- audience: outside -->
 
 This file is the master recording reference.  After each session add new files to the
 checklist and update `RESEARCH_LOG.md` with results.
@@ -83,6 +84,118 @@ named after the take.  After step 3, set: Vari Sw, Tempo Sync, Robot, Loop and T
 you can copy off with USB Storage.  In the SAMPLING General screen: Input Source **RESAMPL**, Sampling Type **STEREO L R**, Trigger Mode **NOTE**, Pre Gain **0 dB**, Pre Trigger **0**; and Pre-Effect Type **OFF**.
 Set a take up as above, then play C4 and hold it for the wave's 17 s.  There's room for about six takes (115 s of stereo in the factory project), so do the list above.  If USB and
 digital both fail to give single-sample clicks, this is the way to get exact data, up to the 16th bit.
+
+---
+
+## VC-2 captures (added 2026-11-22)
+
+**Why:** the VC-2's ports are held to rom.4 bit for bit, but the firmware can't show what comes from outside it: how loud the
+input arrives, which input side the VC-2 hears as the mic, and what rom.4's own effect programs sound like on the real chip.
+These runs play a known signal into the XT's input, in VC-2 mode, while a MIDI run sets the patch take by take.  What each run
+settles, and where it was asked: research/VC2_MODE_PLAN.md, step 5.  **Not tried on an XT**, and nor have the effects captures
+above.  Steps 4 and 5 find out in a few minutes whether the XT takes the messages in VC-2 mode at all.
+
+**Files** are in `analysis/test_files/vc2/`, made by the commands below from the repository's root.  They aren't in git, as the
+runs hold firmware defaults.  To make them:
+```bash
+.venv/bin/python3 research/tools/vc2capture.py
+```
+```bash
+clang++ -std=c++17 -O2 research/tools/fxplay.cpp -framework CoreMIDI -framework CoreFoundation -framework AudioToolbox -framework CoreAudio -o analysis/test_files/vc2/fxplay
+```
+That gives the input signal (`vc2probe.wav`, 32.5 s), a 20-second test (`vc2_test.mid`), four VC-2 runs (`vc2_run_1.mid` to
+`vc2_run_4.mid`: 10, 15, 18 and 10 minutes), one V-Synth-mode run (`vc2_vsynth.mid`, 2 minutes) and the take list
+(`vc2_takes.csv`).  `fxplay` plays a run's MIDI to the XT and its input to your interface together, on one clock.
+
+**1. The connections** (questions d-1 to d-5 ask which of these you have).  Three cables' worth:
+- **The input**: your interface's outputs 1 and 2 into the XT's rear **INPUT** jacks, L and R.  Both sides matter: the test
+  signal has a click on the left alone and one on the right alone, and which ones come back answers which side the VC-2 hears.
+  The front **MIC** jack would carry one side only, at the **INPUT** knob's unmarked gain.
+- **The recording**: the XT's output back into the interface, as for the effects captures (step 1 there: USB, digital or
+  analog).  Stereo, 24-bit, **44.1 kHz**, with no processing.
+- **MIDI both ways**: the runs go to the XT, and the map check in step 4 listens to what the XT sends.  USB-MIDI or a MIDI
+  interface's IN and OUT.
+
+**2. VC-2 mode.**  Press **[V-CARD]** and choose the VC-2 (XT manual, p. 22).  On any patch: <▼ MENU>, **PATCH Init**.  The runs
+set everything else, in memory only, so **don't write the patch or the system afterwards**.  Restarting the XT undoes it all.
+
+**3. The system, by hand, in VC-2 mode.**  On the SYSTEM pages:
+- **INPUT Jack Switch ON**, **INPUT Jack Gain 0dB**, **MIC Jack Switch OFF**, so the rear jacks alone are the input (XT manual,
+  p. 126).
+- **Receive Exclusive ON**, **Device ID 17**, **Part 1 Receive Switch ON**, **Part 1 Receive Channel 1** (for another ID or
+  channel, make the files again with `vc2capture.py --dev N --ch N`).  For USB-MIDI: **USB Mode MIDI**; a **USB-MIDI Driver
+  Type** of GENERIC.
+- **USB External In Type OFF**, so the Mac's sounds can't reach the input.
+
+Check each of these in VC-2 mode itself: whether its SYSTEM settings are the V-Synth's or its own isn't known.
+
+**4. Check the map, 2 minutes.**  The runs set the VC-2's parameters by SysEx at addresses worked out from the V-Synth's map.
+Nothing in rom.4 confirms that the VC-2 receives them there, so ask the XT first:
+1. SYSTEM: **Transmit Edit Data ON**.
+2. On the Mac, with any part of the name of your MIDI input from the XT in place of "V-Synth" (run
+   `analysis/test_files/vc2/fxplay --in x` to list the inputs):
+   ```bash
+   analysis/test_files/vc2/fxplay --in "V-Synth" 120 > analysis/test_files/vc2/learn.txt
+   ```
+3. Within those 2 minutes, at the panel, move each of these one step and back: **Direct Sound Level**, **Vocoder Type**,
+   **OSC 1 Type**, **MFX Type**, **Reverb Type**, **Master Level**, **External In Type**.
+4. Then:
+   ```bash
+   .venv/bin/python3 research/tools/vc2capture.py --learn analysis/test_files/vc2/learn.txt
+   ```
+   Each line names the parameter the runs would set at that address.  If they're the ones you moved, the map is the XT's.  If a
+   line says "not a DT1 of model 00 53", or names a different parameter, stop and tell Claude: the runs would set the wrong
+   things.  If nothing at all arrived, check the MIDI cable from the XT and that Transmit Edit Data stayed on.
+5. **Transmit Edit Data OFF** again.
+
+**5. Test, 20 seconds.**  Turn the monitors down.  Run `analysis/test_files/vc2/fxplay --audio-devices` for your interface's
+name, then, with yours in place of "Interface" and "V-Synth":
+```bash
+analysis/test_files/vc2/fxplay --audio analysis/test_files/vc2/vc2probe.wav --device "Interface" analysis/test_files/vc2/vc2_test.mid "V-Synth"
+```
+After the 5 s countdown you should hear the test signal through the XT: three clicks, then a rising sweep, dropping in level
+halfway (Master Level, so a System write works).  MFX Type changes to Parametric EQ on its screen, and back at the end.  If
+there's no sound: the cable into the INPUT jacks, INPUT Jack Switch, or the interface's own output routing.  If there's sound
+but no change of level or type: Receive Exclusive and Device ID.
+
+**6. The level.**  Set your interface's output so the XT's **PEAK** light stays off through the sweep, and lights at most during
+the last second of the 1 kHz steps (each take's steps end at 0 dBFS on purpose, to find where the input clips).  Then leave the
+interface's output level alone for every run, and write it down (question d-4).
+
+**7. Run 1, 10 minutes.**  Start recording, then:
+```bash
+analysis/test_files/vc2/fxplay --audio analysis/test_files/vc2/vc2probe.wav --device "Interface" analysis/test_files/vc2/vc2_run_1.mid "V-Synth"
+```
+Leave the XT alone until it says done, then stop, and save as `analysis/test_files/vc2/vc2_run_1.wav`.  Check it before run 2:
+```bash
+.venv/bin/python3 research/tools/vc2cut.py analysis/test_files/vc2/vc2_run_1.wav
+```
+The last line says whether to go on.  FAIL lines say what to fix; LOOK lines are worth reading and stop nothing.  A finding that
+only the XT can give, such as which input side the direct sound carries, is an INFO or a LOOK, never a FAIL.  The tool also cuts
+the takes into a folder beside the recording.  Or tell Claude, and it'll run this and read the rest.
+
+**8. Runs 2, 3 and 4.**  The same, with `vc2_run_2.mid` (the vocoder, 15 minutes), `vc2_run_3.mid` (rom.4's MFX, 18 minutes)
+and `vc2_run_4.mid` (its Chorus and Reverbs, 10 minutes), each saved under its own name, each checked before the next.
+
+**9. The V-Synth-mode run, 2 minutes.**  Press [V-CARD] back to the V-Synth.  On any patch, PATCH Init; the run sets OSC 1 to EXT
+IN itself.  SYSTEM: Rx Sys-Ex ON, Device ID 17, Part 1 Rx Sw ON, Rx Ch 1, as for the effects captures.  Then `vc2_vsynth.mid`
+as in step 7, saved as `vc2_vsynth.wav`, and checked the same way.
+
+**10. Tell Claude** the paths you used, the interface and its output level, and anything the checks said.  No normalizing, fades
+or trimming: the takes are found by their timing and the input's clicks.
+
+**If a run gets interrupted:** `--from <seconds>` before `--audio` picks it up, with a `next_s` from `vc2_takes.csv`.  Save that
+part as a separate recording, and give `vc2cut.py` the same `--from <seconds>`.
+
+**From a DAW instead of fxplay:** `vc2capture.py --input-wavs` also writes each run's whole input as `vc2_run_N_in.wav` (about
+150 to 280 MB each).  Put it and the run's `.mid` at the same start, the MIDI to the XT and the audio to the outputs feeding the
+INPUT jacks, and record the XT.  The DAW must send the file's SysEx.
+
+**If SysEx can't be made to work:** `vc2_takes.csv` lists every take's settings in the panel's words.  By hand, the takes that
+answer the most are run 1's `main`, `direct_64`, `extin_stereo`, `extin_monol` and `extin_monor`, and run 2's `main` and
+`legacy`.  For each: PATCH Init, set what the take lists, then play `vc2probe.wav` into the input from any player, holding C4 for
+its 32.5 s.  Run 2's takes are marked: Direct Sound Level 127 until the input's sweep ends (11.5 s in), then as the take lists, and
+C4 held only from then on.  Record each take on its own, and check it with `vc2cut.py <file> --run vc2_run_N --take <name>`.
 
 ---
 
