@@ -216,6 +216,7 @@ void oscInputDrawn(Vc2SetOscInput& w, std::mt19937& rng) {
     reinterpret_cast<uint8_t*>(&w)[kWaveTypeAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
     variDrawn(reinterpret_cast<uint8_t*>(&w), rng);   // before LITE's, which draw the root about the key
     liteDrawn(reinterpret_cast<uint8_t*>(&w), rng);
+    if (rng() % 2) w.legato = 0;   // v397: PCM's start's LEGATO either way (the make's struct's byte is noise)
 }
 
 // Now and then an input's record put in the first four parts' tables at its kind and OSC (half the time from v396),
@@ -235,5 +236,47 @@ void oscSameRecordsDrawn(Vc2Fw& fw, std::span<const Vc2SetOscInput> inputs, std:
         const uint32_t slot = kOscHeaderBytes + kOscKindRow * w.kind + kOscRecordBytes * w.osc;
         for (uint32_t p = 0; p < kFewParts; ++p) fw.cpu.write(kOscTableAt + kOscPartRow * p + slot, r.data(), sizeof r);
     }
+}
+
+namespace {
+// v397: the store's answers: whether it holds the number 0 or 1 (now and then any word); the words' routines nonzero
+// three times in four; an index 0 a time in four, else 1…512, now and then any word (its halfword is tested)
+uint32_t holdsAnswer(std::mt19937& rng) { return rng() % 8 ? rng() % 2 : rng(); }
+uint32_t wordsAnswer(std::mt19937& rng) { return rng() % 8 ? (rng() % 4 ? 1u : 0u) : rng(); }
+uint32_t indexAnswer(std::mt19937& rng) { return rng() % 4 == 0 ? 0u : rng() % 8 ? 1u + rng() % 512 : rng(); }
+
+struct StoreWay {
+    uint32_t routine;
+    bool fills;
+    uint32_t (*answer)(std::mt19937&);
+};
+constexpr StoreWay kStoreWays[] = { { kOscStoreRoutines[0], false, holdsAnswer },
+                                    { kOscStoreRoutines[1], true, wordsAnswer },
+                                    { kOscStoreRoutines[2], false, indexAnswer },
+                                    { kOscStoreRoutines[3], true, wordsAnswer } };
+
+const StoreWay& storeWayOf(uint32_t routine) {
+    for (const StoreWay& w : kStoreWays)
+        if (w.routine == routine) return w;
+    return kStoreWays[0];
+}
+
+// The wave's words a store's routine fills: noise, but the type one of its six mostly, the events' table aimed in its
+// region and their count small, as an input's draws keep them for the converter after
+void waveWordsDrawn(uint8_t* wave, std::mt19937& rng) {
+    bytesDrawn(wave, kOscWaveBytes, rng);
+    wave[kWaveTypeAt - kVariFlagAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
+    putAt(wave, kVariTableAt - kVariFlagAt, kOscEventsAt + (uint32_t)(rng() % kOscEventsAims));
+    putAt(wave, kVariEventsAt - kVariFlagAt, (uint16_t)(rng() % 25));
+}
+} // namespace
+
+bool oscStoreFills(uint32_t routine) { return storeWayOf(routine).fills; }
+
+uint32_t oscStoreAnswered(uint32_t routine, uint8_t* wave, std::mt19937& rng) {
+    const StoreWay& way = storeWayOf(routine);
+    const uint32_t answer = way.answer(rng);
+    if (answer != 0 && way.fills) waveWordsDrawn(wave, rng);
+    return answer;
 }
 #endif

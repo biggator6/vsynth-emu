@@ -4023,3 +4023,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - VariPhrase's words (v396) form the same pitch words as LITE's, about a centre key that EVENT can move. v251's key sum took its centre from a constant; it takes it as a parameter now, and LITE's words stopped running v251's whole head on a copy for theirs.
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
+
+### Session 24, continued (2026-11-22) — v397: PCM's start
+
+- PCM's start was the last of the OSC blocks' routines rom.4 ran for the port; what it calls is the wave store's lookups, which the check answers from drawn words on both sides. Vc2Synth will have to give them from the wave memory.
+- Its only branch the draws missed at first was LEGATO with the make's legato byte clear: every draw of that byte was noise.

@@ -1,6 +1,7 @@
 // An OSC block's kind: see Vc2SetOscKinds.h (v391).  The floats through XtFloat, as the SH-4 rounds; the analog's and
 // the VOCODER's converters the ported ones, on the block's words copied in and out.
 #include "Vc2SetOscKinds.h"
+#include "Vc2InputReads.h"
 #include "Vc2OscAnalogConvert.h"
 #include "Vc2OscExtinConvert.h"
 #include "Vc2OscPcmConvert.h"
@@ -17,8 +18,16 @@ using xtf::flt;
 using xtf::mul;
 
 namespace {
-constexpr uint32_t kPcmStart = 0x8939e120;   // [FW] not ported
 constexpr uint32_t kWaveTypeAt = 0xa7;   // [FW] the wave's type, by which PCM's converter calls its words
+// [FW] PCM's start (v397): the wave store's routines it calls (whether it holds a number, its words, an index, the
+// words by an index); the input's Playback Mode, Pitch KF, Wave Number and wave words; the number's place in the store
+// (less 1, plus 3000); LEGATO; the key's centre; the kinds by the wave's type, 0…5 (0x8939e270's switch, past 5 none)
+constexpr uint32_t kStoreHolds = 0x89351840, kStoreWords = 0x8939cd30, kStoreIndex = 0x893520a0;
+constexpr uint32_t kStoreIndexWords = 0x8939cba0;
+constexpr int kPcmModeAt = 0x62, kPcmKfAt = 0x0e, kPcmNumberAt = 0x44, kPcmWaveAt = 0xa0, kStoreBase = 3000;
+constexpr uint8_t kLegato = 1;
+constexpr int kPcmCentre = 60;
+constexpr std::array<uint32_t, 6> kPcmKinds { 1, 2, 0, 2, 0, 2 };
 constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;          // [FW] EXTIN's converter's two bytes
 constexpr uint32_t kAnalogKind = 3, kExtinKind = 4, kVocoderKind = 5;   // [FW] the starts' kinds
 constexpr uint32_t kSwitchAt = 0, kTypeAt = 1;           // [FW] the record's OSC switch and type
@@ -128,9 +137,31 @@ void portedConvert(Vc2SetOscInput& in, uint32_t* block, bool vocoder, Vc2SetRead
                                    [&](Vc2OscAnalogWords& a) { vc2OscAnalogConvert(input, w, shared, a); });
 }
 
-// Each type's start (0x8939fb40's switch) and converter (0x8939fbd0's)
+// PCM's start's wave (v397): the store's own words when it holds the number, else by the index it gives with the key
+// and velocity; whether it found them
+bool pcmWaveFound(Vc2SetOscInput& in, uint8_t key, Vc2SetReads& reads) {
+    uint8_t* input = bytesOf(in);
+    uint8_t* wave = input + kPcmWaveAt;
+    const auto number = static_cast<uint16_t>(vc2in::s16(input, kPcmNumberAt) - 1 + kStoreBase);
+    if (reads.waveStore(kStoreHolds, { number, 0, 0 }, wave) != 0)
+        return reads.waveStore(kStoreWords, { u16(input, kPcmNumberAt), 0, 0 }, wave) != 0;
+    const auto index = static_cast<uint16_t>(reads.waveStore(kStoreIndex, { number, 0, 0 }, wave));
+    return index != 0 && reads.waveStore(kStoreIndexWords, { index, key, in.velocity }, wave) != 0;
+}
+
+// Each type's start (0x8939fb40's switch) and converter (0x8939fbd0's).  PCM's (0x8939e120, v397): the starts' words
+// with its own tenth, LEGATO's flag (+0x64) and its key (the make's legato struct's), the key Pitch KF gives about 60,
+// then the wave by the store, the kind by its type
 void pcmStart(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
-    reads.unportedOscKind(kPcmStart, bytesOf(in), block);
+    kindStart(block, 0, setTables().pcmTenth, reads);
+    uint8_t* input = bytesOf(in);
+    const bool legato = input[kPcmModeAt] == kLegato && in.legato != 0;
+    block[kFlagAt] = legato ? 1 : 0;
+    const int kf = vc2in::s16(input, kPcmKfAt);
+    const uint8_t key = vc2OscFollowedKey(legato ? in.legatoKey : in.key, in.coarse, kf, kPcmCentre);
+    const bool found = pcmWaveFound(in, key, reads);
+    const uint8_t type = input[kWaveTypeAt];
+    block[0] = found && type < kPcmKinds.size() ? kPcmKinds[type] : 0;
 }
 
 void extinStart(Vc2SetOscInput&, uint32_t* block, Vc2SetReads& reads) {

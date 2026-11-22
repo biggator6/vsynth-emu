@@ -123,7 +123,8 @@ public:
     const Vc2ToneShared& shared() override { return kept_; }
     const int16_t* matrixGroup(uint32_t reader, uint32_t matrix) override;
     // The OSC blocks' (v391, Vc2SetOscBlockCheck.cpp): the step counts the port's own (`oscSteps`), the groups and the
-    // pitch source unlogged, a kind's routine not ported logged
+    // pitch source unlogged, a kind's routine not ported logged (from v397 none: the wave store's routines PCM's start
+    // calls, logged, answered and filling the wave's words from the answers, as their hooks do)
     std::array<uint8_t, 32> oscHeader(uint32_t part) override;
     std::array<uint8_t, 128> oscRecord(uint32_t part, uint32_t kind, uint32_t osc) override;
     std::array<uint8_t, 60> oscSystems() override;
@@ -134,7 +135,7 @@ public:
     int32_t matrixBend(uint32_t matrix) override;
     Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
     float pitchSource() override;
-    void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) override;
+    uint32_t waveStore(uint32_t routine, std::array<uint32_t, 3> args, uint8_t* wave) override;   // v397: as hooked
     uint32_t tripMoving(uint8_t part) override;   // v395: through rom.4's part table, as the draws aim it
     uint16_t waveHalf(uint32_t at) override;      // v396: rom.4's memory, where the draws put the events' tables
     std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes

@@ -105,8 +105,8 @@ public:
     // 0x80 an OSC; the systems' 0x3c bytes after the 16 parts), an OSC's step count (0x89989c84 + 64 × part + 4 × kind
     // + 2 × OSC, Vc2PartRows::steps), the glide key a voice's +0x38 names and a key table's Hold (+0x11c), the legato
     // struct's +1 and +2 that a make's call names, M's bend (+0x174), the Matrix's groups for an OSC by its four getters,
-    // the pitch source's ratio (0x89394a40 on 0x89989748), and a kind's routine the port hasn't yet, by rom.4's address
-    // (PCM's start 0x8939e120, the PCM and EXTIN converters 0x8939e300 and 0x8939e9e0), on the input and the block
+    // the pitch source's ratio (0x89394a40 on 0x89989748) (v391's `unportedOscKind`, the kinds' routines the port
+    // hadn't, went with PCM's start, v397)
     virtual std::array<uint8_t, 32> oscHeader(uint32_t part) = 0;
     virtual std::array<uint8_t, 128> oscRecord(uint32_t part, uint32_t kind, uint32_t osc) = 0;
     virtual std::array<uint8_t, 60> oscSystems() = 0;
@@ -117,7 +117,9 @@ public:
     virtual int32_t matrixBend(uint32_t matrix) = 0;
     virtual Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) = 0;
     virtual float pitchSource() = 0;
-    virtual void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) = 0;
+    // PCM's start's (v397): a routine of the wave store it calls, by rom.4's address, on its arguments (the wave's
+    // number or index, and the key and velocity), filling the wave's words at the input's +0xa0 (`wave`); its answer
+    virtual uint32_t waveStore(uint32_t routine, std::array<uint32_t, 3> args, uint8_t* wave) = 0;
     // LITE's words' (v395): a part's Time Trip under way, its trip object's +8 (Vc2TripObject::moving) by the part table
     // 0x8993d040
     virtual uint32_t tripMoving(uint8_t part) = 0;

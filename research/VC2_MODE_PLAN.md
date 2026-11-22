@@ -744,6 +744,11 @@ version against rom.4's routines with what it calls hooked:
         about that centre on v251's key sum, which takes the centre now, the cents, the level and the flags;
         xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase words"). PCM's converter is whole. Left:
         PCM's start `0x8939e120`.
+      - PCM's start done (v397): the starts' words, LEGATO's flag and key, the key Pitch KF gives, the kind by the
+        wave's type; the wave store's four routines it calls (`0x89351840`, `0x8939cd30`, `0x893520a0`, `0x8939cba0`)
+        through `Vc2SetReads::waveStore`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's PCM start"). Every
+        routine the OSC blocks call is the port's now but the wave store's, which `Vc2Synth` must give (the wave
+        memory's lookups, a port of their own).
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

@@ -21,8 +21,6 @@
 namespace {
 using Blocks = Vc2SetOscBlocks;
 constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0 }, kPitchSource = 0x89394a40;
-// [FW] PCM's start (v393 ported EXTIN's converter, v394 PCM's, v395 its LITE words, v396 its VariPhrase words)
-constexpr uint32_t kUnported[] = { 0x8939e120 };
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 } // namespace
 
@@ -68,7 +66,10 @@ Vc2MatrixGroups SetPortParts::oscGroups(uint32_t, uint32_t osc) {
 
 float SetPortParts::pitchSource() { return std::bit_cast<float>(fw_.cpu.rd32(kOscSourceAt)); }
 
-void SetPortParts::unportedOscKind(uint32_t routine, uint8_t*, uint32_t*) { logged(kSetOscKind, routine, {}); }
+uint32_t SetPortParts::waveStore(uint32_t routine, std::array<uint32_t, 3> args, uint8_t* wave) {
+    logged(kSetOscKind, routine, { args[0], args[1], args[2] });
+    return oscStoreAnswered(routine, wave, answers_);
+}
 
 uint32_t SetPortParts::tripMoving(uint8_t part) {
     return fw_.cpu.rd32(fw_.cpu.rd32(kOscPartTableAt + 4u * part) + kOscTripMovingAt);
@@ -83,7 +84,7 @@ struct OscCounts : SetChildCounts<9> {
     static constexpr const char* kPool = "the OSC blocks";
     static constexpr const char* kSaid = "OSC blocks: %ld events: %ld placements, %ld constructors, %ld ends, %ld "
                                          "conversions, %ld updates, %ld copies, %ld refreshes, %ld dispatches, %ld "
-                                         "converters (%ld calls of the kinds' routines not ported)\n";
+                                         "converters (%ld calls of the wave store)\n";
 };
 
 // The sides, the pool's regions its seed and the step counts besides (the port's in its parts)
@@ -151,7 +152,20 @@ const OscEvent kEvents[] = {
     oscAlone<vc2SetOscConvert, 0x8939fbd0, 8>,
 };
 
-// rom.4's side: the getters a place each, the pitch source its ratio, the kinds' routines not ported logged
+// The wave store's routine on rom.4's side (v397): logged with the arguments the port gives (the number or index; the
+// last routine's key and velocity too), answered, and the wave's words at r5 filled, from the same answers as the port's
+void storeHooked(SetSides& s, uint32_t at, Sh4& c) {
+    const bool byIndex = at == kOscStoreRoutines.back();
+    s.rom.push_back({ kSetOscKind, at, { c.r[4], byIndex ? c.r[6] : 0, byIndex ? c.r[7] : 0 } });
+    std::array<uint8_t, kOscWaveBytes> wave {};
+    const bool fills = oscStoreFills(at);
+    if (fills) c.read(c.r[5], wave.data(), wave.size());
+    const uint32_t answer = oscStoreAnswered(at, wave.data(), s.romAnswers);
+    if (fills) c.write(c.r[5], wave.data(), wave.size());
+    c.ret(answer);
+}
+
+// rom.4's side: the getters a place each, the pitch source its ratio, the wave store's routines as the port's parts
 void hookOsc(SetSides& s) {
     for (uint32_t k = 0; k < 4; ++k)
         s.fw.cpu.hook(kGetters[k], [k](Sh4& c) { c.ret(kOscGroupsAt + kOscGroupBytes * k); });
@@ -159,11 +173,7 @@ void hookOsc(SetSides& s) {
         c.fb[0][0] = c.rd32(kOscSourceAt);
         c.pc = c.pr;
     });
-    for (const uint32_t at : kUnported)
-        s.fw.cpu.hook(at, [&s, at](Sh4& c) {
-            s.rom.push_back({ kSetOscKind, at, {} });
-            c.ret(0);
-        });
+    for (const uint32_t at : kOscStoreRoutines) s.fw.cpu.hook(at, [&s, at](Sh4& c) { storeHooked(s, at, c); });
 }
 } // namespace
 

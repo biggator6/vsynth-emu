@@ -24,12 +24,12 @@ struct Read : Vc2SetEnvelopeTables {
                                                           { 0x893a6928, &tvaRateScale },
                                                           { 0x893a692c, &tvaSampleRate },
                                                           { 0x8939fd58, &vibratoRate }, { 0x8939fd68, &vibratoDepth },
-                                                          { 0x8939eb7c, &extinTenth } }));
+                                                          { 0x8939eb7c, &extinTenth }, { 0x8939e29c, &pcmTenth } }));
         const bool scales = noteScale > 0 && releaseScale > 0 && levelScale > 0 && depthTop > 0 && depthScale > 0;
         const bool mix = mixOff > 0 && mixOther > 0 && mixScale > 0 && mixScaleTwo > 0;
         const bool tva = tvaVelocity > 0 && tvaScale > 0 && tvaScaleOff > 0 && tvaDepthTop > 0 && tvaSend > 0 &&
                          tvaSixths > 0 && tvaSendTwo > 0 && tvaRateScale > 0 && tvaSampleRate > 0;
-        const bool osc = vibratoRate > 0 && vibratoDepth > 0 && extinTenth > 0;
+        const bool osc = vibratoRate > 0 && vibratoDepth > 0 && extinTenth > 0 && pcmTenth > 0;
         return scales && mix && tva && osc && cents > 0 && unit > 0 && times[127] != 0 && rates[127] != 0;
     }
 };

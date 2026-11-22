@@ -3912,6 +3912,40 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's PCM start (2026-11-22, v397) {#vc2-pcm-start}
+
+The start of OSC Type 1, PCM's, `0x8939e120` in the dispatch `0x8939fb40`'s switch. Ported bit for bit as
+`pcmStart` in Vc2SetOscKinds.cpp, checked in xt_vc2sets' eighth part with rom.4's own start running there. With it
+every routine the OSC blocks call is the port's but the wave store's four, which the port reaches through
+`Vc2SetReads::waveStore`. Every address is rom.4's; the offsets are the converter input's.
+
+**Its words:**
+- The starts' words, as the analog's and EXTIN's (v391): 0 at +0x68 and +0x6c, 1 at +0x70…+0x7c, and the clock's
+  tempo (v282's law, `vc2SetTempo`) ÷ 10 at +0x60, its 10 its own pool word `0x8939e29c`.
+- +0x64: 1 when the Playback Mode (+0x62) is LEGATO and the make's legato struct's byte (+6) is set, else 0.
+- The key Pitch KF gives (`0x8939c910` about 60, v251's `vc2OscFollowedKey`) of that struct's key (+5) under LEGATO,
+  else of the voice's key (+3), on the coarse tune (+0x88) and Pitch KF (+0xe).
+- The wave: the store's key for the Wave Number (+0x44) is the number less 1 plus 3000, as a halfword. When the store
+  holds it (`0x89351840`), its words (`0x8939cd30` on the Wave Number and the input's +0xa0); else an index
+  (`0x893520a0`, tested as a halfword), and with one the words by the index, the key and the velocity (+4)
+  (`0x8939cba0` on the input's +0xa0). These fill the wave's words at +0xa0…+0xff.
+- The kind (+0): 0 when no words were found; else by the wave's type (+0xa7, the words'), 0…5 through a switch at
+  `0x8939e270`: 1 (LITE) for 0, 2 (VariPhrase) for 1, 3 and 5, 0 for 2 and 4; past 5, 0.
+
+**The check.** PCM's start runs as rom.4's own. The store's four routines are hooked to log the arguments the port
+gives them (the number or index; the last one's key and velocity too) and answer from the answers' generators, seeded
+alike before each event. The two that fill the wave's words write them from the same generators, noise but for the
+type (one of the six mostly), the events' table pointer and count (`oscStoreAnswered`, Vc2SetOscBlockDraws.cpp). The
+port's `waveStore` logs, answers and fills the same. The input's legato byte is 0 half the time.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99 on the first run.
+- Every line and branch of Vc2SetOscKinds.cpp is reached once the legato byte was drawn 0 half the time; with it
+  every OSC block file (Vc2SetOscBlock.cpp, Vc2SetOscKinds.cpp and the converters' four) is reached whole.
+- `mutate_vc2.py --sets`: PCM's start's 32 plants (its divisor's address for EXTIN's would be no error: both 10), with
+  every OSC part plant and the starts' tables' again, 535, all caught; `osc-start-pcm` and `extin-ported-world`,
+  whose texts named the call v397 removed, re-pointed (the second didn't build at first).
+
 ### The VC-2's VariPhrase words (2026-11-22, v396) {#vc2-variphrase-words}
 
 What PCM's converter calls last for a wave of type 1, 3 or 5: `0x8939f2a0` (its switch at `0x8939e8c0`). Ported bit
