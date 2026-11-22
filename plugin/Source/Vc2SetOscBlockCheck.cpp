@@ -32,6 +32,7 @@ constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0
 constexpr uint32_t kUnported[] = { 0x8939e120, 0x8939e300, 0x8939e9e0 };
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 constexpr uint32_t kHoldAt = 0x11c, kBendAt = 0x174, kBeamAt = 0x180, kSourceWordAt = 4;   // [FW]
+constexpr uint32_t kAliasCancelAt = 9;   // [FW] the systems' Alias Cancel (+0x10209)
 constexpr int kOscSums = 4, kLfoSums = 5;
 } // namespace
 
@@ -161,6 +162,7 @@ void tableDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
     if (all || rng() % 8 == 0) {
         std::array<uint8_t, 60> sys;
         setsNoise(sys, rng);
+        if (rng() % 2) sys[kAliasCancelAt] = 0;   // Alias Cancel off half the time, which noise nearly never is
         fw.cpu.write(kSystemsAt, sys.data(), sizeof sys);
     }
 }

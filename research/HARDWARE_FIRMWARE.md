@@ -3912,6 +3912,16 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The OSC blocks' check with Alias Cancel off (2026-11-22, v392) {#vc2-set-osc-alias}
+
+v391's check drew the parts' OSC systems as noise, where the analog's Alias Cancel switch (+0x10209) is nearly never 0,
+so a planted error making it always 1 was missed. The check now sets it to 0 half the time.
+- xt_vc2sets' eighth part: 0 different at seeds 2024 (40 cases: 16,000 events, 1,494 placements, 2,943
+  constructors, 1,454 ends, 2,787 conversions, 1,461 updates, 1,462 copies, 1,468 refreshes, 1,456 dispatches, 1,475
+  converters; 3,065 calls of the kinds' routines not ported), 7 and 31337 (400 cases each).
+- `mutate_vc2.py --sets` on the 159 OSC plants, Alias Cancel's put back: all caught.
+- `mutate_panel.py rom4-no-setenvelopes rom4-no-tables`, for v391's new reads of `Vc2SetEnvelopeTables`: both caught.
+
 ### The VC-2 part's sets' OSC blocks (2026-11-22, v391) {#vc2-set-osc-blocks}
 
 Item 8's seventh child, the last v314 named: C's OSC blocks, two a voice. `Vc2SetOscBlocks` and the kinds' dispatch
@@ -4032,8 +4042,9 @@ The results:
 - Seeds 7 and 31337, 400 cases each: 160,000 events each, 0 different.
 - Every line and branch of Vc2SetOscBlock.cpp and Vc2SetOscKinds.cpp is reached (llvm-cov, 40 cases).
 - `mutate_vc2.py --sets`: 549 plants, the 160 new among them; 2 missed and left out. The start key's low hold
-  at 1 for 0 is no error (both give 0). Alias Cancel's read is a weakness of the check: it draws the systems as noise,
-  so the switch is nearly never 0. Drawing it 0 half the time is a follow-up. `--settings`: 864, none missed.
+  at 1 for 0 is no error (both give 0). Alias Cancel's read was a weakness of the check: it drew the systems as noise,
+  so the switch was nearly never 0 (v392 draws it 0 half the time, and its plant is caught). `--settings`: 864, none
+  missed. The panel's `rom4-no-setenvelopes` and `rom4-no-tables`, for the tables' new reads: both caught (v392).
 - verify.sh passes every line; fcheck's diff is the new `OSC blocks:` line alone.
 
 The first run stopped at once on the check's own error: the seed's region was 2 bytes, and the comparison reads whole

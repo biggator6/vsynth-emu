@@ -408,8 +408,7 @@ cosm-made-order|    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, r
 # The OSC blocks (vc2setoscblock, Vc2SetOscBlock.cpp, and vc2setosckinds, Vc2SetOscKinds.cpp, v391), not planted: what
 # Vc2SetOscBlock.h holds (the pool's place, two a voice, the seed's start); the frame's two 63s for the converters'
 # (0x8939fd64 and 0x8939c2c0 hold the same as 0x8939d31c); PCM's start and the PCM and EXTIN converters (not ported);
-# the start key's low hold at 1 for 0 (both give 0 there); Alias Cancel's read, missed: the check draws the systems as
-# noise, so the switch is nearly never 0 (a follow-up: draw it 0 half the time).
+# the start key's low hold at 1 for 0 (both give 0 there).
 osc-seed-times|kSeedTimes = 18813;|kSeedTimes = 18812;|vc2setoscblock
 osc-seed-one|static_cast<uint32_t>(seed) * kSeedTimes + 1u;|static_cast<uint32_t>(seed) * kSeedTimes;|vc2setoscblock
 osc-seed-kept|    seed = static_cast<uint16_t>(next);\n|\n|vc2setoscblock
@@ -568,3 +567,4 @@ osc-ways-pcm-routine|reads.unportedOscKind(kPcmConvert, bytesOf(in), block);|rea
 osc-ways-extin-routine|reads.unportedOscKind(kExtinConvert, bytesOf(in), block);|reads.unportedOscKind(kPcmConvert, bytesOf(in), block);|vc2setosckinds
 osc-start-vocoder|    analogStart(in, block, reads);\n    block[0] = kVocoderKind;|    analogStart(in, block, reads);|vc2setosckinds
 osc-ported-vocoder|portedConvert(in, block, true, reads); }|portedConvert(in, block, false, reads); }|vc2setosckinds
+osc-world-alias|a.aliasCancel = sys[kSystemAt + 4];|a.aliasCancel = 1;|vc2setosckinds

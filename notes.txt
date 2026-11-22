@@ -335,6 +335,11 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The OSC blocks' check with Alias Cancel off v392 (2026-11-22, after v391; HARDWARE_FIRMWARE.md, "The OSC blocks'
+  check with Alias Cancel off"): v391's check drew the systems as noise, where Alias Cancel is nearly never 0, and
+  missed a plant making it 1; it is 0 half the time now. 0 different at seeds 2024, 7 and 31337; the 159 OSC plants
+  all caught; rom4-no-setenvelopes and rom4-no-tables caught.
+
 The VC-2 part's sets' OSC blocks v391 (2026-11-22, after v390; HARDWARE_FIRMWARE.md, "The VC-2 part's sets' OSC
   blocks"): item 8's seventh child. Vc2SetOscBlocks, rom.4's 48 inputs word for word, two a voice, with Random Pitch's
   seed, the step counts and the start key; Vc2SetOscKinds, the dispatch and the converter frame (the vibrato's words,
