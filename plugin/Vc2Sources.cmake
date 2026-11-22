@@ -123,6 +123,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SetOscBlock.cpp
     Source/Vc2SetOscKinds.cpp
     Source/Vc2OscExtinConvert.cpp
+    Source/Vc2OscPcmConvert.cpp
     Source/Vc2PartSettings.cpp
     Source/Vc2PartSettingsTables.cpp
     Source/Vc2PartSettingsWords.cpp

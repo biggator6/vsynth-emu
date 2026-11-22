@@ -21,7 +21,8 @@
 namespace {
 using Blocks = Vc2SetOscBlocks;
 constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0 }, kPitchSource = 0x89394a40;
-constexpr uint32_t kUnported[] = { 0x8939e120, 0x8939e300 };   // v393: EXTIN's converter 0x8939e9e0 ported
+// [FW] PCM's start, and LITE's and VariPhrase's words PCM's converter calls (v393 ported EXTIN's converter, v394 PCM's)
+constexpr uint32_t kUnported[] = { 0x8939e120, 0x8939efa0, 0x8939f2a0 };
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 } // namespace
 

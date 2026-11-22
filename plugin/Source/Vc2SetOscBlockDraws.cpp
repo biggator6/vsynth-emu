@@ -12,19 +12,28 @@ constexpr uint32_t kRecordsAPart = 32;
 constexpr uint32_t kAliasCancelAt = 9;   // [FW] the systems' Alias Cancel (+0x10209)
 constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;   // [FW] the bytes EXTIN's converter reads (v393)
 constexpr int kOscSums = 4, kLfoSums = 5;
+constexpr uint32_t kWaveTypeAt = 0xa7;   // [FW] the input's wave type, PCM's start's (v394)
 
 void bytesDrawn(uint8_t* b, uint32_t n, std::mt19937& rng) {
     for (uint32_t i = 0; i < n; ++i) b[i] = (uint8_t)rng();
 }
 
-// [FW] v393: the Harm Formant's bytes EXTIN's converter reads, by the record's offset, in their ranges (vc2params.py's
-// IDs 0x371…0x375): its depth, keyfollow (a halfword), LFO and envelope depths, and its Style, the formant's row
-void harmFormantDrawn(uint8_t* r, std::mt19937& rng) {
-    constexpr uint32_t kDepths[] = { 0x4e, 0x52, 0x53 };
-    for (const uint32_t at : kDepths) r[at] = (uint8_t)((int)(rng() % 127) - 63);
+// A setting's bytes in their ranges, by the record's offset: three depths ±63, a keyfollow (a halfword, ±200) and a
+// choice of `choices` (now and then any byte)
+struct SettingBytes {
+    std::array<uint32_t, 3> depths;
+    uint32_t followAt, choiceAt, choices;
+};
+// [FW] v393: the Harm Formant's, which EXTIN's converter reads (vc2params.py's IDs 0x371…0x375: its depth, keyfollow,
+// LFO and envelope depths, its Style, the formant's row); v394: the Time's, which PCM's reads (and its mode)
+constexpr SettingBytes kHarmFormant { { 0x4e, 0x52, 0x53 }, 0x50, 0x5e, 11 };
+constexpr SettingBytes kPcmTime { { 0x44, 0x48, 0x49 }, 0x46, 0x5d, 3 };
+
+void settingDrawn(uint8_t* r, std::mt19937& rng, const SettingBytes& s) {
+    for (const uint32_t at : s.depths) r[at] = (uint8_t)((int)(rng() % 127) - 63);
     const auto follow = (int16_t)((int)(rng() % 401) - 200);
-    std::memcpy(r + 0x50, &follow, sizeof follow);
-    r[0x5e] = (uint8_t)(rng() % 8 ? rng() % 11 : rng());
+    std::memcpy(r + s.followAt, &follow, sizeof follow);
+    r[s.choiceAt] = (uint8_t)(rng() % 8 ? rng() % s.choices : rng());
 }
 
 // A record: noise; the OSC on mostly, its type spread over the four and now and then any; the waveform one of the
@@ -42,7 +51,8 @@ void recordDrawn(uint8_t* r, std::mt19937& rng) {
     }
     r[0x1c] = (uint8_t)(rng() % 8 ? rng() % 4 : rng() % 16);
     if (rng() % 2) std::memset(r + 0x12, 0, 2);
-    if (rng() % 4) harmFormantDrawn(r, rng);
+    if (rng() % 4) settingDrawn(r, rng, kHarmFormant);
+    if (rng() % 4) settingDrawn(r, rng, kPcmTime);
 }
 
 // A part's header: noise, mono and the portamento's byte mostly 0 or 1, the key's offset and coarse tune small, the
@@ -119,6 +129,8 @@ void oscInputDrawn(Vc2SetOscInput& w, std::mt19937& rng) {
     w.osc = (uint8_t)(w.kind > 3 || rng() % 8 ? rng() % 2 : rng() % 16);
     recordDrawn(w.record.data(), rng);
     w.matrix = oscMatrixDrawn(rng);
+    // v394: the wave's type PCM's start would leave (+0xa7), one of its six mostly, as it calls by it
+    reinterpret_cast<uint8_t*>(&w)[kWaveTypeAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
 }
 
 // Now and then an input's record put in the first four parts' tables at its kind and OSC, half the time with one of

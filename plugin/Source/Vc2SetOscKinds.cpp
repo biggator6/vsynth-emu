@@ -3,6 +3,7 @@
 #include "Vc2SetOscKinds.h"
 #include "Vc2OscAnalogConvert.h"
 #include "Vc2OscExtinConvert.h"
+#include "Vc2OscPcmConvert.h"
 #include "Vc2SetChildHead.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetOscBlock.h"
@@ -14,7 +15,11 @@ using xtf::flt;
 using xtf::mul;
 
 namespace {
-constexpr uint32_t kPcmStart = 0x8939e120, kPcmConvert = 0x8939e300;   // [FW] not ported
+constexpr uint32_t kPcmStart = 0x8939e120;   // [FW] not ported
+// [FW] what PCM's converter calls by the wave's type (+0xa7, 0…5): LITE's words 0x8939efa0 and VariPhrase's
+// 0x8939f2a0, not ported; 0 none
+constexpr uint32_t kWaveTypeAt = 0xa7;
+constexpr std::array<uint32_t, 6> kWaveWords { 0x8939efa0, 0x8939f2a0, 0, 0x8939f2a0, 0, 0x8939f2a0 };
 constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;          // [FW] EXTIN's converter's two bytes
 constexpr uint32_t kAnalogKind = 3, kExtinKind = 4, kVocoderKind = 5;   // [FW] the starts' kinds
 constexpr uint32_t kSwitchAt = 0, kTypeAt = 1;           // [FW] the record's OSC switch and type
@@ -142,8 +147,12 @@ void vocoderStart(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
     block[0] = kVocoderKind;
 }
 
+// PCM's (0x8939e300, v394): its own part, then by the wave's type LITE's words or VariPhrase's, not ported yet
 void pcmConvert(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
-    reads.unportedOscKind(kPcmConvert, bytesOf(in), block);
+    vc2OscPcmConvert(bytesOf(in), worldOf(in, reads), reads.shared(), block);
+    const uint8_t type = bytesOf(in)[kWaveTypeAt];
+    const uint32_t words = type < kWaveWords.size() ? kWaveWords[type] : 0;
+    if (words != 0) reads.unportedOscKind(words, bytesOf(in), block);
 }
 
 // EXTIN's (0x8939e9e0, v393): the systems' byte +0x10203 and the input's part's header byte +0x1e besides

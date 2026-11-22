@@ -46,6 +46,17 @@ struct Vc2OscConvertTables {
     float extinGainScale = 0, extinVelocityScale = 0, extinDepthTop = 0;
     float formantStep = 0, formantCents = 0, formantMost = 0, formantDepth = 0;
     std::array<std::array<int32_t, 8>, 11> formantRows {};
+    // PCM's converter's (v394): its depths' 63 (0x8939e4b4), velocity scale (0x8939e4dc, 32768) and gain divisor
+    // (0x8939e8d8, 6); the envelope and LFO Time depths' curve, its lines' knee 60 (0x8939e724), −120 (0x8939e728), 3
+    // (0x8939e72c), −60 (0x8939e730), −2 (0x8939e734), −3 (0x8939e738) and 20 (0x8939e73c); the Time law 0x8939c310's
+    // −63 (0x8939c570), 60 (0x8939c574), −60 (0x8939c578), 20 (0x8939c57c), −3 (0x8939c580), −5 (0x8939c584), 3
+    // (0x8939c588), 5 (0x8939c58c), 127 (0x8939c590), its 1200, 63 and 12000 the formant law's words; and the Formant
+    // law 0x8939c410's low hold, −12000 (0x8939c594)
+    float pcmDepthTop = 0, pcmVelocityScale = 0, pcmGainScale = 0;
+    float depthKnee = 0, depthOffset = 0, depthPer = 0, depthKneeLow = 0, depthSlopeLow = 0, depthPerLow = 0;
+    float depthScale = 0;
+    float timeLeast = 0, timeKnee = 0, timeKneeLow = 0, timeScale = 0, timeFromLow = 0, timeLeastOut = 0;
+    float timeFrom = 0, timeMostOut = 0, timeBeam = 0, pcmFormantLeast = 0;
 };
 
 [[nodiscard]] bool vc2LoadOscConvert(const char* path);

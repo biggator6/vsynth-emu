@@ -56,7 +56,12 @@ float vc2OscExtinFormant(int16_t depth, int16_t sum, uint8_t row, int16_t follow
     const auto offset = static_cast<int16_t>(depth + s.offset);
     const float keyed = div(mul(flt(static_cast<int32_t>(static_cast<uint32_t>(follow) * distance)), t.formantStep),
                             t.formantCents);
-    const float held = vc2OscHeld(add(div(mul(flt(offset), t.formantMost), t.formantDepth), flt(sum)), t.sumLeast,
+    return vc2OscFormantHeld(offset, sum, keyed, t.sumLeast);
+}
+
+float vc2OscFormantHeld(int16_t depth, int16_t sum, float keyed, float least) {
+    const Vc2OscConvertTables& t = extinTables();
+    const float held = vc2OscHeld(add(div(mul(flt(depth), t.formantMost), t.formantDepth), flt(sum)), least,
                                   t.formantMost);
     const float scaled = div(mul(div(held, t.formantMost), t.formantDepth), t.formantDepth);
     return vc2OscHeld(add(scaled, keyed), -1.0f, 1.0f);

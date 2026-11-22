@@ -179,6 +179,7 @@ VC2PORTS=(
     "vc2setoscblock|Vc2SetOscBlock.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setosckinds|Vc2SetOscKinds.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2oscextin|Vc2OscExtinConvert.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2oscpcm|Vc2OscPcmConvert.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setoscconvtables|Vc2OscConvertTables.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2settings|Vc2PartSettings.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2settingstables|Vc2PartSettingsTables.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"

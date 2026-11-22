@@ -20,6 +20,9 @@ struct Vc2OscExtinIn {
 // 0x8939c490: a formant offset −1…1 by a depth `depth`, the Matrix's sum `sum`, a row `row` of the table (held to its
 // last, 10), a keyfollow `follow` and a key `key`
 float vc2OscExtinFormant(int16_t depth, int16_t sum, uint8_t row, int16_t follow, int16_t key);
+// The formant laws' tail (EXTIN's 0x8939c490, PCM's 0x8939c410, v394): the depth × 12000 ÷ 63 plus the Matrix's sum,
+// held to `least`…12000, ÷ 12000 × 63 ÷ 63, plus the keyed part, held to ±1
+float vc2OscFormantHeld(int16_t depth, int16_t sum, float keyed, float least);
 
 // 0x8939e9e0 on the input and the block (0x108 bytes, its kind at +0, as the start left it)
 void vc2OscExtinConvert(uint8_t* input, const Vc2OscConvertIn& in, const Vc2OscExtinIn& x, const Vc2ToneShared& shared,

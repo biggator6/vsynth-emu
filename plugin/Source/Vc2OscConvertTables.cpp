@@ -45,11 +45,25 @@ auto extinWords(Vc2OscConvertTables& t) {
 }
 constexpr uint32_t kFormantRowsAt = 0x8993d0c8;   // [FW] .data, as C startup leaves it
 
+// [FW] PCM's converter's and its Time and Formant laws' (v394)
+auto pcmWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939e4b4, &t.pcmDepthTop }, { 0x8939e4dc, &t.pcmVelocityScale }, { 0x8939e8d8, &t.pcmGainScale },
+        { 0x8939e724, &t.depthKnee }, { 0x8939e728, &t.depthOffset }, { 0x8939e72c, &t.depthPer },
+        { 0x8939e730, &t.depthKneeLow }, { 0x8939e734, &t.depthSlopeLow }, { 0x8939e738, &t.depthPerLow },
+        { 0x8939e73c, &t.depthScale }, { 0x8939c570, &t.timeLeast }, { 0x8939c574, &t.timeKnee },
+        { 0x8939c578, &t.timeKneeLow }, { 0x8939c57c, &t.timeScale }, { 0x8939c580, &t.timeFromLow },
+        { 0x8939c584, &t.timeLeastOut }, { 0x8939c588, &t.timeFrom }, { 0x8939c58c, &t.timeMostOut },
+        { 0x8939c590, &t.timeBeam }, { 0x8939c594, &t.pcmFormantLeast },
+    });
+}
+
 struct Read : Vc2OscConvertTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, convertWords(*this));
         vc2ReadPool(image, secondPartWords(*this));
         vc2ReadPool(image, extinWords(*this));
+        vc2ReadPool(image, pcmWords(*this));
         image.read(kFormantRowsAt, formantRows.data(), sizeof formantRows);
         detune[0].slope = 1.0f;   // [FW] 0x8939c744: the first line is x itself (+ fldi0's 0)
         detune[1].slope = 2.0f;   // [FW] 0x8939c75a: fldi1, doubled

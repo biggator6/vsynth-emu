@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's PCM converter v394 (2026-11-22, after v393; HARDWARE_FIRMWARE.md, "The VC-2's PCM converter"): rom.4's
+  0x8939e300 to its call by the wave's type. vc2OscPcmConvert: v251's head words it writes alike, the Time (0x8939c310)
+  and Formant (0x8939c410) laws, the depth curve, the gain between the wave's two level words. LITE's and VariPhrase's
+  words (0x8939efa0, 0x8939f2a0), which it calls last, are rom.4's own for now. xt_vc2sets' eighth part: 0 different
+  at seeds 2024, 7 and 31337 on the first run; 295 plants caught. Not in the sound yet.
+
 The VC-2's EXTIN converter v393 (2026-11-22, after v392; HARDWARE_FIRMWARE.md, "The VC-2's EXTIN converter"): rom.4's
   0x8939e9e0, which v391's OSC blocks called by address. vc2OscExtinConvert: v251's head with its own gain, then the
   kind 6 or 7, the formant by 0x8939c490 on 11 .data rows, its depths and words. xt_vc2sets' eighth part runs rom.4's

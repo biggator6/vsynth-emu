@@ -3912,6 +3912,65 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's PCM converter (2026-11-22, v394) {#vc2-pcm-converter}
+
+The OSC converter of type 1, PCM's, `0x8939e300` in `0x8939fbd0`'s switch, to its last call: ported bit for bit as
+`vc2OscPcmConvert` with its Time and Formant laws (Vc2OscPcmConvert.cpp), its constants in `Vc2OscConvertTables`,
+checked in xt_vc2sets' eighth part with rom.4's own converter running there. What it calls last, by the wave's type
+(the input's +0xa7, from PCM's start), isn't ported yet: LITE's words `0x8939efa0` for type 0, VariPhrase's
+`0x8939f2a0` for types 1, 3 and 5, none for 2, 4 or past 5. Every address is rom.4's.
+
+**Its head.** It writes, as v251's part does, the ratio (+0xc), the pitch envelope's depth and word (+0x1c, +0x20),
+the pitch LFO's depth and word (+0x3c, +0x40), the level and its word (+0x34, +0x38), and the level LFO's depth and
+word (+0x54, +0x58). It writes no key (+4), cents (+8, +0x68) or pitch10s (the input's +0x94, +0x98). The port runs
+`vc2OscBlockConvert` on a copy of the input and takes those words.
+
+**Its own words:**
+- +0x10, the Time: `0x8939c310` on the record's Time depth (+0x4c), the OSC group's Time sum, M's bytes +0x180 and
+  +0x181, the Time keyfollow (+0x4e), the key from 60, and a sign from the Time's mode (+0x65): 0 −1, 1 0, 2 and past
+  1.
+- +0x28: 2 on OSC 1, 6 on OSC 2. +0x24: the Time envelope depth (+0x51) on the depth curve, × a velocity factor (sens
+  +0x54, curve +0x52).
+- +0x48: 0. +0x44: the Time LFO depth (+0x50) with the LFO group's Time sum, held to ±63, on the depth curve.
+- +0x14, the Formant: `0x8939c410` on the Formant depth (+0x56), the OSC group's Formant sum, its keyfollow (+0x58) and
+  the key from 60.
+- +0x30: 3 on OSC 1, 7 on OSC 2. +0x2c: the Formant envelope depth (+0x5b) ÷ 63 × a velocity factor (sens +0x5e,
+  curve +0x5c).
+- +0x50: 0. +0x4c: the Formant LFO depth (+0x5a) with the LFO group's Formant sum, held to ±63, ÷ 63.
+- +0x5c, the gain: the level curve's word at the wave's byte +0xa4 ÷ 32768, × 2^(Wave Gain/6), × the word at +0xa6
+  ÷ 32768.
+
+**The depth curve** has three lines on x, a whole number −63…63. Past 60 it is (x × 2 − 120) ÷ 3 + 3, the first part
+by FMAC. Below −60 it is (x × −2 − 120) ÷ −3 − 3. Between them it is x ÷ 20.
+
+**The Time law** `0x8939c310`:
+- x is the sum × 63 ÷ 12000 plus the depth.
+- On a curve of three lines by the sign s:
+  - above 63, the upper line at 63; below −63, the lower line at −63;
+  - above 60, the upper line: (5 − (s + 3)) × (x − 60) ÷ 3 + (s + 3);
+  - below −60, the lower line: (s − 3) + (−5 − (s − 3)) × (x + 60) ÷ −3;
+  - else x ÷ 20 + s.
+- Plus (M's +0x181 − 3 × its +0x180) ÷ 127.
+- × 2^(key × keyfollow ÷ 1200), held to ±5.
+
+**The Formant law** `0x8939c410` is EXTIN's (v393) without its row: the depth × 12000 ÷ 63 plus the sum, held to
+±12000, ÷ 12000 × 63 ÷ 63, plus keyfollow × key ÷ 1200, held to ±1. The two laws' tail is one function now,
+`vc2OscFormantHeld`.
+
+**The check.** PCM's converter runs as rom.4's own on rom.4's side, with LITE's and VariPhrase's words hooked as PCM's
+start is. The Time's bytes are drawn in their ranges three times in four (depths ±63, keyfollow ±200, mode 0…2), and
+the wave's type 0…5 mostly; the Harm Formant's draw and the Time's are one function (`settingDrawn`).
+
+The results:
+- 0 different at seeds 2024 (40 cases: 16,000 events, 1,372 converters; 1,258 calls of the three routines not ported),
+  7 and 31337 (400 cases each), on the first run.
+- Every line and branch of Vc2OscPcmConvert.cpp is reached.
+- `mutate_vc2.py --sets`: the 87 PCM plants, with the EXTIN and OSC plants run again (295 in all), all caught. One
+  plant was no error at first, the depth curve's knee by ≥ 61 (x is a whole number), and moves the knee by one now.
+- `--carrier`'s 49 plants in Vc2OscConvertTables.cpp, and the panel's `rom4-no-oscconvert`: all caught.
+- verify.sh passes every line. Its first run failed only the build ID: another checkout's plugin had been installed
+  over this one's in the meantime (the last build installs).
+
 ### The VC-2's EXTIN converter (2026-11-22, v393) {#vc2-extin-converter}
 
 The OSC converter of type 2, EXTIN's, `0x8939e9e0` in `0x8939fbd0`'s switch, which v391's OSC blocks called by rom.4's
