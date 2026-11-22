@@ -12,12 +12,44 @@
 # don't happen to reach, so fcheck's run doesn't guard it.  A port wire… (v193) is the Multi Step Modulator's wiring,
 # run through xt_tone's MSM mode (`xt_tone rom msm`), [cases] its cases.  mode extin (v203): through xt_tone's EXT IN
 # mode (`xt_tone rom extin`), the only run that draws EXT IN.
+# --changed <rev> first (2026-11-21, the user's rule): only the plants whose port's file (mutate_tonefile.sh's
+# tonefile, mutate.sh's own table) differs between rev and the working tree; the whole list when one of those files is
+# xt_tone's own check's, as every plant's verdict is the check's.  --list: say which plants a run would plant, and stop.
 import concurrent.futures as cf, os, re, subprocess, sys
 import mutlist
 D = os.path.dirname(os.path.abspath(__file__))
-cases = sys.argv[1] if len(sys.argv) > 1 else '2000'
+CHECK = ('tonecheck', 'tonefw', 'tonefwcpp', 'tonefwh', 'tonecases', 'tonecarry', 'tonepatchids',
+         'wirecheck', 'wirefwmsm')   # the ports whose files are xt_tone's own check's
+args = [a for a in sys.argv[1:] if a != '--list']
+rev = args[1] if args[:1] == ['--changed'] else None
+args = args[2:] if rev else args
+cases = args[0] if args else '2000'
 env = dict(os.environ, PORT='tone', XT_TONE_STOP='1')
-muts = mutlist.plants(D + '/tone_muts.txt', sys.argv[2:], 'mutate_tone', ('tone', '', ''))
+muts = mutlist.plants(D + '/tone_muts.txt', args[1:], 'mutate_tone', ('tone', '', ''))
+SAY_FILES = 'source "$0"; for p; do echo "$(tonefile "$p")"; done'   # each port's file, a line each
+def changedPlants(muts):
+    # each port's file by tonefile (solo's plants are XtSoloVoice.cpp's, as tonesolo's), against git's files changed
+    ports = sorted({m[3] for m in muts})
+    asked = ['tonesolo' if p == 'solo' else p for p in ports]
+    said = subprocess.run(['bash', '-c', SAY_FILES, D + '/mutate_tonefile.sh', *asked],
+                          capture_output=True, text=True, check=True).stdout.split('\n')
+    files = dict(zip(ports, said))
+    diff = subprocess.run(['git', '-C', D + '/../..', 'diff', '--name-only', rev, '--', 'plugin/Source'],
+                          capture_output=True, text=True, check=True).stdout.split()
+    changed = {os.path.basename(f) for f in diff}
+    hit = {p for p in ports if files[p] in changed}
+    print(f'mutate_tone: changed against {rev}, with plants:',
+          ' '.join(sorted({files[p] for p in hit})) or 'none', flush=True)
+    if hit & set(CHECK):
+        print('mutate_tone: xt_tone\'s own check changed, so the whole list', flush=True)
+        return muts
+    return [m for m in muts if m[3] in hit]
+muts = changedPlants(muts) if rev else muts
+if '--list' in sys.argv:
+    for m in muts: print(m[0], m[3])
+    print('mutate_tone:', len(muts), 'plants')
+    sys.exit(0)
+if not muts: sys.exit(0)
 script = D + '/mutate.sh'
 subprocess.run(['bash', script, 'zz-base', 'constexpr float kLand', 'constexpr float kLand', '1'], env=env, capture_output=True)   # builds the shared objects
 def plantEnv(m):
@@ -58,10 +90,11 @@ with cf.ThreadPoolExecutor(8) as ex:
             how = f'{c[3]}, seed {c[4] or "default"}' + (f', mode {c[5]}' if c[5] else '')
             sys.exit(f'mutate_tone: the run with nothing planted ({how}) says {t or "nothing"}, '
                      'so no plant would mean anything')
-    res = list(ex.map(run, muts))
-missed = errors = 0
-for n, t in res:
-    if t is None: errors += 1
-    elif t.startswith('tone: 0 '): missed += 1
-    print(('ERROR  ' if t is None else 'MISSED ' if t.startswith('tone: 0 ') else 'caught ') + n.ljust(20), t or '')
-print('planted', len(res), 'missed', missed, 'errors', errors)
+    # each line said as soon as it and those before it are in, in the list's order, so a long run shows how far it is
+    missed = errors = 0
+    for n, t in ex.map(run, muts):
+        if t is None: errors += 1
+        elif t.startswith('tone: 0 '): missed += 1
+        print(('ERROR  ' if t is None else 'MISSED ' if t.startswith('tone: 0 ') else 'caught ') + n.ljust(20), t or '',
+              flush=True)
+print('planted', len(muts), 'missed', missed, 'errors', errors)

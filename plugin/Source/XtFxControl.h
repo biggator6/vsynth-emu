@@ -65,6 +65,11 @@ public:
     // changed and the type assigns it, and a new type starts from nothing, so it wants calling as often as the firmware does.
     void setMatrix(int prm1, int prm2, int prm3);
 
+    // Control thread.  A control change as the driver's receiver takes it, on any channel (v402): rom.4's keeps CC 91 and
+    // 93 and, for any number, runs the event it posts, which scales the MFX's Reverb Send by CC 91 and its Chorus Send by
+    // CC 93 (value / 127), from 127 at the start, a patch keeping them.  An image whose driver takes none does nothing.
+    void controller(int number, int value);
+
     // Control thread.  The firmware's poll of an outside clock (0x894acb10): with Clock Source (ID 0x41) at 1 and sent, the tempo as the clock reads it, 150000 / its ms over the last six clocks,
     // reaches the effects if it has moved by more than 2.5 BPM plus 1%.
     void outsideClock(int sixClocksMs);
@@ -82,6 +87,10 @@ public:
     // For the check: called on the control thread with each parameter ID the driver reads.
     using ReadObserver = void (*)(void* context, int id);
     void observeReads(ReadObserver observer, void* context) { readObserver_ = observer; readContext_ = context; }
+
+    // For the check, control thread: a byte of the driver's own memory (the input routing's bytes, which move no chip word
+    // on rom.4; v400)
+    uint8_t driverByte(uint32_t address) const;
 
     // Control thread: has the chip got everything?  And the driver's copy of a word.
     bool drained() const { return (!ok() || (backlog_.empty() && open_->words.empty())) && read_.load(std::memory_order_acquire) == write_.load(std::memory_order_relaxed); }
@@ -161,7 +170,8 @@ public:
     // rom.4's frame goes in as the VC-2 makes it, and its DIR words reach no output (v274).  At most 32 frames a call, the bus's block.
     void process(const float* frame, float* lr, int frames) override;
     // Audio thread: the outside input as the converter hands it, int32 L then R a frame at the XT's full scale (±2^31),
-    // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204)
+    // pushed before process() takes it with the frame: into the chip's input slots, analog and USB alike (v204); on an
+    // image that adds its USB pair to the analog one, the analog pair alone (XtFxImage::feedsUsb, v400)
     void pushInput(const int32_t* lr, int frames) override;
     // What the chip handed back for the EXT IN OSCs in the last process() (XtBus.h): words 4 and 5 of each frame
     const int32_t* returned() const override { return back_; }
@@ -178,6 +188,7 @@ private:
     std::unique_ptr<XtFxChip> chip_;
     XtFxControl control_;
     float frameGain_;                         // the image's (XtFxImage.h)
+    bool feedsUsb_;                           // and whether its USB pair hears the input
     XtExtInput in_;
     int32_t back_[64] = {};
 };

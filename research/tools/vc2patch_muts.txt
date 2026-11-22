@@ -1,0 +1,46 @@
+# Planted errors in rom.4's patch store and its .p02 reader (v450), for mutate_vc2.py --patch: each must make
+# xt_vc2patch, on rom.4 and the disk image's patches, say something differs.  name|old|new[|port[|seed]]
+# The store's sections (Vc2PatchStore.cpp): each place, stride and bound
+common-last|{ 0x120, 0x1b5, 0x000, 0 },|{ 0x120, 0x1b6, 0x000, 0 },
+mfx-at|{ 0x1b6, 0x23b, 0x06c, 0 },|{ 0x1b6, 0x23b, 0x06d, 0 },
+chorus-at|{ 0x23c, 0x26f, 0x0b0, 0 },|{ 0x23c, 0x26f, 0x0af, 0 },
+reverb-first|{ 0x270, 0x2d2, 0x0cc, 0 },|{ 0x271, 0x2d2, 0x0cc, 0 },
+tone-at|{ 0x2d3, 0x38f, 0x0fe, 0x80 },|{ 0x2d3, 0x38f, 0x0fd, 0x80 },
+tone-stride|{ 0x2d3, 0x38f, 0x0fe, 0x80 },|{ 0x2d3, 0x38f, 0x0fe, 0x7e },
+tone-last|{ 0x2d3, 0x38f, 0x0fe, 0x80 },|{ 0x2d3, 0x390, 0x0fe, 0x80 },
+env-stride|{ 0x390, 0x438, 0x4fe, 0x70 },|{ 0x390, 0x438, 0x4fe, 0x6e },
+lfo-at|{ 0x439, 0x461, 0xbfe, 0x14 },|{ 0x439, 0x461, 0xbfd, 0x14 },
+cosm-zone-stride|{ 0x462, 0x4a5, 0xd3e, 0x22 },|{ 0x462, 0x4a5, 0xd3e, 0x20 },
+cosm-two|kCosmStride = 0x220;|kCosmStride = 0x200;
+cosm-last|kCosmFirst = 0x462, kCosmLast = 0x4a5;|kCosmFirst = 0x462, kCosmLast = 0x4a3;
+beam-at|{ 0x4a6, 0x4b3, 0x117e, 0 },|{ 0x4a6, 0x4b3, 0x1180, 0 },
+lines-stride|{ 0x4b4, 0x4f6, 0x1184, 0x22 },|{ 0x4b4, 0x4f6, 0x1184, 0x21 },
+lines-gone|{ 0x4b4, 0x4f6, 0x1184, 0x22 },|
+# The typed blocks: their first IDs, slot bases, and which is an ID's
+typed-mfx-base|{ { 0x56a, 0x1bb },|{ { 0x56a, 0x1bc },
+typed-reverb-first|{ 0x819, 0x272 }|{ 0x81b, 0x272 }
+typed-cosm-base|{ 0x926, 0x464 }|{ 0x926, 0x465 }
+typed-first-block|std::ranges::find_if(std::rbegin(kTyped), std::rend(kTyped),|std::ranges::find_if(std::begin(kTyped), std::end(kTyped),
+# The reader (Vc2PatchFile.cpp): the file's calls, the guard, rom.4's routines and the answer
+open-refused|c.hook(kOpen, [](Sh4& s) { s.ret(kHandle); });|c.hook(kOpen, [](Sh4& s) { s.ret((uint32_t)-1); });|vc2patchfile
+read-one-more|at_ += n;|at_ += n + 1;|vc2patchfile
+seek-from-end|if (from != kFromStart) return (uint32_t)-1;|if (from == kFromStart) return (uint32_t)-1;|vc2patchfile
+seek-place|at_ = to;|at_ = kHeaders;|vc2patchfile
+seek-answer|        return to;|        return kHeaders;|vc2patchfile
+headers-guard|size < (size_t)kHeaders)|size < (size_t)kHeaders - 1)|vc2patchfile
+caller-test|(int32_t)r0 < 0)|(int32_t)r0 < -100)|vc2patchfile
+no-default|!cpu.call(kDefaultPatch, { 1 }, xtfw::kStack) \|\| ||vc2patchfile
+store-args|cpu.call(kToStore, { kStore, kFileImage }|cpu.call(kToStore, { kFileImage, kStore }|vc2patchfile
+name-first|kNameFirst = 0x120|kNameFirst = 0x121|vc2patchfile
+name-spaces|out.name.back() == ' '|out.name.back() == '_'|vc2patchfile
+step-limit|cpu.stepLimit = xtfw::kCallSteps;|cpu.stepLimit = 1000;|vc2patchfile
+# The store's reads both images share (XtPatchStore.cpp): the range's rule, the centre, the 32-bit fields, COSM 2, a zone,
+# the store's end, a typed ID's slot and range
+xt-range-one|if (d->min != d->max && (v < d->min \|\| v > d->max)) v = d->def;|if ((v < d->min \|\| v > d->max)) v = d->def;|vc2patchxt
+xt-centre|return v - d->centre;|return v;|vc2patchxt
+xt-width-32|width >= 32 ? v : v & ((1u << width) - 1)|width >= 32 ? v & 0xffffff : v & ((1u << width) - 1)|vc2patchxt
+xt-cosm-two|(id >= l.cosmFirst && id <= l.cosmLast ? l.cosmStride * cosm : 0)|(id >= l.cosmFirst && id < l.cosmLast ? l.cosmStride * cosm : 0)|vc2patchxt
+xt-zone|return s.at + s.zoneStride * zone + |return s.at + s.zoneStride * (zone > 0 ? zone - 1 : 0) + |vc2patchxt
+xt-past-store|if (at < 0 \|\| at + bytes > (int)store.size()) return 0;|if (at < 0 \|\| at + bytes >= (int)store.size()) return 0;|vc2patchxt
+xt-typed-slot|const int v = xtStoreValue(l, store, base + d->slot, zone, cosm);|const int v = xtStoreValue(l, store, base + d->slot + 1, zone, cosm);|vc2patchxt
+xt-typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v < d->min \|\| v >= d->max ? d->def : v;|vc2patchxt

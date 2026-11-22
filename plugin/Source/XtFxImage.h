@@ -24,15 +24,21 @@ struct XtFxImage {
     uint32_t takeMessage, clockPoll;        // (self): the message's readers; the poll of an outside clock
     uint32_t matrixTake, matrixApply;       // (self, values), (self): the Matrix's MFX-PRMs; 0 where nothing reaches them
     uint32_t inputRequest, inputEvent;      // the outside input's routing, () each; 0 where it isn't mapped
+    uint32_t controllerStore;               // (self, number, value): a control change as the driver keeps it (v402)
+    uint32_t controllerEvent;               // (self): the event that store posts; both 0 where the image takes none
     uint32_t sleep, putWord, getWord;       // the bus's primitives, each hooked with what it sends, byte for byte
     uint32_t putCoefficient, putOffset;
     std::array<uint32_t, 2> reads;          // (section or 0, id) → the value
-    std::array<uint32_t, 7> answered;       // the spins, and what the start touches outside the driver: they return 0
+    std::array<uint32_t, 8> answered;       // the spins, and what the start touches outside the driver: they return 0; 0 none
     std::span<const IdRow> idRows;
     // What the bus frame takes on its way into the chip besides the firmware's truncation (XtFxUnit, v274): rom.2's
     // tones play in XtSynth at Out Gain for TG 0, so Out Gain's default, a sixteenth, goes here (v136); rom.4's frame comes
     // as the VC-2 makes it, its tones at their own Out Gain and the mic and the vocoder added past it, so nothing
     float frameGain;
+    // Whether the unit gives the plugin's one outside input to the USB pair of the chip's slots as well as the analog pair
+    // (v400): rom.2 hears one pair or the other by External Input Source, so both; rom.4 hears the analog pair always and
+    // adds the USB pair to it by USB External In Type, so the analog pair alone, or the input would be heard twice
+    bool feedsUsb;
 };
 
 const XtFxImage& xtVSynthFx();   // rom.2's

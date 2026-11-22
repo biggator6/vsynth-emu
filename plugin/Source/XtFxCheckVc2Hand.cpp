@@ -15,6 +15,7 @@ void handMessages(const char* rom, int events, uint32_t seed) {
         const Edit e = ed.any();
         if (e.matrix || e.patch) continue;
         uint32_t second = 0, fourth = 0;
+        bool routed = false;
         for (const auto& [id, value] : e.sets) {
             const int v = std::clamp(value, c.lowest(id), c.highest(id));
             if (hand->store[(size_t)id] == v) continue;
@@ -22,9 +23,11 @@ void handMessages(const char* rom, int events, uint32_t seed) {
             const IdBlock* b = listedBlock(id);
             second |= b ? b->second : 0;
             fourth |= b ? b->fourth : 0;
+            routed |= id == kExtInType;
         }
         apply(c, e);
         if (second | fourth) hand->message(second, fourth);
+        if (routed) hand->route();
         tried++;
         if (c.ok() && wordsApart(c, hand->chip) == 0) continue;
         if (first.empty()) first = "edit " + std::to_string(i) + (c.ok() ? "" : ": " + c.error());

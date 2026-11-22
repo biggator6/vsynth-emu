@@ -4756,6 +4756,400 @@ The results:
 - Every line and branch of `Vc2Notes.cpp` is reached, but for the `constexpr` table builder, which runs at compile time.
 - `mutate_vc2.py --notes`: 55 planted, 0 missed.
 
+### A .p02 onto the VC-2's parameters (2026-11-21, v452) {#vc2-patch-load}
+
+Step 4.5's third item (research/VC2_MODE_PLAN.md), with which its first half is done. `VSynthEmuProcessor::loadVc2Patch`
+reads a `.p02` by rom.4's own reader (`vc2PatchRead`, v450) and puts its values on the VC-2's parameters (v451): each of
+the 1,314 a patch holds (all but the system's 18) as the store reads it, its ID in its zone (the tone's block, the
+envelopes', LFOs' and COSMs') and COSM, a typed ID through its block's slots, the Start Offsets on the V-Synth's range
+(`vc2PatchValue`, PluginVc2Patch.cpp). Each is set as a host's automation would, and only if it has moved; no V-Synth
+parameter and no VC-2 system one moves. A file rom.4's reader refuses, or none, is refused, the status saying why, and
+nothing moves.
+
+**The session.** The store and the patch's name are kept (`PluginVc2Patch`) and go in the session's state beside the
+parameters, `vc2Store` (the store's 0x13a4 bytes in base64) and `vc2PatchName`, for what the parameters don't hold:
+zones 3–16 and the arpeggio pattern, as a V-Synth patch's store keeps its zones (v195). A session from before v452 has
+neither and leaves none, in a new instance and in one that had a patch loaded; one from before v451 loads its V-Synth
+parameters as saved and the VC-2's at their defaults. Append-only: no earlier property or parameter is touched.
+
+**PluginProcessor.h split.** It was past the kit's 300 lines, which the guard won't let grow, so a part went first,
+moved as it stood: the per-OSC file buffer, `LoadedWave`, is `PluginLoadedWave.h`'s `PluginLoadedWave`, the class
+keeping its name for it. Then the VC-2 patch's three members and its state, 298 lines.
+
+**Not yet:** a `.p02` from the editor (the header's Browse… opens a `.p00`; the VC-2's pages and the mode switch are
+step 4.5's second half), and nothing plays the patch (step 4.3's Vc2Synth).
+
+**The check.** `VSynthEmuArpPluginTest`'s VC-2 patch part (`Vc2PatchPluginTest.cpp`, 16 checks): the disk image's 128
+`.p02`, each written to a file and loaded, every one of the 1,314 parameters as the store reads it (168,192 values), the
+store kept whole and the name its own, no V-Synth parameter and no VC-2 system one moved (those moved to their tops
+first, so a write would show); a V-Synth patch, a text file, four bytes and no file refused, nothing moved; a session
+after a load bringing the parameters, store and name back; and the sessions from before v452 and v451 above.
+`mutate_panel.py` with the 11 `vc2-patch-` plants (the system's read, zone 2 read as zone 1, COSM 2 as COSM 1, the typed
+read as the first bank's, a refused file going on, the store or name not kept, the state not saved, not restored or
+kept from the last patch, the name not saved): 11 caught.
+
+### rom.4's parameters as the plugin's (2026-11-21, v451) {#vc2-host-params}
+
+Step 4.5's second item (research/VC2_MODE_PLAN.md). rom.4's IDs become host parameters, appended after the V-Synth's 763,
+whose IDs and order are as they were: `VSynthEmuArpPluginTest <rom> params` gives its first 763 lines byte for byte as
+v450's. The scope is the user's (2026-11-21, put with the counts below): a patch's zones 1 and 2, as a VC-2 patch edits
+two (rom.4's Current Zone, 0x140, is ZONE1–ZONE2; 42 of the 64 factory patches put the mic's EXT IN in zone 2), and the
+system settings the V-Synth's parameters are.
+
+| Part | rom.4's IDs | Each | Parameters |
+|---|---|---|---|
+| The common: tune, keys, portamento, tempo, bend, the effects' switches, Current Zone, the zones' splits, Scale Tune, the Matrix, the vocoder block, the patch EQ | 0x12c…0x1b4 with a range | once | 112 |
+| The effects' Types and levels | 0x1b7…0x1ba, 0x23c…0x23e, 0x270, 0x271 | once | 9 |
+| Beam Type, Pad Mode and Hold, the arpeggio | 0x4a6…0x4b2 | once | 13 |
+| The tone (both OSCs, the VOCODER OSC's IDs with them) | 0x2d3…0x38f with a range, and the Start Offsets 0x306, 0x33a | zones 1, 2 | 2 × 155 |
+| The 13 envelopes | 0x390…0x438 with a range | zones 1, 2 | 2 × 130 |
+| The 5 LFOs | 0x439…0x461 with a range | zones 1, 2 | 2 × 35 |
+| COSM 1 and 2: Switch and Type, then the types' own IDs | 0x462, 0x463, 0x927…0x9ab | zones 1, 2, each COSM | 4 × 135 |
+| The system: Master Level, Clock Source, Output Gain, External In Type, the controller assigns | 0x40, 0x43, 0x78, 0x7a, 0x89…0x96 | once | 18 |
+
+1,332 in all. Left out: the patch's name (its data, as the V-Synth's), the dummies and reserved areas (rom.4 names them
+`(dummy)`, `Reserv area`, `reserved` or `Dummy`, or gives a range of one value), the effects' and COSMs' slots, which
+their types' own IDs are read through, zones 3–16 and the arpeggio pattern (the patch's data, v452), and the effect
+types' own parameters (edits by ID, as the V-Synth's). The Start Offsets have a range of one value in rom.4's descriptors,
+as rom.2's have, and are there by the V-Synth's rule, 0 to 2^24 − 1 (v152).
+
+**What a host sees.** An ID by rom.4's hex ID (the user's choice): `vc2_193` "VC-2 Vocoder Sw", zone 2's `vc2z2_2e5`
+"VC-2 Z2 OSC 1 Type", COSM 2's `vc2c2_927`, both `vc2z2c2_927`; a COSM's name with its "COSM n" before rom.4's, whose own
+"COSM " is dropped. Each an integer over rom.4's range (the value less the descriptor's centre; a typed ID's own range),
+its default rom.4's, its text rom.4's routine's (Vc2Params' `vc2ValueText`, the screens' form) and read back by that
+text. rom.4's names repeat across the COSM types (Drive, Tone, Output Level) and twice within two (type 14's "Filter 1
+Q", a Side Band Filter's "Side Band Width"): rom.4's own, kept, the ID telling them apart.
+
+**rom.4 before the parameters.** A processor makes its parameters in its initializer, before its search for the images
+(`findRom`), so a process's first instance had no rom.4 tables for them. Now `createParameterLayout` first brings rom.4
+in from where an instance finds it (`vc2FindRomEarly`, PluginRom.cpp: beside each place rom.2 is sought, then rom.4's
+own places), quietly; `findRom`'s places and `findVc2Rom`'s take are shared with it, their order as before. `findRom`
+no longer seeks rom.4 itself when it finds no rom.2, as the layout's search has just looked in the same places; an image
+chosen by hand still finds rom.4 beside it (`openRom`). That made three of `VSynthEmuRomTest`'s plants (`rom4-not-beside`,
+`rom4-not-sought`, `rom4-not-alone`) miss at first: rom.4 was in by a later instance's early search before the test
+asked. The test now asks right after the instance opens rom.2, and `rom4-not-alone` plants in the early search. The set is
+fixed in the source (`PluginVc2Params.cpp`: runs of rom.4's IDs, no names or ranges), so a host's list is the same with
+rom.4 or without: an instance made without it has each a stand-in, named by its hex ID, its range −32768…32767 (every
+value rom.4's descriptors give the set but the Start Offsets'), so a session's values survive it.
+
+**The editor.** The VC-2's pages need the user's look, so `VSynthEmuEditorTest` holds the 1,332 apart (the user's
+decision): each one of the set, in its order, none reached by a control, the set whole. The tests that found their
+parameters by counting from the list's end (the MSM's and the zones' parts of `VSynthEmuArpPluginTest`) count past the
+VC-2's now.
+
+**Not yet:** nothing reads them into a sound (step 4.3's Vc2Synth, then the mode switch); a `.p02`'s load into them and
+the patch's data in the session are v452's.
+
+**The checks.** `VSynthEmuArpPluginTest`'s VC-2 part (`Vc2ParamPluginTest.cpp`, 16 checks): the set against rom.4 (every
+ID of the agreed sections, the test's own spans, that rom.4 gives a range and a name not a dummy's, each in its zones and
+COSMs: 1,332) and the agreed form of four IDs; on a processor made with rom.4 in, every parameter from the 764th the
+set's, each its exact name, range, default, its text at five values and that text read back rom.4's; a fresh run of the
+program with no image to find, the same IDs in order, each stand-in holding rom.4's range; the same with VSE_XT_ROM
+naming rom.2, rom.4 found before the parameters and each range rom.4's; a session with every VC-2 parameter moved, back
+as saved, and one from before them (the VC-2's taken out) loading the V-Synth's as saved and the VC-2's at their
+defaults. `VSynthEmuEditorTest`: 2,602 checks, the 1,332 held apart. `VSynthEmuRomTest` 19 of 19. `mutate_panel.py`: the
+19 `vc2-param-` plants (in `PluginVc2Params.cpp`, the layout and the early search) 19 caught, and every `rom-` and `rom4-`
+plant, 29, caught after the change above.
+
+### rom.4's patch store and a .p02 (2026-11-21, v450) {#vc2-patch-store}
+
+Step 4.5's first half (research/VC2_MODE_PLAN.md), its `.p02` first: the parameters' load (v452) reads a patch through
+it. A `.p02` is read as rom.4 reads one, and its store by rom.4's own pointing routines, as `XtFiles` and
+`XtPatchStore` read a `.p00` by rom.2's ("V-Synth's files").
+
+**The reader.** rom.4's patch load `0x89341de0` calls the reader `0x893419a0(file image, path)` and takes any answer
+from 0 up as read (`0x89341e76`). The reader goes through the OS's file wrappers, each sending on by the path's drive
+or the handle's kind to the kernel outside the image: open `0x89336c60`, read `0x89336cf0`, seek `0x89336db0` (from the
+start only), close `0x89336ca0`. Its tests, in its order:
+- 16 bytes from 0: not `SVD0` at +2 (a V-Synth patch, refused), the first word big-endian 0x001e, `VC20` at +2;
+- 16 more: `PATa` at +0x10, `VC_2` at +0x14, the data's place big-endian at +0x18, sought, the seek's answer that place;
+- the version, 7 bytes at +6: `Rev000`…`Rev005` refused (−90);
+- the default patch laid out as a file (`0x89324b10`, from the default patch `0x89325300(1)` builds at `0x89971cdd`),
+  then the data over it, its length at +0x1c but at most 0x13a4 bytes, read whole (a short read is refused);
+- `Rev006` and `Rev007` upgraded in the file's layout (`0x89341bda`…`0x89341c8e`, `0x89341ce2`…`0x89341d3c`): by the
+  Patch Category (0x12c), 7–9 or not, zone 2's TVA Switch (0x2d9) to 1 or 0, its Env 13 Attack Time (0x42c) to 3 and
+  Velocity Sens (0x433) to 0, and on `Rev006` the file's bytes 0x1370 and 0x1371 rewritten (a 6-bit field, at most 50).
+  Any other version is read as it stands: all 128 of the disk image's (`Internal.vc2/Patch`) are `Rev008`.
+
+A file under 32 bytes reads short at its first or second test, and the reader answers that count, which its caller
+takes as read with nothing laid out. The plugin refuses such a file itself.
+
+**The store.** rom.4's conversion `0x89324b20(store, file)` copies the file's blocks into the store's layout: the file
+holds the tone's 8 blocks 78 bytes apart from +0xe6, the store 128 bytes apart from +0xfe (the VOCODER OSC's IDs at
++0x52…+0x7b); MFX, Chorus and Reverb go from +0x54, +0x98 and +0xb4 to +0x6c, +0xb0 and +0xcc, the 16 envelope blocks
+from +0x356 to +0x4fe. The store is 0x13a4 bytes, the file's data's size. A section starts where rom.4's routine aims a
+read object at the part's store (`0x8950d8e0`'s entry +8: obj+4 = the store + the place; the routine beside each takes
+the store at +4, and aims at the same place):
+
+| IDs | What | Routine | At | Each block |
+|---|---|---|---|---|
+| 0x120…0x1b5 | the common: name, tune, keys, the zones' splits, Scale Tune, the Matrix, the vocoder block, the patch EQ | `0x893207b0` | 0 | |
+| 0x1b6…0x23b | MFX: Activity, Type, levels, slots | `0x893208d0` | 0x6c | |
+| 0x23c…0x26f | Chorus | `0x89320950` | 0xb0 | |
+| 0x270…0x2d2 | Reverb | `0x893209d0` | 0xcc | |
+| 0x2d3…0x38f | the tone: Structure, MOD, TVA, both OSCs with the VOCODER OSC's | `0x89320a50` | 0xfe | +0x80, 8 |
+| 0x390…0x438 | the 13 envelopes | `0x89320ad0` | 0x4fe | +0x70, 16 |
+| 0x439…0x461 | the 5 LFOs | `0x89320b70` | 0xbfe | +0x14, 16 |
+| 0x462…0x4a5 | a COSM's Switch, Type and slots (r7 the COSM; COSM 2 0x220 on) | `0x89320c10` | 0xd3e | +0x22, 16 |
+| 0x4a6…0x4b3 | Beam Type, Pad Mode and Hold, the arpeggio | `0x89320d10` | 0x117e | |
+| 0x4b4…0x4f6 | the arpeggio pattern's line | `0x89320da0` | 0x1184 | +0x22, 16 |
+
+The typed IDs read through their block's slots, the slot base the block's Type ID + 4, 3, 2 and 1: MFX's from 0x56a
+(slots from 0x1bb), Chorus's from 0x7ce (0x23f), Reverb's from 0x819 (0x272), with the 14 IDs in no table after its
+types, and a COSM's from 0x926 (0x464). rom.4's reads (`0x89328580` the bits, `0x8932b050` the value, `0x8932b460` a
+typed one) are rom.2's code on rom.4's descriptors, so one set of reads serves both images: `XtStoreLayout` (XtFiles.h)
+holds an image's sections, its COSMs and its descriptors, and rom.2's `xtPatchRaw`, `xtPatchValue` and `xtPatchTyped`
+are those reads on rom.2's, unchanged.
+
+**In the plugin.** `Vc2PatchStore` is rom.4's layout (`vc2Store()`, `vc2StoreTyped`), `Vc2PatchFile` the read
+(`vc2PatchRead`): rom.4's reader in the interpreter on the file's bytes, its four file calls served from them, then
+the conversion, as `xtFwPatchStore` runs rom.2's; the image's path kept by `loadVc2` (`vc2LoadPatchFiles`, the loader's
+new last). A seek past the file's end is taken, as a disk's, and reads nothing, so a patch whose data is none reads as
+the defaults. Nothing plays it yet: the parameters it goes into are v451's.
+
+**The check** (`xt_vc2patch <rom.4> [cases] [seed]`, `Vc2PatchStoreCheck.cpp` and `Vc2PatchFileCheck.cpp`, in fcheck at
+40, about 3 s): each section's first ID found by rom.4's names (Patch Name 1, Activity, Chorus Type, Reverb Type,
+Structure Type, Env 1 Attack Time, LFO 1 Waveform, COSM Switch, Beam Type, Control Switch, and its last the ID before
+Sampling Template Name 1), each place by calling rom.4's routine and the one beside it at every block, so the check's
+numbers are none of the port's: 8,972 placements; every ID's bits and value by rom.4's readers at every block, on the
+disk image's 128 patches as `vc2PatchRead` stores them and 40 stores of random bits: 1,439,592; every typed ID at every
+zone and COSM, its block by rom.4's type tables, its slot base by its block's Parameter 1: 880,992; the 128 files against
+rom.4's routines on their data straight, and each name against rom.4's own reading (`0x89320810`); and 21 copies of a
+file made otherwise against what the reader's code takes of them (the tags, the versions, a data length short and long,
+data further on, none, the headers alone, a byte short of them): 0 different. `mutate_vc2.py --patch` (40 plants in
+`vc2patch_muts.txt`, in `Vc2PatchStore.cpp`, `Vc2PatchFile.cpp` and the shared reads in `XtPatchStore.cpp`): 40 caught.
+The first plant on the Reverb's first typed ID moved 0x819 alone, Reverb Off's one ID, whose range is one value: it
+reads its default from any slot, so the plant moves two. rom.2's reads being the shared code now, their plants ran
+too: `mutate_files.py`'s 22 in `XtPatchStore.cpp`, 22 caught, and `xt_files` and every other fcheck section as their
+baseline; `mutate_tone.py --changed HEAD` finds no tone plant in the files changed; the loader's
+`mutate_panel.py rom4-no-patchfiles rom4-no-tables rom4-no-voices`, 3 caught. `verify.sh`: every line held but the build
+ID's, as two other sessions' builds overwrote `~/Library`'s AU and VST3 during the run; installed again, the AU is this
+build's and auval passes on it.
+
+### rom.4's MFX sends by CC 91 and 93 (2026-11-21, v402) {#vc2-fx-cc}
+
+Step 4.4's fifth item (research/VC2_MODE_PLAN.md), found in v401. rom.4's effect driver takes two MIDI controllers of
+its own: CC 91 on the MFX's Reverb Send and CC 93 on its Chorus Send. rom.2's has nothing of the kind.
+
+**The receiver.** The driver holds a MIDI receiver at its +0x54 (`0x89980f78`): its vtable `0x898cb3a8`, set by
+`0x89360c40`. The front delivers messages to its slot 1, `0x89360b90`, which switches on the status byte, masked to its
+upper half from 0x80 to 0xef:
+
+| Status | What the receiver does |
+|---|---|
+| 0x40 | `0x8935fab0(driver, message, …)`, then event 2 posted |
+| 0x41 | `0x8935fc00(driver, message, …)`, then event 2 posted |
+| 0xb0…0xbf, a control change on any channel | `0x893608a0(driver, number, value)`, then event 0x10 posted |
+| anything else | nothing |
+
+Which messages the front hands this receiver is the front's, step 4.3's.
+
+**The store**, `0x893608a0`, switches on number − 91:
+- CC 91 goes to the driver's +0x18;
+- CC 92 does nothing;
+- CC 93 goes to +0x1a.
+
+Any other number stores nothing, but its event is still posted.
+
+**The event**, 0x10, runs `0x89360930` in the effect task's loop:
+- It reads MFX Chorus Send (0x1b9) through the typed read and takes +0x1a. If either differs from what it last applied
+  (+0x0e, +0x14), it keeps both and writes the Chorus send at send × CC / 127. That is the integer quotient, by the magic
+  multiply 0x81020409 and a shift of 6. It goes through the level table `0x89365e80` into `0x89363450`.
+- It does the same for MFX Reverb Send (0x1ba) with +0x18 (+0x10, +0x16), into `0x89363460`.
+- The MFX's block reader (`0x8935f4e0…`) sets the two sends through `0x893603a0` and `0x893603f0`. Those take the scales
+  last applied (+0x14, +0x16), so a patch keeps the controllers' effect.
+- The MFX's part of the driver's start (`0x89360300`) sets all four words to 127. Nothing else writes them.
+
+**In the plugin.** `XtFxControl::controller(number, value)` is a control change as the receiver takes it: rom.4's store
+`0x893608a0` with the two data bytes, then its event's routine `0x89360930`. That is how `routeInput` runs a request and
+its event. The image holds the two addresses (`controllerStore`, `controllerEvent`); rom.2's are 0, so nothing happens
+there. Nothing calls it yet: which of the host's controllers reach the VC-2's effects is the plugin's wiring (step 4.5),
+as the front's is the part's (step 4.3).
+
+**The checks** (`xt_fx <rom.4> vc2`, two new parts):
+
+| Part | Against | Samples | Different |
+|---|---|---|---|
+| Control changes by hand | rom.4's own receiver given each message's three bytes (status 0xb0 on a channel drawn, CC 91, 93 or any number, any value), then its event's routine, run from the check's own addresses; MFX sends edited and patches of any MFX type loaded between; the chip's words and the driver's object after each. Some control change must move a word | 202 | 0 |
+| The sends' law | 96 pairs a send: the chip's words through the queue after a send and a control change on a fresh start, the same for the same send × CC / 127; a send with no control change the same send at 127; the lowest and highest levels apart | 194 | 0 |
+
+Both are 0 different at seeds 2024, 7 and 31337.
+
+**Plants.** `mutate_fx.py --vc2`: 82 of 82 caught, 8 of them new: the store gone or the event in its place, the event
+another routine, the event not run or not flushed, the number and value swapped, the wrong object, the number cut to 6
+bits. `--control`: 184 of 184. fxthreads.sh: no races. A control change left unflushed shows only in the law's part:
+the driver's own copy of the words has it, and the chip never gets it.
+
+### rom.4's Matrix MFX-PRMs (2026-11-21, v401) {#vc2-fx-matrix}
+
+Step 4.4's fourth item (research/VC2_MODE_PLAN.md). rom.4 sends its Matrix's MFX-PRM1…3 to the part mixer, not to the
+effects. So `setMatrix` doing nothing on rom.4 (v259) is rom.4's own way, and this version checks that it is.
+
+**Where they go.** rom.4's Matrix destinations 75…77 keep rom.2's names, "MFX-PRM1…3" (the list at `0x898c22b0`). M
+numbers them 9…11, group 2 (v247's table). Group 2's reader `0x893a24d0` has two callers: `0x893a2e50` and its copy in
+M's init `0x893a2ee0` (v247's `Vc2MatrixLevels`). Each takes the three sums × 1/127 into the part mixer's offsets:
+- PRM1 into `0x89997290`, Direct Sound Level's offset;
+- PRM2 into `0x89997294`, MFX Send's offset, the vocoder's level into MULTI;
+- PRM3 into `0x89997298`, which the consonants' output stage reads (`0x893ed56a`, `0x893ed6ea`; v209's `Vc2Consonants`).
+
+Then each calls the targets' routine `0x893b1ee0`. All of that is ported (v209, v227, v247), and step 4.3 wires it.
+
+**What's left in the effects.** rom.2's path (HARDWARE_FIRMWARE.md, "XtFxControl") runs from the tone's `0x894e7aa0` to
+`0x894abe50`. That calls the stub `0x894ad4e0`, which is the MFX object's take `0x894ae7e0` on the object at the
+driver's +8, and posts the effect task's event 0x10. The event runs the stub `0x894ad4f0`, the MFX object's apply
+`0x894ae870`. On rom.4:
+- The MFX object's take and apply are still there, `0x89361d50` and `0x89361de0`; they do what rom.2's do. Nothing
+  reaches them: no literal, no word in the image, no bsr or bra (a scan of every branch in its code), and no stub like
+  rom.2's two.
+- The effect task's event 0x10 (in its loop, `0x89360ac0`) runs `0x89360930` instead. It scales the MFX's Chorus Send
+  (0x1b9) by CC 93 and its Reverb Send (0x1ba) by CC 91: each × value / 127 through the level table `0x89365e80`, into
+  `0x89363450` and `0x89363460`.
+- The controllers come in through the task's message handler `0x89360b90`. A control change goes to `0x89360c10`,
+  which hands CC 91…93 to `0x893608a0` and posts event 0x10. `0x893608a0` keeps CC 91 at the driver's +0x18 and CC 93 at
+  +0x1a; CC 92 does nothing.
+- None of this pairs by shape with anything in rom.2.
+
+So rom.4 took the Matrix's MFX parameters off the effects and gave the effects CC 91 and CC 93 on the MFX's sends.
+~~`XtFxControl` doesn't run that event yet; the plan has it as a new item, 4.4.5.~~ (v402: it does, "rom.4's MFX sends
+by CC 91 and 93".)
+
+**The check.** `xt_fx <rom.4> vc2` has a new part, the Matrix through the queue. It is `xt_fx control`'s routine
+(XtFxCheckQueue.cpp), now run on an image. rom.2's run and its line are as they were: all three PRMs are moved on each of
+the 42 types, and 28 types answer. On rom.4 no type answers, the chip has every word the driver sent each time, and the
+driver's object, from `0x89980f24` to its message's flags, is byte for byte as it was. 128 samples, 0 different at seeds
+2024, 7 and 31337.
+
+**Plants.** `mutate_fx.py --vc2`: 74 of 74 caught. `--control`: 184 of 184, rom.2's as before. fxthreads.sh: no races.
+The two new plants give `setMatrix` rom.4's dead pair, whole or with the apply elsewhere. That moves no chip word, so in
+the new part only the object's bytes show them.
+
+### rom.4's outside input (2026-11-21, v400) {#vc2-fx-input}
+
+Step 4.4's third item (research/VC2_MODE_PLAN.md). The 2026-11-17 map found no reader of External In Type (0x7a) in
+rom.4's effect driver. There is one outside the driver, as rom.2's EXT IN request is outside rom.2's. On rom.4 it moves
+no chip word.
+
+**What reads External In Type.** Three places in rom.4 read 0x7a through the parameter read `0x89324350`. The scan
+covered every `mov #0x7a, r5` in its code, 0x89300000…0x89540000; the other seven are screens' coordinates.
+- **The EXT IN request `0x8935b050`.** It is rom.2's `0x894a7dd0` without the Source. It runs the setters of the
+  routing's wanted bytes at `0x89980fa9` (rom.2's `0x89ced225`): byte 1 to 0, byte 6 to the Type, byte 5 to 0. Then it
+  posts event 0x40 to the effect task: `0x893620d0`, the kernel's post `0x89301830` on `0x8994fefc`. rom.4 has no setter
+  of byte 7 and no External Input Source (its ID 0x7b is USB Mode). Nothing in rom.4 holds the request's address, as
+  nothing in rom.2 holds `0x894a7dd0`'s.
+- **Two inline copies of it:** case 4 of an internal message 0x40 (at `0x8935b300`, in `0x8935b090`, a method of the
+  vtable at `0x898cac48`), and the sampling object's `0x89359e60`. The second makes an OS call first, and calls
+  `0x89395740(0)` and `0x893957f0(0)` after.
+- **`0x893a1000`**, from the system's reader `0x8939b0d0`. It puts Master Tune, Master Key Shift and External In Type
+  into the tone generator's system words, at `0x89e371e0` + 0x10200 (+0, +2, +3). The EXTIN converter (`0x8939e9e0`,
+  OSC Type 2) writes its block's +0xb0 from that byte (`0x8939ee30`): 1 when it is 0, STEREO, else 0. That is the SH-4's
+  side, step 4.3's.
+
+**The event, `0x893620e0`.** It is rom.4's event 0x40. The effect task's loop (`0x89360ac0`) runs it, as does event 0x08's
+`0x8935ef40`, which first sets byte 1 to 2 when `0x89934540` is 1, as rom.2's does. It compares the wanted bytes with
+the applied ones at `0x89980fb0`: seven of them, where rom.2 has eight at `0x89ced22d`. What a change of each does:
+
+| Byte | What a change does |
+|---|---|
+| 4, with 3 | `0x89362070`: the fades at 0x238, with 50 ms waits; then coefficient 0x34 at 0xffe0 (byte 4 = 0), or at 0x20 after 50 ms (byte 4 = 1) |
+| 1, 0 | coefficient 0x34 at 0x20 after 50 ms, when byte 4 is set |
+| 3 | `0x89362040`, a fade at 0x238, when byte 4 is clear |
+| 2 | `0x89361fd0`: coefficients at words 0x8f and 0x93, from the gain table `0x895166f8` |
+| 6, the Type | stored; nothing is sent |
+| 5 | not read |
+
+Nothing else in rom.4 reads the applied bytes. Their loads are the init `0x89361ed0`, the start `0x89361f00`, two
+getters and the event. So **External In Type moves no chip word on rom.4.** Run through XtFxControl's queue at each
+Type: no word is sent, and the chip routes as before.
+
+**USB External In Type (0x7f)** belongs to the system reader (`0x8935feb0`; one of v259's rows). On a change the reader
+calls `0x893638b0`, which writes the USB pair's gains: four coefficients through `0x89362940`, at words 0x85…0x88. Run
+on the chip with noise into one pair at a time (`xt_fx <rom.4> vc2`'s new part):
+
+| Pair and USB External In Type | Slots 0x90, 0x94, 0x98 (left) | Slot 0x9a (right) | 0x92, 0x96 |
+|---|---|---|---|
+| analog, whatever either Type says | L | R | nothing |
+| USB, OFF | nothing | nothing | nothing |
+| USB, STEREO | L | R | nothing |
+| USB, MONO-L+R | (L + R)/2 | (L + R)/2 | nothing |
+| USB, MONO-L | (L + R)/2 | nothing | nothing |
+| USB, MONO-R | nothing | (L + R)/2 | nothing |
+
+The chip halves each side on its own, and 0x90 comes a sample later than 0x94 and 0x98. Program A also reads a third
+pair, 0x14 and 0x16, which reaches nothing at the defaults on either image. By its place it is the digital input; not
+traced.
+
+**The unit.** rom.2 hears either the analog pair or the USB pair, by External Input Source. rom.4 always hears the
+analog pair, and adds the USB pair to it by USB External In Type. The unit has given the plugin's one input to both pairs
+since v204, so on rom.4 the input would be heard twice under any USB type but OFF. `XtFxImage::feedsUsb` is rom.2's
+true, as before, and rom.4's false: on rom.4 the input goes to the analog pair alone, and the USB pair stays silent.
+
+**The words back.**
+- rom.4's audio task points `0x8993eadc` at the start of the received block (`0x8cc3f800` + 1024·i, invalidated first).
+  rom.2's `0x8987c7a0` points at the block + 16.
+- The part mixer reads frame words 1 and 5 (+4, +0x14) as the mic and the tracker's input.
+- `0x89396170` copies words 0…3 to `0x89989d00`, as rom.2's `0x894db220` does. A peak meter (`0x8935ae70`, on
+  `0x8997f630`) reads words 1, 2 and 3 of that copy.
+
+v204 took word k as what program A writes at slot 0x90 + 2k. That made words 4 and 5 rom.2's EXT IN pair, which
+External Input Type routes. Applied to rom.4, it puts the mic on slot 0x92, and no input reaches 0x92:
+- Program A writes it at pc 0x1e3 (rom.2 at 0x5f), from a chain that no GRAM word reaches. That covers the 2026-11-13
+  scan of all 256 words as an impulse with the three effects on, and these runs: a tone into the analog, USB and third
+  pairs and into the frame's eight words, at every External In Type and USB type, with each of the routing's bytes 0…4
+  set in turn and the event run (`0x89361fd0`'s gains among them).
+- Setting each coefficient of core 0 to 0x40 in turn opens no path to it.
+- Every instruction form the chain uses also occurs in rom.2's programs. Four forms occur in rom.4's alone, all after
+  the chain, at pc 0x216…0x2e5.
+
+So either word 1 isn't slot 0x92, or the chip does something with that chain that neither XtFxChip nor JE-8086's
+interpreter does. Which slot goes to which word is set by the bridge (IC37, TC200E06) and the kernel's set-up of it, and
+neither image holds that. A capture can settle it (step 5): on the VC-2, whether the direct sound follows a tone on L
+alone, then on R alone; in V-Synth mode, whether an EXT IN OSC follows External Input Type at MONO L and MONO R, as
+v204's mapping says. A bridge that reads a slot partway through the sample would explain part of it, not all: read
+after pc 0x5f and before 0x1e3, rom.4's word 1 would be 0x90's L, but no single read time gives both images their pairs.
+Nothing here hands rom.4's words 1 and 5 to the part yet. `returned()` is still words 4 and 5 by v204's mapping, on both
+images.
+
+**In the plugin** (XtFxImage.cpp, XtFxInput.cpp):
+- rom.4's request `0x8935b050` and event `0x893620e0` are routeInput's.
+- Its post `0x893620d0` is answered, as rom.2's `0x894aee70` is. The Category's post `0x89391e50` becomes an eighth
+  answered address.
+- External In Type is a BlockInput row.
+- `feedsUsb` decides whether the unit gives the input to the USB pair.
+- `XtFxControl::driverByte` lets the check read the routing's bytes.
+
+rom.2's unit, driver and words are as they were.
+
+**The checks** (`xt_fx <rom.4> vc2`, three new parts):
+
+| Part | Against | Samples | Different |
+|---|---|---|---|
+| The input routing by hand | rom.4's request and event run from the check's own addresses (`HandDriver::route`), comparing the 14 routing bytes and every word, at the start and at each Type. Held to the firmware's own way: no chip word moves, the Type lands in applied byte 6, ID 0x7a is read | 6 | 0 |
+| The input routing on the chip | the table above: noise into each pair at every External In Type × USB External In Type, each slot at its best delay within a word's last bit, 0x92 and 0x96 silent | 40 | 0 |
+| The input through the unit | words 4 and 5 take the analog pair's way alone, under each USB type | 5 | 0 |
+
+External In Type is also among the edits of the queue, live-edit and hand parts, with the hand side routing it, and among
+the IDs that must each count as a change. The start against the firmware's task now runs the request and the event on
+both sides. With 0x7a drawn, the queue part's count is 479,645 samples and the unit's against the reference 311,519
+(v274: 493,298 and 289,442), both 0 different. Every part is 0 different at seeds 2024, 7 and 31337. rom.2's
+`xt_fx control` prints its lines as before, line for line.
+
+**Plants.**
+- `mutate_fx.py --vc2`: 72 of 72 caught. 14 are new: the request, event and post gone or elsewhere, External In Type's
+  row gone, on another ID or in another block, the USB pair fed (in the image, the unit and both of XtFxInput.cpp's
+  lines, the port `fx4in`), the routing not sent or not run. Four old ones were moved with the code they quote.
+- `mutate_fx.py --control`: 184 of 184 caught: rom.2's `route-post` and `in-usb` moved with their lines, and a new
+  `feeds-usb-rom2`.
+- fxthreads.sh: no races.
+
+**Split first.** template-law refused a third copy of the unit's set-up, so it is one factory, `settledUnit`
+(XtFxCheckUnit.h). The input's frames through the unit are one function, `handedBack`. v204's input law and v205's copy
+check now use both.
+
+**Not done.**
+- The mic's slot, above.
+- The third pair, 0x14 and 0x16.
+- What `0x89359e60`'s two calls (`0x89395740`, `0x893957f0`) do.
+
 ### rom.4's frame through the unit (2026-11-19, v274) {#vc2-fx-frame}
 
 Step 4.4's second item (research/VC2_MODE_PLAN.md). `XtFxUnit` takes an image: rom.4's runs rom.4's driver, with the frame
@@ -5337,7 +5731,7 @@ Step 4.4's first part (research/VC2_MODE_PLAN.md, which has the map). rom.4's dr
 - **The patch EQ is read with the switches.** EQ 1 and EQ 2 (IDs 0x1af…0x1b4) are in the switches' reader, so a live edit of one goes as a switches message. The system's reader has no mid bands on rom.4 (0x67, 0x68, 0x6f…0x72).
 - **A patch of Category 10 or 11 posts an event.** The switches' routine calls `0x89391e50`, which posts event 0x200 on the object `0x8994fec8` through the kernel. No chip word moves at any Category. `XtFxControl` answers it with nothing, as it does rom.2's post of event 0x40; what the event does in the tone generator is for step 4.3. The first version faulted here: it took a check that loads a patch of every Category to show it.
 - **Seven MFX parameters don't take a live edit alone**, the seven rom.2 has, at the same types and places (0x588, 0x5c4, 0x5ea, 0x641, 0x6c8, 0x6ca, 0x72b).
-- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4. No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.
+- **Not mapped.** Nothing reaches rom.4's pair of the Matrix's MFX-PRM routines (`0x89361d50`, `0x89361de0`), so `setMatrix` does nothing on rom.4 (v401: rom.4's own way, as it sends them to the part mixer: "rom.4's Matrix MFX-PRMs"). ~~No reader reads External In Type (0x7a), so there is no input routing on rom.4 yet.~~ (v400: the EXT IN request reads it, outside the driver as on rom.2, and moves no chip word: "rom.4's outside input".)
 
 **The check**, `xt_fx <rom.4> vc2`. Comparing the chip with JE-8086's is blind to what the driver is asked, as both chips hear the same words, so most of it is about the driver:
 

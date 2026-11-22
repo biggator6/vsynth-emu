@@ -17,6 +17,7 @@
 #include "TestOnsets.h"
 #include "TestPatches.h"
 #include "../Source/PluginParamIds.h"
+#include "../Source/PluginVc2Params.h"
 #include <algorithm>
 #include <optional>
 #include <ranges>
@@ -29,22 +30,22 @@ constexpr int kFirstUpper = 0x124;            // zone 1's Range Upper; zone z's 
 constexpr double kRate = 48000.0;
 constexpr int kBlock = 480;                   // 10 ms
 
-// The sixteen before the list's last kAfterZones, in the zones' order, each split's name, range, default and texts against
-// the firmware's; then the last (v206), External In Type and Source, the same way
+// The sixteen before the kAfterZones before the VC-2's (v451), in the zones' order, each split's name, range, default and
+// texts against the firmware's; then those (v206), External In Type and Source, the same way
 void splitsAgainstFirmware(TestChecks& check, VSynthEmuProcessor& p, const juce::File& rom) {
     Firmware fw(rom);
     check(fw.text.ok(), "the firmware's text routine should run");
     const auto& list = p.getParameters();
-    const int after = VSynthEmuProcessor::kAfterZones;
+    const int after = VSynthEmuProcessor::kAfterZones, end = list.size() - (int)vc2HostParams().size();
     for (int z = 0; z < kXtZones; ++z) {
-        auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[list.size() - after - kXtZones + z]);
+        auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[end - after - kXtZones + z]);
         check(prm && prm->paramID == Params::zoneUpperId(z), "zone " + std::to_string(z + 1) + "'s split in its place");
         const int id = kFirstUpper + z;
         paramAgainstFirmware(check, prm, { id, firmwareName(fw.image, id), true, false }, fw.text);
     }
     static constexpr int kExtIn[] = { 0x78, 0x7c };   // [FW] External In Type, External In Source
     for (int k = 0; k < after; ++k) {
-        auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[list.size() - after + k]);
+        auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[end - after + k]);
         paramAgainstFirmware(check, prm, { kExtIn[k], firmwareName(fw.image, kExtIn[k]), true, false }, fw.text);
     }
 }

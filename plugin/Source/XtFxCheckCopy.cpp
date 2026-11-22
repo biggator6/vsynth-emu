@@ -2,7 +2,7 @@
 // chip, against XtFxUnit's words 4 and 5, bit for bit, under every External Input Type and Source, settled and after a
 // change of Type, and at the defaults with nothing set (XtFxCheck.h).  XT_FX_MAIN only.
 #ifdef XT_FX_MAIN
-#include "XtFxCheck.h"
+#include "XtFxCheckUnit.h"
 #include <climits>
 
 namespace xtfxcheck {
@@ -19,15 +19,10 @@ void noiseFrame(Rng& r, int32_t* lr) {
 // The unit at Type `from` and Source `source` (from < 0: the defaults, nothing set), then `to`: the frames whose words
 // differ, those of the change's kSettle aside
 long copyAgainstChip(const char* rom, int from, int to, int source, uint32_t seed) {
-    auto u = std::make_unique<XtFxUnit>(rom);
+    using Sets = std::vector<std::pair<int, int>>;
+    const auto u = settledUnit(rom, xtVSynthFx(), from >= 0 ? Sets { { 0x78, from }, { 0x7c, source } } : Sets {});
     XtExtInCopy copy;
-    if (from >= 0) {
-        u->control().set(0x78, from);
-        u->control().set(0x7c, source);
-        u->control().update();
-        copy.setType(from);
-    }
-    u->settle();
+    if (from >= 0) copy.setType(from);
     XtExtInput copied;
     Rng r(seed);
     float frame[8] = {}, lr[2];

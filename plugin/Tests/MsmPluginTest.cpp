@@ -17,6 +17,7 @@
 #include "TestFirmware.h"
 #include "TestPatches.h"
 #include "../Source/PluginMsm.h"
+#include "../Source/PluginVc2Params.h"
 #include "../Source/XtPatch.h"
 
 namespace {
@@ -49,7 +50,8 @@ void msmAgainstFirmware(TestChecks& check, VSynthEmuProcessor& p, const juce::Fi
     Firmware fw(rom);
     check(fw.text.ok(), "the firmware's text routine should run");
     const auto& list = p.getParameters();
-    const int first = list.size() - VSynthEmuProcessor::kAfterZones - kXtZones - kMsmParams;
+    const int vc2 = (int)vc2HostParams().size();   // the VC-2's, after the External In's (v451)
+    const int first = list.size() - vc2 - VSynthEmuProcessor::kAfterZones - kXtZones - kMsmParams;
     for (int id = kXtMsmFirstId; id <= kXtMsmLastId; ++id) {
         auto* prm = dynamic_cast<juce::RangedAudioParameter*>(list[first + id - kXtMsmFirstId]);
         const juce::String want = expectedId(id);

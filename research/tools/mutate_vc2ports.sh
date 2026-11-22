@@ -33,7 +33,9 @@
 # under xt_vc2voices, its second part; its second part (vc2release, vc2nodenotes, v278) under its third; the voice's
 # virtuals (vc2class, v279) and the update queue (vc2queue) under its fourth; the conversion sets C (vc2sets, v280) and
 # the notes' Matrix objects M (vc2notematrix) under xt_vc2sets; C's common (vc2setcommon, v281) under its second part;
-# C's envelopes (vc2setenvelope, v282) and their tables (vc2setenvtables) under its third.
+# C's envelopes (vc2setenvelope, v282) and their tables (vc2setenvtables) under its third; the patch store (vc2patch,
+# v450), the .p02's reader (vc2patchfile) and the store's reads both images share (vc2patchxt, XtPatchStore.cpp) under
+# xt_vc2patch.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -86,11 +88,12 @@ VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEve
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
-# xt_vc2synth's (v314): every VC-2 port the plugin's build lists but rom.4's parameter tables, then the rom.2 ports
-# they lean on, the shared compares and the check
+# xt_vc2synth's (v314): every VC-2 port the plugin's build lists but rom.4's parameter tables and the patch store and
+# .p02 reader that read with them (v450), then the rom.2 ports they lean on, the shared compares and the check
+NOT_SYN=" Vc2Params Vc2PatchStore Vc2PatchFile "
 VC2SYNTH=()
 while read -r f; do
-    [ "$f" = Vc2Params ] || VC2SYNTH+=("$f")
+    [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\)\.cpp$|\1|p' "$REPO/plugin/Vc2Sources.cmake")
 VC2SYNTH+=(Vc2SynthCheck Vc2CheckWords XtLfo XtEnvelope XtCosm XtOsc XtExtIn XtLitePlayer)
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
@@ -108,6 +111,7 @@ VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSetting
     Vc2PartNumbers Vc2PartNumbersCheck Vc2PartHandlersCheck Vc2PartStartUp Vc2PartStartUpCheck Vc2PartVoices
     Vc2PartVoicesTables Vc2TimeTrip Vc2TimeTripCheck Vc2PartChannel Vc2PartChannelCheck Vc2MidiDispatch
     Vc2MidiDispatchCheck Vc2NotesTask Vc2NotesTaskCheck)
+VC2PATCH=(Vc2PatchStore Vc2PatchFile Vc2PatchStoreCheck Vc2PatchFileCheck Vc2Params XtFxValueText)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -266,6 +270,9 @@ VC2PORTS=(
     "vc2partchannel|Vc2PartChannel.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2mididispatch|Vc2MidiDispatch.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2notestask|Vc2NotesTask.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2patch|Vc2PatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
+    "vc2patchfile|Vc2PatchFile.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
+    "vc2patchxt|XtPatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

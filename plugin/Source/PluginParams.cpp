@@ -2,6 +2,7 @@
 // has always seen them; and OSC k's parameter IDs.  Moved as they stood from PluginProcessor.cpp (v190).
 #include "PluginProcessor.h"
 #include "PluginParamIds.h"
+#include "PluginVc2Params.h"
 
 juce::String VSynthEmuProcessor::oscParamId(int k, const juce::String& id) { return Params::oscId(k, id); }
 
@@ -31,6 +32,8 @@ VSynthEmuProcessor::createParameterLayout() {
     addMsmParams(params);   // PluginMsm.cpp, v193: the same
     addZoneParams(params);  // PluginZones.cpp, v195: the same
     addExtInParams(params); // PluginExtIn.cpp, v206: the same
+    vc2FindRomEarly();             // PluginRom.cpp, v451: rom.4 in first, so the VC-2's are rom.4's
+    vc2AddHostParameters(params);  // PluginVc2Params.cpp, v451: rom.4's, appended
 
     return { params.begin(), params.end() };
 }

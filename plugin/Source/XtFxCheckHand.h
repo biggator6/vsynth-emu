@@ -34,6 +34,7 @@ struct HandDriver : Rig {
     std::vector<int16_t> store;
     HandDriver(const char* rom, const HandImage& hand, std::vector<uint32_t>* log = nullptr);
     void message(uint32_t second, uint32_t fourth);
+    void route();                 // the input's routing: the EXT IN request and its event's routine, where the image has one
     void poll(int sixClocksMs);   // the outside clock: its source at the clock object's +0x40, ms over six clocks at +0x48
 
 private:

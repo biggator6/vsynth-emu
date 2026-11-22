@@ -31,6 +31,31 @@ struct Truncation {
     static constexpr int kWords = 256;
 };
 
+// A unit on an image with these parameters set by ID, sent and played until the chip has them (v400: what the input's
+// checks each start from)
+inline std::unique_ptr<XtFxUnit> settledUnit(const char* rom, const XtFxImage& image,
+                                             const std::vector<std::pair<int, int>>& sets) {
+    auto u = std::make_unique<XtFxUnit>(rom, image);
+    for (const auto& [id, value] : sets) u->control().set(id, value);
+    u->control().update();
+    u->settle();
+    return u;
+}
+
+// The outside input `in` (int32 L then R a frame) through the unit a frame at a time, a silent bus beside it: the words
+// handed back for each frame, words 4 and 5
+inline std::vector<int32_t> handedBack(XtFxUnit& u, const std::vector<int32_t>& in) {
+    std::vector<int32_t> back(in.size());
+    float frame[8] = {}, lr[2] = {};
+    for (size_t i = 0; i + 1 < in.size(); i += 2) {
+        u.pushInput(&in[i], 1);
+        u.process(frame, lr, 1);
+        back[i] = u.returned()[0];
+        back[i + 1] = u.returned()[1];
+    }
+    return back;
+}
+
 void unitConversion(const char* rom, uint32_t seed, const UnitWay& way);   // XtFxCheckUnit.cpp
 void unitLevels(const char* rom, bool print, const UnitWay& way);
 void unitAgainstReference(const char* rom, int randomEvents, uint32_t seed, const UnitWay& way);   // XtFxCheckUnitRef.cpp

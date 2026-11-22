@@ -123,12 +123,12 @@ rom-not-kept|keepSetting(kRomKey, file.getFullPathName());|;|plugin/Source/Plugi
 patch-wave-folder|file.getParentDirectory().getSiblingFile("Wave")|file.getParentDirectory().getChildFile("Wave")|plugin/Source/PluginPatchFiles.cpp|patch
 # The two known images (v198), by VSynthEmuRomTest: rom.4 found beside the rom.2 opened, each refused as the other's
 # image, a file of neither refused.
-rom4-not-beside|    cand.add(rom.getSiblingFile(kVc2RomName).getFullPathName());\n||plugin/Source/PluginRom.cpp|rom-image
+rom4-not-beside|seekVc2(rom != juce::File() ? juce::StringArray(rom.getFullPathName()) : juce::StringArray());|seekVc2(juce::StringArray());|plugin/Source/PluginRom.cpp|rom-image
 rom4-not-sought|    findVc2Rom(file);\n||plugin/Source/PluginRom.cpp|rom-image
-rom4-not-alone|    findVc2Rom(juce::File());\n||plugin/Source/PluginRom.cpp|rom-image
+rom4-not-alone|void vc2FindRomEarly() { seekVc2(romPlaces()); }|void vc2FindRomEarly() {}|plugin/Source/PluginRom.cpp|rom-image
 rom-any-image|    out.known = known == std::end(kKnown) ? nullptr : *known;|    out.known = &kVSynth;|plugin/Source/XtSynthRom.cpp|rom-image
 rom-not-the-image|    if (file->known != &image_) {|    if (false) {|plugin/Source/XtSynthRom.cpp|rom-image
-rom4-no-tables|return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)\n           && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)\n           && vc2LoadCosm(path) && vc2LoadMatrix(path) && vc2LoadRamp(path) && vc2LoadOscConvert(path)\n           && vc2LoadLibMath(path) && vc2LoadToneMix(path) && vc2LoadPartVoices(path) && vc2LoadKeys(path)\n           && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path);|Sh4 m; return m.loadRom(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-tables|return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)\n           && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)\n           && vc2LoadCosm(path) && vc2LoadMatrix(path) && vc2LoadRamp(path) && vc2LoadOscConvert(path)\n           && vc2LoadLibMath(path) && vc2LoadToneMix(path) && vc2LoadPartVoices(path) && vc2LoadKeys(path)\n           && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);|Sh4 m; return m.loadRom(path);|plugin/Source/XtSynthRom.cpp|rom-image
 # v208: the unvoiced detector's coefficients, loaded with rom.4's parameters at the start; v210: LEGACY's; v213: HIRESO's;
 # v220: the vocoder object's
 rom4-no-unvoiced|&& vc2LoadUnvoiced(path) && vc2LoadLegacy(path)|&& vc2LoadLegacy(path)|plugin/Source/XtSynthRom.cpp|rom-image
@@ -163,7 +163,9 @@ rom4-no-voices|&& vc2LoadToneMix(path) && vc2LoadPartVoices(path) &&|&& vc2LoadT
 rom4-no-keys|&& vc2LoadPartVoices(path) && vc2LoadKeys(path)\n|&& vc2LoadPartVoices(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
 rom4-no-setenvelopes|vc2LoadKeys(path)\n           && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n|vc2LoadKeys(path)\n           && vc2LoadPartSettings(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
 rom4-no-partsettings|vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n|vc2LoadSetEnvelopes(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
-rom4-no-osmidi|vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path);|vc2LoadPartSettings(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-osmidi|vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);|vc2LoadPartSettings(path)\n           && vc2LoadPatchFiles(path);|plugin/Source/XtSynthRom.cpp|rom-image
+# v450: the image a .p02's read runs on, kept by rom.4's loader at the start
+rom4-no-patchfiles|&& vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);|&& vc2LoadOsMidi(path);|plugin/Source/XtSynthRom.cpp|rom-image
 # v206: the FX page's labelled boxes (External In Type and Source on the System card) and the OSC panel's EXT IN face
 editor-fx-choices-hidden|            c->box.setVisible(sys);|            c->box.setVisible(false);|plugin/Source/FxPanel.cpp|layout
 editor-fx-system-boxes|sys.rows = rowsOf(system_, systemChoices_);|sys.rows = rowsOf(system_, toneChoices_);|plugin/Source/FxPanel.cpp|layout
@@ -222,3 +224,37 @@ editor-d-pad-off-sends|    return cc == kOff \|\| cc == kAlsoOff ? 0 : cc;|    r
 editor-d-pad-hold-unsaved|        processor_.apvts.state.setProperty(kPadHold, hold_.getToggleState(), nullptr);|        ;|plugin/Source/UiTripColumn.cpp|layout
 editor-d-beat-osc1|Params::oscId(osc, Params::kBeatKeep), attached_|Params::oscId(0, Params::kBeatKeep), attached_|plugin/Source/UiTripColumn.cpp|layout
 editor-d-beat-cut|        beat_[(size_t)osc].setBounds(beat);|        beat_[(size_t)osc].setBounds(beat.withTrimmedLeft(beat.getWidth() / 2));|plugin/Source/UiTripColumn.cpp|layout
+# v451: the VC-2's host parameters (PluginVc2Params.cpp) against rom.4, by VSynthEmuArpPluginTest's VC-2 part; their place
+# in the layout and the search for rom.4 before it (PluginParams.cpp, PluginRom.cpp); and held apart by the editor's check
+vc2-param-not-added|    vc2AddHostParameters(params);  // PluginVc2Params.cpp, v451: rom.4's, appended|    ;|plugin/Source/PluginParams.cpp|arpplugin
+vc2-param-not-held-apart|    vc2AddHostParameters(params);  // PluginVc2Params.cpp, v451: rom.4's, appended|    ;|plugin/Source/PluginParams.cpp|layout
+vc2-param-no-early|    vc2FindRomEarly();             // PluginRom.cpp, v451: rom.4 in first, so the VC-2's are rom.4's|    ;|plugin/Source/PluginParams.cpp|arpplugin
+vc2-param-early-beside|        if (r.isNotEmpty()) cand.add(juce::File(r).getSiblingFile(kVc2RomName).getFullPathName());|        ;|plugin/Source/PluginRom.cpp|arpplugin
+vc2-param-env-run|{ 0x395, 0x39b, 1, 13, 13 }|{ 0x395, 0x39a, 1, 13, 13 }|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-scale-step|{ 0x153, 0x169, 2 }|{ 0x153, 0x169, 1 }|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-one-zone|constexpr int kZones = 2,|constexpr int kZones = 1,|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-start-offset|{ 0x306, 0x32e }|{ 0x307, 0x32e }|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-assigns|{ 0x89, 0x96 }|{ 0x89, 0x94 }|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-id-zone|(zone ? "z2" : "")|(zone ? "z1" : "")|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-id-hex|paddedLeft('0', 3)|paddedLeft('0', 4)|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-centre|const int lo = d->min - d->centre, hi = d->max - d->centre;|const int lo = d->min, hi = d->max - d->centre;|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-default|return { lo, hi, std::clamp(d->def - d->centre, lo, hi) };|return { lo, hi, lo };|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-typed-range|return { t->min, t->max, std::clamp(t->def, t->min, t->max) };|return { t->min, t->max + 1, std::clamp(t->def, t->min, t->max) };|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-text|return named ? juce::String(vc2ValueText(id, v)) : juce::String(v);|return juce::String(v);|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-read-back|if (t.trim() == juce::String(vc2ValueText(id, v)).trim()) return v;|if (t.trim() == juce::String(vc2ValueText(id, v)).trim()) return lo;|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-name-zone|juce::String head = p.zone ? "VC-2 Z2 " : "VC-2 ";|juce::String head = "VC-2 ";|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-name-cosm|if (name.startsWith("COSM ")) name = name.substring(5);|;|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-stand-in|if (!rom4) return { kVc2StandInLo, kVc2StandInHi, 0 };|if (!rom4) return { 0, 127, 0 };|plugin/Source/PluginVc2Params.cpp|arpplugin
+# v452: a .p02 onto the VC-2's parameters and the patch in the session (PluginVc2Patch.cpp, PluginState.cpp), by
+# VSynthEmuArpPluginTest's VC-2 patch part
+vc2-patch-system|    if (p.id < kStoreFirst) return std::nullopt;|    if (p.id < 0x40) return std::nullopt;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-zone|xtStoreValue(vc2Store(), store, p.id, p.zone, p.cosm);|xtStoreValue(vc2Store(), store, p.id, 0, p.cosm);|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-cosm|return vc2StoreTyped(store, p.id, p.zone, p.cosm);|return vc2StoreTyped(store, p.id, p.zone, 0);|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-typed|    if (p.id >= kVc2FirstTyped) return vc2StoreTyped(store, p.id, p.zone, p.cosm);\n||plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-refused-goes-on|        return false;\n    }\n    for (const Vc2HostParam& h|    }\n    for (const Vc2HostParam& h|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-store-not-kept|        vc2Patch_.store = read.store;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-name-not-kept|        vc2Patch_.name = read.name;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-not-saved|    vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name|    ;|plugin/Source/PluginState.cpp|arpplugin
+vc2-patch-not-restored|    vc2PatchFromState(vc2Patch_, apvts.state);   // v452: none from a session before it|    ;|plugin/Source/PluginState.cpp|arpplugin
+vc2-patch-stale|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : std::vector<uint8_t>();|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : patch.store;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-name-saved|    state.setProperty(kNameKey, patch.name, nullptr);|    ;|plugin/Source/PluginVc2Patch.cpp|arpplugin

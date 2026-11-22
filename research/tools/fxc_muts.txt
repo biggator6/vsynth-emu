@@ -176,12 +176,13 @@ route-start|send(BlockSystem, true);\n    routeInput();|send(BlockSystem, true);
 route-block|{ 0x78, 0x78, BlockInput }, { 0x7c, 0x7c, BlockInput },||fxim
 route-send|if (blocks & BlockInput) routeInput();|
 route-patch|dirty_ & (BlockSystem \| BlockAttenuation \| BlockInput); dirty_ = 0;|dirty_ & (BlockSystem \| BlockAttenuation); dirty_ = 0;
-route-post|kPostEvent { 0x894aee70, 0x89391e50 }|kPostEvent { 0, 0x89391e50 }|fxim
+route-post|kPostInput { 0x894aee70, 0x893620d0 }|kPostInput { 0, 0x893620d0 }|fxim
+feeds-usb-rom2|kVSynthFrameGain, true })|kVSynthFrameGain, false })|fxim
 unit-input-taken|in_.take(frames);|in_.take(0);|fxu
 unit-input-back|        frameBack(i);\n||fxu
 route-event|    call(image_.inputEvent);\n||fxi
 in-slot|kAnalogL = 0x10,|kAnalogL = 0x11,|fxi
-in-usb|    chip.setGram(kUsbL, l);\n||fxi
+in-usb|    chip.setGram(kUsbL, feedsUsb_ ? l : 0);\n||fxi
 in-shift|in[2 * i] >> 8, r|in[2 * i] >> 7, r|fxi
 in-right-left|chip.setGram(kAnalogR, r);|chip.setGram(kAnalogR, l);|fxi
 in-pushed|{ in_.push(lr, frames); }|{ (void)lr; (void)frames; }|fxi

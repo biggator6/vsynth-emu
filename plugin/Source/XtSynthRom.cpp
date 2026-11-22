@@ -28,6 +28,7 @@
 #include "Vc2PartSettingsTables.h"
 #include "Vc2OsMidiTables.h"
 #include "Vc2Params.h"
+#include "Vc2PatchFile.h"
 #include "Vc2Unvoiced.h"
 #include "Vc2VocoderTables.h"
 #include "XtFiles.h"
@@ -115,8 +116,8 @@ bool loadTables(const char* path) {
 // library's logf and powf (Vc2LibMathTables.cpp), the tone's OSC mix's (Vc2ToneMixTables.cpp, v269), the part's
 // voices' (Vc2PartVoicesTables.cpp, v272), the part's keys' (Vc2KeysTables.cpp, v276), C's envelopes'
 // (Vc2SetEnvelopeTables.cpp, v282), the part's settings' (Vc2PartSettingsTables.cpp, v287), the OS MIDI task's
-// (Vc2OsMidiTables.cpp, v313); the VC-2's other ports' tables go here as they come, read at this start and never at a
-// switch of modes
+// (Vc2OsMidiTables.cpp, v313), and the image a .p02's read runs on (Vc2PatchFile.cpp, v450); the VC-2's other ports'
+// tables go here as they come, read at this start and never at a switch of modes
 bool loadVc2(const char* path) {
     return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)
            && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)
@@ -124,7 +125,7 @@ bool loadVc2(const char* path) {
            && vc2LoadCosm(path) && vc2LoadMatrix(path) && vc2LoadRamp(path) && vc2LoadOscConvert(path)
            && vc2LoadLibMath(path) && vc2LoadToneMix(path) && vc2LoadPartVoices(path) && vc2LoadKeys(path)
            && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)
-           && vc2LoadOsMidi(path);
+           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);
 }
 
 // An image in the tables: loaded by the first file taken, then only compared with.  The lock and what it guards are

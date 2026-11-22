@@ -30,6 +30,7 @@ VC2_TABLES=(
     Vc2SetEnvelopeTables        # C's envelopes' (v282)
     Vc2PartSettingsTables       # the part's settings' (v287)
     Vc2OsMidiTables             # the OS MIDI task's (v313)
+    "Vc2PatchFile Vc2PatchStore"   # the image a .p02's read runs on, and the store it reads into (v450)
 )
 
 # vc2Tables <source dir> [suffix]: the rows' files the tree has, one a line, each with the suffix (.cpp for a source).
