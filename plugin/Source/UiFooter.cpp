@@ -1,6 +1,8 @@
 // D's footer (UiFooter.h; UI step 1, its keys played from v201)
 #include "UiFooter.h"
 #include "PluginParamIds.h"
+#include "PluginVc2Params.h"
+#include "UiControls.h"
 #include "UiLook.h"
 #include "UiParts.h"
 #include <algorithm>
@@ -12,6 +14,7 @@ constexpr int kKeys = Footer::kWhiteKeys / kWhitesPerOctave * kOctave;   // ever
 constexpr float kBlackW = 0.6f, kBlackH = 0.6f;   // a black key: its share of a white key's width, of the keys' height
 constexpr float kSoftest = 0.25f;                 // a press's velocity at a key's top edge; full at its bottom
 constexpr int kChannel = 1;
+constexpr int kVc2MonoPoly = 0x130, kVc2FirstUpper = 0x141, kVc2Zones = 2;   // [FW] the VC-2's, its zones 1 and 2
 // Each semitone of an octave: the white key it is or follows, and whether it is black
 constexpr int kWhiteOf[kOctave] = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 };
 constexpr bool kBlack[kOctave] = { false, true, false, true, false, false, true, false, true, false, true, false };
@@ -40,10 +43,28 @@ juce::Colour Footer::zoneColour(int zone) {
     return step % 2 ? base.darker(0.25f * (float)(step + 1) / 2.0f) : base.brighter(0.2f * (float)step / 2.0f);
 }
 
+// The mode's (v453): the V-Synth's Keys and zones, or the VC-2 patch's Mono/Poly and its two zones' ranges (0x141 on)
+void Footer::setVc2(bool vc2) {
+    vc2_ = vc2;
+    shown_.clear();
+    refresh();
+}
+
+juce::String Footer::monoPolyId() const {
+    return vc2_ ? vc2HostParamId(kVc2MonoPoly, 0, 0) : Params::kMonoPoly;
+}
+
+juce::String Footer::upperId(int zone) const {
+    return vc2_ ? vc2HostParamId(kVc2FirstUpper + zone, 0, 0) : Params::zoneUpperId(zone);
+}
+
+int Footer::zones() const {
+    return vc2_ ? kVc2Zones : processor_.patchZones();
+}
+
 void Footer::refresh() {
-    juce::String now = processor_.apvts.getParameter(Params::kMonoPoly)->getCurrentValueAsText();
-    for (int zone = 0; zone < processor_.patchZones(); ++zone)
-        now << '|' << processor_.apvts.getRawParameterValue(Params::zoneUpperId(zone))->load();
+    juce::String now = Controls::currentText(processor_.apvts, monoPolyId());
+    for (int zone = 0; zone < zones(); ++zone) now << '|' << Controls::paramValue(processor_.apvts, upperId(zone));
     if (now == shown_) return;
     shown_ = now;
     repaint();
@@ -110,8 +131,8 @@ void Footer::paint(juce::Graphics& g) {
     Ui::fill(g, getLocalBounds().removeFromTop(1), Look::divider);
     const auto status = getLocalBounds().reduced(Look::inset, 0).withTrimmedTop(4).withTrimmedBottom(6)
                             .removeFromLeft(kStatusW);
-    const juce::String keys = processor_.apvts.getParameter(Params::kMonoPoly)->getCurrentValueAsText();
-    Ui::drawText(g, "Keys " + keys + "   Zones " + juce::String(processor_.patchZones()), status,
+    const juce::String keys = Controls::currentText(processor_.apvts, monoPolyId());
+    Ui::drawText(g, "Keys " + keys + "   Zones " + juce::String(zones()), status,
                  { Look::sans(11.0f), Look::label });
     const auto area = keysArea();
     const float keyW = area.getWidth() / (float)kWhiteKeys;
@@ -123,8 +144,8 @@ void Footer::paint(juce::Graphics& g) {
 void Footer::paintZones(juce::Graphics& g, juce::Rectangle<float> band, float keyW) const {
     const int highKey = kLowKey + kKeys - 1;
     int lower = 0;
-    for (int zone = 0; zone < processor_.patchZones(); ++zone) {
-        const int upper = juce::roundToInt(processor_.apvts.getRawParameterValue(Params::zoneUpperId(zone))->load());
+    for (int zone = 0; zone < zones(); ++zone) {
+        const int upper = Controls::paramValue(processor_.apvts, upperId(zone));
         const int from = juce::jmax(lower, kLowKey), to = juce::jmin(upper, highKey);
         if (from <= to) {
             const float x0 = band.getX() + whiteIndexOf(from) * keyW;

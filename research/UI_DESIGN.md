@@ -219,7 +219,8 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
   panels showing their faces; at the smallest, default and largest sizes the drawing filling the window, scaled whole; on
   each page, and on SYNTH with each block selected, no control outside its parent, over another, without a size or with
   its text cut short; every control moved, each instance's (each OSC, COSM, MSM track, Matrix Control and zone) moving its
-  own parameters alone, and every parameter with a control but the 17 below and the VC-2 mode's, held apart (v451);
+  own parameters alone, and every parameter with a control but the 17 below (the VC-2 mode's held apart from v451 to
+  v453, on its pages since: "The VC-2 mode's pages");
   each page's name, block and effect pressed;
   the header's build, Browse…, ROM… and each PCM OSC's Load…, and a patch's note; a curve's points dragged, a route on its
   block, the list's and the overviews' presses; the FX page on every effect type, its list's text whole with room for 15
@@ -251,16 +252,17 @@ Every control is made from its parameter's ID, so a new parameter needs a row in
 - The Time Trip circle (`timeTrip`, 1): a finger going round the rim, for a host's automation; the pad sends the XT's
   controllers instead (v202, the user's choice).
 
-The VC-2 mode's 1,332 (v451, `vc2…`, after the 763) have none yet either: its pages need the user's look. Until they
-come `VSynthEmuEditorTest` holds them apart (the user's decision, 2026-11-21): each one of the set in its order, none
-reached by a control, and the set whole. The pages will be made from their IDs by tables, as every other.
+The VC-2 mode's 1,332 (v451, `vc2…`, after the 763) each have a control on the VC-2's pages from v453, where
+`VSynthEmuEditorTest` held them apart until then.
 
 ### The VC-2 mode's pages {#vc2-pages-pointer}
 
-Decided, not built (2026-11-22): `UI_DESIGN_VC2.md` beside this file, with its mock-up `UI_DESIGN_VC2.html`. Six
-pages in VC-2 mode, each of the 1,332 on one of them; its questions d-1 to d-14 all decided as recommended (the user:
-"take the recommendations from VC-2 mode's pages"). It comes here as the pages are built (step 4.5's second half), and
-that file goes.
+Built in v453 (2026-11-22): `UI_DESIGN_VC2.md` beside this file, with its mock-up `UI_DESIGN_VC2.html`. The header's
+V-SYNTH/VC-2 switch is the session's mode (d-15); in VC-2 mode six pages, each of the 1,332 on one of them, made from
+the VC-2's tables (`UiVc2*.cpp`) by D's parts, which take a mode's tables where they took the V-Synth's (a Block's
+`Model`, a panel's or a page's `Mode`). A VC-2 control's kind and text come from rom.4's value strings (d-8, d-9).
+`VSynthEmuEditorTest` checks them as D's (`EditorVc2Test.cpp`, `EditorVc2TextTest.cpp`). What waits for `Vc2Synth`
+says so on its page. That file comes here once those come, and goes.
 
 ### Still to do
 

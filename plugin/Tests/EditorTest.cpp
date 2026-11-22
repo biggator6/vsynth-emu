@@ -117,21 +117,31 @@ void chrome(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& 
     check(!seen(labelOf(note), ed), "a patch's note stays when nothing is missing");
 }
 
-// Each page, and SYNTH with each block selected, into a folder
+// A mode's pages, then SYNTH with each block selected, each drawn by `shoot` under a name with the mode's prefix
+template <size_t N>
+void eachPageAndBlock(SynthEditor& ed, const std::array<const char*, N>& pages, const juce::String& prefix,
+                      const std::function<void(const juce::String&)>& shoot) {
+    for (int page = 0; page < (int)N; ++page) {
+        ed.showPage(page);
+        shoot(prefix + "page-" + pages[(size_t)page]);
+    }
+    ed.showPage(Blocks::kSynthPage);
+    for (int block = 0; block < Blocks::kCount; ++block) {
+        ed.select(block);
+        shoot(prefix + "synth-block" + juce::String(block));
+    }
+}
+
+// Each page, and SYNTH with each block selected, into a folder; then the VC-2 mode's (v453)
 void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
     check(dir.createDirectory().wasOk(), "can't make " + dir.getFullPathName().toStdString());
     const auto shoot = [&](const juce::String& name) {
         check(writeSnapshot(ed, dir.getChildFile(name + ".png")), "can't write " + name.toStdString());
     };
-    for (int page = 0; page < (int)Blocks::kPages.size(); ++page) {
-        ed.showPage(page);
-        shoot(juce::String("page-") + Blocks::kPages[(size_t)page]);
-    }
-    ed.showPage(Blocks::kSynthPage);
-    for (int block = 0; block < Blocks::kCount; ++block) {
-        ed.select(block);
-        shoot("synth-block" + juce::String(block));
-    }
+    eachPageAndBlock(ed, Blocks::kPages, {}, shoot);
+    ed.showMode(PluginMode::vc2);
+    eachPageAndBlock(ed, Blocks::kVc2Pages, "vc2-", shoot);
+    ed.showMode(PluginMode::vsynth);
     ed.select(Blocks::kFirstSelected);
     const juce::StringArray views = ed.lower().list().names();
     for (int v = 0; v < views.size(); ++v) {
@@ -143,35 +153,38 @@ void snapshots(SynthEditor& ed, const juce::File& dir, TestChecks& check) {
 
 // Every parameter with a control that has moved it, but those no editor has shown (the engine's three, unread and kept
 // for old sessions, and Scale Tune) and the Time Trip circle, left to a host's automation where the pad sends the XT's
-// controllers (v202); with `list`, the parameters no control reaches, said.  The VC-2 mode's (v451) are held apart until
-// its pages come (the user's decision, 2026-11-21): each one of its set in order, none with a control, the set whole;
-// `list` says how many.  How many have one.
+// controllers (v202); with `list`, the parameters no control reaches, said.  The VC-2 mode's (v451) every one, on its
+// pages (v453: no longer held apart; the 36 nothing found reads among them, faint), the set whole and in its order.  How
+// many have one.
 int coverage(LayoutCheck& l, TestChecks& check, bool list) {
     const juce::StringArray unshown { "pitchShift", "timeStretch", "formantShift", "timeTrip" };
     const auto& vc2 = vc2HostParams();
-    size_t apart = 0;
+    size_t vc2At = 0;
     int have = 0;
     for (auto* r : l.params) {
         const juce::String& id = r->paramID;
-        if (id.startsWith(kVc2ParamPrefix)) {
-            const bool inOrder = apart < vc2.size() && vc2[apart++].paramId == id;
-            check(inOrder && l.reached.count(id) == 0,
-                  ("the VC-2's " + id + ": its set's, with no control yet").toStdString());
-        } else if (l.reached.count(id) != 0) {
+        const bool isVc2 = id.startsWith(kVc2ParamPrefix);
+        const bool inOrder = !isVc2 || (vc2At < vc2.size() && vc2[vc2At++].paramId == id);
+        check(inOrder, ("the VC-2's " + id + " out of its set's order").toStdString());
+        if (l.reached.count(id) != 0) {
             ++have;
         } else if (list) {
             std::printf("no control: %s\n", id.toRawUTF8());
         } else {
-            check(unshown.contains(id) || id.startsWith("scaleTune"), ("no control sets " + id).toStdString());
+            const bool shownNowhere = !isVc2 && (unshown.contains(id) || id.startsWith("scaleTune"));
+            check(shownNowhere, ("no control sets " + id).toStdString());
         }
     }
-    check(apart == vc2.size(), "the VC-2 mode's, held apart, should be its set's " + std::to_string(vc2.size()));
-    if (list) std::printf("held apart: the VC-2 mode's %zu, no page yet\n", apart);
+    check(vc2At == vc2.size(), "the VC-2 mode's should be its set's " + std::to_string(vc2.size()));
     return have;
 }
 
 int editorTest(const juce::File& rom, const juce::File& work, const juce::StringArray& rest) {
     TestChecks check { "editor" };
+    // rom.4 in before the processor makes its parameters, so the VC-2's are rom.4's and not stand-ins (v453), as a
+    // host's first instance finds it beside rom.2 (vc2FindRomEarly)
+    check(xtSynthSetVc2Rom(rom.getSiblingFile("V-SynthXT.rom.4.bin").getFullPathName().toStdString()),
+          "rom.4 should load beside rom.2");
     VSynthEmuProcessor p;
     check(p.setRomFile(rom), "the ROM should load");
     auto owned = std::make_unique<SynthEditor>(p);
@@ -189,14 +202,18 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     waveChecks(ed, p, work, check);
     keyChecks(l, ed, p, check);
     padChecks(l, ed, p, check);
+    vc2Checks(l, ed, p, check, [&] { sizes(l, ed, check); });
+    vc2TextChecks(ed, p, check);
+    ed.showMode(PluginMode::vsynth);
+    check(!ed.vc2() && pluginMode(p.apvts.state) == PluginMode::vsynth, "the V-Synth mode doesn't come back");
     const int reached = coverage(l, check, rest[0] == "list");
     if (rest[0] != "list" && !rest.isEmpty())
         snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);
     check(l.errors == 0, std::to_string(l.errors) + " layout errors (said above)");
     return check.summary(std::to_string(l.states) + " states, " + std::to_string(l.checked) + " placements, " +
-                         std::to_string(reached) + " of " + std::to_string(l.params.size() - vc2HostParams().size()) +
+                         std::to_string(reached) + " of " + std::to_string(l.params.size()) +
                          " parameters have a control, the VC-2's " + std::to_string(vc2HostParams().size()) +
-                         " held apart");
+                         " among them");
 }
 
 }

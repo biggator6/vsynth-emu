@@ -2,7 +2,7 @@
 # on rom.4, say something differs.  name|old|new[|port[|seed]]
 # The tables' places and forms
 names-table|kNames = 0x898b5798;|kNames = 0x898b579c;
-names-short|kLongestName = 40;|kLongestName = 12;
+names-short|kLongestName = 40,|kLongestName = 12,
 desc-table|kDescriptors = 0x8950f0b0;|kDescriptors = 0x8950f0bc;
 desc-stride|kDescBytes = 12, kTypedBytes = 8;|kDescBytes = 8, kTypedBytes = 8;
 bank-table|kBank = 0x895131a8;|kBank = 0x895131b0;

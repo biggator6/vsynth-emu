@@ -24,12 +24,16 @@ T* theOne(SynthEditor& ed, const std::string& what, TestChecks& check) {
 }
 
 // Which instance of its kind a block is, by the prefixes its kind's parameters take (an OSC's, a COSM's); a kind of one
-// instance has none to hold its controls to (count 0)
+// instance has none to hold its controls to (count 0).  The VC-2's (v453) by `instance`, which says which instance a
+// parameter is, or -1 for one of no instance of the kind, or another zone's
 struct Owner {
     std::function<juce::String(int)> prefix;
     int count = 0, index = 0;
+    std::function<int(const juce::String&)> instance;
 };
 Owner ownerOf(const Blocks::Block& b);
+// How many of a panel's knobs show (its face's)
+int visibleKnobs(juce::Component& panel);
 // Every control shown under root moved through the real controls; each must move its owner's own parameters alone
 void movesOwn(LayoutCheck& l, juce::Component& root, const juce::String& where, const Owner& own, TestChecks& check);
 // Each face of a Type in turn: the parameter set, then at(face); the Type left as it was found
@@ -56,3 +60,10 @@ void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
 // The Time Trip pad (EditorPadTest.cpp, v202): a press's, a drag's and a release's controllers by the assigns as they
 // stand, Hold, an assign OFF
 void padChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// The VC-2 mode (EditorVc2Test.cpp, v453; research/UI_DESIGN_VC2.md): the header's switch and the session's mode, each
+// page and block at three sizes (`sizes`), each zone's, OSC's and COSM's controls on every face moving their own
+// parameters alone, after a change of zone too, each Matrix Control's and zone's; and (EditorVc2TextTest.cpp) the
+// controls' kinds (d-8), their text (d-9) and the mic's checks, each failing on its own cause
+void vc2Checks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check,
+               const std::function<void()>& sizes);
+void vc2TextChecks(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

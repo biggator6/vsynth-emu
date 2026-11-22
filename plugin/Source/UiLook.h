@@ -63,6 +63,9 @@ inline constexpr float sweepEnd = 2.75f * juce::MathConstants<float>::pi;
 inline const juce::Identifier modLo { "modLo" }, modHi { "modHi" };
 // A toggle drawn as a power dot rather than a switch, by this property
 inline const juce::Identifier power { "power" };
+// A control that is the editor's own and no parameter's, by this property (v453: the V-Synth's Pad Hold, where the
+// VC-2's is a parameter of the same name); the editor's test doesn't look for a parameter it moves
+inline const juce::Identifier editorsOwn { "editorsOwn" };
 
 class Feel : public juce::LookAndFeel_V4 {
 public:

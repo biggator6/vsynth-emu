@@ -1,5 +1,6 @@
 // A knob made from a parameter's ID (UiKnob.h; UI step 1)
 #include "UiKnob.h"
+#include "UiControls.h"
 #include "UiLook.h"
 
 namespace {
@@ -8,6 +9,7 @@ constexpr int kBigDial = 40;   // from this size a knob's name and value are 11,
 
 Knob::Knob(juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name, int dialSize)
     : attachment_(state, id, dial_), size_(dialSize) {
+    Controls::showEditorText(dial_, state, id);   // a VC-2 value on its string's scale (v453)
     const float text = dialSize >= kBigDial ? 11.0f : 10.0f;
     dial_.setRotaryParameters(Look::sweepStart, Look::sweepEnd, true);
     dial_.setTitle(name);

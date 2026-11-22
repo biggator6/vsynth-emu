@@ -1,29 +1,25 @@
-// D's COSM panel (UiCosmPanel.h; UI step 2)
+// D's COSM panel (UiCosmPanel.h; UI step 2; a mode's faces, v453)
 #include "UiCosmPanel.h"
 #include "PluginParamIds.h"
 #include "UiLook.h"
 #include "UiParts.h"
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 namespace {
 
 using Controls::KnobRow;
-constexpr int kTypes = CosmPanel::kTypes;
-constexpr int kKnobs = 5, kDial = 30, kTitleH = 20, kDisplayW = 96, kDisplayH = 62;
+using Display = CosmPanel::Display;
+constexpr int kTypes = CosmPanel::kTypes, kKnobs = CosmPanel::kKnobs;
+constexpr int kDial = 30, kTitleH = 20, kDisplayW = 96, kDisplayH = 62;
 
-// How a type's display draws: its response as a filter, its curve as a shaper, or its name
-enum class Display { response, curve, name };
-// What each type shows: its own box beside Type, its first knobs, its display; IDs as Params::cosmId's names
-struct CosmFace {
-    const char* sub;
-    std::array<KnobRow, kKnobs> knobs;
-    Display display;
-};
+// What each of the V-Synth's types shows: its own box beside Type, its first knobs, its display; IDs as Params::cosmId's
+// names
 constexpr KnobRow kNone { nullptr, nullptr };
-constexpr CosmFace kTvf { "Filter", { { { "Cutoff", "Cutoff" }, { "Reso", "Reso" }, { "CutoffKF", "KF" },
-                                        { "CutoffEnv", "Env" }, { "CutoffLfo", "LFO" } } }, Display::response };
-constexpr CosmFace kFaces[kTypes] = {
+constexpr CosmPanel::Face kTvf { "Filter", { { { "Cutoff", "Cutoff" }, { "Reso", "Reso" }, { "CutoffKF", "KF" },
+                                               { "CutoffEnv", "Env" }, { "CutoffLfo", "LFO" } } }, Display::response };
+constexpr CosmPanel::Face kFaces[kTypes] = {
     kTvf,
     kTvf,
     { "DualType", { { { "Dual1Freq", "Freq 1" }, { "Dual1Q", "Q 1" }, { "Dual2Freq", "Freq 2" }, { "Dual2Q", "Q 2" },
@@ -55,34 +51,52 @@ constexpr CosmFace kFaces[kTypes] = {
     { "SpkType", { { kNone, kNone, kNone, kNone, kNone } }, Display::name },
 };
 
+juce::String vsynthCosmId(int cosm, const juce::String& name) {
+    return Params::cosmId(cosm, name.toRawUTF8());
+}
+
+int knobsIn(const CosmPanel::Face& face) {
+    return (int)std::count_if(face.knobs.begin(), face.knobs.end(), [](const KnobRow& k) { return k.id != nullptr; });
+}
+
 // A filter's response across the display: flat, then falling from the corner, a peak there by the second knob
 float responseAt(float x, float corner, float peak) {
     const float f = x / juce::jmax(0.05f, corner);
     return 1.0f / std::sqrt((1.0f - f * f) * (1.0f - f * f) + f * f / (0.3f + 4.0f * (1.0f - peak)));
 }
 
-// The display's height at x, 0 to 1, by its kind and the face's first two knobs
+// The display's height at x, 0 to 1, by its kind and the face's first two knobs: a filter's response, a shaper's curve,
+// or the GROWL's wobble, as many cycles across as its Speed gives (one to eight), as deep as its Intensity
 float curveAt(Display kind, float x, float a, float b) {
     if (kind == Display::response) return juce::jlimit(0.0f, 1.0f, 0.5f * responseAt(x, 0.1f + 0.85f * a, b));
+    if (kind == Display::wobble)
+        return 0.5f + 0.45f * a * std::sin(juce::MathConstants<float>::twoPi * (1.0f + 7.0f * b) * x);
     return 0.5f + 0.5f * std::tanh((1.0f + 6.0f * a) * (2.0f * x - 1.0f));
 }
 
 }
 
 CosmPanel::CosmPanel(juce::AudioProcessorValueTreeState& state, int cosm)
-    : FacedPanel(state, { "COSM " + juce::String(cosm + 1), Params::cosmId(cosm, "Switch"),
-                          Params::cosmId(cosm, "Type") }, kTypes) {
-    for (int t = 0; t < kTypes; ++t) {
-        if (kFaces[t].sub != nullptr) addSub(t, Params::cosmId(cosm, kFaces[t].sub));
-        for (const KnobRow& k : kFaces[t].knobs)
-            if (k.id != nullptr) addKnob(t, Params::cosmId(cosm, k.id), k.name, kDial);
+    : CosmPanel(state, cosm, { kFaces, kTypes, vsynthCosmId, "Switch", "Type" }) {}
+
+CosmPanel::CosmPanel(juce::AudioProcessorValueTreeState& state, int cosm, Model model)
+    : FacedPanel(state, { "COSM " + juce::String(cosm + 1), model.id(cosm, model.switchRow),
+                          model.id(cosm, model.typeRow) }, model.count),
+      model_(std::move(model)) {
+    for (int t = 0; t < model_.count; ++t) {
+        if (model_.faces[t].sub != nullptr) addSub(t, model_.id(cosm, model_.faces[t].sub));
+        for (const KnobRow& k : model_.faces[t].knobs)
+            if (k.id != nullptr) addKnob(t, model_.id(cosm, k.id), k.name, kDial);
     }
     refresh();
 }
 
 int CosmPanel::tableKnobs(int type) {
-    const auto& knobs = kFaces[(size_t)juce::jlimit(0, kTypes - 1, type)].knobs;
-    return (int)std::count_if(knobs.begin(), knobs.end(), [](const KnobRow& k) { return k.id != nullptr; });
+    return knobsIn(kFaces[(size_t)juce::jlimit(0, kTypes - 1, type)]);
+}
+
+int CosmPanel::knobsOf(int face) const {
+    return knobsIn(model_.faces[(size_t)juce::jlimit(0, model_.count - 1, face)]);
 }
 
 float CosmPanel::proportionOf(size_t knob) const {
@@ -114,10 +128,10 @@ void CosmPanel::resized() {
     }
 }
 
-// A filter's response, a shaper's curve by its first knob, or the type's name
+// A filter's response, a shaper's curve by its first knob, the GROWL's wobble, or the type's name
 void CosmPanel::paintDisplay(juce::Graphics& g) const {
     Ui::fillRounded(g, display_.toFloat(), Look::field, 6.0f);
-    const Display kind = kFaces[(size_t)juce::jmax(0, face())].display;
+    const Display kind = model_.faces[(size_t)juce::jmax(0, face())].display;
     if (kind == Display::name) {
         Ui::drawText(g, type_.getText(), display_.reduced(6), { Look::sans(10.0f), Look::muted,
                                                                 juce::Justification::centred });

@@ -20,7 +20,7 @@ inline bool isControl(juce::Component* c) {
 inline juce::String controlName(juce::Component* c) {
     if (auto* l = dynamic_cast<juce::Label*>(c)) return "label \"" + l->getText() + "\"";
     if (auto* b = dynamic_cast<juce::Button*>(c)) return "button \"" + b->getButtonText() + "\"";
-    if (auto* x = dynamic_cast<juce::ComboBox*>(c)) return "box \"" + x->getText() + "\"";
+    if (auto* x = dynamic_cast<juce::ComboBox*>(c)) return "box \"" + x->getText() + "\" (" + x->getTitle() + ")";
     if (dynamic_cast<juce::Slider*>(c)) return "slider at " + c->getBounds().toString();
     return "component at " + c->getBounds().toString();
 }
@@ -198,9 +198,10 @@ struct LayoutCheck {
         const juce::String text = b->getButtonText();
         if (text.startsWith("OSC ")) return {};   // which OSC the Time Trip column shows
         // what chooses what shows, or the editor's own, and no parameter: the FX page's buttons, the page bar's Keyboard
-        // switch (v201), the pad's Hold (v202)
-        static const juce::StringArray kChoosers { "MFX", "Chorus", "Reverb", "System", "Keyboard", "Pad Hold" };
-        if (kChoosers.contains(text)) return {};
+        // switch (v201), the V-Synth's pad Hold (v202; v453 by its property, as the VC-2's Pad Hold is a parameter), the
+        // header's modes (v453)
+        static const juce::StringArray kChoosers { "MFX", "Chorus", "Reverb", "System", "Keyboard", "V-SYNTH", "VC-2" };
+        if (kChoosers.contains(text) || b->getProperties().contains(Look::editorsOwn)) return {};
         if (b->getRadioGroupId() != 0 && b->getToggleState()) return {};   // one of a pair: the other moves it
         return [b] { b->setToggleState(!b->getToggleState(), juce::sendNotificationSync); };
     }

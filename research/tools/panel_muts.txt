@@ -83,7 +83,7 @@ zone-pick-patch|    for (int i = 0; i < kXtZones; ++i) c.zoneUpper[i] = p(0x124 
 # (mutate_panel.py's MUTS) MISSED on D's first run, as D's taller FX page held the card left in its own place; the
 # test now holds each FX page's left cards level with its list (cardsLevel, EditorPagesTest.cpp).
 editor-d-unscaled|    drawing_.setTransform(juce::AffineTransform::scale(scale()));|    ;|plugin/Source/UiEditor.cpp|layout
-editor-d-page-stuck|pages_[i]->setVisible((int)i == pageBar_.chosen());|pages_[i]->setVisible(false);|plugin/Source/UiEditor.cpp|layout
+editor-d-page-stuck|pages_[i]->setVisible((int)i == pageBar_.chosen() && !vc2());|pages_[i]->setVisible(false);|plugin/Source/UiEditor.cpp|layout
 editor-d-synth-always|c->setVisible(synth);|c->setVisible(true);|plugin/Source/UiEditor.cpp|layout
 editor-d-effect-page|fx->showPage(effect);|fx->showPage(0);|plugin/Source/UiEditor.cpp|layout
 editor-d-lower-unselected|    lower_.setSelected(block);|    ;|plugin/Source/UiEditor.cpp|layout
@@ -94,15 +94,15 @@ editor-d-browse-unplaced|    browse_.setBounds(box.removeFromRight(kBrowseW).wit
 editor-d-note-hidden|        patchNote_.setVisible(noted_);|        ;|plugin/Source/UiHeader.cpp|layout
 editor-d-note-unplaced|    if (noted_) patchNote_.setBounds(lines.removeFromBottom(kNoteH));|    ;|plugin/Source/UiHeader.cpp|layout
 editor-d-face-early|    if (Controls::box(type_, state, names.typeId, attached_)) addAndMakeVisible(type_);|    type_.onChange = [this] { refresh(); };\n    if (Controls::box(type_, state, names.typeId, attached_)) addAndMakeVisible(type_);|plugin/Source/UiFacedPanel.cpp|layout
-editor-d-load-hidden|        c->setVisible(face() == kPcm);|        c->setVisible(false);|plugin/Source/UiOscPanel.cpp|layout
-editor-d-osc-one|    return Params::oscId(osc_, name);|    return Params::oscId(0, name);|plugin/Source/UiOscPanel.cpp|layout
-editor-d-cosm-one|addKnob(t, Params::cosmId(cosm, k.id), k.name, kDial);|addKnob(t, Params::cosmId(0, k.id), k.name, kDial);|plugin/Source/UiCosmPanel.cpp|layout
+editor-d-load-hidden|        c->setVisible(face() == model_.pcm);|        c->setVisible(false);|plugin/Source/UiOscPanel.cpp|layout
+editor-d-osc-one|    return Params::oscId(osc, name);|    return Params::oscId(0, name);|plugin/Source/UiOscPanel.cpp|layout
+editor-d-cosm-one|    return Params::cosmId(cosm, name.toRawUTF8());|    return Params::cosmId(0, name.toRawUTF8());|plugin/Source/UiCosmPanel.cpp|layout
 editor-d-block-one|    return Params::cosmId(index, name.toRawUTF8());|    return Params::cosmId(0, name.toRawUTF8());|plugin/Source/UiBlockKinds.cpp|layout
 editor-d-trip-one|Params::oscId(osc, Params::kTripSw)|Params::oscId(0, Params::kTripSw)|plugin/Source/UiTripColumn.cpp|layout
 editor-d-msm-track|rows.push_back({ msmParamId(msmTrackFwId(track, i)), kSettingNames[i] });|rows.push_back({ msmParamId(msmTrackFwId(0, i)), kSettingNames[i] });|plugin/Source/UiMsm.cpp|layout
-editor-d-msm-steps|msmParamId(msmTrackFwId(track, kSettings + s));|msmParamId(msmTrackFwId(track, kSettings));|plugin/Source/UiMsm.cpp|layout
-editor-d-matrix-row|Matrix::sourceId(control)|Matrix::sourceId(0)|plugin/Source/UiMatrix.cpp|layout
-editor-d-zone-cell|upper_(state, Params::zoneUpperId(zone),|upper_(state, Params::zoneUpperId(0),|plugin/Source/UiZonesPage.cpp|layout
+editor-d-msm-steps|msmParamId(msmTrackFwId(track, MsmTrack::kSettings + s))|msmParamId(msmTrackFwId(track, MsmTrack::kSettings))|plugin/Source/UiMsm.cpp|layout
+editor-d-matrix-row|ids(control, 0), attached_|ids(0, 0), attached_|plugin/Source/UiMatrix.cpp|layout
+editor-d-zone-cell|std::make_unique<ZoneCell>(p.apvts, z, mode_.upperId(z))|std::make_unique<ZoneCell>(p.apvts, z, mode_.upperId(0))|plugin/Source/UiZonesPage.cpp|layout
 editor-d-assigns-one|VSynthEmuProcessor::assignParamId(i), VSynthEmuProcessor::assignName(i)|VSynthEmuProcessor::assignParamId(0), VSynthEmuProcessor::assignName(i)|plugin/Source/UiModPage.cpp|layout
 editor-d-no-tempo|    { "TEMPO", { { { "clockSource", "Clock" }, { "patchTempo", "Tempo" } } }, 1 },\n||plugin/Source/UiPlayPage.cpp|layout
 editor-d-route-any|            if (!Blocks::reaches(block_, to)) continue;|            ;|plugin/Source/UiRoutes.cpp|layout
@@ -222,7 +222,7 @@ editor-d-pad-hold-ignored|    if (!hold_) lift();|    lift();|plugin/Source/UiTr
 editor-d-pad-fixed-assign|controllerEvent(kChannel, assigned(kTripX), value.x)|controllerEvent(kChannel, 82, value.x)|plugin/Source/UiTripPad.cpp|layout
 editor-d-pad-off-sends|    return cc == kOff \|\| cc == kAlsoOff ? 0 : cc;|    return cc == kOff \|\| cc == kAlsoOff ? cc : cc;|plugin/Source/UiTripPad.cpp|layout
 editor-d-pad-hold-unsaved|        processor_.apvts.state.setProperty(kPadHold, hold_.getToggleState(), nullptr);|        ;|plugin/Source/UiTripColumn.cpp|layout
-editor-d-beat-osc1|Params::oscId(osc, Params::kBeatKeep), attached_|Params::oscId(0, Params::kBeatKeep), attached_|plugin/Source/UiTripColumn.cpp|layout
+editor-d-beat-osc1|return Params::oscId(osc, Params::kBeatKeep); }|return Params::oscId(0, Params::kBeatKeep); }|plugin/Source/UiTripColumn.cpp|layout
 editor-d-beat-cut|        beat_[(size_t)osc].setBounds(beat);|        beat_[(size_t)osc].setBounds(beat.withTrimmedLeft(beat.getWidth() / 2));|plugin/Source/UiTripColumn.cpp|layout
 # v451: the VC-2's host parameters (PluginVc2Params.cpp) against rom.4, by VSynthEmuArpPluginTest's VC-2 part; their place
 # in the layout and the search for rom.4 before it (PluginParams.cpp, PluginRom.cpp); and held apart by the editor's check
@@ -258,3 +258,19 @@ vc2-patch-not-saved|    vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.c
 vc2-patch-not-restored|    vc2PatchFromState(vc2Patch_, apvts.state);   // v452: none from a session before it|    ;|plugin/Source/PluginState.cpp|arpplugin
 vc2-patch-stale|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : std::vector<uint8_t>();|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : patch.store;|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-name-saved|    state.setProperty(kNameKey, patch.name, nullptr);|    ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+# The VC-2 mode's pages (v453): each by VSynthEmuEditorTest, its VC-2 checks (EditorVc2Test.cpp, EditorVc2TextTest.cpp)
+editor-vc2-osc-one|    return id + index * stepOf(kRunsOf[(size_t)kind], id);|    return id + 0 * stepOf(kRunsOf[(size_t)kind], id);|plugin/Source/UiVc2Kinds.cpp|layout
+editor-vc2-zone-one|    return vc2HostParamId(instanceId(kind, index, id), zone, cosm);|    return vc2HostParamId(instanceId(kind, index, id), 0, cosm);|plugin/Source/UiVc2Kinds.cpp|layout
+editor-vc2-cosm-one|    const int cosm = kind == Kind::cosm && cosmHolds(id) ? index : 0;|    const int cosm = 0;|plugin/Source/UiVc2Kinds.cpp|layout
+editor-vc2-env-role|{ "Release", 5 }|{ "Release", 4 }|plugin/Source/UiVc2Kinds.cpp|layout
+editor-vc2-matrix-one|kMatrixFirst + kMatrixStride * control + field|kMatrixFirst + field|plugin/Source/UiVc2Kinds.cpp|layout
+editor-vc2-face-row|{ "35b", "Growl" }|{ "35c", "Growl" }|plugin/Source/UiVc2Rack.cpp|layout
+editor-vc2-no-pad-mode|vc2HostParamId(kPadHold, 0, 0), vc2HostParamId(kPadMode, 0, 0),|vc2HostParamId(kPadHold, 0, 0), vc2HostParamId(kPadHold, 0, 0),|plugin/Source/UiVc2Rack.cpp|layout
+editor-vc2-kind-switch|s.pieces[1].a == "ON"|s.pieces[1].a == "OFF"|plugin/Source/UiVc2Text.cpp|layout
+editor-vc2-text-bare|    return formats ? routine : mine;|    return routine;|plugin/Source/UiVc2Text.cpp|layout
+editor-vc2-eq-swapped|listedIn(kEqFreq, id) ? kVSynthEqFreq : kVSynthEqQ|listedIn(kEqFreq, id) ? kVSynthEqQ : kVSynthEqFreq|plugin/Source/UiVc2Text.cpp|layout
+editor-vc2-zone-stuck|    if (zone != zone_) make(zone);|    if (zone_ < 0) make(zone);|plugin/Source/UiVc2SynthPage.cpp|layout
+editor-vc2-mode-unsaved|    setPluginMode(processor_.apvts.state, mode);|    ;|plugin/Source/UiEditor.cpp|layout
+editor-vc2-page-names|    setNames(vc2 ? pageNames(Blocks::kVc2Pages) : pageNames(Blocks::kPages));|    setNames(pageNames(Blocks::kPages));|plugin/Source/UiPageBar.cpp|layout
+editor-vc2-mic-input|p.hasInput() ? State::ok : State::silent|State::ok|plugin/Source/UiVc2Mic.cpp|layout
+editor-vc2-path-own|    return { Vc2Blocks::path(zone), vc2Setting, effects, vc2HostParamId(0x2d3, zone, 0),|    return { Vc2Blocks::path(zone), vc2Setting, effects, vc2HostParamId(0x2d3, 0, 0),|plugin/Source/UiVc2SynthPage.cpp|layout

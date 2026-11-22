@@ -30,7 +30,7 @@ struct DetailFace {
 struct BlockKind {
     const char* name;
     bool numbered;
-    juce::String (*param)(int index, const juce::String& name);
+    juce::String (*param)(int zone, int index, const juce::String& name);   // the zone a mode's (the VC-2's, v453)
     std::array<EnvName, kMaxEnvs> envs;
     const char* lfo;
     int lfoFirst;
@@ -40,6 +40,17 @@ struct BlockKind {
     const DetailFace* details;
     int faces;
 };
+
+// A mode's tables (v453): its kinds in Kind's order, the zone its instances' parameters are a patch's, and its Matrix
+// Controls' IDs (field 0 Source, 1 Destination 1, 2 Sens 1, 3 Destination 2, 4 Sens 2).  A Block with none is the
+// V-Synth's, made from this file's table; the VC-2's are its own (UiVc2Kinds.h), one for each zone.
+struct Model {
+    const BlockKind* kinds;
+    int zone;
+    juce::String (*matrix)(int control, int field);
+};
+inline constexpr int kMatrixSource = 0, kMatrixFields = 5;
+juce::String matrixParam(const Block& b, int control, int field);   // its mode's Matrix Control's
 
 const BlockKind& kindOf(const Block& b);
 juce::String blockName(const Block& b);                        // "OSC 1", "MOD"

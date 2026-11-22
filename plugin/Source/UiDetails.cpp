@@ -2,6 +2,10 @@
 #include "UiDetails.h"
 #include "UiLook.h"
 
+namespace {
+constexpr int kFaintH = 20;
+}
+
 DetailsView::DetailsView(Controls::State& state, const Blocks::Block& b)
     : state_(state), typeId_(Blocks::typeIdOf(b)) {
     const Blocks::BlockKind& kind = Blocks::kindOf(b);
@@ -16,6 +20,9 @@ DetailsView::DetailsView(Controls::State& state, const Blocks::Block& b)
     }
     Look::setTextLook(none_, Look::sans(11.0f), Look::muted, juce::Justification::centredLeft);
     addChildComponent(none_);
+    Look::setTextLook(faint_, Look::sans(11.0f), Look::muted, juce::Justification::centredLeft);
+    faint_.setText("Faint: rom.4 holds these, and nothing found reads them", juce::dontSendNotification);
+    addChildComponent(faint_);
     refresh();
 }
 
@@ -34,12 +41,15 @@ void DetailsView::show(int face) {
     face_ = face;
     for (size_t f = 0; f < faces_.size(); ++f) faces_[f]->setVisible((int)f == face && faces_[f]->made() > 0);
     auto* type = typeId_.isEmpty() ? nullptr : state_.getParameter(typeId_);
-    const juce::String name = type != nullptr ? type->getCurrentValueAsText() : juce::String("this block");
+    const juce::String name = type != nullptr ? Controls::currentText(state_, typeId_) : juce::String("this block");
     none_.setText("Every setting of " + name + " is on its panel above", juce::dontSendNotification);
     none_.setVisible(faces_[(size_t)face]->made() == 0);
+    faint_.setVisible(faces_[(size_t)face]->dimmed() > 0);
 }
 
+// The face's grid, and under it the line saying what is faint when it has any (the VC-2's, d-6)
 void DetailsView::resized() {
     none_.setBounds(getLocalBounds().withHeight(24));
-    for (const auto& f : faces_) f->setBounds(getLocalBounds());
+    faint_.setBounds(getLocalBounds().removeFromBottom(kFaintH));
+    for (const auto& f : faces_) f->setBounds(getLocalBounds().withTrimmedBottom(f->dimmed() > 0 ? kFaintH : 0));
 }
