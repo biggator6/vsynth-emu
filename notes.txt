@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's sets' OSC blocks v391 (2026-11-22, after v390; HARDWARE_FIRMWARE.md, "The VC-2 part's sets' OSC
+  blocks"): item 8's seventh child. Vc2SetOscBlocks, rom.4's 48 inputs word for word, two a voice, with Random Pitch's
+  seed, the step counts and the start key; Vc2SetOscKinds, the dispatch and the converter frame (the vibrato's words,
+  the ported analog and VOCODER converters). PCM's start and the PCM and EXTIN converters are rom.4's own through
+  Vc2SetReads until ported. xt_vc2sets gains an eighth part: 0 different at seeds 2024, 7 and 31337; --sets 549
+  planted, 2 missed and left out (one no error, one the check's draw, a follow-up); --settings 864, 0 missed.
+
 The VC-2 part's sets' COSM inputs v390 (2026-11-22, on its own branch from vc2-mode 650bf26, beside step 4.3's v329 on;
   HARDWARE_FIRMWARE.md, "The VC-2 part's sets' COSM inputs"): item 8's sixth child, which v314 named. Vc2SetCosmInputs,
   rom.4's 48 inputs word for word, two a voice: the constructor (the kind's and index's bytes, the voice's two bytes,

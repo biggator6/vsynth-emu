@@ -67,6 +67,9 @@ std::array<uint16_t, N> setsWordsDrawn(std::mt19937& rng) {
     return words;
 }
 
+// The clock object's words a tempo is made of, at or either side of the holds' thresholds or any (v391, from the
+// envelopes' part)
+void setsClockDrawn(Vc2Fw& fw, std::mt19937& rng);
 // The Matrix's sums the readers answer drawn (all, or now and then each)
 void setsSumsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all);
 // The Matrix group's `readers` hooked to log the M they're given and answer the sums
@@ -111,15 +114,19 @@ struct SetChildSides {
     }
 };
 
-// A child's routine on an object and C's call (an update): rom.4's on (object, the call struct), the port's
-// `mine(object, call)`
+// A child's routine on an object and C's call (an update; v391, a refresh, which answers): rom.4's on (object, the call
+// struct), the port's `mine(object, call)`
 template <class Sides, class Mine>
 std::string setsChildUpdate(Sides& x, std::mt19937& rng, const Vc2CheckRoutine& r, const char* pool, Mine mine) {
     const uint32_t at = setsCall(x.s, rng), object = x.any(rng);
     const Vc2SetCall call = setsCallAt(x.s, at);
     return setsChildOnBoth(x.s, x.region(pool), r, { object, at }, [&] {
-        mine(object, call);
-        return 0u;
+        if constexpr (std::is_void_v<decltype(mine(object, call))>) {
+            mine(object, call);
+            return 0u;
+        } else {
+            return mine(object, call);
+        }
     });
 }
 
@@ -155,8 +162,8 @@ std::string setsChildEnd(Sides& x, std::mt19937& rng, const Vc2CheckRoutine& r, 
 
 // A child's events by the port's member and rom.4's routine, each counted in `byEvent[Counted]`, its pool said as its
 // counts' kPool: the placement (rom.4's given the object's bytes, a voice's number and an index), the constructor (on
-// a block `Block` draws, M by `Matrix`, the kind by `Kind` and the index under `Indices` stacked), the end (a bare
-// return in rom.4), the update
+// a block `Block` draws, M by `Matrix`, the kind by `Kind`, the index under `Indices` stacked, C's call by `Call`), the
+// end (a bare return in rom.4), the update
 // (an object and C's call), the conversion (and a block `Block` draws) and the copy (an object and a block; the port's
 // member given the reads when it takes them)
 template <class Sides, uint32_t Routine, uint32_t Bytes, size_t Counted>
@@ -169,9 +176,9 @@ std::string setsPlaceEvent(Sides& x, std::mt19937& rng) {
 }
 
 template <class Sides, auto Block, uint32_t Routine, size_t Counted, uint32_t Indices, auto Matrix = setsAnyWord,
-          auto Kind = setsAnyKind>
+          auto Kind = setsAnyKind, auto Call = setsCall>
 std::string setsMakeEvent(Sides& x, std::mt19937& rng) {
-    const uint32_t at = setsCall(x.s, rng);
+    const uint32_t at = Call(x.s, rng);
     const Vc2SetChildCall c { x.any(rng), setsCallAt(x.s, at), Block(rng), Matrix(rng), Kind(rng),
                               rng() % 8 ? rng() % Indices : rng() % 16 };
     x.s.fw.cpu.wr32(kVc2Sp, c.kind);
@@ -195,6 +202,16 @@ std::string setsUpdateEvent(Sides& x, std::mt19937& rng) {
     ++x.n.byEvent[Counted];
     const auto mine = [&](uint32_t object, const Vc2SetCall& call) { (x.port.*Member)(object, call, x.s.parts); };
     return setsChildUpdate(x, rng, { Routine, "the update" }, decltype(x.n)::kPool, mine);
+}
+
+// A refresh (v391): the update's on the port's member given the reads, its answer against rom.4's
+template <class Sides, auto Member, uint32_t Routine, size_t Counted>
+std::string setsRefreshEvent(Sides& x, std::mt19937& rng) {
+    ++x.n.byEvent[Counted];
+    const auto mine = [&](uint32_t object, const Vc2SetCall& call) {
+        return (x.port.*Member)(object, call, x.s.parts);
+    };
+    return setsChildUpdate(x, rng, { Routine, "the refresh", vc2R0 }, decltype(x.n)::kPool, mine);
 }
 
 template <class Sides, auto Member, auto Block, uint32_t Routine, size_t Counted>

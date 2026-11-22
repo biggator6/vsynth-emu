@@ -10,6 +10,7 @@
 #include <cstdint>
 
 class Vc2ToneShared;
+struct Vc2MatrixGroups;
 
 // What C's routines are given beside C: the voice's +0x34 (its key table, source, part, number and three bytes), its
 // +0x53, and a word (0x893a76d0's the legato's struct, the retune's rom.4's 0x8953fb2c, else 0)
@@ -47,6 +48,13 @@ struct Vc2SetClock {
     int32_t numerator = 0;
     int32_t denominator = 0;
     uint16_t period = 0;
+};
+
+// A voice's glide key's words the OSC blocks read (v391): Vc2KeyGlide's key table (+0), its last POLY key and whether a
+// key was held then (+0x1a, +0x1b), its last MONO key and the same (+0x20, +0x21)
+struct Vc2SetGlide {
+    uint32_t table = 0;
+    uint8_t prevPoly = 0, prevPolyHeld = 0, prevMono = 0, prevMonoHeld = 0;
 };
 
 // What C's TVA reads past the part's words (v285): the flag of the part's CC 7 and 11 on the level (rom.4's byte
@@ -93,6 +101,23 @@ public:
     virtual std::array<uint16_t, 21> cosmInputOf(uint32_t part, uint32_t kind, uint32_t index) = 0;
     virtual const Vc2ToneShared& shared() = 0;
     virtual const int16_t* matrixGroup(uint32_t reader, uint32_t matrix) = 0;
+    // The OSC blocks' (v391): the parts' OSC table (0x89e371e0: 0x1020 a part, its 32-byte header, then 0x100 a kind and
+    // 0x80 an OSC; the systems' 0x3c bytes after the 16 parts), an OSC's step count (0x89989c84 + 64 × part + 4 × kind
+    // + 2 × OSC, Vc2PartRows::steps), the glide key a voice's +0x38 names and a key table's Hold (+0x11c), the legato
+    // struct's +1 and +2 that a make's call names, M's bend (+0x174), the Matrix's groups for an OSC by its four getters,
+    // the pitch source's ratio (0x89394a40 on 0x89989748), and a kind's routine the port hasn't yet, by rom.4's address
+    // (PCM's start 0x8939e120, the PCM and EXTIN converters 0x8939e300 and 0x8939e9e0), on the input and the block
+    virtual std::array<uint8_t, 32> oscHeader(uint32_t part) = 0;
+    virtual std::array<uint8_t, 128> oscRecord(uint32_t part, uint32_t kind, uint32_t osc) = 0;
+    virtual std::array<uint8_t, 60> oscSystems() = 0;
+    virtual uint16_t& oscStep(uint32_t part, uint32_t kind, uint32_t osc) = 0;
+    virtual Vc2SetGlide glideAt(uint32_t glide) = 0;
+    virtual uint8_t holdOf(uint32_t keys) = 0;
+    virtual std::array<uint8_t, 2> legatoOf(uint32_t word) = 0;
+    virtual int32_t matrixBend(uint32_t matrix) = 0;
+    virtual Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) = 0;
+    virtual float pitchSource() = 0;
+    virtual void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) = 0;
 };
 
 struct Vc2NoteMatrixWords {

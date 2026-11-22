@@ -4002,3 +4002,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The constructor multiplies the kind's and the index's whole words, the update their bytes. A word reads 21,504 bytes a step of 256 past its byte, which is the size of the 16 parts' rows, so only a word past 255 can tell the two apart. The rows drawn past the parts' are where it reads.
 - My first plant run said every name was "not in vc2sets_muts.txt". zsh passed the unquoted list as one argument. The names go through a bash script now.
 - The port's shared routines run rom.4's own in the interpreter and leave r0 changed, which the check reads as rom.4's answer. v285 kept the registers inline for its curve; one class keeps them for all four now (SetKeptShared).
+
+### Session 24, continued (2026-11-22) — v391: the sets' OSC blocks
+
+- The OSC blocks call more than the brief named: the dispatch, three kinds' starts, the converter frame with the vibrato's words, and the PCM and EXTIN converters, none ported. The dispatch, the starts, the frame and the analog's and VOCODER's converters are in v391; PCM's start and the PCM and EXTIN converters stay rom.4's own through Vc2SetReads.
+- The step counts' table is part 0's 64 bytes, with the update queue after it: the check keeps 16 parts' worth of its own copy, as a part past 0 counts into whatever follows.
+- To stop my plant run I ran pkill -f with a pattern every session's runs match. The two running sessions were told; neither had a run going then.

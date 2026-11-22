@@ -10,6 +10,7 @@ struct Read : Vc2SetEnvelopeTables {
         image.read(0x89542134, notes.data(), sizeof notes);
         image.read(0x89541f34, levels.data(), sizeof levels);
         image.read(0x8953fc90, times.data(), sizeof times);
+        image.read(0x8953ffd0, vibrato.data(), sizeof vibrato);
         vc2ReadFloats(image, { 0x8953fdb0, static_cast<int>(rates.size()) }, rates.data());
         vc2ReadPool(image, std::to_array<Vc2PoolWord>({ { 0x8939a66c, &noteScale }, { 0x8939a8f4, &releaseScale },
                                                           { 0x8939a67c, &levelScale }, { 0x8939ab50, &cents },
@@ -21,12 +22,15 @@ struct Read : Vc2SetEnvelopeTables {
                                                           { 0x893a64f4, &tvaDepthTop }, { 0x893a6914, &tvaSend },
                                                           { 0x893a6918, &tvaSixths }, { 0x893a6920, &tvaSendTwo },
                                                           { 0x893a6928, &tvaRateScale },
-                                                          { 0x893a692c, &tvaSampleRate } }));
+                                                          { 0x893a692c, &tvaSampleRate },
+                                                          { 0x8939fd58, &vibratoRate }, { 0x8939fd68, &vibratoDepth },
+                                                          { 0x8939eb7c, &extinTenth } }));
         const bool scales = noteScale > 0 && releaseScale > 0 && levelScale > 0 && depthTop > 0 && depthScale > 0;
         const bool mix = mixOff > 0 && mixOther > 0 && mixScale > 0 && mixScaleTwo > 0;
         const bool tva = tvaVelocity > 0 && tvaScale > 0 && tvaScaleOff > 0 && tvaDepthTop > 0 && tvaSend > 0 &&
                          tvaSixths > 0 && tvaSendTwo > 0 && tvaRateScale > 0 && tvaSampleRate > 0;
-        return scales && mix && tva && cents > 0 && unit > 0 && times[127] != 0 && rates[127] != 0;
+        const bool osc = vibratoRate > 0 && vibratoDepth > 0 && extinTenth > 0;
+        return scales && mix && tva && osc && cents > 0 && unit > 0 && times[127] != 0 && rates[127] != 0;
     }
 };
 constinit Vc2RomTables<Read> tables;

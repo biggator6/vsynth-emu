@@ -42,9 +42,10 @@ inline constexpr uint32_t kSetsTvaFlagAt = 0x89997fcc, kSetsTrailerAt = 0x89e4b0
 inline constexpr uint32_t kSetsTvaMatricesAt = 0x8C036000, kSetsTvaMatrixBytes = 0x200;
 inline constexpr SetPartTable kSetsCosmTable { 0x89e2003c, 0x540, 84, 2 };   // [FW] the COSM inputs' 42 bytes (v390)
 
-// The calls logged: C's children's methods, and a Matrix group's reader (v282, the envelopes' part)
+// The calls logged: C's children's methods, a Matrix group's reader (v282, the envelopes' part) and an OSC kind's routine
+// not ported (v391)
 enum SetMethod : int32_t { kSetAllocate, kSetConstruct, kSetEnd, kSetConvert, kSetUpdate, kSetCopy, kSetRelease,
-                           kSetRefresh, kSetMatrixSum, kSetMethods };
+                           kSetRefresh, kSetMatrixSum, kSetOscKind, kSetMethods };
 
 // A call as either side made it: which method, the routine it reached, its arguments (r4…, a struct's three words where
 // it takes one, the stacked words)
@@ -121,9 +122,30 @@ public:
     std::array<uint16_t, 21> cosmInputOf(uint32_t part, uint32_t kind, uint32_t index) override;
     const Vc2ToneShared& shared() override { return kept_; }
     const int16_t* matrixGroup(uint32_t reader, uint32_t matrix) override;
+    // The OSC blocks' (v391, Vc2SetOscBlockCheck.cpp): the step counts the port's own (`oscSteps`), the groups and the
+    // pitch source unlogged, a kind's routine not ported logged
+    std::array<uint8_t, 32> oscHeader(uint32_t part) override;
+    std::array<uint8_t, 128> oscRecord(uint32_t part, uint32_t kind, uint32_t osc) override;
+    std::array<uint8_t, 60> oscSystems() override;
+    uint16_t& oscStep(uint32_t part, uint32_t kind, uint32_t osc) override;
+    Vc2SetGlide glideAt(uint32_t glide) override;
+    uint8_t holdOf(uint32_t keys) override;
+    std::array<uint8_t, 2> legatoOf(uint32_t word) override;
+    int32_t matrixBend(uint32_t matrix) override;
+    Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
+    float pitchSource() override;
+    void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) override;
+    std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes
 
 private:
     void logged(int32_t kind, uint32_t routine, std::array<uint32_t, 8> args);
+    // N bytes of rom.4's memory at `at` (v391)
+    template <size_t N>
+    std::array<uint8_t, N> bytesAt(uint32_t at) {
+        std::array<uint8_t, N> b;
+        fw_.cpu.read(at, b.data(), N);
+        return b;
+    }
     // The part's N words for a child by `t`, where the draws wrote them
     template <size_t N>
     std::array<uint16_t, N> partWords(const SetPartTable& t, uint32_t part, uint32_t kind, uint32_t index) {
@@ -206,5 +228,7 @@ long vc2SetMixPart(SetSides& s, const Vc2Run& run);
 long vc2SetTvaPart(SetSides& s, const Vc2Run& run);
 // The COSM inputs' (v390, Vc2SetCosmInputCheck.cpp)
 long vc2SetCosmInputPart(SetSides& s, const Vc2Run& run);
+// The OSC blocks' (v391, Vc2SetOscBlockCheck.cpp)
+long vc2SetOscBlockPart(SetSides& s, const Vc2Run& run);
 // The further parts in turn
 long vc2SetsFurther(SetSides& s, const Vc2Run& run);

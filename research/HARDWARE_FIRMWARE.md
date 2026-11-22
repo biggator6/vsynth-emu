@@ -3912,6 +3912,135 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2 part's sets' OSC blocks (2026-11-22, v391) {#vc2-set-osc-blocks}
+
+Item 8's seventh child, the last v314 named: C's OSC blocks, two a voice. `Vc2SetOscBlocks` and the kinds' dispatch
+and converter frame (`Vc2SetOscKinds`) are bit for bit against rom.4's own in `xt_vc2sets`' eighth part. PCM's start
+and the PCM and EXTIN converters aren't ported yet; the port calls them by rom.4's address through
+`Vc2SetReads::unportedOscKind`.
+
+**Its words.** There are 48 blocks of 0x108 bytes from `0x89e34060`, two a voice: `0x8939fdd0(0x108, number, index)`
+gives 0x89e34060 + 0x210 × the number + 0x108 × the index. Each is an OSC converter's input, v251's layout:
+
+| Offset | What |
+|---|---|
+| +0x00…+0x02 | the call's part, the kind's byte and the index's (the OSC) |
+| +0x03, +0x04 | the voice's key and its +0x43 |
+| +0x05, +0x06 | the make's legato struct's +2 and +1 (the constructor alone writes them) |
+| +0x08…+0x87 | the OSC's record, from `0x89e371e0` + 0x1020 × the part + 32 + 0x100 × the kind + 0x80 × the OSC, by the block move `0x895060fc` |
+| +0x88 | the coarse tune: the systems' (+0x10202), the part's header's +1 and the record's +0xe, signed bytes |
+| +0x8c | Random Pitch, tenths of a cent |
+| +0x90 | the fine tune: the key's scale tune (the header's +6 + 2 × (key mod 12)), the systems' (+0x10200), the header's +2 and the record's +0x10, signed halfwords, M's bend (+0x174) and Random Pitch |
+| +0x94, +0x98 | the converter's pitch10s (v251) |
+| +0x9c | the key a portamento starts from |
+| +0xa0… | PCM's start's: its wave's words |
+| +0x100 | M |
+| +0x104 | the OSC's step count when it was made |
+
+The parts' OSC table is v288's: 0x1020 a part (a 32-byte header, then 0x100 a kind and 0x80 an OSC), and the systems'
+0x3c bytes after the 16 parts. The header's bytes, as the routines use them: +0 the key's offset, +1 the coarse, +2 the
+fine, +4 mono, +5 the portamento's legato, +6… the twelve scale tunes.
+
+**The constructor** `0x8939fe00(block, call, W's block, M; the kind and the index on the stack)`:
+- writes M, the kind's and index's bytes, the voice's two bytes and the legato struct's two;
+- takes the step count at `0x89989c84` + 64 × the part + 4 × the kind + 2 × the OSC into +0x104, and adds 1 to it there.
+  v289's reader clears it when the Wave Number changes. The table is part 0's 64 bytes alone (`Vc2PartRows::steps`):
+  a part past 0 would count in the update queue that follows it, and the VC-2 has part 0 alone;
+- writes the part and copies the record by the part and the two bytes;
+- writes the coarse tune, Random Pitch and the fine tune;
+- writes the start key: in POLY (+4 = 0) the voice's glide key's last POLY key (P+0x1a) plus the header's +0, or the
+  key itself when the portamento's byte is 1, no key was held then (P+0x1b) and the Hold pedal (P's table's +0x11c) is
+  under 64; in MONO the same by P+0x20 and P+0x21, the pedal unread; held to 0…127;
+- then runs the dispatch `0x8939fb40` and the converter `0x8939fbd0` on the block. It answers the block.
+
+The voice's +0x38 is its glide key P, rom.4's `Vc2KeyGlide` (v276), whose +0 is its key table.
+
+**Random Pitch.** With the record's +0x12 (Random Pitch Depth) at 0 it is 0 and the seed is left. Otherwise the seed,
+a halfword at `0x89996f4c`, steps on to seed × 18813 + 1; the offset is the depth × the seed as a signed halfword, shifted
+left one, its bits 16…31 as a signed halfword. The seed starts at 31415, from the static initializer `0x893a0340`, which
+also writes three floats nothing reads (`0x89996f48`, `0x89996f50`, `0x89996f54`). Only the constructor and the
+conversion draw from it. The port keeps it as the pool's own word.
+
+**The other routines.**
+- The conversion `0x893a0040(block, call, W's block)` writes the voice's two bytes, the tunes with a new Random Pitch,
+  and the start key, P+0x20 plus the header's +0, held. It runs the converter, not the dispatch. Its part is the call's.
+- The update `0x893a0250(block, call)` copies the record again and writes the tunes again, Random Pitch kept from +0x8c.
+- The copy `0x893a0310(block, W's block)` is the converter alone (a `bra`).
+- The refresh `0x893a0150(block, call)` reads the part's record again and answers 1 when its type moved; for the
+  analog's, when its waveform (+0x20) moved; for PCM's, when its Wave Number (+0x3c) or the bytes +0x5c and +0x59 moved;
+  else 0.
+- The end `0x893a0000` is a bare return.
+
+**The dispatch** `0x8939fb40(input, block)`:
+- With the OSC off (the record's +0), the block's kind is 0.
+- Otherwise it switches on the type (+1) less 1. PCM's start `0x8939e120` sets kind 1, 2 or 0 by its wave. EXTIN's
+  `0x8939e940` sets kind 4. The VOCODER's runs the analog's start, then sets kind 5. The analog's `0x8939ced0`, for
+  type 0 and past 3, sets kind 3.
+- Each start writes 0 at +0x68 and +0x6c, 1 at +0x70…+0x7c, the clock's tempo (v282's law, `vc2SetTempo`) ÷ 10 at
+  +0x60 and 0 at +0x64. PCM's writes a flag there: 1 when the record's +0x5a is 1 and the input's +6 isn't 0.
+
+**The converter** `0x8939fbd0(input, block)`:
+- With kind 0, nothing.
+- Otherwise the vibrato's words, +0x80…+0xb0:
+  - the Type's row of 80 bytes at `0x8953ffd0` (the record's +0x1c): its word +0 as the wave, its +0x18…+0x38 as the
+    biases, delay, rise and hold;
+  - a fall of 0, a ratio of 1, the velocity ÷ 2;
+  - the rate (+0x1d) × 6/127 + 2 by FMAC;
+  - the depth (+0x1e) with the LFO getter's Pitch sum, held to ±63, as (d/63)·|d/63| × 300;
+  - and `0x8939c260` on the depth, the sum again and the row's +0x4c: the same square × the row's word, held to ±1.
+- Then the converter by the type: PCM's `0x8939e300`, EXTIN's `0x8939e9e0`, the VOCODER's `0x8939db00` (v251's part and
+  v222's), and the analog's `0x8939cf70` (v251's and v256's) for the rest.
+- Its two calls of the LFO getter are the input's OSC's (`0x893a26b0` for OSC 1, `0x893a28b0` for OSC 2).
+
+**The port.**
+- `Vc2SetOscBlocks` (Vc2SetOscBlock.cpp) holds the pool and the seed. `Vc2SetOscKinds.cpp` holds the dispatch, the
+  starts, the vibrato and the frame, calling `vc2OscBlockConvert`, `vc2OscAnalogConvert` and `vc2VocoderOscConvert` on
+  the block's words copied in and out.
+- What it reads goes through `Vc2SetReads`: the table's header, record and systems, the step count (by reference, the
+  plugin's `Vc2PartRows::steps`), the glide key and its table's Hold, the legato struct, M's bend and D-Beam bytes, the
+  OSC's Matrix groups, the pitch source and the shared routines.
+- The tempo's law moved from Vc2SetEnvelope.cpp into Vc2SetChildHead (`vc2SetTempo`). The vibrato's rows and the
+  frame's pool words joined `Vc2SetEnvelopeTables`.
+- The frame's two 63s (`0x8939fd64`, `0x8939c2c0`) are read as the converters' (`0x8939d31c`, `vc2OscDepthSquared`),
+  the same value; the analog's start's 10 is the converters' `perTenth`, its own pool word.
+
+**The check**, xt_vc2sets' eighth part (Vc2SetOscBlockCheck.cpp), on the seed after the COSM inputs':
+- The sets' part's hooks on the blocks' routines come off.
+- The OSC's four Matrix getters answer drawn groups, a place each. The pitch source (`0x89394a40`) answers a drawn
+  ratio. Neither is logged: rom.4 calls them more often than the port, which reads them once a converter.
+- PCM's start and the PCM and EXTIN converters are hooked to log their routine and do nothing; the port logs the same.
+- The velocity curve and powf are rom.4's own on both sides (`SetKeptShared`).
+- Drawn in rom.4's memory: the parts' whole OSC table (the records mostly noise, the OSC on mostly, the type spread
+  over the four, the waveform one of eleven, Pitch KF 0 or 100% now and then, the Vibrato Type of its four or of its
+  four bits, Random Pitch Depth 0 half the time); the headers' mono, portamento byte, key offset and coarse; the
+  systems as noise; the clock (`setsClockDrawn`, the envelopes' part's); four glide keys at the voices' +0x38, their
+  tables' Hold at 0, 63, 64, 127 or any; four legato structs for the make's call's word; four Ms' bends and D-Beam
+  bytes.
+- The step counts (16 parts' 64 bytes, the port's own copy in the check) and the seed are compared beside the pool.
+- Each case puts noise in the blocks, then runs 400 events: the placement, the constructor, the end, the conversion,
+  the update, the copy, the refresh, and the dispatch and the converter alone. After each it compares the blocks, the
+  seed, the step counts, W, the calls and the answer.
+- Now and then an input's record is put in the first four parts' tables at its kind and OSC, half the time with one
+  of the bytes the refresh compares moved, so the refresh meets its every test.
+- Not drawn: a kind past 3 with an OSC past 1, or a kind past 15. The step counts end at 16 parts' 64 bytes, and the
+  records at 16 kinds. A Vibrato Type past 15 is not drawn either: its field is four bits.
+
+The results:
+- Seed 2024, 40 cases: 16,000 events (1,413 placements, 2,920 constructors, 1,377 ends, 2,943 conversions, 1,495
+  updates, 1,441 copies, 1,491 refreshes, 1,412 dispatches, 1,508 converters; 3,099 calls of the kinds' routines not
+  ported), 0 different. The earlier parts' lines are as they were.
+- Seeds 7 and 31337, 400 cases each: 160,000 events each, 0 different.
+- Every line and branch of Vc2SetOscBlock.cpp and Vc2SetOscKinds.cpp is reached (llvm-cov, 40 cases).
+- `mutate_vc2.py --sets`: 549 plants, the 160 new among them; 2 missed and left out. The start key's low hold
+  at 1 for 0 is no error (both give 0). Alias Cancel's read is a weakness of the check: it draws the systems as noise,
+  so the switch is nearly never 0. Drawing it 0 half the time is a follow-up. `--settings`: 864, none missed.
+- verify.sh passes every line; fcheck's diff is the new `OSC blocks:` line alone.
+
+The first run stopped at once on the check's own error: the seed's region was 2 bytes, and the comparison reads whole
+words. The seed's word holds the halfword after it now. The next run reached every line but two branches: the
+refresh's tests after the Wave Number never met an equal number, as the records were drawn apart. The draws now put an
+input's record in the parts' tables now and then.
+
 ### The VC-2 part's sets' COSM inputs (2026-11-22, v390) {#vc2-set-cosm-inputs}
 
 Item 8's sixth child (VC2_MODE_PLAN.md, step 4.3; v314's note names it beside the OSC blocks'): C's COSM inputs, two a

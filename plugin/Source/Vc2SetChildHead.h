@@ -44,6 +44,10 @@ void vc2ChildPart(uint8_t* object, Vc2KindWords<N> of, const Vc2SetCall& call, V
 // word, shifted by `shift`, rounded toward 0 (the common's by 127², the envelopes' by 6400, the TVA's by 6000 and 63)
 int32_t vc2ByMagic(int32_t n, int32_t magic, int shift);
 
+// The clock's tempo, held as rom.4 holds it: the library's signed division, below 200 to 20, above 2500 to 250 (v282's,
+// the envelopes' constructor's; v391, the OSC blocks' kinds' starts' too)
+uint16_t vc2SetTempo(const Vc2SetClock& c);
+
 // A float as the block's word (the envelopes', LFOs' and mix's writers)
 inline uint32_t floatWord(float f) {
     return std::bit_cast<uint32_t>(f);

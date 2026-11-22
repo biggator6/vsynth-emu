@@ -9,7 +9,9 @@
 // each the draws (Vc2SetsDraws.cpp); after each C, M, W, the part's M, the calls and the answer.  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2CarrierTables.h"
 #include "Vc2CosmTables.h"
+#include "Vc2OscConvertTables.h"
 #include "Vc2LibMathTables.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetsChildCheck.h"
@@ -227,7 +229,8 @@ int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offse
 
 long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
     const long children = vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run);
-    return children + vc2SetMixPart(s, run) + vc2SetTvaPart(s, run) + vc2SetCosmInputPart(s, run);
+    const long kinds = vc2SetMixPart(s, run) + vc2SetTvaPart(s, run) + vc2SetCosmInputPart(s, run);
+    return children + kinds + vc2SetOscBlockPart(s, run);
 }
 
 uint32_t* setsPortWords(SetSides& s, uint32_t at) {
@@ -251,7 +254,8 @@ std::string setsChildOnBoth(SetSides& s, std::span<const Vc2Region> pools, const
     const std::string what = vc2BothAnswer(s.fw, routine, args, mine, [&] {
         const Vc2Region notes { Vc2Notes::kNotesAt, &s.notes.notes, sizeof s.notes.notes, "W" };
         std::string words = vc2RegionsDifference(s.fw, { pools[0], notes });
-        if (words.empty() && pools[1].bytes != 0) words = vc2RegionsDifference(s.fw, { pools[1] });
+        for (size_t k = 1; k < pools.size() && words.empty(); ++k)
+            if (pools[k].bytes != 0) words = vc2RegionsDifference(s.fw, { pools[k] });
         return words.empty() ? vc2CallsDifference(s.rom, s.mine, saidCall) : words;
     });
     return what.empty() ? what : std::string(routine.name) + ": " + what;
@@ -274,7 +278,8 @@ std::string setsOnBoth(SetSides& s, const Vc2CheckRoutine& routine, std::initial
 }
 
 int main(int argc, char** argv) {
-    constexpr auto load = vc2LoadAll<vc2LoadMatrix, vc2LoadLibMath, vc2LoadSetEnvelopes, vc2LoadCosm>;
+    constexpr auto load = vc2LoadAll<vc2LoadMatrix, vc2LoadLibMath, vc2LoadSetEnvelopes, vc2LoadCosm, vc2LoadOscConvert,
+                                     vc2LoadCarrier>;
     const Vc2CheckStart start { "xt_vc2sets", load, { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" } };
     return vc2CheckMain<SetSides>(argc, argv, start, setsCase, saySetCounts, vc2SetsFurther);
 }

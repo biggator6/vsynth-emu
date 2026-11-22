@@ -719,7 +719,15 @@ version against rom.4's routines with what it calls hooked:
       - the COSM inputs' done (v390, another session's, beside 4.3's from v329): `Vc2SetCosmInputs`, the 48 inputs, the
         constructor `0x89399b10` (its 42 bytes placed by the kind's and index's whole words), conversion, update and copy
         on the dispatcher `0x89399920` and its converters (v235…v241's); xt_vc2sets' seventh part (HARDWARE_FIRMWARE.md,
-        "The VC-2 part's sets' COSM inputs"). v314's two children left: the OSC blocks' (`0x8939fe00` and its kin).
+        "The VC-2 part's sets' COSM inputs"). v314's other child: the OSC blocks' (`0x8939fe00` and its kin).
+      - the OSC blocks' done (v391): `Vc2SetOscBlocks`, the 48 inputs, constructor, conversion, update, copy and refresh,
+        Random Pitch's seed, the step counts and the start key; `Vc2SetOscKinds`, the dispatch `0x8939fb40` with the
+        analog's, EXTIN's and the VOCODER's starts and the converter `0x8939fbd0` with the vibrato's words and the analog's
+        and VOCODER's converters (v251, v256, v222); xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets'
+        OSC blocks"). Both of v314's children are done. Left, which the OSC blocks call by rom.4's address through
+        `Vc2SetReads::unportedOscKind`: PCM's start `0x8939e120` (its wave lookups `0x89394b30`, `0x89394c20`,
+        `0x89394d10`, `0x89351840`, `0x89351ad0`, `0x89351ff0`, `0x893520a0`, `0x8939cd30`, `0x8939cba0`), the PCM
+        converter `0x8939e300` and EXTIN's `0x8939e9e0` (its own level law `0x8939c490` on a .data table), a version each.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.
