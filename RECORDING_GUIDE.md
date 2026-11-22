@@ -143,9 +143,9 @@ That gives the input signal (`vc2probe.wav`, 32.5 s), a 20-second test (`vc2_tes
   Mode as it is.  Turn off any thru from the interface's IN to its OUT, in its own settings or the DAW's, at least for step 4:
   there the XT sends a message for every edit, and a thru would send each one straight back.  Close the DAW's hold on the
   interface's ports if fxplay can't open them.
-- **Digital.**  The Pulse's optical ports are ADAT, and S/PDIF on them isn't confirmed, so the XT's COAXIAL and OPTICAL OUT may
-  have nowhere to go.  The analog path gives levels, sides, pitches, times and responses: everything in runs 1 and 2, and the
-  effects' responses in runs 3 and 4, but not sample by sample.
+- **Digital.**  Not used: the Pulse's optical ports are ADAT only, so the XT's COAXIAL and OPTICAL OUT stay unplugged, and
+  everything goes through the Pulse's analog converters.  That gives levels, sides, pitches, times and responses: everything
+  in runs 1 and 2, and the effects' responses in runs 3 and 4, but not sample by sample.
 
 **2. VC-2 mode.**  Press **[V-CARD]** and choose the VC-2 (XT manual, p. 22).  On any patch: <▼ MENU>, **PATCH Init**.  The runs
 set everything else, in memory only, so **don't write the patch or the system afterwards**.  Restarting the XT undoes it all.

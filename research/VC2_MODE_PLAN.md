@@ -1155,11 +1155,12 @@ second half); the comparison against `XtFxChip` on rom.4's programs (needs a rec
 
 **The user's answers so far** (2026-11-22): the interface is a **Ferrofish Pulse 16, over MADI** to the Mac, and the XT can be
 **wired back to back** to it, direct inputs and outputs. So d-1 is answered; d-2 is the rear INPUT jacks from the Pulse's
-analog outs; d-3 is analog (the Pulse's optical ports are ADAT, S/PDIF on them not confirmed, so the XT's digital outs may have
-nowhere to go); d-4 is the Pulse's own level setting (−8 to +20 dBu at 0 dBFS in 1 dB steps; recommended +8 dBu out, the
+analog outs; d-3 is analog, the Pulse's converters both ways (its optical ports are ADAT only, so the XT's digital outs aren't
+used); d-4 is the Pulse's own level setting (−8 to +20 dBu at 0 dBFS in 1 dB steps; recommended +8 dBu out, the
 sweep at the XT's −10 dBu nominal, +20 dBu in), written down. With 16 inputs, DIRECT OUT and a loopback of the signal can be
-recorded too. d-5: **a MIDI interface**, both ways. RECORDING_GUIDE.md, "VC-2 captures", step 1, has the wiring. Still open:
-whether the Pulse's optical ports take S/PDIF (if so, the XT's digital out goes there as well).
+recorded too. d-5: **a MIDI interface**, both ways. RECORDING_GUIDE.md, "VC-2 captures", step 1, has the wiring. All five
+answered. With no digital path, the comparison against `XtFxChip` sample by sample waits on USB audio from the XT, if a
+current Mac sees it; the analog recordings settle the rest.
 
 The questions as asked, each with the recommendation:
 - **d-1. The audio interface**: its name, its line outputs and inputs, whether it has an S/PDIF (coaxial or optical) input,
