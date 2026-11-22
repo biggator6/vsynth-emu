@@ -32,6 +32,7 @@ BASE = {
     'Master Level': 127, 'Output Gain': 16, 'External In Type': MONO_LR, 'EQ Switch': 1,
 }
 SYSTEM = ('Master Level', 'Output Gain', 'External In Type', 'EQ Switch')
+MARKER_S = 11.5       # a marked take: the direct sound at 127 over the input's clicks and sweep, then its key goes down
 
 
 def take(name, why, sets=None, key=60, probe='full', tail=1.0):
@@ -71,7 +72,16 @@ def run1():
 
 
 def run2():
-    """The vocoder and the carrier: OSC 1 EXTIN off (the modulator, the input word), OSC 2 the carrier."""
+    """The vocoder and the carrier: OSC 1 EXTIN off (the modulator, the input word), OSC 2 the carrier.  Each take with
+    an input is marked: its direct sound carries the input's clicks and sweep for MARKER_S, its key down only after
+    them, so the cutter places every take by them; the vocoder is measured on the input's voice, from 17.5 s."""
+    takes = run2_takes()
+    for t in takes:
+        t['marker'] = t['probe'] is not None
+    return takes
+
+
+def run2_takes():
     c = {'OSC 2 Switch': 1}
     vc = {**c, 'OSC 2 Type': VOCODER}
     h = {**c, 'Vocoder Sw': 1, 'Vocoder Type': HIRESO}
@@ -121,6 +131,8 @@ def run3():
              probe='fx'),
         take('peq1_plus15', 'the patch EQ 1 Gain +15 dB: on MULTI only', {**f, 'EQ 1 Gain': 30}, probe='fx'),
         take('peq2_plus15', 'the patch EQ 2 Gain +15 dB', {**f, 'EQ 2 Gain': 30}, probe='fx'),
+        take('direct', 'the direct sound alone, MAIN: the reference for the next', {'Direct Sound Level': 127},
+             probe='fx'),
         take('peq1_direct', 'EQ 1 Gain +15 on the direct sound, MAIN: nothing, if the EQ is MULTI\'s alone',
              {'Direct Sound Level': 127, 'EQ 1 Gain': 30}, probe='fx'),
     ]

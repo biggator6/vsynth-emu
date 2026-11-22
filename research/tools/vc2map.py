@@ -6,8 +6,8 @@ bank, read": the type tables).
 The map is the V-Synth's (its manual's Parameter Address Map, which fxcapture.py's runs use) on rom.4's own IDs: in a
 block, address offset = ID - the block's first ID.  Nothing in rom.4 that receives or sends SysEx has been read, so
 this is inferred, from this: block by block, rom.4's IDs after each block's first are rom.2's name for name (the
-system's 72 but two, which rom.4 gave to MIDI MODE for VariOS and USB External In Type; the patch common's 115, then
-the vocoder block from +0x73; the MFX's, Chorus's and Reverb's heads; zone 1's 128).  `Map(rom4, rom2)` checks that
+system's 72 but two, which rom.4 gave to MIDI MODE for VariOS and USB External In Type; the patch common's 114, its
+115th a dummy on both, then the vocoder block from +0x73; the MFX's, Chorus's and Reverb's heads; zone 1's 128).  `Map(rom4, rom2)` checks that
 again on the images it is given, and refuses to write a run when it fails.  The XT itself can settle the map: with
 Transmit Edit Data on, an edit at its panel sends a DT1, and `vc2capture.py --learn` names each one by this map.
 

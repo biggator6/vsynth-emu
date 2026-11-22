@@ -83,6 +83,9 @@ def settings(m, t):
     p.append('play nothing' if t['key'] is None else 'hold %s' % note_name(t['key']))
     if t['probe'] is None:
         p.append('the input silent')
+    if t.get('marker'):
+        p.append('Direct Sound Level 127 for the input\'s first %.1f s (its clicks and sweep), then as set, and only '
+                 'then the key' % vc2takes.MARKER_S)
     return '; '.join(p)
 
 
@@ -94,14 +97,19 @@ def build(run, takes, w, text):
     w.wait(2000)
     for t in takes:
         reload = w.apply_take(t)
+        if t.get('marker'):
+            w.put('Direct Sound Level', 127)
         w.wait(2500 if reload else 800)                     # a program's load, a mute ramp, a reverb's clear
         start = w.ms
         if t['probe']:
             w.cue('probe:%.1f' % probe_seconds(t['probe']))     # fxplay plays the input's first that many seconds
             cues.append((start, t['probe']))
+        if t.get('marker'):                                 # the clicks through the direct sound, then the take's own level
+            w.wait(vc2takes.MARKER_S * 1000)
+            w.put('Direct Sound Level', {**vc2takes.BASE, **t['set']}['Direct Sound Level'])
         if t['key'] is not None:
             w.note(True, t['key'])
-        w.wait(probe_seconds(t['probe']) * 1000 + 200)
+        w.wait(start + probe_seconds(t['probe']) * 1000 + 200 - w.ms)
         if t['key'] is not None:
             w.note(False, t['key'])
         off = w.ms
@@ -113,17 +121,21 @@ def build(run, takes, w, text):
 
 
 def test_run(m, dev, ch):
-    """The test: the input as the direct sound; Master Level down in its sweep; MFX Type to Parametric EQ and back."""
+    """The test: the input as the direct sound and as the EXT IN tone on C4, so it is heard whichever word the mic is;
+    Master Level down in its sweep; MFX Type to Parametric EQ and back."""
     w = Vc2Run(dev, ch, m)
+    heard = {**vc2takes.BASE, 'Direct Sound Level': 127, 'OSC 1 Switch': 1, 'MFX Switch': 1}
     w.wait(1000)
-    w.apply({**vc2takes.BASE, 'Direct Sound Level': 127, 'MFX Switch': 1})
+    w.apply(heard)
     w.wait(1500)
     w.cue('probe:%.1f' % vc2probe.FX_END)
+    w.note(True, 60)
     w.wait(8000)
     w.put('Master Level', 40)
     w.wait(1000)
-    w.apply({**vc2takes.BASE, 'Direct Sound Level': 127, 'MFX Switch': 1, 'Master Level': 40, 'MFX Type': 1})
+    w.apply({**heard, 'Master Level': 40, 'MFX Type': 1})
     w.wait(8000)
+    w.note(False, 60)
     w.put('Master Level', 127)
     w.apply(vc2takes.BASE)
     w.wait(200)
