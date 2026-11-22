@@ -740,7 +740,23 @@ version against rom.4's routines with what it calls hooked:
       against the receiver run by hand. For step 4.5: which of the host's controllers reach it is the plugin's to wire,
       as which MIDI the front hands the receiver is step 4.3's.
 5. The plugin: the mode switch, rom.4's IDs as parameters appended, the session, a `.p02`'s load, the tab of cards, the
-   plugin test, verify.sh lines and plants.
+   plugin test, verify.sh lines and plants. Split in two (2026-11-21), the first half in its own number block, v450–v499,
+   beside step 4.3 and the effects; the second needs step 4.3's Vc2Synth whole and the pages the user's look.
+   The parameters' scope, the user's decisions (2026-11-21): a patch's zones 1 and 2 (the common, the effects' types
+   and levels, Beam, Pad and the arpeggio, and each zone's tone, 13 envelopes, 5 LFOs and both COSMs by type; zones 3–16
+   and the arpeggio pattern the patch's data, the effect types' own parameters edits by ID, as the V-Synth's), the
+   system settings the V-Synth's are (the controller assigns, Master Level, Output Gain, Clock Source, External In
+   Type), held apart in `VSynthEmuEditorTest` and counted until the VC-2 pages come, their IDs by rom.4's hex ID.
+   1. done (v450): a `.p02` read by rom.4's own reader and its store by rom.4's pointing routines, `Vc2PatchFile` and
+      `Vc2PatchStore`, against rom.4 in `xt_vc2patch` (HARDWARE_FIRMWARE.md, "rom.4's patch store and a .p02").
+   2. done (v451): rom.4's agreed IDs, 1,332, as host parameters after the 763, by rom.4's names, ranges and text, the
+      set fixed in the source and rom.4 brought in before the layout (HARDWARE_FIRMWARE.md, "rom.4's parameters as the
+      plugin's").
+   3. done (v452): a `.p02`'s load into them, `loadVc2Patch`, and the session's state for them, append-only: the
+      parameters by the processor's state as every other, the patch's store and name beside them (HARDWARE_FIRMWARE.md,
+      "A .p02 onto the VC-2's parameters"). With it the first half is done.
+   4. The second half: the mode switch's audio, the wiring to Vc2Synth, the VC-2 pages and cards, the plugin test of a
+      played block.
 
 ### 5. Against the machine
 

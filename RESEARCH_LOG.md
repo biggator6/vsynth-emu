@@ -3970,3 +3970,27 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - v145 left the other runners unchecked for its false pass. Running them with no ROM found it in `mutate_fx.py --control`: it treats too few result lines as a crash, and a run that never started has none.
 - My first guard was too early. It checked the ROM before the build, and the mid-run test still read "caught" on its first plant. I can't be sure which side of the guard the ROM went on in that test, but a build takes seconds, so the gap was real. It now checks again just before the run, and the test removes the ROM during the build, so it isn't a race any more.
 - A plant that kills the run has been reading as no difference on the encoder's waves and the solo cases, the opposite of what the headers said. No plant in the lists happens to do that, so no verdict changed. It's a check that nothing had tested.
+
+### Session 23 (2026-11-21) — v450: rom.4's patch store and a .p02
+
+- The plugin side of step 4.5 started beside step 4.3 and the effects, in its own number block (v450–v499). Its scope was the user's call: rom.4 has 2,476 IDs. Put with counts, the user took a patch's zones 1 and 2 (about 1,310: a VC-2 patch edits two zones, and 42 of the 64 factory patches put the mic's EXT IN in zone 2), the system settings the V-Synth's are, the new parameters held apart in the editor test until the VC-2 pages come, and IDs by rom.4's hex ID.
+- The `.p02` came first, as the parameters' load reads through it. The research tool of 2026-11-13 read one with rom.4's default patch, its layout as a file and its conversion, but no file check: rom.4's real reader, found by the strings it compares, tests the header, refuses six old versions, and upgrades two others. So the plugin runs that reader itself, with the four OS file calls it makes served from the file's bytes, rather than a port of its tests.
+- rom.4's caller takes any answer of 0 or more as read, and the reader answers a short header read's count. A 5-byte file is then "read" with nothing laid out. The plugin refuses anything under the two 16-byte headers itself.
+- The kit refused the first store reader as a copy of rom.2's. It was: rom.4's readers are rom.2's code on its own descriptors. So both images' reads are one code on a layout (`XtStoreLayout`), and rom.2's are one-liners on it. I'd first added a block count to rom.2's section rows; nothing reads it, and leaving those rows as they were kept `files_muts.txt`'s plants on them valid.
+- To keep the check from agreeing with the port by construction, it finds every section's first ID by rom.4's names, every place by calling rom.4's ten pointing routines, and the typed blocks by rom.4's type tables: none of the port's numbers. Its first run failed one case, a `Rev006` file's store unlike the straight read. That was my expectation: rom.4 upgrades that version. The check now says which bytes an upgrade may write, by running rom.4's conversion on a marked image.
+- A planted error moving the Reverb's first typed ID by one was missed: 0x819, Reverb Off's one ID, has a range of one value and reads its default from any slot. It moves two now.
+
+### Session 23, continued (2026-11-21) — v451: rom.4's parameters as the plugin's
+
+- A host's parameter list can't wait for a ROM, and a processor makes its parameters before it looks for its images. So the set is fixed in the source as runs of rom.4's IDs (no names or ranges, which stay rom.4's at run time), and the layout brings rom.4 in first. Without rom.4 the same IDs come as stand-ins wide enough that a session's values survive them.
+- `PluginProcessor.h` is past the kit's 300 lines, which the guard won't let grow, so the VC-2's parameters reach the layout through free functions; v452's state in the processor will start by splitting it.
+- The early search was first a copy of `findVc2Rom`'s loop, and the kit said so. Both now take one routine, the rom.2 files to look beside its only difference.
+- `verify.sh`'s build-ID line failed twice on v450. The first time it was mine: I wrote v451's first files into `plugin/Source` during the run, and the ID counts untracked files there. The second, two other sessions' builds had replaced `~/Library`'s AU and VST3 by the end. The AU was this build's again once reinstalled, and auval passed on it.
+- The MSM's and zones' parts of the arpeggio test found their parameters by counting back from the list's end, and broke on the 1,332 after them. They count past the VC-2's now, rather than the constant they used growing in a header that can't grow.
+- My first name check would have passed a name with "COSM " left in it, as it only looked at the end. I made it compare the whole name before planting that error.
+
+### Session 23, continued (2026-11-21) — v452: a .p02 onto the VC-2's parameters
+
+- `PluginProcessor.h` had to shrink before it could take the patch's members: the per-OSC file buffer went to a header of its own, moved as it stood. The kit refused the new header at first because the old copy was still in place; the order is take out, then write.
+- The processor's accessor was first `vc2Store()`, the very name of the store layout's free function, which a member would have shadowed inside the class. It is `vc2PatchStore()`.
+- The test first left the VC-2's system parameters out, as no patch holds them, so a load that wrote them would have passed. It moves them to their tops before the loads now and asks that they stay.

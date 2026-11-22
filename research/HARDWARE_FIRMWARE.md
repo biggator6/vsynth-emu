@@ -1546,6 +1546,176 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A .p02 onto the VC-2's parameters (2026-11-21, v452) {#vc2-patch-load}
+
+Step 4.5's third item (research/VC2_MODE_PLAN.md), with which its first half is done. `VSynthEmuProcessor::loadVc2Patch`
+reads a `.p02` by rom.4's own reader (`vc2PatchRead`, v450) and puts its values on the VC-2's parameters (v451): each of
+the 1,314 a patch holds (all but the system's 18) as the store reads it, its ID in its zone (the tone's block, the
+envelopes', LFOs' and COSMs') and COSM, a typed ID through its block's slots, the Start Offsets on the V-Synth's range
+(`vc2PatchValue`, PluginVc2Patch.cpp). Each is set as a host's automation would, and only if it has moved; no V-Synth
+parameter and no VC-2 system one moves. A file rom.4's reader refuses, or none, is refused, the status saying why, and
+nothing moves.
+
+**The session.** The store and the patch's name are kept (`PluginVc2Patch`) and go in the session's state beside the
+parameters, `vc2Store` (the store's 0x13a4 bytes in base64) and `vc2PatchName`, for what the parameters don't hold:
+zones 3–16 and the arpeggio pattern, as a V-Synth patch's store keeps its zones (v195). A session from before v452 has
+neither and leaves none, in a new instance and in one that had a patch loaded; one from before v451 loads its V-Synth
+parameters as saved and the VC-2's at their defaults. Append-only: no earlier property or parameter is touched.
+
+**PluginProcessor.h split.** It was past the kit's 300 lines, which the guard won't let grow, so a part went first,
+moved as it stood: the per-OSC file buffer, `LoadedWave`, is `PluginLoadedWave.h`'s `PluginLoadedWave`, the class
+keeping its name for it. Then the VC-2 patch's three members and its state, 298 lines.
+
+**Not yet:** a `.p02` from the editor (the header's Browse… opens a `.p00`; the VC-2's pages and the mode switch are
+step 4.5's second half), and nothing plays the patch (step 4.3's Vc2Synth).
+
+**The check.** `VSynthEmuArpPluginTest`'s VC-2 patch part (`Vc2PatchPluginTest.cpp`, 16 checks): the disk image's 128
+`.p02`, each written to a file and loaded, every one of the 1,314 parameters as the store reads it (168,192 values), the
+store kept whole and the name its own, no V-Synth parameter and no VC-2 system one moved (those moved to their tops
+first, so a write would show); a V-Synth patch, a text file, four bytes and no file refused, nothing moved; a session
+after a load bringing the parameters, store and name back; and the sessions from before v452 and v451 above.
+`mutate_panel.py` with the 11 `vc2-patch-` plants (the system's read, zone 2 read as zone 1, COSM 2 as COSM 1, the typed
+read as the first bank's, a refused file going on, the store or name not kept, the state not saved, not restored or
+kept from the last patch, the name not saved): 11 caught.
+
+### rom.4's parameters as the plugin's (2026-11-21, v451) {#vc2-host-params}
+
+Step 4.5's second item (research/VC2_MODE_PLAN.md). rom.4's IDs become host parameters, appended after the V-Synth's 763,
+whose IDs and order are as they were: `VSynthEmuArpPluginTest <rom> params` gives its first 763 lines byte for byte as
+v450's. The scope is the user's (2026-11-21, put with the counts below): a patch's zones 1 and 2, as a VC-2 patch edits
+two (rom.4's Current Zone, 0x140, is ZONE1–ZONE2; 42 of the 64 factory patches put the mic's EXT IN in zone 2), and the
+system settings the V-Synth's parameters are.
+
+| Part | rom.4's IDs | Each | Parameters |
+|---|---|---|---|
+| The common: tune, keys, portamento, tempo, bend, the effects' switches, Current Zone, the zones' splits, Scale Tune, the Matrix, the vocoder block, the patch EQ | 0x12c…0x1b4 with a range | once | 112 |
+| The effects' Types and levels | 0x1b7…0x1ba, 0x23c…0x23e, 0x270, 0x271 | once | 9 |
+| Beam Type, Pad Mode and Hold, the arpeggio | 0x4a6…0x4b2 | once | 13 |
+| The tone (both OSCs, the VOCODER OSC's IDs with them) | 0x2d3…0x38f with a range, and the Start Offsets 0x306, 0x33a | zones 1, 2 | 2 × 155 |
+| The 13 envelopes | 0x390…0x438 with a range | zones 1, 2 | 2 × 130 |
+| The 5 LFOs | 0x439…0x461 with a range | zones 1, 2 | 2 × 35 |
+| COSM 1 and 2: Switch and Type, then the types' own IDs | 0x462, 0x463, 0x927…0x9ab | zones 1, 2, each COSM | 4 × 135 |
+| The system: Master Level, Clock Source, Output Gain, External In Type, the controller assigns | 0x40, 0x43, 0x78, 0x7a, 0x89…0x96 | once | 18 |
+
+1,332 in all. Left out: the patch's name (its data, as the V-Synth's), the dummies and reserved areas (rom.4 names them
+`(dummy)`, `Reserv area`, `reserved` or `Dummy`, or gives a range of one value), the effects' and COSMs' slots, which
+their types' own IDs are read through, zones 3–16 and the arpeggio pattern (the patch's data, v452), and the effect
+types' own parameters (edits by ID, as the V-Synth's). The Start Offsets have a range of one value in rom.4's descriptors,
+as rom.2's have, and are there by the V-Synth's rule, 0 to 2^24 − 1 (v152).
+
+**What a host sees.** An ID by rom.4's hex ID (the user's choice): `vc2_193` "VC-2 Vocoder Sw", zone 2's `vc2z2_2e5`
+"VC-2 Z2 OSC 1 Type", COSM 2's `vc2c2_927`, both `vc2z2c2_927`; a COSM's name with its "COSM n" before rom.4's, whose own
+"COSM " is dropped. Each an integer over rom.4's range (the value less the descriptor's centre; a typed ID's own range),
+its default rom.4's, its text rom.4's routine's (Vc2Params' `vc2ValueText`, the screens' form) and read back by that
+text. rom.4's names repeat across the COSM types (Drive, Tone, Output Level) and twice within two (type 14's "Filter 1
+Q", a Side Band Filter's "Side Band Width"): rom.4's own, kept, the ID telling them apart.
+
+**rom.4 before the parameters.** A processor makes its parameters in its initializer, before its search for the images
+(`findRom`), so a process's first instance had no rom.4 tables for them. Now `createParameterLayout` first brings rom.4
+in from where an instance finds it (`vc2FindRomEarly`, PluginRom.cpp: beside each place rom.2 is sought, then rom.4's
+own places), quietly; `findRom`'s places and `findVc2Rom`'s take are shared with it, their order as before. `findRom`
+no longer seeks rom.4 itself when it finds no rom.2, as the layout's search has just looked in the same places; an image
+chosen by hand still finds rom.4 beside it (`openRom`). That made three of `VSynthEmuRomTest`'s plants (`rom4-not-beside`,
+`rom4-not-sought`, `rom4-not-alone`) miss at first: rom.4 was in by a later instance's early search before the test
+asked. The test now asks right after the instance opens rom.2, and `rom4-not-alone` plants in the early search. The set is
+fixed in the source (`PluginVc2Params.cpp`: runs of rom.4's IDs, no names or ranges), so a host's list is the same with
+rom.4 or without: an instance made without it has each a stand-in, named by its hex ID, its range −32768…32767 (every
+value rom.4's descriptors give the set but the Start Offsets'), so a session's values survive it.
+
+**The editor.** The VC-2's pages need the user's look, so `VSynthEmuEditorTest` holds the 1,332 apart (the user's
+decision): each one of the set, in its order, none reached by a control, the set whole. The tests that found their
+parameters by counting from the list's end (the MSM's and the zones' parts of `VSynthEmuArpPluginTest`) count past the
+VC-2's now.
+
+**Not yet:** nothing reads them into a sound (step 4.3's Vc2Synth, then the mode switch); a `.p02`'s load into them and
+the patch's data in the session are v452's.
+
+**The checks.** `VSynthEmuArpPluginTest`'s VC-2 part (`Vc2ParamPluginTest.cpp`, 16 checks): the set against rom.4 (every
+ID of the agreed sections, the test's own spans, that rom.4 gives a range and a name not a dummy's, each in its zones and
+COSMs: 1,332) and the agreed form of four IDs; on a processor made with rom.4 in, every parameter from the 764th the
+set's, each its exact name, range, default, its text at five values and that text read back rom.4's; a fresh run of the
+program with no image to find, the same IDs in order, each stand-in holding rom.4's range; the same with VSE_XT_ROM
+naming rom.2, rom.4 found before the parameters and each range rom.4's; a session with every VC-2 parameter moved, back
+as saved, and one from before them (the VC-2's taken out) loading the V-Synth's as saved and the VC-2's at their
+defaults. `VSynthEmuEditorTest`: 2,602 checks, the 1,332 held apart. `VSynthEmuRomTest` 19 of 19. `mutate_panel.py`: the
+19 `vc2-param-` plants (in `PluginVc2Params.cpp`, the layout and the early search) 19 caught, and every `rom-` and `rom4-`
+plant, 29, caught after the change above.
+
+### rom.4's patch store and a .p02 (2026-11-21, v450) {#vc2-patch-store}
+
+Step 4.5's first half (research/VC2_MODE_PLAN.md), its `.p02` first: the parameters' load (v452) reads a patch through
+it. A `.p02` is read as rom.4 reads one, and its store by rom.4's own pointing routines, as `XtFiles` and
+`XtPatchStore` read a `.p00` by rom.2's ("V-Synth's files").
+
+**The reader.** rom.4's patch load `0x89341de0` calls the reader `0x893419a0(file image, path)` and takes any answer
+from 0 up as read (`0x89341e76`). The reader goes through the OS's file wrappers, each sending on by the path's drive
+or the handle's kind to the kernel outside the image: open `0x89336c60`, read `0x89336cf0`, seek `0x89336db0` (from the
+start only), close `0x89336ca0`. Its tests, in its order:
+- 16 bytes from 0: not `SVD0` at +2 (a V-Synth patch, refused), the first word big-endian 0x001e, `VC20` at +2;
+- 16 more: `PATa` at +0x10, `VC_2` at +0x14, the data's place big-endian at +0x18, sought, the seek's answer that place;
+- the version, 7 bytes at +6: `Rev000`…`Rev005` refused (−90);
+- the default patch laid out as a file (`0x89324b10`, from the default patch `0x89325300(1)` builds at `0x89971cdd`),
+  then the data over it, its length at +0x1c but at most 0x13a4 bytes, read whole (a short read is refused);
+- `Rev006` and `Rev007` upgraded in the file's layout (`0x89341bda`…`0x89341c8e`, `0x89341ce2`…`0x89341d3c`): by the
+  Patch Category (0x12c), 7–9 or not, zone 2's TVA Switch (0x2d9) to 1 or 0, its Env 13 Attack Time (0x42c) to 3 and
+  Velocity Sens (0x433) to 0, and on `Rev006` the file's bytes 0x1370 and 0x1371 rewritten (a 6-bit field, at most 50).
+  Any other version is read as it stands: all 128 of the disk image's (`Internal.vc2/Patch`) are `Rev008`.
+
+A file under 32 bytes reads short at its first or second test, and the reader answers that count, which its caller
+takes as read with nothing laid out. The plugin refuses such a file itself.
+
+**The store.** rom.4's conversion `0x89324b20(store, file)` copies the file's blocks into the store's layout: the file
+holds the tone's 8 blocks 78 bytes apart from +0xe6, the store 128 bytes apart from +0xfe (the VOCODER OSC's IDs at
++0x52…+0x7b); MFX, Chorus and Reverb go from +0x54, +0x98 and +0xb4 to +0x6c, +0xb0 and +0xcc, the 16 envelope blocks
+from +0x356 to +0x4fe. The store is 0x13a4 bytes, the file's data's size. A section starts where rom.4's routine aims a
+read object at the part's store (`0x8950d8e0`'s entry +8: obj+4 = the store + the place; the routine beside each takes
+the store at +4, and aims at the same place):
+
+| IDs | What | Routine | At | Each block |
+|---|---|---|---|---|
+| 0x120…0x1b5 | the common: name, tune, keys, the zones' splits, Scale Tune, the Matrix, the vocoder block, the patch EQ | `0x893207b0` | 0 | |
+| 0x1b6…0x23b | MFX: Activity, Type, levels, slots | `0x893208d0` | 0x6c | |
+| 0x23c…0x26f | Chorus | `0x89320950` | 0xb0 | |
+| 0x270…0x2d2 | Reverb | `0x893209d0` | 0xcc | |
+| 0x2d3…0x38f | the tone: Structure, MOD, TVA, both OSCs with the VOCODER OSC's | `0x89320a50` | 0xfe | +0x80, 8 |
+| 0x390…0x438 | the 13 envelopes | `0x89320ad0` | 0x4fe | +0x70, 16 |
+| 0x439…0x461 | the 5 LFOs | `0x89320b70` | 0xbfe | +0x14, 16 |
+| 0x462…0x4a5 | a COSM's Switch, Type and slots (r7 the COSM; COSM 2 0x220 on) | `0x89320c10` | 0xd3e | +0x22, 16 |
+| 0x4a6…0x4b3 | Beam Type, Pad Mode and Hold, the arpeggio | `0x89320d10` | 0x117e | |
+| 0x4b4…0x4f6 | the arpeggio pattern's line | `0x89320da0` | 0x1184 | +0x22, 16 |
+
+The typed IDs read through their block's slots, the slot base the block's Type ID + 4, 3, 2 and 1: MFX's from 0x56a
+(slots from 0x1bb), Chorus's from 0x7ce (0x23f), Reverb's from 0x819 (0x272), with the 14 IDs in no table after its
+types, and a COSM's from 0x926 (0x464). rom.4's reads (`0x89328580` the bits, `0x8932b050` the value, `0x8932b460` a
+typed one) are rom.2's code on rom.4's descriptors, so one set of reads serves both images: `XtStoreLayout` (XtFiles.h)
+holds an image's sections, its COSMs and its descriptors, and rom.2's `xtPatchRaw`, `xtPatchValue` and `xtPatchTyped`
+are those reads on rom.2's, unchanged.
+
+**In the plugin.** `Vc2PatchStore` is rom.4's layout (`vc2Store()`, `vc2StoreTyped`), `Vc2PatchFile` the read
+(`vc2PatchRead`): rom.4's reader in the interpreter on the file's bytes, its four file calls served from them, then
+the conversion, as `xtFwPatchStore` runs rom.2's; the image's path kept by `loadVc2` (`vc2LoadPatchFiles`, the loader's
+new last). A seek past the file's end is taken, as a disk's, and reads nothing, so a patch whose data is none reads as
+the defaults. Nothing plays it yet: the parameters it goes into are v451's.
+
+**The check** (`xt_vc2patch <rom.4> [cases] [seed]`, `Vc2PatchStoreCheck.cpp` and `Vc2PatchFileCheck.cpp`, in fcheck at
+40, about 3 s): each section's first ID found by rom.4's names (Patch Name 1, Activity, Chorus Type, Reverb Type,
+Structure Type, Env 1 Attack Time, LFO 1 Waveform, COSM Switch, Beam Type, Control Switch, and its last the ID before
+Sampling Template Name 1), each place by calling rom.4's routine and the one beside it at every block, so the check's
+numbers are none of the port's: 8,972 placements; every ID's bits and value by rom.4's readers at every block, on the
+disk image's 128 patches as `vc2PatchRead` stores them and 40 stores of random bits: 1,439,592; every typed ID at every
+zone and COSM, its block by rom.4's type tables, its slot base by its block's Parameter 1: 880,992; the 128 files against
+rom.4's routines on their data straight, and each name against rom.4's own reading (`0x89320810`); and 21 copies of a
+file made otherwise against what the reader's code takes of them (the tags, the versions, a data length short and long,
+data further on, none, the headers alone, a byte short of them): 0 different. `mutate_vc2.py --patch` (40 plants in
+`vc2patch_muts.txt`, in `Vc2PatchStore.cpp`, `Vc2PatchFile.cpp` and the shared reads in `XtPatchStore.cpp`): 40 caught.
+The first plant on the Reverb's first typed ID moved 0x819 alone, Reverb Off's one ID, whose range is one value: it
+reads its default from any slot, so the plant moves two. rom.2's reads being the shared code now, their plants ran
+too: `mutate_files.py`'s 22 in `XtPatchStore.cpp`, 22 caught, and `xt_files` and every other fcheck section as their
+baseline; `mutate_tone.py --changed HEAD` finds no tone plant in the files changed; the loader's
+`mutate_panel.py rom4-no-patchfiles rom4-no-tables rom4-no-voices`, 3 caught. `verify.sh`: every line held but the build
+ID's, as two other sessions' builds overwrote `~/Library`'s AU and VST3 during the run; installed again, the AU is this
+build's and auval passes on it.
+
 ### rom.4's MFX sends by CC 91 and 93 (2026-11-21, v402) {#vc2-fx-cc}
 
 Step 4.4's fifth item (research/VC2_MODE_PLAN.md), found in v401. rom.4's effect driver takes two MIDI controllers of

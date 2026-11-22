@@ -38,7 +38,7 @@ wave-fine|out.tuneFine = (int8_t)vplp[0x1b];|out.tuneFine = (uint8_t)vplp[0x1b];
 riff-start|file + 8, "WAVE", 4) ? 12 : 0;|file + 8, "WAVE", 4) ? 0 : 0;|wavefile
 linr-tag|const bool linear = !vpfl \|\| !std::memcmp(vpfl + 40, "LINR", 4);|const bool linear = !vpfl;|wavefile
 linr-short|if ((linear ? nData / 2 : nData - 8) < want) return fail(why, "fewer samples than the header says");|;|wavefile
-typed-slot|const int v = xtPatchValue(store, base + d->slot, zone, cosm);|const int v = xtPatchValue(store, base + d->slot + 4, zone, cosm);|patchstore
+typed-slot|const int v = xtStoreValue(l, store, base + d->slot, zone, cosm);|const int v = xtStoreValue(l, store, base + d->slot + 4, zone, cosm);|patchstore
 typed-base|{ p[0], s16(p + 2), s16(p + 4), s16(p + 6) }|{ p[0] + 1, s16(p + 2), s16(p + 4), s16(p + 6) }|patchstore
 typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v;|patchstore
 typed-default|{ p[0], s16(p + 2), s16(p + 4), s16(p + 6) }|{ p[0], s16(p + 4), s16(p + 4), s16(p + 6) }|patchstore

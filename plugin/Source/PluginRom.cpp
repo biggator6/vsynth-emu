@@ -2,6 +2,7 @@
 // v198, with the VC-2's rom.4 beside the V-Synth's rom.2).  The images themselves, once a process, are XtSynthRom.cpp's.
 #include "PluginProcessor.h"
 #include "PluginAppFolder.h"
+#include "PluginVc2Params.h"
 
 #include <cstdlib>
 
@@ -22,18 +23,46 @@ static void addPlaces(juce::StringArray& cand, const char* name, const char* key
     cand.add(appSettings()->getValue(key));
 }
 
-// A new instance's search for rom.2, first to last: VSE_XT_ROM, then the places.  rom.4 is sought at every start, with
-// rom.2 or without it (openRom, or here), so both images are in before any switch of modes (the user's decision,
-// 2026-11-14)
-void VSynthEmuProcessor::findRom() {
+// Where a new instance looks for rom.2, first to last: VSE_XT_ROM, then the places
+static juce::StringArray romPlaces() {
     juce::StringArray cand;
     if (const char* p = std::getenv("VSE_XT_ROM")) cand.add(juce::String::fromUTF8(p));
     addPlaces(cand, kRomName, kRomKey);
-    for (const auto& c : cand)
-        if (c.isNotEmpty() && juce::File(c).existsAsFile() && openRom(juce::File(c))) return;
-    setStatus("No ROM: choose V-SynthXT.rom.2.bin, or put it next to the plugin");
-    findVc2Rom(juce::File());
+    return cand;
 }
+
+// The first of `cand` that is a file `take` takes
+template <class Take>
+static bool firstTaken(const juce::StringArray& cand, Take take) {
+    for (const auto& c : cand)
+        if (c.isNotEmpty() && juce::File(c).existsAsFile() && take(juce::File(c))) return true;
+    return false;
+}
+
+static bool takeVc2(const juce::File& f) { return xtSynthSetVc2Rom(f.getFullPathName().toStdString()); }
+
+// A new instance's search for rom.2.  rom.4 is sought at every start, with rom.2 or without it (vc2FindRomEarly, as the
+// parameters are made, then openRom's), so both images are in before any switch of modes (the user's decision,
+// 2026-11-14)
+void VSynthEmuProcessor::findRom() {
+    if (firstTaken(romPlaces(), [this](const juce::File& f) { return openRom(f); })) return;
+    setStatus("No ROM: choose V-SynthXT.rom.2.bin, or put it next to the plugin");
+}
+
+// rom.4 beside each rom.2 named, where the unpacker leaves both, then rom.4's own places, unless it's in.  Quiet: a file
+// there that isn't the VC-2's image is passed over, and the V-Synth plays as it did without one.
+static void seekVc2(const juce::StringArray& roms) {
+    if (xtSynthVc2RomReady()) return;
+    juce::StringArray cand;
+    for (const auto& r : roms)
+        if (r.isNotEmpty()) cand.add(juce::File(r).getSiblingFile(kVc2RomName).getFullPathName());
+    addPlaces(cand, kVc2RomName, kVc2RomKey);
+    firstTaken(cand, takeVc2);
+}
+
+// Before the parameters are made (createParameterLayout, v451), so the VC-2's are rom.4's: beside each place rom.2 is
+// sought, as findRom and findVc2Rom would come to it
+void vc2FindRomEarly() { seekVc2(romPlaces()); }
 
 bool VSynthEmuProcessor::openRom(const juce::File& file) {
     if (std::string why; !file.existsAsFile() || !xtSynthSetRom(file.getFullPathName().toStdString(), &why)) {
@@ -55,16 +84,9 @@ bool VSynthEmuProcessor::setRomFile(const juce::File& file) {
     return true;
 }
 
-// rom.4: beside the rom.2 just opened first, if there is one, where the unpacker leaves both, then the places.  Quiet:
-// a file there that isn't the VC-2's image is passed over, and the V-Synth plays as it did without one.
+// rom.4: beside the rom.2 just opened first, if there is one, where the unpacker leaves both, then the places
 void VSynthEmuProcessor::findVc2Rom(const juce::File& rom) {
-    if (hasVc2Rom()) return;
-    juce::StringArray cand;
-    if (rom != juce::File())
-        cand.add(rom.getSiblingFile(kVc2RomName).getFullPathName());
-    addPlaces(cand, kVc2RomName, kVc2RomKey);
-    for (const auto& c : cand)
-        if (c.isNotEmpty() && juce::File(c).existsAsFile() && xtSynthSetVc2Rom(c.toStdString())) return;
+    seekVc2(rom != juce::File() ? juce::StringArray(rom.getFullPathName()) : juce::StringArray());
 }
 
 bool VSynthEmuProcessor::setVc2RomFile(const juce::File& file) {

@@ -9,6 +9,8 @@
 #include "XtFiles.h"
 #include "XtFxControl.h"
 #include "PluginArp.h"
+#include "PluginLoadedWave.h"
+#include "PluginVc2Patch.h"
 #include <climits>
 #include <mutex>
 
@@ -80,6 +82,11 @@ public:
     // and the status says why, if it's no patch.  The effects sound only with the Effects switch on, which a patch leaves as it is.  The name, and what it asks for that isn't
     // here (XtPatch.h), for the editor.  applyPatch's `zone` is the one put on the parameters, 0 but in PluginTest (each zone's values through them).
     bool loadPatch(const juce::File& file, int zone = 0);
+    // Message thread.  A VC-2 patch (.p02, v452; PluginVc2Patch.h): rom.4's reader's values onto the VC-2's parameters, its
+    // store kept for the session; false, the status saying why, for a file that isn't one.  The store and name kept last.
+    bool loadVc2Patch(const juce::File& file);
+    std::vector<uint8_t> vc2PatchStore() const;
+    juce::String vc2PatchName() const;
     void applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder);
     // How many zones the patch loaded last plays (1 for none), and whether its zones' waves are all encoded and in the synth.
     int patchZones() const { return patchZones_.load(); }
@@ -192,20 +199,8 @@ private:
 
     juce::AudioFormatManager formatManager_;
 
-    // ── File buffers, one per OSC ────────────────────────────────────────────
-    // Written on the message thread, OSC 1's read on the audio thread (legacy path).
-    struct LoadedWave {
-        juce::AudioBuffer<float> buffer;
-        std::atomic<bool>        loaded { false };
-        juce::String             name;
-        double                   rate = 44100.0;
-        int                      bits = 16;
-        int                      ownType = -1;       // a V-Synth wave's own encode type (XtVpwFormat): 0 LITE, 1 SOLO, 3 BACKING, 5 ENSEMBLE; -1 none
-        bool                     isOwn = false;      // a V-Synth wave, and what it says of itself (its audio left out)
-        XtWaveFile               own;
-        std::atomic<int>         gen { 0 };          // a newer encode request discards an older result
-        std::atomic<bool>        reencode { false }; // its Encode Type or Depth changed
-    };
+    // ── File buffers, one per OSC (PluginLoadedWave.h, v452) ─────────────────
+    using LoadedWave = PluginLoadedWave;
     LoadedWave               wave_[2];
     juce::CriticalSection    bufferLock_;
     // Each OSC's wave as the editor draws it (PluginWaveView.cpp, v200), made from the channels its encode copies; the
@@ -297,6 +292,7 @@ private:
     void takeWave(const XtWaveFile& wave, const juce::File& file, int osc);
     void unloadWave(int osc);
     juce::String patchName_, patchNote_;
+    PluginVc2Patch vc2Patch_;   // the VC-2 patch loaded last, or a session's (v452)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VSynthEmuProcessor)
 };

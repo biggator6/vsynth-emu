@@ -8,11 +8,14 @@
 // - a session: settings and pattern back in another processor; one saved before v190 brings the XT's default pattern;
 // - a chord through processBlock with the arpeggio on: XtSynth's render on the processor's own controls, sample for
 //   sample, a note each quarter; the Switch off, the chord once.
-// Then the Multi Step Modulator's plugin side (MsmPluginTest.cpp, v193), whose checks this program runs too.
+// Then the Multi Step Modulator's plugin side (MsmPluginTest.cpp, v193), the zones' (v195) and the VC-2's parameters
+// (Vc2ParamPluginTest.cpp, v451), whose checks this program runs too; `vc2ids`, the VC-2 part's child run.
 // `params` lists every parameter instead: its place, ID, name, range, default and its text at five points, what a host
 // sees of it, so a change to how the list is made can be shown to leave it as it was (v190's split of PluginProcessor.cpp).
 // Run: VSynthEmuArpPluginTest <rom.2.bin> [params].  Exit 0 if every check holds.
 #include "MsmPluginTest.h"
+#include "Vc2ParamPluginTest.h"
+#include "Vc2PatchPluginTest.h"
 #include "ZonePluginTest.h"
 #include "TestChecks.h"
 #include "TestControls.h"
@@ -184,11 +187,14 @@ int arpPluginTest(const juce::File& rom, const juce::File& work) {
     throughProcessor(check, rom, true);
     throughProcessor(check, rom, false);
     const int arp = check.summary();
-    return msmPluginTest(rom, work) | zonePluginTest(rom, work) | arp;   // the MSM's (v193) and the zones' (v195)
+    // the MSM's (v193), the zones' (v195), the VC-2's parameters (v451) and a .p02 onto them (v452)
+    return msmPluginTest(rom, work) | zonePluginTest(rom, work) | vc2ParamPluginTest(rom, work)
+           | vc2PatchPluginTest(rom, work) | arp;
 }
 
-// Every parameter as a host sees it, one a line
-int paramList(const juce::File&, const juce::File&) {
+// Every parameter as a host sees it, one a line: rom.4 in from beside rom.2 first, as an instance with both finds it
+int paramList(const juce::File& rom, const juce::File&) {
+    xtSynthSetVc2Rom(rom.getSiblingFile("V-SynthXT.rom.4.bin").getFullPathName().toStdString());
     VSynthEmuProcessor p;
     int place = 0;
     for (auto* base : p.getParameters()) {
@@ -208,6 +214,7 @@ int paramList(const juce::File&, const juce::File&) {
 } // namespace
 
 int main(int argc, char** argv) {
-    const bool list = argc > 2 && std::strcmp(argv[2], "params") == 0;
-    return testMain(argc, argv, "arpplugin", list ? paramList : arpPluginTest);
+    const char* mode = argc > 2 ? argv[2] : "";
+    if (std::strcmp(mode, "vc2ids") == 0) return testMain(argc, argv, "arpplugin", vc2ParamStandIns);   // v451's child
+    return testMain(argc, argv, "arpplugin", std::strcmp(mode, "params") == 0 ? paramList : arpPluginTest);
 }

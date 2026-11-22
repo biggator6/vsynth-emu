@@ -28,7 +28,8 @@
 # Filters' (vc2cosmsideband, v241), under xt_vc2cosm; the Matrix core's refresh and groups (v243) in vc2matrix's file;
 # the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm; the library's logf and powf (vc2libm) and their
 # constants (vc2libmtables) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
-# (vc2voicestables) under xt_vc2voices.
+# (vc2voicestables) under xt_vc2voices; the patch store (vc2patch, v450), the .p02's reader (vc2patchfile) and the
+# store's reads both images share (vc2patchxt, XtPatchStore.cpp) under xt_vc2patch.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -63,6 +64,7 @@ VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmT
          Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmDspCheck Vc2CosmDspKinds Vc2CosmDspSlots XtCosm XtOsc XtEnvelope)
 VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
 VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes)
+VC2PATCH=(Vc2PatchStore Vc2PatchFile Vc2PatchStoreCheck Vc2PatchFileCheck Vc2Params XtFxValueText)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
 VC2PORTS=(
@@ -161,6 +163,9 @@ VC2PORTS=(
     "vc2libmtables|Vc2LibMathTables.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
     "vc2voices|Vc2PartVoices.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2voicestables|Vc2PartVoicesTables.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2patch|Vc2PatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
+    "vc2patchfile|Vc2PatchFile.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
+    "vc2patchxt|XtPatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

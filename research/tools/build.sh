@@ -37,6 +37,11 @@ rm -f "$O"/xt_vc2tva
 rm -f "$O"/xt_vc2cosm
 rm -f "$O"/xt_vc2libm
 rm -f "$O"/xt_vc2voices
+rm -f "$O"/xt_vc2patch
+# rom.4's patch store and its .p02 reader (v450) against rom.4's own routines, on the disk image's patches
+[ -f Vc2PatchStoreCheck.cpp ] && cc -DXT_VC2PATCH_MAIN Vc2PatchStoreCheck.cpp Vc2PatchFileCheck.cpp Vc2PatchStore.cpp \
+   Vc2PatchFile.cpp Vc2Params.cpp XtFxValueText.cpp XtPatchStore.cpp XtDiskImage.cpp "${FW[@]}" XtMultiBandPlayer.cpp \
+   XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2patch" &
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
    Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp "${SH4[@]}" -o "$O/xt_vc2voices" &
