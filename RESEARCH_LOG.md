@@ -3994,3 +3994,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `PluginProcessor.h` had to shrink before it could take the patch's members: the per-OSC file buffer went to a header of its own, moved as it stood. The kit refused the new header at first because the old copy was still in place; the order is take out, then write.
 - The processor's accessor was first `vc2Store()`, the very name of the store layout's free function, which a member would have shadowed inside the class. It is `vc2PatchStore()`.
 - The test first left the VC-2's system parameters out, as no patch holds them, so a load that wrote them would have passed. It moves them to their tops before the loads now and asks that they stay.
+
+### Session 24 (2026-11-22) — v453: the VC-2 mode's pages
+
+- The worktree was cut from master, not vc2-mode; the coordinating session had it fast-forwarded to 650bf26 before any work.
+- The design left the mode switch's form open, so I asked (d-15) before building it; the user took the session setting.
+- D's parts were the V-Synth's tables in code. Copying them for the VC-2 was refused by the kit, rightly, so each part now takes a mode's tables (a Block's `Model`, a panel's or a page's `Mode`), the V-Synth's by default. Each step was built and the V-Synth's editor test run before any VC-2 page existed: 2602 checks, the same 183 states and 29,379 placements.
+- The first full run said Vocoder Sw wasn't a switch and Tempo read 1200. The cause was the test, not the tables: its processor was made before rom.4 was in, so the VC-2's parameters were stand-ins. The test brings rom.4 in first, as the VC-2 parameter test does, and the editor now treats a stand-in as a plain knob rather than reading rom.4's strings against the stand-in's range.
+- My test's parse of a host ID looked for "c2" in the whole head, and "vc2" has one: every COSM 1 control seemed to move COSM 2's. It reads the head after the prefix now.
+- The patch EQ's Q from its string would have been 0.5, 2.0, 3.5…: even steps fit 0.5~8.0 over six values. rom.2's routine on its EQ Mid 1 Q gives 0.5, 0.7, 1.0, 2.0, 4.0, 8.0, and rom.4's driver puts the patch EQ in those mid bands, so the editor asks rom.2's routine for both bands' Freq and Q.
+- Pad Mode's box beside Pad Hold cut TIME-TRIP at every size; it has a row of its own.

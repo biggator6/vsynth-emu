@@ -926,6 +926,21 @@ The VC-2 part's notes v275 (2026-11-19, on claude/vc2-part-4-3 after vc2-mode's 
   passes are one code twice; 0x89396640 is a copy of the start nothing calls. No tables, so no loader. Not in the sound
   yet.
 
+The VC-2 mode's pages v453 (2026-11-22, after v452; HARDWARE_FIRMWARE.md, "The VC-2 mode's pages in the editor";
+  research/UI_DESIGN_VC2.md; the plan's step 4.5, its second half's editor part). The header's V-SYNTH/VC-2 switch, a
+  session setting (PluginMode.h; d-15, the user's answer: not a host parameter); in VC-2 mode six pages, SYNTH (a zone's
+  path, rack and lower panel, Z1 and Z2 on Current Zone), VOCODER, MODULATION, FX, PLAY, ZONES, each D's parts made from
+  the VC-2's own tables by rom.4's IDs through vc2HostParamId (UiVc2*.cpp): every one of the 1,332 has its control.
+  D's parts take a mode's tables where they took the V-Synth's (a Block points at its mode's Model; the OSC, COSM, AMP
+  panels, the Time Trip column, the path, the pages by a Mode each), the V-Synth's editor as it was (2602 checks, the
+  same states and placements before the VC-2's were added). A control's kind and the editor's text by rom.4's value
+  string (Vc2Params' vc2ValueString; UiVc2Text.cpp: d-8, d-9), the patch EQ's Freq and Q by rom.2's routine on its mid
+  bands; the mic's checks that read parameters and hasInput() (UiVc2Mic.cpp). UiBars (the MSM's steps, the VC-2's Scale
+  Tune), xtArpPatternRead (rom.2's and rom.4's patterns). VSynthEmuEditorTest's VC-2 checks (EditorVc2Test.cpp,
+  EditorVc2TextTest.cpp): 5204 checks, every VC-2 parameter reached. mutate_panel.py --editor: the 15 editor-vc2-
+  plants, and six editor-d- ones following their moved lines. Waits for Vc2Synth: the mic's state and the bands, the
+  VOCODER display, the switch's audio, a wave's name, the effect types' own parameters.
+
 A .p02 onto the VC-2's parameters v452 (2026-11-21, after v451; HARDWARE_FIRMWARE.md, "A .p02 onto the VC-2's
   parameters"; the plan's step 4.5, item 3: its first half done). loadVc2Patch: rom.4's reader's store onto the 1,314
   VC-2 parameters a patch holds, each by its ID in its zone and COSM (vc2PatchValue, PluginVc2Patch.cpp); the store

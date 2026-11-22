@@ -15,7 +15,7 @@ constexpr uint32_t kDescriptors = 0x8950f0b0;   // [FW] the first bank: 12 bytes
 constexpr uint32_t kBank = 0x895131a8;          // [FW] the second: 8 bytes an ID from kVc2FirstTyped
 constexpr uint32_t kStrings = 0x898b8154;       // [FW] a pointer an ID to its values' string, one table for every ID
 constexpr uint32_t kValueText = 0x894fa070;     // [FW] (id, value, 1 to add the unit): rom.2's 0x89461a70, by rom.4's IDs
-constexpr int kLongestName = 40;
+constexpr int kLongestName = 40, kLongestString = 4096;
 constexpr size_t kDescBytes = 12, kTypedBytes = 8;
 
 // rom.4's routine as it is: no ID run as another's format, each ID's own row of strings, no time by the driver.  What it
@@ -25,7 +25,7 @@ bool noTime(int) { return false; }
 constexpr XtTextImage kVc2Text { kValueText, kStrings, kStrings, 0, 0, asItIs, asItIs, noTime };
 
 struct Tables {
-    std::vector<std::string> names;
+    std::vector<std::string> names, strings;
     std::vector<XtParamDesc> descs;
     std::vector<XtTypedDesc> typed;
 };
@@ -38,6 +38,17 @@ std::vector<T> records(Sh4& image, uint32_t at, int count, size_t bytes, Decode 
     std::vector<T> out;
     for (size_t k = 0; k < raw.size(); k += bytes) out.push_back(decode(&raw[k]));
     return out;
+}
+
+// An ID's values' string as rom.4 holds it, its marks kept: names split by 1, a range by 2, the unit after a 3 (v453)
+std::string valueString(Sh4& image, uint32_t at) {
+    std::string t;
+    for (int i = 0; i < kLongestString; ++i) {
+        const char ch = (char)image.rd8(at + (uint32_t)i);
+        if (!ch) break;
+        t += ch;
+    }
+    return t;
 }
 
 // The process's: the tables written once, by the first load, and read with no lock once `loaded_` says so; the routine's
@@ -65,6 +76,7 @@ bool Params::load(const char* path) {
     for (int id = 0; id < kVc2Ids; ++id) {
         t.names.push_back(xtFirmwareName(image, image.rd32(kNames + 4 * (uint32_t)id), kLongestName));
         if (t.names.back().empty()) return false;   // every ID has a name: an empty one is a table misread
+        t.strings.push_back(valueString(image, image.rd32(kStrings + 4 * (uint32_t)id)));
     }
     t.descs = records<XtParamDesc>(image, kDescriptors, kVc2FirstTyped, kDescBytes, xtParamDescOf);
     t.typed = records<XtTypedDesc>(image, kBank, kVc2Ids - kVc2FirstTyped, kTypedBytes, xtTypedDescOf);
@@ -103,6 +115,11 @@ const XtTypedDesc* vc2TypedDesc(int id) { return entry(&Tables::typed, id - kVc2
 std::string vc2ParamName(int id) {
     const std::string* name = entry(&Tables::names, id);
     return name ? *name : std::string();
+}
+
+std::string vc2ValueString(int id) {
+    const std::string* string = entry(&Tables::strings, id);
+    return string ? *string : std::string();
 }
 
 std::string vc2ValueText(int id, int value) { return g_params.loaded() ? g_params.text(id, value) : std::string(); }

@@ -13,6 +13,7 @@ public:
     ~Footer() override;   // a key held as the editor closes is let go
     void paint(juce::Graphics&) override;
     void refresh();   // repaints if the keys' mode, the zones or their keys have moved since they were drawn
+    void setVc2(bool vc2);   // the VC-2 mode's keys and zones (v453), or the V-Synth's
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
@@ -29,7 +30,11 @@ public:
 
 private:
     VSynthEmuProcessor& processor_;
+    bool vc2_ = false;
     juce::String shown_;   // what the footer said when it was drawn
+    juce::String monoPolyId() const;
+    juce::String upperId(int zone) const;
+    int zones() const;
     std::optional<int> held_;
     juce::Rectangle<float> keysArea() const;
     float velocityAt(int key, float y) const;

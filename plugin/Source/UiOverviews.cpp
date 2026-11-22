@@ -35,10 +35,10 @@ void Overview::resized() {
     }
 }
 
-EnvelopesOverview::EnvelopesOverview(Controls::State& state)
+EnvelopesOverview::EnvelopesOverview(Controls::State& state, const Blocks::Path& path)
     : Overview(kEnvelopesPerRow) {
     for (int block = 0; block < Blocks::kCount; ++block) {
-        const Blocks::Block& b = Blocks::kPath[(size_t)block];
+        const Blocks::Block& b = path[(size_t)block];
         int env = 0;
         for (const Blocks::EnvName& e : Blocks::kindOf(b).envs) {
             if (e.name == nullptr) continue;
@@ -49,10 +49,10 @@ EnvelopesOverview::EnvelopesOverview(Controls::State& state)
     }
 }
 
-LfosOverview::LfosOverview(Controls::State& state)
+LfosOverview::LfosOverview(Controls::State& state, const Blocks::Path& path)
     : Overview(kLfosPerRow) {
     for (int block = 0; block < Blocks::kCount; ++block) {
-        const Blocks::Block& b = Blocks::kPath[(size_t)block];
+        const Blocks::Block& b = path[(size_t)block];
         if (Blocks::kindOf(b).lfo == nullptr) continue;
         auto shape = std::make_unique<LfoShape>(state, b);
         auto& clicked = shape->onClick;

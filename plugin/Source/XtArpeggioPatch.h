@@ -6,6 +6,7 @@
 #include "XtArpeggio.h"
 #include "XtSynthControls.h"
 #include <cstdint>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -31,6 +32,10 @@ inline constexpr XtArpSettingId kXtArpSettingIds[] = {
 
 XtArpSettings xtArpSettingsOf(const std::vector<uint8_t>& store);
 XtArpPattern xtArpPatternOf(const std::vector<uint8_t>& store);
+// A pattern by a reader of its IDs (v453: rom.2's from a .p00's store, rom.4's from a .p02's, whose lines are rom.2's
+// layout from 0x4b4): `value(id, line)`, a line's State at `state`, its Note/CC after it, its Step 1 at `step1` and
+// each step two IDs on
+XtArpPattern xtArpPatternRead(const std::function<int(int id, int line)>& value, int state, int note, int step1);
 
 // The other way round, for patchOf: `p` with the arpeggio's values by ID, a pattern's ID with its line in the top 16 bits
 using XtPatchIds = std::unordered_map<int, int>;

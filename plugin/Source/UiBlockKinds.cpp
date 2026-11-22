@@ -2,18 +2,19 @@
 #include "UiBlockKinds.h"
 #include "PluginParamIds.h"
 #include "UiDetailTables.h"
+#include "UiMatrixIds.h"
 
 namespace Blocks {
 
 namespace {
 
-juce::String oscParam(int index, const juce::String& name) {
+juce::String oscParam(int, int index, const juce::String& name) {
     return Params::oscId(index, name);
 }
-juce::String cosmParam(int index, const juce::String& name) {
+juce::String cosmParam(int, int index, const juce::String& name) {
     return Params::cosmId(index, name.toRawUTF8());
 }
-juce::String plainParam(int, const juce::String& name) {
+juce::String plainParam(int, int, const juce::String& name) {
     return name;
 }
 
@@ -44,7 +45,11 @@ constexpr BlockKind kKinds[] = {
 }
 
 const BlockKind& kindOf(const Block& b) {
-    return kKinds[(size_t)b.kind];
+    return (b.model != nullptr ? b.model->kinds : kKinds)[(size_t)b.kind];
+}
+
+juce::String matrixParam(const Block& b, int control, int field) {
+    return b.model != nullptr ? b.model->matrix(control, field) : Matrix::controlFieldId(control, field);
 }
 
 juce::String blockName(const Block& b) {
@@ -53,7 +58,7 @@ juce::String blockName(const Block& b) {
 }
 
 juce::String blockParam(const Block& b, const juce::String& name) {
-    return kindOf(b).param(b.index, name);
+    return kindOf(b).param(b.model != nullptr ? b.model->zone : 0, b.index, name);
 }
 
 juce::String typeIdOf(const Block& b) {

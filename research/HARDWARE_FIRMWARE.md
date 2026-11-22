@@ -4756,6 +4756,60 @@ The results:
 - Every line and branch of `Vc2Notes.cpp` is reached, but for the `constexpr` table builder, which runs at compile time.
 - `mutate_vc2.py --notes`: 55 planted, 0 missed.
 
+### The VC-2 mode's pages in the editor (2026-11-22, v453) {#vc2-pages-built}
+
+Step 4.5's second half, its editor part (research/VC2_MODE_PLAN.md, step 5), as `research/UI_DESIGN_VC2.md` lays it out:
+the header's V-SYNTH/VC-2 switch and, in VC-2 mode, six pages made from the VC-2's own tables, every one of the 1,332
+parameters with its control. Nothing here plays: the VC-2's sound is step 4.3's `Vc2Synth`.
+
+**The mode** (d-15, the user's answer of 2026-11-22): a session setting, the processor's state property
+`instrumentMode` (`PluginMode.h`), not a host parameter, so the parameters' list is as it was and no host switches an
+engine mid-note. A session from before has none and opens on the V-Synth.
+
+**D's parts by a mode.** Each part took the V-Synth's IDs; now it takes a mode's tables: a `Blocks::Block` points at its
+mode's `Model` (its kinds, its zone, its Matrix's IDs; none is the V-Synth's), and the path, the OSC, COSM and AMP
+panels, the Time Trip column, the MODULATION, PLAY and ZONES pages each take a `Mode` whose default is the V-Synth's. The
+V-Synth's editor is unchanged by it: `VSynthEmuEditorTest`'s 2602 checks, 183 states and 29,379 placements as before,
+run before any VC-2 page was added. A VC-2 row is rom.4's ID for zone 1, OSC 1 and COSM 1, in hex; an envelope's or
+LFO's its first ID and a role (`390+Attack`); OSC 2's and COSM 2's by rom.4's runs (`Vc2Blocks::instanceId`), the zone
+and COSM 2 by `vc2HostParamId`. A change of zone makes the SYNTH page's controls again, for the other zone.
+
+**A control's kind and its text, by rom.4's own strings.** `Vc2Params` keeps each ID's values' string beside its name
+(`vc2ValueString`: names split by 1, a range's ends by 2, the unit after 3). d-8: two names OFF and ON (or BYPASS and
+ON) a switch; other names, or a range beside a name in eight values or fewer, a box; a range a knob. d-9: where the
+routine's text at an ID's lowest and highest values isn't its string's ends, the editor shows the string's own scale,
+computed from it (a name a value, a range the values the names leave, in even steps of its ends' decimals, a note range
+by key): Structure 1…3, Split Point and the zones' uppers as notes, Patch Tempo 20.0…250.0, Impact 0.0…4.0, End Point
+1…32, the COSM types' Types from 1, Velocity Curve FIXED, Side Band Width FLAT, Beam Type OFF and 1…4, Current Zone
+ZONE1/2, the EQ's Gain in dB, a Wave Number OFF and 1…999. A string whose ends don't divide evenly keeps the routine's
+bare number (Harm Formant Style, d-9's "bare"; the Dual Filter's 100…4900 Hz; SBF2's Q 1.0…32.0). COSM Type is the
+manual's short names, GROWL in COMB's place. **The patch EQ's Freq and Q** have the V-Synth's own scale: rom.4's driver
+reads EQ 1 and 2 into program A's mid bands, and rom.2's routine formats its EQ Mid 1 Freq and Q (0x67, 0x68) on the
+same 27 and 6 values, so the editor asks rom.2's routine (read at run time, nothing copied). The host parameters keep
+rom.4's routine's text. A parameter made as a stand-in (an instance made before rom.4 was in) is a plain knob.
+
+**The arpeggio pattern of a .p02** (`vc2ArpPattern`): rom.4's lines are rom.2's layout from 0x4b4 (Control Switch,
+Control Number, Step 1 at 0x4b7, a step every two IDs), read by `xtArpPatternRead`, which rom.2's `xtArpPatternOf` now
+calls with its own IDs.
+
+**The mic's checks** (d-12; `UiVc2Mic.cpp`) that the editor can read: Vocoder Sw, the host's input bus
+(`hasInput`), Vocoder Sound Level and zone 1's MFX Send; the mic's signal and a sounding note wait for `Vc2Synth`'s view,
+and say so. The header's MIC chip, the path's VOCODER chip (OFF, NO INPUT, LEVEL 0, or the Type) and the VOCODER page's
+MIC IN card read them.
+
+**Waits for Vc2Synth** (step 4.3), each saying so where it shows: the mic's state (the input's level, voiced, the
+tracked pitch, Auto Note's note, the notes sounding, the output) and NO MIC and NO NOTE; the VOCODER card's bands (d-14);
+the mode switch's audio; a PCM wave's name and picture from the VC-2's library; the effect types' own parameters and
+names (rom.4's effect driver in the plugin).
+
+**The check.** `VSynthEmuEditorTest`'s VC-2 part (`EditorVc2Test.cpp`, `EditorVc2TextTest.cpp`): the header's switch
+and the session keeping it, the page bar's names; each page and each block at three sizes; for each zone, chosen by its
+chip, each OSC panel on its four faces and each COSM panel on its seventeen, each block's envelopes, LFO, routes and
+DETAILS on every face, the Time Trip column and AMP, each moving its own instance's and zone's parameters alone; each
+Matrix Control and zone cell its own; the kinds and texts above; each mic check failing on its own cause. 5204 checks,
+2078 of 2095 parameters with a control (the V-Synth's 17 host-only ones the rest). `mutate_panel.py --editor`'s 15
+`editor-vc2-` plants.
+
 ### A .p02 onto the VC-2's parameters (2026-11-21, v452) {#vc2-patch-load}
 
 Step 4.5's third item (research/VC2_MODE_PLAN.md), with which its first half is done. `VSynthEmuProcessor::loadVc2Patch`

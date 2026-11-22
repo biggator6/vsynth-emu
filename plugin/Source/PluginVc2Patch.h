@@ -4,6 +4,7 @@
 // the parameters, for what they don't hold (zones 3-16, the arpeggio pattern).  HARDWARE_FIRMWARE.md, "A .p02 onto the
 // VC-2's parameters".
 #include "PluginVc2Params.h"
+#include "XtArpeggio.h"
 #include <mutex>
 #include <optional>
 #include <vector>
@@ -17,6 +18,9 @@ struct PluginVc2Patch {
 // The value a store gives a VC-2 parameter, its ID read in its zone and COSM as rom.4 reads it; none for the system's,
 // which no patch holds
 std::optional<int> vc2PatchValue(const std::vector<uint8_t>& store, const Vc2HostParam& p);
+// The arpeggio pattern a store holds, as the PLAY page draws it (v453): its 16 lines by rom.4's IDs from 0x4b4, read by
+// line as rom.2's are (xtArpPatternRead); the XT's own pattern, every cell REST, with no store
+XtArpPattern vc2ArpPattern(const std::vector<uint8_t>& store);
 // The patch into a session's state, and back out of one: a session without one (from before v452) leaves none
 void vc2PatchToState(const PluginVc2Patch& patch, juce::ValueTree& state);
 void vc2PatchFromState(PluginVc2Patch& patch, const juce::ValueTree& state);

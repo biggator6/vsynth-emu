@@ -10,10 +10,21 @@ namespace {
 constexpr int kStripH = 40, kOctaveH = 14, kKeysBodyH = kStripH + kOctaveH;
 constexpr int kNameH = 18, kDotW = 10, kPerRow = kXtZones / 2, kTextH = 14, kPlaysLines = 3;
 
-juce::StringArray splitIds() {
+juce::StringArray splitIds(const ZonesPage::Mode& mode) {
     juce::StringArray ids;
-    for (int z = 0; z < kXtZones; ++z) ids.add(Params::zoneUpperId(z));
+    for (int z = 0; z < kXtZones; ++z) ids.add(mode.upperId(z));
     return ids;
+}
+
+// What zone `zone` plays: zone 1 the panel's; the others the patch's as the processor says, or silent with no patch's data
+juce::String vsynthPlays(VSynthEmuProcessor& p, int zone) {
+    if (zone == 0) return "the panel";
+    const juce::StringArray plays = p.zonePlays();
+    return zone < plays.size() && plays[zone].isNotEmpty() ? plays[zone] : juce::String("no patch, silent");
+}
+
+ZonesPage::Mode vsynthZones() {
+    return { [](int zone) { return Params::zoneUpperId(zone); }, "zonePlays", vsynthPlays };
 }
 
 }
@@ -28,8 +39,8 @@ void ZoneKeys::paint(juce::Graphics& g) {
     paintZoneStrip(g, strip, upper, look);
 }
 
-ZoneCell::ZoneCell(Controls::State& state, int zone)
-    : zone_(zone), upper_(state, Params::zoneUpperId(zone), "Range Upper", Footer::zoneColour(zone)) {
+ZoneCell::ZoneCell(Controls::State& state, int zone, const juce::String& upperId)
+    : zone_(zone), upper_(state, upperId, "Range Upper", Footer::zoneColour(zone)) {
     addAndMakeVisible(upper_);
 }
 
@@ -49,27 +60,27 @@ void ZoneCell::paint(juce::Graphics& g) {
                  { Look::sans(12.0f, "Bold"), Look::text });
     r.removeFromTop(Bar::kHeight + 6);
     Ui::drawText(g, keys_, r.removeFromTop(kTextH), { Look::mono(10.0f), Look::text });
-    g.setColour(Look::muted);
-    g.setFont(Look::sans(11.0f));
-    g.drawFittedText(plays_, r.withTrimmedTop(2), juce::Justification::topLeft, kPlaysLines);
+    Ui::drawWrapped(g, plays_, r.withTrimmedTop(2), { Look::sans(11.0f), Look::muted }, kPlaysLines);
 }
 
 void ZoneCell::resized() {
     upper_.setBounds(getLocalBounds().reduced(10, 8).withTrimmedTop(kNameH).withHeight(Bar::kHeight));
 }
 
-ZonesPage::ZonesPage(VSynthEmuProcessor& p)
-    : processor_(p), splits_(p.apvts, splitIds(), [this] { refresh(); }) {
+ZonesPage::ZonesPage(VSynthEmuProcessor& p) : ZonesPage(p, vsynthZones()) {}
+
+ZonesPage::ZonesPage(VSynthEmuProcessor& p, Mode mode)
+    : processor_(p), mode_(std::move(mode)), splits_(p.apvts, splitIds(mode_), [this] { refresh(); }) {
     keysCard_ = std::make_unique<Card>("KEYS");
     keys_ = &keysCard_->setBody(std::make_unique<ZoneKeys>());
     zonesCard_ = std::make_unique<Card>("ZONES");
     addAndMakeVisible(*keysCard_);
     addAndMakeVisible(*zonesCard_);
     for (int z = 0; z < kXtZones; ++z) {
-        cells_[(size_t)z] = std::make_unique<ZoneCell>(p.apvts, z);
+        cells_[(size_t)z] = std::make_unique<ZoneCell>(p.apvts, z, mode_.upperId(z));
         zonesCard_->addAndMakeVisible(*cells_[(size_t)z]);
     }
-    plays_.referTo(p.apvts.state.getPropertyAsValue("zonePlays", nullptr));
+    plays_.referTo(p.apvts.state.getPropertyAsValue(mode_.property, nullptr));
     plays_.addListener(this);
     refresh();
 }
@@ -78,20 +89,14 @@ ZonesPage::~ZonesPage() {
     plays_.removeListener(this);
 }
 
-// What zone `zone` plays: zone 1 the panel's; the others the patch's as the processor says, or silent with no patch's data
-juce::String ZonesPage::playsOf(const juce::StringArray& plays, int zone) {
-    if (zone == 0) return "the panel";
-    return zone < plays.size() && plays[zone].isNotEmpty() ? plays[zone] : juce::String("no patch, silent");
-}
-
 // The splits from their parameters onto the map and the cells, with what each zone plays (none while the page is being
 // made: the watch's first call comes before them)
 void ZonesPage::refresh() {
     if (keys_ == nullptr || !cells_.back()) return;
     for (int z = 0; z < kXtZones; ++z) keys_->upper[z] = juce::roundToInt(splits_.value((size_t)z));
     keys_->repaint();
-    const juce::StringArray plays = processor_.zonePlays();
-    for (int z = 0; z < kXtZones; ++z) cells_[(size_t)z]->show(xtZoneKeys(keys_->upper, z), playsOf(plays, z));
+    for (int z = 0; z < kXtZones; ++z)
+        cells_[(size_t)z]->show(xtZoneKeys(keys_->upper, z), mode_.plays(processor_, z));
 }
 
 // The keys across the top, then the zones' cells in two rows of eight

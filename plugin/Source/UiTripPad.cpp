@@ -12,6 +12,7 @@ constexpr float kRing = 0.4f;             // the circle to scrub round, as a sha
 }
 
 int TripPad::assigned(int assign) const {
+    if (assigns_) return assign == kTripX ? assigns_().x : assigns_().y;
     const auto* id = VSynthEmuProcessor::assignParamId(assign);
     const int cc = juce::roundToInt(processor_.apvts.getRawParameterValue(id)->load());
     return cc == kOff || cc == kAlsoOff ? 0 : cc;
