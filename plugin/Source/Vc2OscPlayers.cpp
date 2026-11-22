@@ -3,10 +3,12 @@
 // and what VariPhrase's note-on shares with LITE's (v240, Vc2OscPlayers.h; LITE's in Vc2OscLite.cpp).  The players' own
 // routines (their renders, setups, seeks, updates, the event lookup) stay rom.4's by address through Vc2OscParts.
 // Every address is rom.4's; every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's players' installs and
-// VariPhrase's note-on".
+// VariPhrase's note-on".  From v330 the players' update, start and settings are the voice's own (Vc2OscVari.cpp), from
+// v331 the event lookup (Vc2OscWalkStart.cpp); their renders, set-ups and band seeks still go out.
 #include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"
+#include "Vc2OscWalk.h"
 #include "XtFloat.h"
 #include <array>
 #include <bit>
@@ -66,15 +68,16 @@ void setLoop(Vc2OscVoice& v, uint32_t at, uint32_t first, uint32_t second, uint3
     v.setU32(at + 8, span);
 }
 
-// [FW] 0x893af590…: the range by events, each event's position (0x893cc0d0) in samples, the end's less 1; the loops'
-// modes one-way by the object's 0x08, their rates 1; a seek to the third event's position when it isn't the first
+// [FW] 0x893af590…: the range by events, each event's position (0x893cc0d0, from v331 the voice's own) in samples, the
+// end's less 1; the loops' modes one-way by the object's 0x08, their rates 1; a seek to the third event's position when
+// it isn't the first
 void byEvents(Vc2OscVoice& v, Vc2OscParts& parts) {
-    const auto a = (uint32_t)(parts.eventPosition(v.u16(kFrom)) >> 4);
-    const auto b = (uint32_t)((parts.eventPosition(v.u16(kTo)) >> 4) - 1);
+    const auto a = (uint32_t)(vc2OscEventPosition(v, parts, v.u16(kFrom)) >> 4);
+    const auto b = (uint32_t)((vc2OscEventPosition(v, parts, v.u16(kTo)) >> 4) - 1);
     const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;
     vc2OscSetVariOff(v, { .start = a, .end = b, .loopStart = a, .loopEnd = b, .bwdEnd = b, .bwdStart = a,
                           .fwdMode = mode, .bwdMode = mode, .fwdRate = 1.0f, .bwdRate = 1.0f });
-    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);
+    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, vc2OscEventPosition(v, parts, v.u16(kSeekTo)), parts);
 }
 
 // [FW] 0x893af660…: the range in samples, the end's less 1, with the loop record's words; the backward's rate factor

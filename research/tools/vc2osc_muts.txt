@@ -589,9 +589,9 @@ offset-at|kSamples = 0x250,|kSamples = 0x24c,|vc2oscplayers
 zero-at-at|kZeroAt = 0x248,|kZeroAt = 0x244,|vc2oscplayers
 position-copy-at|kPositionCopy = 0x288;|kPositionCopy = 0x28c;|vc2oscplayers
 loop-span|    v.setU32(at + 8, span);\n||vc2oscplayers
-ev-shift|parts.eventPosition(v.u16(kFrom)) >> 4|parts.eventPosition(v.u16(kFrom)) >> 3|vc2oscplayers
-ev-end-minus|(parts.eventPosition(v.u16(kTo)) >> 4) - 1|(parts.eventPosition(v.u16(kTo)) >> 4)|vc2oscplayers
-ev-end-from|parts.eventPosition(v.u16(kTo))|parts.eventPosition(v.u16(kFrom))|vc2oscplayers
+ev-shift|vc2OscEventPosition(v, parts, v.u16(kFrom)) >> 4|vc2OscEventPosition(v, parts, v.u16(kFrom)) >> 3|vc2oscplayers
+ev-end-minus|(vc2OscEventPosition(v, parts, v.u16(kTo)) >> 4) - 1|(vc2OscEventPosition(v, parts, v.u16(kTo)) >> 4)|vc2oscplayers
+ev-end-from|vc2OscEventPosition(v, parts, v.u16(kTo))|vc2OscEventPosition(v, parts, v.u16(kFrom))|vc2oscplayers
 ev-start-end|.start = a, .end = b,|.start = b, .end = a,|vc2oscplayers
 ev-fwd-loop|.loopStart = a, .loopEnd = b,|.loopStart = b, .loopEnd = a,|vc2oscplayers
 ev-bwd-loop|.bwdEnd = b, .bwdStart = a,|.bwdEnd = a, .bwdStart = b,|vc2oscplayers
@@ -600,8 +600,7 @@ ev-mode|const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 
 ev-mode-bwd|.bwdMode = mode, .fwdRate|.bwdMode = 0, .fwdRate|vc2oscplayers
 ev-rates|.fwdRate = 1.0f, .bwdRate = 1.0f|.fwdRate = 1.0f, .bwdRate = 0.0f|vc2oscplayers
 ev-seek-test|if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy|if (v.u16(kSeekTo) != v.u16(kTo)) v.seekBy|vc2oscplayers
-ev-seek-pos|v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);|v.seekBy(kSeek, parts.eventPosition(v.u16(kTo)), parts);|vc2oscplayers
-ev-seek-always|    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);|    v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);|vc2oscplayers
+ev-seek-always|    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, vc2OscEventPosition(v, parts, v.u16(kSeekTo)), parts);|    v.seekBy(kSeek, vc2OscEventPosition(v, parts, v.u16(kSeekTo)), parts);|vc2oscplayers
 sm-start|{ v.u32(kFrom), v.u32(kTo) - 1 }|{ v.u32(kFrom) - 1, v.u32(kTo) - 1 }|vc2oscplayers
 sm-end|{ v.u32(kFrom), v.u32(kTo) - 1 }|{ v.u32(kFrom), v.u32(kTo) }|vc2oscplayers
 sm-fwd|setLoop(v, kLoop, w.loopStart, w.loopEnd,|setLoop(v, kLoop, w.loopEnd, w.loopStart,|vc2oscplayers
@@ -1812,3 +1811,10 @@ se-vari-kept|(uint8_t)((u8(kFlags) & ~kVariOff) \| (was & kVariOff))|u8(kFlags)|
 se-vari-bit|kVariOff = 0x20;|kVariOff = 0x10;|vc2oscvari
 se-bytes|    for (uint32_t k = 1; k < kFlagBytes; ++k) setU8(kObject + k, u8(kFlags + k));\n||vc2oscvari
 k2-settings|.settingsWay = Vc2OscSettings::vari,|.settingsWay = Vc2OscSettings::none,|vc2osckinds
+# v331: VariPhrase's note-on's event lookup the voice's own (vc2oscwalkstart; the note-on's three calls, ev-shift and the
+# four after it, vc2oscplayers).  Not planted, as nothing could show it: the event's number read signed (the check's
+# events are below 0x8000, held to the case's table).  ev-seek-pos (the seek to the range's end's event, not the seek
+# point's) went: Vari off's seek writes the position alone, which the start after it writes again, so with the lookup
+# the voice's own nothing shows which event it sought (the hook's logged argument had); ev-seek-always holds the seek
+ev-lookup-next|return vc2walk::lookup(Vc2WalkWords { v, p }, event).pos;|return vc2walk::lookup(Vc2WalkWords { v, p }, event + 1).pos;|vc2oscwalkstart
+ev-lookup-kind|Vc2WalkWords { v, p }, event).pos;|Vc2WalkWords { v, p }, event).kind;|vc2oscwalkstart

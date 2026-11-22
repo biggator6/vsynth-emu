@@ -14,6 +14,7 @@ constexpr uint32_t kSettings = 0x893ae780, kLegato = 0x893ae9b0, kRender = 0x893
 // [FW] the block's words LITE's two heads' steer reads: its kind, the wave's type, the records (the block's draw is
 // oscDrawNoteBlock's, Vc2OscDraws.cpp from v319)
 constexpr int kKindWord = 0, kWaveWord = 0xb0 / 4, kHeaderWord = 0xd4 / 4, kLoopWord = 0xdc / 4;
+constexpr int kFlagsWord = 0xe4 / 4;   // [FW] v331: the block's flags (the voice's +0x138), its low byte
 constexpr int kKinds = 8;
 constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
 constexpr uint32_t kCarrierKind = 5, kKind6Kind = 6;   // [FW] v266's kinds, counted
@@ -115,6 +116,12 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
         oscWriteVoice(s, v);
     }
     if (block[kKindWord] == kVariPhrase) s.n.variDrawn += oscSteerVariWords(s.voices[(size_t)v], s.shared.renders);
+    const bool byEvents = oscVariByEvents((uint8_t)block[kFlagsWord], block[kWaveWord]);   // v331
+    if (block[kKindWord] == kVariPhrase && byEvents) {
+        oscSteerVariTable(s.voices[(size_t)v], s.shared.records.events);
+        oscHoldVariBlockEvents(block, s.shared.records.events);
+        ++s.n.variByEvents;
+    }
     oscSteerSeek(s, v, oscBlockIsModeOne(block.data()));   // v329: LITE's note-on seeks on the object as it finds it
     const uint32_t legato = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 2;
     s.fw.cpu.write(kOscBlockAt, block.data(), sizeof block);

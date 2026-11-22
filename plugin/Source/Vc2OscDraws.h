@@ -89,8 +89,8 @@ struct OscRingSides {
 };
 // The hooks' answers before an event, xt_vc2osc's and xt_vc2tone's (v321, the two checks' copies made one): the OS's
 // clock, the input stage's peak (kind 5's update's Dynamics: 0 now and then, else a level, into rom.4's word
-// 0x899d9a5c too), what a render answers, the flags a seek leaves, the event lookup's positions and its second word;
-// none taken yet on either side, and the port's log of calls cleared; from v322 the effect chip's frames the EXT IN
+// 0x899d9a5c too), what a render answers, the flags a seek leaves (v331: the event lookup's positions went, its own);
+// and the port's log of calls cleared; from v322 the effect chip's frames the EXT IN
 // player plays, from the shared generator of their own, into rom.4's memory with the part's pointer to them
 void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng);
 // Vari off's object words the renders read, by their offsets in the object (the voice's +0x15c on), as
@@ -161,6 +161,14 @@ void oscModeOneBlock(uint32_t* block, std::mt19937& rng);
 bool oscIsModeOne(const Vc2OscVoice& o);
 bool oscBlockIsModeOne(const uint32_t* block);
 long oscSteerModeOneSeek(Vc2OscVoice& o, OscShared& shared, bool seeks);
+// v331 (Vc2OscWalkDraws.cpp): whether VariPhrase's note-on reads its range by events (the block's flags byte, the wave's
+// type: Vari off, in events, types 1, 6, 7, 8), through the event lookup 0x893cc0d0 on the object's events' table; then
+// that table's words (+0x10, first +7, stride +8) the case's, and its three events (the voice's +0x13c, +0x140, +0x144,
+// or a note-on block's) each held to two past the case's last event: noise there, rom.4 would read wherever it pointed
+bool oscVariByEvents(uint8_t flags, uint32_t type);
+void oscSteerVariTable(Vc2OscVoice& o, const OscEventTable& t);
+void oscHoldVariEvents(Vc2OscVoice& o, const OscEventTable& t);
+void oscHoldVariBlockEvents(std::span<uint32_t> block, const OscEventTable& t);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
 void oscDrawWave(Vc2Fw& fw, OscShared& shared);
 // v327 (Vc2OscWalkDraws.cpp), at the wave's draw: a case's events' table at kOscEventsAt, 4…12 events of a stride of

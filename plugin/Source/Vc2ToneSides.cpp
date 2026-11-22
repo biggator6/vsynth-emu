@@ -161,6 +161,7 @@ void toneSteerModeOne(ToneSides& s, int i, int osc) {
 
 void toneSteerOscs(ToneSides& s, int i, bool noteOn) {
     constexpr uint32_t kVariPhrase = 2, kLevelAt = 0x1e0;   // [FW] the kind; the object's level, the re-seek's wait
+    constexpr uint32_t kFlagsWord = 0xe4 / 4, kWaveWord = 0xb0 / 4;   // [FW] v331: a block's flags and wave type
     for (int osc = 0; osc < 2; ++osc) {
         Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
         const uint32_t* block = &s.shared.input.at(In::kOscs[(size_t)osc]);
@@ -175,7 +176,15 @@ void toneSteerOscs(ToneSides& s, int i, bool noteOn) {
         const bool vari = (noteOn ? block[0] : v.kind()) == kVariPhrase;   // v330: its update steps its words
         const long drawn = vari ? oscSteerVariWords(v, s.shared.osc.renders) : 0;
         s.n.variDrawn += drawn;
-        if (seeks || band || drawn != 0) s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
+        // v331: its note-on's range by events reads the object's events' table and the block's three events
+        const bool events = noteOn && vari && oscVariByEvents((uint8_t)block[kFlagsWord], block[kWaveWord]);
+        if (events) {
+            oscSteerVariTable(v, s.shared.osc.records.events);
+            oscHoldVariBlockEvents({ &s.shared.input.at(In::kOscs[(size_t)osc]), kOscBlockWords },
+                                   s.shared.osc.records.events);
+            ++s.n.variByEvents;
+        }
+        if (seeks || band || drawn != 0 || events) s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
     }
 }
 
@@ -227,8 +236,8 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     drawPrevious(s, rng);
     // v328: a LITE wave of type 1 (the legato's kinds too) the records its set-up reads, from the renders' generator
     for (uint32_t block : In::kOscs) oscModeOneBlock(&s.shared.input.at(block), s.shared.osc.renders);
+    toneSteerOscs(s, i, true);   // v329, v330; from v331 before the input's write, as it holds a block's events
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
-    toneSteerOscs(s, i, true);   // v329, v330
     drawListedWords(s, i, rng);
 }
 #endif

@@ -99,11 +99,10 @@ public:
     // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read
     virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
-    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0);
-    // 0x893cc0d0(the object, event, &position, &…), an event's position ×16; a player's routine on the object, by its
-    // address (v238; gone with v328, mode 1's set-up its last, and back from v330 for VariPhrase's players' set-ups)
+    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
+    // player's routine on the object, by its address (v238; gone with v328, mode 1's set-up its last, and back from
+    // v330 for VariPhrase's players' set-ups).  The event lookup 0x893cc0d0 went with v331, the voice's own
     virtual uint32_t address() = 0;
-    virtual int32_t eventPosition(uint32_t event) = 0;
     virtual void objectCall(uint32_t routine) = 0;
     virtual Vc2OscWaveHeader waveHeader(uint32_t at) = 0;
     virtual Vc2OscLoopRecord loopRecord(uint32_t at) = 0;

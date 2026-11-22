@@ -72,6 +72,11 @@ void vc2WalkStart(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way) {
     way.startJump(v, p);
 }
 
+// [FW] v331: 0x893cc0d0's position (×16) of event `event`, as VariPhrase's note-on reads its range by events
+int32_t vc2OscEventPosition(Vc2OscVoice& v, Vc2OscParts& p, uint32_t event) {
+    return vc2walk::lookup(Vc2WalkWords { v, p }, event).pos;
+}
+
 // [FW] 0x893cc830 (v329): with the range in samples, `at` held to 0…the last event's position, the event found for
 // it, the jump there (0x893ca160), and the position `at`; else the current event `at`'s low half, held to the last
 // (unsigned), and the jump; then the beat's position the position × 32.  The beat's reset after it is the voice's

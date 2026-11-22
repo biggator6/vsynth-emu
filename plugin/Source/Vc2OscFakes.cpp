@@ -36,10 +36,6 @@ uint32_t objectRoutine(Sh4& c, OscCall& t, uint32_t at) {   // a player's routin
     t.a = at;
     return c.r[4] - Vc2OscVoice::kObject;
 }
-uint32_t eventAt(Sh4& c, OscCall& t, uint32_t at) {   // the event lookup's (the object, event, &position, &…) (v238)
-    t.b = c.r[5];
-    return objectRoutine(c, t, at);
-}
 
 // How a hooked routine answers, one shape each: its r0, after what it leaves in fr0 or the object
 uint32_t none(Sh4&, const OscDraws&) { return 0; }
@@ -48,28 +44,13 @@ uint32_t seekFlags(Sh4& c, const OscDraws& d) {   // the seek's object's byte 0,
     c.write(c.r[4], &d.seekFlags, 1);
     return 0;
 }
-uint32_t positions(Sh4& c, const OscDraws& d) {   // the next of the drawn positions, and a word the caller drops
-    const int32_t position = d.positions[d.romTaken++ % d.positions.size()];
-    c.write(c.r[6], &position, sizeof position);
-    c.write(c.r[7], &d.aside, sizeof d.aside);
-    return 0;
-}
-
-// v328: the event lookup answers as drawn where VariPhrase's note-on calls it (0x893af420…0x893af7a0), whose positions
-// the port's parts draw; elsewhere (SOLO's start in mode 1's set-up) rom.4's own runs, as the port's own lookup does
-bool fromVariNoteOn(uint32_t pr) {
-    constexpr uint32_t kFrom = 0x893af420, kTo = 0x893af7a0;   // [FW]
-    return pr - kFrom < kTo - kFrom;
-}
-
-// A hooked routine: where, what it logs as, how its arguments read, its answer; and (v328) the callers it answers,
-// rom.4's own running for any other, or every caller
+// A hooked routine: where, what it logs as, how its arguments read, its answer (v328's answering by the caller went
+// with v331, the event lookup now the voice's own)
 struct OscHook {
     uint32_t at;
     OscKind kind;
     uint32_t (*decode)(Sh4&, OscCall&, uint32_t);
     uint32_t (*answer)(Sh4&, const OscDraws&);
-    bool (*from)(uint32_t pr) = nullptr;
 };
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
@@ -78,9 +59,9 @@ struct OscHook {
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
 // renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
-// update, players' start and settings (v330): rom.4's own run, and the routines they call hooked
+// update, players' start and settings (v330) and its note-on's event lookup (v331): rom.4's own run, and the routines
+// they call hooked, each by its address
 const OscHook kHooks[] = {
-    { 0x893cc0d0, kEventPosition, eventAt, positions, fromVariNoteOn },
     // v330: VariPhrase's players' set-ups its start runs on the object, by the wave's type
     { 0x893cc2e0, kObjectCall, objectRoutine, none }, { 0x893cd1d0, kObjectCall, objectRoutine, none },
     { 0x893cc8f0, kObjectCall, objectRoutine, none }, { 0x893cc310, kObjectCall, objectRoutine, none },
@@ -122,7 +103,6 @@ int oscVoiceNumber(uint32_t at) {
 void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log, int (*voiceOf)(uint32_t)) {
     for (const OscHook& h : kHooks) {
         fw.cpu.hook(h.at, [&draws, &log, h, voiceOf](Sh4& cpu) {
-            if (h.from != nullptr && !h.from(cpu.pr)) return;   // the routine itself, the pc left as it is
             OscCall call { h.kind, -1, 0, 0, 0 };
             call.voice = voiceOf(h.decode(cpu, call, h.at));
             log.push_back(call);

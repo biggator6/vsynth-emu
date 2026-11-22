@@ -162,6 +162,9 @@ void toneDrawModulatorWords(ToneSides& s, int i, std::mt19937& rng) {
         bothAt(s, at + offsetof(Vc2LfoWords, unread70), w.unread70, (uint32_t)rng());   // a follow copies these two
         bothAt(s, at + offsetof(Vc2LfoWords, waveCase), w.waveCase, (uint32_t)rng());   // read by no wave a block gives
         if (rng() % 4 == 0) drawClock(s, at, w, rng);
+        // v331: one time in four the fade mode the note-on took (+0x2c) apart from the block's, as a settings since
+        // leaves them: the release tests the note-on's (lfo-release-block-mode had been caught by one case's chance)
+        if (rng() % 4 == 0) bothAt(s, at + offsetof(Vc2LfoWords, mode), w.mode, (uint32_t)(rng() % 4));
     }
 }
 #endif

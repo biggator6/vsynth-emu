@@ -48,6 +48,10 @@ std::string vibratoNoteOnEvent(VibratoRig& r, std::mt19937& rng) {
 std::string vibratoUpdateEvent(VibratoRig& r, std::mt19937& rng) {
     const int32_t n = rng() % 8 == 0 ? (int32_t)(rng() % 2000) : (int32_t)(rng() % 64);
     oscHoldVibrato(r.vibrato.w, n);
+    // v331: one update in eight lands the time on 0 exactly, from −10 a count (the update's step, 0x893b2c1c…), where its
+    // test of the delay's end is (vib-up-delay-ge had been caught by one case's chance in the voice part)
+    constexpr int32_t kTimePerCount = 10;   // [FW]
+    if (rng() % 8 == 0) r.vibrato.w.time = (float)(-kTimePerCount * n);
     r.fw.cpu.write(kObjectAt, &r.vibrato.w, sizeof r.vibrato.w);
     ++r.updates;
     std::string what = vc2BothOn(r.fw, kUpdate, { kObjectAt, (uint32_t)n }, "the update", [&] { r.vibrato.update(n); },

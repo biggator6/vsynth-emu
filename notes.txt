@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's VariPhrase event lookup v331 (2026-11-22, on claude/vc2-part-4-3 after v330; HARDWARE_FIRMWARE.md, "The
+  VC-2's VariPhrase event lookup"): step 4.3's fifty-ninth version. VariPhrase's note-on's range by events reads the
+  event lookup 0x893cc0d0 as the voice's own (v328's lookup, vc2OscEventPosition), so Vc2OscParts::eventPosition and
+  the lookup's hook are gone, v328's answering by the caller with them. The checks draw the object's events' table and
+  hold the block's three events within it before a note-on by events, which the still hooked set-ups would otherwise
+  have written (Vc2OscVariDraws.cpp). 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's VariPhrase update, start and settings v330 (2026-11-22, on claude/vc2-part-4-3 after v329;
   HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase update, start and settings"): step 4.3's fifty-eighth version, the first
   piece of item 11's fifth part. Kind 2's update 0x893c88b0 (five words 0.7 of the way to their targets by FSUB and

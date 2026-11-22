@@ -89,7 +89,6 @@ float Vc2ToneOscLink::boundFloat(uint32_t part, uint32_t offset) {
 }
 
 uint32_t Vc2ToneOscLink::address() { return host_.self() + kOscsAt[(size_t)osc_]; }
-int32_t Vc2ToneOscLink::eventPosition(uint32_t event) { return outside().eventPosition(event); }
 void Vc2ToneOscLink::objectCall(uint32_t routine) { outside().objectCall(routine); }
 Vc2OscWaveHeader Vc2ToneOscLink::waveHeader(uint32_t at) { return outside().waveHeader(at); }
 Vc2OscLoopRecord Vc2ToneOscLink::loopRecord(uint32_t at) { return outside().loopRecord(at); }

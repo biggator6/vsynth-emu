@@ -33,8 +33,9 @@ inline constexpr uint32_t kOscWaveAt = 0x8C0B0000;       // the wave Vari off's 
 inline constexpr uint32_t kOscWaveHalfwords = 16384;
 inline constexpr uint32_t kOscEventsAt = 0x8C0C8000;     // the events' table mode 1 walks (v327; v328 32 KB up)
 
-// v330: a kind's routine and its settings by address went, the last VariPhrase's; a player's set-up came back
-enum OscKind : int32_t { kRenderBy, kSeek, kEventPosition, kObjectCall, kOscKinds };
+// v330: a kind's routine and its settings by address went, the last VariPhrase's; a player's set-up came back.  v331:
+// the event lookup went, the voice's own
+enum OscKind : int32_t { kRenderBy, kSeek, kObjectCall, kOscKinds };
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
 // routine's address, a settings word's offset in the settings' block or a word's in the voice, the output as 1, a
@@ -92,14 +93,10 @@ void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r);
 void oscRealWave(OscRecords& r, int k, std::mt19937& rng);
 
 // What the hooked routines answer, drawn once for both sides; the flags byte a seek leaves in the object (a player may
-// write it); the event lookup's positions, each side taking the next (v238).  The ramps are the voice's own from v236,
-// the vibrato from v267
+// write it).  The ramps are the voice's own from v236, the vibrato from v267, the event lookup from v331
 struct OscDraws {
     uint32_t rendered = 0;
     uint8_t seekFlags = 0;
-    std::array<int32_t, 3> positions {};
-    uint32_t aside = 0;          // what the lookup leaves in its second word, which its caller drops
-    mutable size_t romTaken = 0;
     int32_t clock = 0;           // the OS's millisecond word a carrier's init reads (v266)
     float peak = 0.0f;           // the input stage's peak (0x899d9a5c), which kind 5's update reads (v321)
     std::array<int32_t, kOscFrameWords> frames {};   // the effect chip's frames, the EXT IN player's (v322)
@@ -113,7 +110,6 @@ struct OscShared {
     // generator of their own, so the run's other draws stay as they were; seeded from the run's.  `extIn` until v323
     std::mt19937 renders {};
     std::vector<int16_t> wave = std::vector<int16_t>(kOscWaveHalfwords);   // v323: what rom.4 has at kOscWaveAt
-    size_t positionsTaken = 0;   // the port's side of the event lookup's positions (v238)
     Vc2MicRing ring {};
     std::array<float, Vc2Kind6::kBlock> unvoiced {};
     OscRecords records {};
@@ -139,7 +135,6 @@ public:
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
     uint32_t address() override { return oscVoiceAt(voice_); }
-    int32_t eventPosition(uint32_t event) override;
     void objectCall(uint32_t routine) override { log(kObjectCall, routine); }   // v330: VariPhrase's players' set-ups
 
 private:

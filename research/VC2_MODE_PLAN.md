@@ -1027,6 +1027,10 @@ version against rom.4's routines with what it calls hooked:
          (`objectCall`) until the players come (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase update, start and
          settings"). Found: the start gives a band seek the right units, a number in events and the point × 16 in
          samples. Next: the event lookup for VariPhrase's note-on and the band seeks.
+       - The event lookup (v331): VariPhrase's note-on's range by events reads `0x893cc0d0` as the voice's own (v328's
+         lookup, `vc2OscEventPosition`), so `Vc2OscParts::eventPosition` is gone and the lookup's hook with it
+         (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase event lookup"). Next: the band seeks, which call the players'
+         own routines, with each player.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

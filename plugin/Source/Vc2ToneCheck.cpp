@@ -124,16 +124,17 @@ int main(int argc, char** argv) {
     const auto& c = n.oscCalls;
     std::printf("osc: note-ons by kind %ld %ld %ld %ld %ld %ld %ld %ld (%ld OSC 1s steady for a COSM 1 of its pitch), "
                 "%ld settings, %ld mic blocks; calls beyond the tone: %ld renders, %ld seeks (%ld VariPhrase re-seeks "
-                "asked, v329), %ld event lookups, %ld players' set-ups (v330)\n", k[0], k[1], k[2], k[3], k[4], k[5],
-                k[6], k[7], n.oscSteadied, n.oscSettings, n.micBlocks, c[kRenderBy], c[kSeek], n.bandReseeks,
-                c[kEventPosition], c[kObjectCall]);
+                "asked, v329), %ld players' set-ups (v330)\n", k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7],
+                n.oscSteadied, n.oscSettings, n.micBlocks, c[kRenderBy], c[kSeek], n.bandReseeks,
+                c[kObjectCall]);   // v331: no event lookups
     std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's, %ld through "
                 "LITE's heads'\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks);   // v322, v323, v326
     std::printf("lite: %ld settings on a type with a way, %ld through an earlier tone's head; %ld inputs of two "
                 "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head), %ld OSCs steered for its "
                 "seek\n", n.liteSettings, n.settingsTaken, n.bothVari, n.modeOneSetUps, n.modeOneTaken,
                 n.modeOneSeeks);   // v324, v328, v329
-    std::printf("vari: %ld words drawn finite before its update or note-on\n", n.variDrawn);   // v330
+    std::printf("vari: %ld words drawn finite before its update or note-on, %ld note-ons by events\n", n.variDrawn,
+                n.variByEvents);   // v330, v331
     std::printf("xt_vc2tone: %ld different\n", tally.different);
     return 0;
 }

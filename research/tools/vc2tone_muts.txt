@@ -796,7 +796,6 @@ link-bound-tone|return host_.mods.boundFloat(self, part, offset);|return host_.m
 link-bound-in-tone|if (part - self < Vc2Tone::kSize)|if (part - self < Vc2Tone::kSize / 2)|vc2tonehostosc
 link-bound-outside|return outside().boundFloat(part, offset);|return 0.0f;|vc2tonehostosc
 link-address|{ return host_.self() + kOscsAt[(size_t)osc_]; }|{ return host_.self() + kOscsAt[0]; }|vc2tonehostosc
-link-event-position|{ return outside().eventPosition(event); }|{ return outside().eventPosition(event + 1); }|vc2tonehostosc
 link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHeader(at + 4); }|vc2tonehostosc
 link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc
 # v321: the input stage's peak, which kind 5's update (ported in the voice) asks of the link (vc2tonehostosc)
@@ -818,3 +817,4 @@ link-voice-end|<= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) {|<=
 link-voice-pool|pool.holds(at) && osc < kOscsAt.size()|false && osc < kOscsAt.size()|vc2tonehostosc
 # v330: link-object-call is back where link-kind-call stood (VariPhrase's players' set-ups go out on the object again);
 # link-kind-call and link-kind-settings went with the kind's routine and settings by address, VariPhrase's the last
+# v331: link-event-position went with the link's event lookup, VariPhrase's note-on reading the voice's own

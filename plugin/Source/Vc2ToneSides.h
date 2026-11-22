@@ -41,6 +41,7 @@ struct ToneCounts {
     long settingsTaken = 0;                     // v328: and the LITE settings through a take's head
     long modeOneSeeks = 0, bandReseeks = 0;     // v329: the OSCs steered for mode 1's seek, VariPhrase's re-seeks
     long variDrawn = 0;                         // v330: VariPhrase's update's words drawn finite
+    long variByEvents = 0;                      // v331: its note-ons by events, their table steered
     std::array<long, kOscKinds> oscCalls {};
 };
 

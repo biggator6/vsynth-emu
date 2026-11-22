@@ -113,10 +113,6 @@ void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng) {
     fw.cpu.wr32(kPeakAt, std::bit_cast<uint32_t>(d.peak));
     d.rendered = (uint32_t)rng();
     d.seekFlags = (uint8_t)rng();
-    for (int32_t& p : d.positions) p = (int32_t)rng();   // v238: the event lookup's, each side from the first
-    d.aside = (uint32_t)rng();
-    d.romTaken = 0;
-    shared.positionsTaken = 0;
     shared.calls.clear();
     constexpr uint32_t kFramesPointerAt = 0x8993eadc;   // [FW] where the part reads the effect chip's frames from
     for (int32_t& w : d.frames) w = (int32_t)shared.renders();

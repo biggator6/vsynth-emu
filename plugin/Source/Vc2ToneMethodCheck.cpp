@@ -142,9 +142,11 @@ std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
     Vc2ToneParts& parts = s.parts[(size_t)i];
     ++s.n.setters;
     if (set.numbered == &Vc2Tone::setEnvelopeBlock) toneSteerSustain(s, i, n, rng);
-    if (set.plain == &Vc2Tone::setMixBlock && rng() % 2) {   // v319: the sync's flag as a blend's note-on leaves it
+    // v319: the sync's flag as a blend's note-on leaves it; from v331 half of those 0, as another type's settings leave
+    // it, where a blend's settings set it (mix-settle-blend-sync had been caught by one case's chance)
+    if (set.plain == &Vc2Tone::setMixBlock && rng() % 2) {
         constexpr uint32_t kSyncOnAt = 0x1afc;   // [FW] the tail's +4
-        toneBothWord(s, i, kSyncOnAt, t.tail.syncOn, 1u);
+        toneBothWord(s, i, kSyncOnAt, t.tail.syncOn, rng() % 2 ? 1u : 0u);
     }
     if (set.plain) return toneOn(s, i, set.at, { tone, block }, [&] { (t.*set.plain)(in.block(offset), parts); });
     if (set.numbered == &Vc2Tone::setOscBlock) return toneOscSettingsOf(s, i, n, rng, false);

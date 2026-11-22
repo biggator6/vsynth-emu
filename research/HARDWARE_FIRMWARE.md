@@ -1546,6 +1546,59 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's VariPhrase event lookup (2026-11-22, v331) {#vc2-osc-vari-lookup}
+
+Step 4.3's fifty-ninth version, the second piece of item 11's fifth part. VariPhrase's note-on (`0x893af420`) reads its
+range by events through the event lookup `0x893cc0d0`, three times: the range's start and end, and the seek point. That
+is for types 1, 6, 7 and 8 under Vari off, with the block's flags (+0x138) 0x20 set and 0x80 clear (`0x893af590…`). The
+lookup was ported in v328 for SOLO's start, and is now the note-on's too (`vc2OscEventPosition`, `Vc2OscWalkStart.cpp`):
+- r4 the object, r5 the event's number (the block's half word, zero-extended), r6 the position's word, r7 the kind's;
+- the entry (stride × n + first) half words into the table the object's +0x10 names, its +4 the position ×16, which the
+  note-on shifts down by 4.
+With no caller left, `Vc2OscParts::eventPosition` is gone, and the link's with it.
+
+**Found.** The note-on's seek to its seek point under Vari off (`0x893c6360`) writes the position alone, and the start
+the note-on ends with (the position the walk's sign starts from, `vc2OscVariOffStart`) writes it again. So which event
+it sought leaves nothing; only the beat's reset the seek ends in does. Kept as rom.4 has it.
+
+**The checks.** The lookup's hook is gone from both checks, and v328's answering by the caller (`OscHook::from`) with
+it: rom.4's own lookup runs wherever it is called. Its drawn answers went too: the positions, the second word, the two
+sides' counts of them. The lookup reads the object's events' table, which the players' set-ups would write, and those
+are still hooked. So before a VariPhrase note-on that reads by events (`oscVariByEvents`, `Vc2OscVariDraws.cpp`):
+- the object's table words are the case's (+0x10 the table, +7 its first half word, +8 its stride: `oscSteerVariTable`);
+- the three events, the block's or the voice's, are each held to two past the case's last event (`oscHoldVariEvents`,
+  `oscHoldVariBlockEvents`). That keeps a seek point equal to the range's start equal.
+With the hook gone and nothing steered, the first run faulted there, reading where the noise pointed. xt_vc2tone does the
+same on the tone's own voice and the input's block (`toneSteerOscs`), now before the input is written.
+
+Taking the lookup's positions out of `oscDrawAnswers` moved every later draw of both checks. Three older plants had been
+caught by one case's chance and went missed in the first whole runs; each now has a reach of its own:
+- `vib-up-delay-ge` (the vibrato's test of its delay's end, at a time of exactly 0): the vibrato part's update lands the
+  time on 0 one time in eight, from −10 a count.
+- `shape-pool-sq-kf2` (LA-SQUARE's second corner's keyfollow word, in the sub oscillator's shape): on an LA-SQUARE with
+  the sub on as drawn, one time in two the Tone KF any of its 15, the Tone 60…100, a pitch near the root and Fat
+  0…1 octave alone, where the corners fall between the wave's Hz and 20 kHz (`steerLaCorner`). Turning the sub on
+  over words drawn without it gave a NaN's sign, so it doesn't.
+- `mix-settle-blend-sync` (a blend's settings setting the sync's flag): xt_vc2tone's mix setter finds the flag 0 one
+  time in four, as another type's settings leave it, where v319's steer had made it 1 or left it.
+- `lfo-release-block-mode` (an LFO's release testing the block's fade mode, not the one its note-on took), which that
+  steer moved in turn: xt_vc2tone's modulators' draw gives the note-on's mode (+0x2c) 0…3 apart from the block's one
+  time in four, as a settings since leaves them.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc reads 36, 465 and 463
+  VariPhrase note-ons by events, xt_vc2tone 97, 1006 and 997.
+- at 400 cases in xt_vc2osc, `Vc2OscWalkStart.cpp` and `Vc2OscPlayers.cpp` are wholly reached, every line and branch.
+  In xt_vc2tone the latter's three guards for a type past each player's range are not, its blocks' types all within.
+- `mutate_vc2.py --osc`: 2 new plants on the lookup, caught, and the 4 whose text moved with the note-on's calls.
+  `ev-seek-pos` went (the Found above), as did the tone's `link-event-position` with the link's lookup. The whole `--osc`
+  (1,721) and `--tone` (757) lists caught, after the four reaches above. No rom.2 port changed, so
+  `mutate_tone.py --changed` plants nothing.
+- verify.sh's first run lost the build id to another session's install (its v392); run again, it passed.
+
+**Next.** The band seeks (`0x893cc630`, `0x893cd090`, `0x893cd440`) call the players' own routines, so they come with
+each player: BACKING and ENSEMBLE, SOLO, the period-jump player.
+
 ### The VC-2's VariPhrase update, start and settings (2026-11-22, v330) {#vc2-osc-vari-update}
 
 Step 4.3's fifty-eighth version, the first piece of item 11's fifth part. Kind 2's (VariPhrase's) update `0x893c88b0`,

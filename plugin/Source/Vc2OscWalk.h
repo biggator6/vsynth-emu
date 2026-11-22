@@ -43,9 +43,10 @@ struct Vc2WalkWay {
 // 0x893ca160 (its wrapper of 0x893ca190)
 extern const Vc2WalkWay kVc2ModeOneWalk;
 
-// one-off: five routines' declarations, alike only in taking the voice and its parts
+// one-off: six routines' declarations, alike only in taking the voice and its parts
 void vc2WalkCrossing(Vc2OscVoice& v, Vc2OscParts& p);                          // 0x893c9380
 void vc2WalkForward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);    // 0x893c8f50
 void vc2WalkBackward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);   // 0x893c9140
 void vc2WalkStart(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);      // 0x893cc1a0 (v328, Vc2OscWalkStart.cpp)
 void vc2OscSeekModeOne(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);            // 0x893cc830 (v329, Vc2OscWalkStart.cpp)
+int32_t vc2OscEventPosition(Vc2OscVoice& v, Vc2OscParts& p, uint32_t event);   // 0x893cc0d0's position (v331, the same)
