@@ -13,6 +13,12 @@ constexpr uint32_t kAliasCancelAt = 9;   // [FW] the systems' Alias Cancel (+0x1
 constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;   // [FW] the bytes EXTIN's converter reads (v393)
 constexpr int kOscSums = 4, kLfoSums = 5;
 constexpr uint32_t kWaveTypeAt = 0xa7;   // [FW] the input's wave type, PCM's start's (v394)
+// [FW] v395: the input's words LITE's words read: the key, Pitch KF, the coarse and fine tunes; the wave's root key and
+// its offset, length and last word; the record's start sample; and the switches it tests
+constexpr uint32_t kLiteKeyAt = 3, kLitePitchKfAt = 0x0e, kLiteCoarseAt = 0x88, kLiteFineAt = 0x90;
+constexpr uint32_t kLiteRootAt = 0xa8, kLiteRootOffsetAt = 0xa5, kLiteLengthAt = 0xbc, kLiteWaveWordAt = 0xfc;
+constexpr uint32_t kLiteStartAt = 0x48;
+constexpr uint32_t kLiteSwitches[] = { 0x60, 0x63, 0x64, 0x67, 0x68, 0xb0 };
 
 void bytesDrawn(uint8_t* b, uint32_t n, std::mt19937& rng) {
     for (uint32_t i = 0; i < n; ++i) b[i] = (uint8_t)rng();
@@ -65,6 +71,36 @@ void headerDrawn(uint8_t* h, std::mt19937& rng) {
     h[1] = (uint8_t)(rng() % 4 ? (int)(rng() % 97) - 48 : (int)rng());
     if (rng() % 2) h[kExtinHeaderAt] = 0;   // v393: EXTIN's own words, which this byte set skips
 }
+
+// A value's bytes into an input at `at`
+template <class T>
+void putAt(uint8_t* b, uint32_t at, T v) {
+    std::memcpy(b + at, &v, sizeof v);
+}
+
+// v395: what LITE's words read.  Half the time the pitch10s near the wave's root, so the cents fall inside their hold:
+// the coarse tune ±48, the fine ±1000 tenths, Pitch KF 0, 100% or ±100%, the root key within 30 of the key and its
+// offset ±12.  Each switch 0 half the time, the last word 0 or its low byte 0 a time in four each; the start sample at
+// the length or one short of it a time in four each, the length 0 now and then
+void liteDrawn(uint8_t* b, std::mt19937& rng) {
+    if (rng() % 2) {
+        putAt(b, kLiteCoarseAt, (int16_t)((int)(rng() % 97) - 48));
+        putAt(b, kLiteFineAt, (int32_t)((int)(rng() % 2001) - 1000));
+        const auto kfs = std::to_array<int16_t>({ 0, 1000, (int16_t)((int)(rng() % 2001) - 1000) });
+        putAt(b, kLitePitchKfAt, setsOneOf(kfs, rng));
+        b[kLiteRootAt] = (uint8_t)(b[kLiteKeyAt] + (int)(rng() % 61) - 30);
+        b[kLiteRootOffsetAt] = (uint8_t)((int)(rng() % 25) - 12);
+    }
+    for (const uint32_t at : kLiteSwitches)
+        if (rng() % 2) b[at] = 0;
+    if (rng() % 2) putAt(b, kLiteWaveWordAt, rng() % 2 ? 0u : (uint32_t)rng() & ~0xffu);   // a word, not a byte
+    uint32_t length;
+    std::memcpy(&length, b + kLiteLengthAt, sizeof length);
+    if (rng() % 16 == 0) length = 0;
+    putAt(b, kLiteLengthAt, length);
+    const uint32_t way = rng() % 4;
+    if (way < 2) putAt(b, kLiteStartAt, length - way);
+}
 } // namespace
 
 void oscTableDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
@@ -116,6 +152,12 @@ void oscAroundDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
         const float source = rng() % 2 ? 1.0f : 0.25f + (float)(rng() % 3751) / 1000.0f;
         fw.cpu.wr32(kOscSourceAt, std::bit_cast<uint32_t>(source));
     }
+    // v395: the part table aimed at the trip objects, each one's word LITE's words read 0 half the time
+    for (uint32_t p = 0; p < kOscParts; ++p) {
+        const uint32_t trip = kOscTripsAt + kOscTripBytes * p;
+        if (all) fw.cpu.wr32(kOscPartTableAt + 4 * p, trip);
+        if (all || rng() % 8 == 0) fw.cpu.wr32(trip + kOscTripMovingAt, rng() % 2 ? 0 : rng() % 2 ? 1 : rng());
+    }
 }
 
 uint32_t oscMatrixDrawn(std::mt19937& rng) {
@@ -131,6 +173,7 @@ void oscInputDrawn(Vc2SetOscInput& w, std::mt19937& rng) {
     w.matrix = oscMatrixDrawn(rng);
     // v394: the wave's type PCM's start would leave (+0xa7), one of its six mostly, as it calls by it
     reinterpret_cast<uint8_t*>(&w)[kWaveTypeAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
+    liteDrawn(reinterpret_cast<uint8_t*>(&w), rng);
 }
 
 // Now and then an input's record put in the first four parts' tables at its kind and OSC, half the time with one of

@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's LITE words v395 (2026-11-22, after v394; HARDWARE_FIRMWARE.md, "The VC-2's LITE words"): rom.4's
+  0x8939efa0, PCM's converter's last call for a wave of type 0. vc2OscPcmLite: the input's pitch10s and the block's
+  key as v251's head forms them, the cents against the wave's root key held to ±6000, the play mode, the start sample
+  held below the wave's length, four switches (Time Trip under way through the part table, Vc2SetReads::tripMoving),
+  the wave's 48 bytes and its last word's test. VariPhrase's words (0x8939f2a0) and PCM's start stay rom.4's own.
+  xt_vc2sets' eighth part: 0 different at seeds 2024, 7, 31337 and 99 on the first run. Not in the sound yet.
+
 The VC-2's PCM converter v394 (2026-11-22, after v393; HARDWARE_FIRMWARE.md, "The VC-2's PCM converter"): rom.4's
   0x8939e300 to its call by the wave's type. vc2OscPcmConvert: v251's head words it writes alike, the Time (0x8939c310)
   and Formant (0x8939c410) laws, the depth curve, the gain between the wave's two level words. LITE's and VariPhrase's

@@ -57,6 +57,9 @@ struct Vc2OscConvertTables {
     float depthScale = 0;
     float timeLeast = 0, timeKnee = 0, timeKneeLow = 0, timeScale = 0, timeFromLow = 0, timeLeastOut = 0;
     float timeFrom = 0, timeMostOut = 0, timeBeam = 0, pcmFormantLeast = 0;
+    // LITE's words' (v395, 0x8939efa0): the cents' tenths, 10 (0x8939f2dc), and their hold, 6000 (0x8939f2e0) and −6000
+    // (0x8939f2e4)
+    float liteTenth = 0, liteCentsMost = 0, liteCentsLeast = 0;
 };
 
 [[nodiscard]] bool vc2LoadOscConvert(const char* path);

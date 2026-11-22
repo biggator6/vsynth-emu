@@ -21,8 +21,9 @@
 namespace {
 using Blocks = Vc2SetOscBlocks;
 constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0 }, kPitchSource = 0x89394a40;
-// [FW] PCM's start, and LITE's and VariPhrase's words PCM's converter calls (v393 ported EXTIN's converter, v394 PCM's)
-constexpr uint32_t kUnported[] = { 0x8939e120, 0x8939efa0, 0x8939f2a0 };
+// [FW] PCM's start, and VariPhrase's words PCM's converter calls (v393 ported EXTIN's converter, v394 PCM's, v395
+// LITE's words)
+constexpr uint32_t kUnported[] = { 0x8939e120, 0x8939f2a0 };
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 } // namespace
 
@@ -69,6 +70,10 @@ Vc2MatrixGroups SetPortParts::oscGroups(uint32_t, uint32_t osc) {
 float SetPortParts::pitchSource() { return std::bit_cast<float>(fw_.cpu.rd32(kOscSourceAt)); }
 
 void SetPortParts::unportedOscKind(uint32_t routine, uint8_t*, uint32_t*) { logged(kSetOscKind, routine, {}); }
+
+uint32_t SetPortParts::tripMoving(uint8_t part) {
+    return fw_.cpu.rd32(fw_.cpu.rd32(kOscPartTableAt + 4u * part) + kOscTripMovingAt);
+}
 
 namespace {
 struct OscCounts : SetChildCounts<9> {

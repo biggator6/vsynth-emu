@@ -135,6 +135,7 @@ public:
     Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
     float pitchSource() override;
     void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) override;
+    uint32_t tripMoving(uint8_t part) override;   // v395: through rom.4's part table, as the draws aim it
     std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes
 
 private:

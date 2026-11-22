@@ -118,6 +118,9 @@ public:
     virtual Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) = 0;
     virtual float pitchSource() = 0;
     virtual void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) = 0;
+    // LITE's words' (v395): a part's Time Trip under way, its trip object's +8 (Vc2TripObject::moving) by the part table
+    // 0x8993d040
+    virtual uint32_t tripMoving(uint8_t part) = 0;
 };
 
 struct Vc2NoteMatrixWords {

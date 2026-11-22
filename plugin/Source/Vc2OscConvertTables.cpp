@@ -58,12 +58,20 @@ auto pcmWords(Vc2OscConvertTables& t) {
     });
 }
 
+// [FW] LITE's words' (v395)
+auto litePoolWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939f2dc, &t.liteTenth }, { 0x8939f2e0, &t.liteCentsMost }, { 0x8939f2e4, &t.liteCentsLeast },
+    });
+}
+
 struct Read : Vc2OscConvertTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, convertWords(*this));
         vc2ReadPool(image, secondPartWords(*this));
         vc2ReadPool(image, extinWords(*this));
         vc2ReadPool(image, pcmWords(*this));
+        vc2ReadPool(image, litePoolWords(*this));
         image.read(kFormantRowsAt, formantRows.data(), sizeof formantRows);
         detune[0].slope = 1.0f;   // [FW] 0x8939c744: the first line is x itself (+ fldi0's 0)
         detune[1].slope = 2.0f;   // [FW] 0x8939c75a: fldi1, doubled

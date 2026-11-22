@@ -18,6 +18,10 @@ inline constexpr uint32_t kOscRecordBytes = 0x80, kOscSystemsAt = kOscTableAt + 
 inline constexpr uint32_t kOscStepsAt = 0x89989c84;
 // [FW] a key table's Hold, M's bend and D-Beam bytes, a voice's word for its glide key
 inline constexpr uint32_t kOscHoldAt = 0x11c, kOscBendAt = 0x174, kOscBeamAt = 0x180, kOscSourceWordAt = 4;
+// v395: the part table (rom.4's .data, 0xffffffff after C startup) and a trip object's word LITE's words read; the
+// trip objects the draws aim it at, in Vc2Fw's RAM
+inline constexpr uint32_t kOscPartTableAt = 0x8993d040, kOscTripMovingAt = 8;   // [FW]
+inline constexpr uint32_t kOscTripsAt = 0x8C03C000, kOscTripBytes = 0x28;
 
 // The parts' OSC table (every header and record at a case's first draw, now and then a part's; the systems), the glide
 // keys, legato structs, Ms' bytes, groups and pitch source, an input, one of the four Ms, and the refresh's records

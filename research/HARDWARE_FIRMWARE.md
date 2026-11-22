@@ -3912,6 +3912,52 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's LITE words (2026-11-22, v395) {#vc2-lite-words}
+
+What PCM's converter calls last for a wave of type 0 (the input's +0xa7, from PCM's start): `0x8939efa0`, which it
+reaches through its switch at `0x8939e8c0` (types 1, 3 and 5 go to VariPhrase's words `0x8939f2a0`; 2, 4 and past 5
+to none). Ported bit for bit as `vc2OscPcmLite` (Vc2OscPcmLite.cpp), its three pool words in `Vc2OscConvertTables`,
+checked in xt_vc2sets' eighth part with rom.4's own routine running there. Every address is rom.4's; the input's
+offsets are the converter input's (the record from +8, the wave's words from +0xa0, PCM's start's).
+
+**Its pitch.** It forms the two pitch10s into the input's +0x94 and +0x98 and the key into the block's byte +4, the
+same integers v251's head forms (the key follow's sum on the key +3 and the second key +0x9c, coarse +0x88, Pitch KF
++0xe, fine +0x90; the key by `0x8939c910`). PCM's converter writes neither. The port runs `vc2OscBlockConvert` on a
+copy of the input and takes them.
+
+**Its cents** (+8 from the first pitch10, +0x68 from the second) are against the wave's root key, not A4: (pitch10 −
+(wave +0xa8 − (signed) wave +0xa5) × 1000) ÷ 10, held to ±6000, the upper bound first. Its 10, 6000 and −6000 are its
+own pool words (`0x8939f2dc`, `0x8939f2e0`, `0x8939f2e4`).
+
+**Its other words:**
+The record's bytes are named by rom.4's OSC block reader (`0x893a04e0`, Vc2PartSettingsOscBlock.cpp): +0x40 Start
+Offset, +0x58 Tempo Sync Sw, +0x59 Robot Voice Sw, +0x5a Playback Mode, +0x5b Loop Sw, +0x5c Vari Sw, +0x5e Energy,
++0x5f Time Trip Sw, +0x60 Time Trip Beat Keep (the input's +8 more).
+- +0xb0: 2 with Vari Sw (the input's +0x64), else 0.
+- +0xf8 and +0x100: the Start Offset (the input's word +0x48), held below the wave's length (+0xbc) as an unsigned
+  compare: at or past it, the length − 1 (a length of 0 gives 0xffffffff). +0xfc: the length.
+- +0xe4: 1 with Loop Sw (the input's +0x63), or when the wave's byte +0xb0 is 0.
+- +0xec: 1 when the part's Time Trip is under way and Time Trip Sw (the input's +0x67) is on. The part's trip object
+  is the part table's (`0x8993d040`, by the input's byte +0, the part), its word +8 (`Vc2TripObject::moving`, v301's).
+  The port reads it through `Vc2SetReads::tripMoving`.
+- +0xe8: Tempo Sync Sw (the input's +0x60); +0xf0: Time Trip Beat Keep (its +0x68).
+- +0xb4…+0xe3: the wave's 48 bytes from +0xcc. +0xf4: 1 when the wave's word +0xfc is not 0.
+
+**The check.** LITE's words run as rom.4's own on rom.4's side; PCM's start and VariPhrase's words stay hooked. The
+part table is `0xffffffff` after C startup (a static initializer fills it), so at each case's start the check aims it
+at 16 trip objects in Vc2Fw's RAM (0x8C03C000), each one's +8 drawn 0 half the time. Half the time an input's coarse
+tune (±48), fine (±1,000 tenths), Pitch KF (0, 100% or ±100%) and the wave's root (within 30 of the key, its offset
+±12) are drawn so the cents fall inside their hold; its switches and the wave's last word are 0 half the time (that
+word's low byte alone 0 a time in four), and the start sample is the length or one short of it a time in four each
+(`liteDrawn`).
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99 (100 cases each) on the first run; 147 calls at 40 cases.
+- Every line and branch of Vc2OscPcmLite.cpp and Vc2SetOscKinds.cpp is reached.
+- `mutate_vc2.py --sets`: the 63 LITE plants, with the OSC, EXTIN and PCM plants run again under the new draws (the
+  `pcm-ways-` ones moved to the new table of ways), 360 in all, all caught. `--carrier`'s 49 plants in
+  Vc2OscConvertTables.cpp: all caught.
+
 ### The VC-2's PCM converter (2026-11-22, v394) {#vc2-pcm-converter}
 
 The OSC converter of type 1, PCM's, `0x8939e300` in `0x8939fbd0`'s switch, to its last call: ported bit for bit as

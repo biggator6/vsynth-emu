@@ -4014,3 +4014,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The git guard refuses amends, so v391's missed Alias Cancel plant got a version of its own (v392); the converters start at v393.
 - EXTIN's converter equalled rom.4 on its first run, but four of its plants were missed: with the record's bytes as noise, the formant held at ±1 almost always. The Harm Formant's IDs gave the ranges to draw them in.
 - Its formant law's third span takes its distance from the second key, not the third. It is ported as rom.4 has it.
+
+### Session 24, continued (2026-11-22) — v394, v395: PCM's converter, LITE's words
+
+- PCM's converter writes none of the pitch words v251's head writes (key, cents, pitch10s). LITE's words, which it calls for a wave of type 0, write them, with the cents taken against the wave's root key rather than A4.
+- LITE's words read the part's trip object through the part table at 0x8993d040, which is 0xffffffff after C startup. The check aims it at trip objects of its own; anything that runs rom.4's code with the table unset faults there.
+- A shell edit of a source file goes past the content laws. Three such edits were made again with Edit, and one name they had let through twice was renamed.

@@ -735,6 +735,10 @@ version against rom.4's routines with what it calls hooked:
         `0x8939c410`, the depth curve and the gain; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's PCM
         converter"). Left: what it calls by the wave's type, LITE's words `0x8939efa0` and VariPhrase's `0x8939f2a0`
         (about 1,100 instructions), and PCM's start `0x8939e120` with its wave lookups.
+      - LITE's words done (v395): `vc2OscPcmLite`, the pitch10s and key as v251's head makes them, the cents against
+        the wave's root, the start sample held below the length, the switches (Time Trip under way through the part
+        table, `Vc2SetReads::tripMoving`) and the wave's bytes; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The
+        VC-2's LITE words"). Left: VariPhrase's words `0x8939f2a0` and PCM's start `0x8939e120`.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.
