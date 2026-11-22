@@ -116,6 +116,33 @@ That gives the input signal (`vc2probe.wav`, 32.5 s), a 20-second test (`vc2_tes
 - **MIDI both ways**: the runs go to the XT, and the map check in step 4 listens to what the XT sends.  USB-MIDI or a MIDI
   interface's IN and OUT.
 
+**With the Ferrofish Pulse 16 over MADI** (your rig, 2026-11-22), wired back to back:
+
+| Pulse 16 | XT | For |
+|---|---|---|
+| analog out 1, 2 | rear **INPUT** L, R | the test signal into the XT |
+| analog in 1, 2 | **MAIN OUT** L, R | the recording the checker reads |
+| analog in 3, 4 (if you can spare them) | **DIRECT OUT** L, R | what DIR carries on the VC-2, which nobody has seen: by rom.4's programs, nothing |
+| analog in 5, 6 (the same) | the signal going into the XT, split off or routed back | the signal itself, on the same converters, so the XT's own gain separates from the Pulse's |
+
+- **Levels.**  The Pulse's analog level is set from −8 to +20 dBu at 0 dBFS, in 1 dB steps.  Outputs 1 and 2: **+8 dBu**, so the
+  signal's −18 dBFS sweep reaches the XT at −10 dBu, the rear inputs' nominal level (XT manual, specifications).  Inputs: **+20
+  dBu**, so nothing the XT sends clips the Pulse; the direct sound may then read low, which the checker only notes.  Write both
+  settings down: with them the input's level reads in volts.  If the XT's PEAK light comes on during the sweep (step 6), lower the
+  outputs a dB at a time and write down where you stopped.
+- **Rate.**  The Pulse, the MADI interface and the recorder at **44.1 kHz**.  The XT's own clock runs beside them, so the checker
+  will say "two clocks, or an analog path": that's expected here.
+- **The input's channels.**  fxplay plays the signal on the Mac's MADI interface as a stereo pair: the channels macOS's Audio MIDI
+  Setup lists as that device's stereo pair (Configure Speakers), 1 and 2 unless you change it.  Route those MADI channels to the
+  Pulse's analog outs 1 and 2.  `fxplay --audio-devices` gives the name for `--device`.
+- **The recording.**  Record the Pulse's inputs over MADI in your DAW, and export each run at 44.1 kHz, 24-bit, with MAIN OUT as
+  channels 1 and 2.  More channels in the same file are fine: the checker reads the first two, and Claude reads the rest.
+- **The cables.**  The XT's INPUT and DIRECT OUT jacks are unbalanced 1/4-inch phone jacks, its MAIN OUT balanced.  Use the same
+  kind of cable on the loopback pair as on the pair into the XT, so the two levels compare.
+- **Digital.**  The Pulse's optical ports are ADAT, and S/PDIF on them isn't confirmed, so the XT's COAXIAL and OPTICAL OUT may
+  have nowhere to go.  The analog path gives levels, sides, pitches, times and responses: everything in runs 1 and 2, and the
+  effects' responses in runs 3 and 4, but not sample by sample.
+
 **2. VC-2 mode.**  Press **[V-CARD]** and choose the VC-2 (XT manual, p. 22).  On any patch: <▼ MENU>, **PATCH Init**.  The runs
 set everything else, in memory only, so **don't write the patch or the system afterwards**.  Restarting the XT undoes it all.
 

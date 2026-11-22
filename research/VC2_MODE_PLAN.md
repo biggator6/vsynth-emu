@@ -1153,7 +1153,15 @@ Chorus and Reverb heads, zone 1's 128. The guide's step "Learn the map" asks the
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
 
-**The user's to answer** (2026-11-22; asked, not yet answered), each with the recommendation:
+**The user's answers so far** (2026-11-22): the interface is a **Ferrofish Pulse 16, over MADI** to the Mac, and the XT can be
+**wired back to back** to it, direct inputs and outputs. So d-1 is answered; d-2 is the rear INPUT jacks from the Pulse's
+analog outs; d-3 is analog (the Pulse's optical ports are ADAT, S/PDIF on them not confirmed, so the XT's digital outs may have
+nowhere to go); d-4 is the Pulse's own level setting (−8 to +20 dBu at 0 dBFS in 1 dB steps; recommended +8 dBu out, the
+sweep at the XT's −10 dBu nominal, +20 dBu in), written down. With 16 inputs, DIRECT OUT and a loopback of the signal can be
+recorded too. RECORDING_GUIDE.md, "VC-2 captures", step 1, has the wiring. Still open: d-5, and whether the Pulse's optical
+ports take S/PDIF (if so, the XT's digital out goes there as well).
+
+The questions as asked, each with the recommendation:
 - **d-1. The audio interface**: its name, its line outputs and inputs, whether it has an S/PDIF (coaxial or optical) input,
   and whether it runs at 44.1 kHz. Recommended: two line outputs into the XT's INPUT jacks and two inputs back, at 44.1 kHz and
   24 bits; with an S/PDIF input, the XT's COAXIAL or OPTICAL OUT recorded there as well.
