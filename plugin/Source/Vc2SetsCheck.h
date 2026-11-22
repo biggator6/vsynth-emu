@@ -136,6 +136,7 @@ public:
     float pitchSource() override;
     void unportedOscKind(uint32_t routine, uint8_t* input, uint32_t* block) override;
     uint32_t tripMoving(uint8_t part) override;   // v395: through rom.4's part table, as the draws aim it
+    uint16_t waveHalf(uint32_t at) override;      // v396: rom.4's memory, where the draws put the events' tables
     std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes
 
 private:

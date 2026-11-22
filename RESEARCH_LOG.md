@@ -4020,3 +4020,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - PCM's converter writes none of the pitch words v251's head writes (key, cents, pitch10s). LITE's words, which it calls for a wave of type 0, write them, with the cents taken against the wave's root key rather than A4.
 - LITE's words read the part's trip object through the part table at 0x8993d040, which is 0xffffffff after C startup. The check aims it at trip objects of its own; anything that runs rom.4's code with the table unset faults there.
 - A shell edit of a source file goes past the content laws. Three such edits were made again with Edit, and one name they had let through twice was renamed.
+- VariPhrase's words (v396) form the same pitch words as LITE's, about a centre key that EVENT can move. v251's key sum took its centre from a constant; it takes it as a parameter now, and LITE's words stopped running v251's whole head on a copy for theirs.
+- EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
+- The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.

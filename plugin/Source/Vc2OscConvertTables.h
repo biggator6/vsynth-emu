@@ -11,6 +11,11 @@ struct Vc2OscCentsLine {
     float top = 0, offset = 0, slope = 0;
 };
 
+// A pitch10's cents' divisor and hold, each its routine's own pool words (LITE's and VariPhrase's words', v396)
+struct Vc2OscCentsHold {
+    float tenth = 0, most = 0, least = 0;
+};
+
 struct Vc2OscConvertTables {
     float perTenth = 0;                  // 0x8939d07c: 10, the cents' tenths
     float centsMost = 0, centsLeast = 0;  // 0x8939d084, 0x8939d310: ±6000
@@ -59,7 +64,12 @@ struct Vc2OscConvertTables {
     float timeFrom = 0, timeMostOut = 0, timeBeam = 0, pcmFormantLeast = 0;
     // LITE's words' (v395, 0x8939efa0): the cents' tenths, 10 (0x8939f2dc), and their hold, 6000 (0x8939f2e0) and −6000
     // (0x8939f2e4)
-    float liteTenth = 0, liteCentsMost = 0, liteCentsLeast = 0;
+    Vc2OscCentsHold lite {};
+    // VariPhrase's words' (v396, 0x8939f2a0): three sets of a tenth and a hold (10, 6000, −6000), one for each way to the
+    // cents: against A4 (0x8939f8d0, 0x8939f8d8, 0x8939f8dc), against the root on a type 1 (0x8939f8d0, 0x8939f8d8,
+    // 0x8939fb78) and on the others (0x8939fb7c, 0x8939fb80, 0x8939fb78); the level's scale, 32768 (0x8939fb88)
+    Vc2OscCentsHold variA4 {}, variRoot {}, variRootOther {};
+    float variLevel = 0;
 };
 
 [[nodiscard]] bool vc2LoadOscConvert(const char* path);

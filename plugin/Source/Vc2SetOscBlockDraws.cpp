@@ -6,6 +6,7 @@
 #include "Vc2SetOscBlockCheck.h"
 #include <bit>
 #include <iterator>
+#include <vector>
 
 namespace {
 constexpr uint32_t kRecordsAPart = 32;
@@ -18,7 +19,13 @@ constexpr uint32_t kWaveTypeAt = 0xa7;   // [FW] the input's wave type, PCM's st
 constexpr uint32_t kLiteKeyAt = 3, kLitePitchKfAt = 0x0e, kLiteCoarseAt = 0x88, kLiteFineAt = 0x90;
 constexpr uint32_t kLiteRootAt = 0xa8, kLiteRootOffsetAt = 0xa5, kLiteLengthAt = 0xbc, kLiteWaveWordAt = 0xfc;
 constexpr uint32_t kLiteStartAt = 0x48;
-constexpr uint32_t kLiteSwitches[] = { 0x60, 0x63, 0x64, 0x67, 0x68, 0xb0 };
+constexpr uint32_t kLiteSwitches[] = { 0x60, 0x61, 0x63, 0x64, 0x67, 0x68, 0xb0 };   // v396: Robot Voice's 0x61 too
+// [FW] v396: VariPhrase's words': the Playback Mode, the wave's table flag, a word, events' count and table, the step
+// count; the systems' byte by which EVENT's centre moves
+constexpr uint32_t kVariModeAt = 0x62, kVariFlagAt = 0xa0, kVariWordAt = 0xac, kVariEventsAt = 0xb4;
+constexpr uint32_t kVariTableAt = 0xc4, kVariStepAt = 0x104, kEventCentreAt = 4, kVariEvent = 3;
+constexpr uint32_t kVariRecordTypeAt = 9, kVariPcm = 1, kVariCentre = 60, kVariPeriod = 12;   // [FW] the record's type
+constexpr uint32_t kVariPastHalf = 0x8001;   // an events' count whose period is just past a signed halfword
 
 void bytesDrawn(uint8_t* b, uint32_t n, std::mt19937& rng) {
     for (uint32_t i = 0; i < n; ++i) b[i] = (uint8_t)rng();
@@ -78,6 +85,12 @@ void putAt(uint8_t* b, uint32_t at, T v) {
     std::memcpy(b + at, &v, sizeof v);
 }
 
+// A word a routine tests whole: as drawn half the time, else 0 or, half of those, a word whose low byte alone is 0 (a
+// word, not a byte)
+void testedWordDrawn(uint8_t* b, uint32_t at, std::mt19937& rng) {
+    if (rng() % 2) putAt(b, at, rng() % 2 ? 0u : (uint32_t)rng() & ~0xffu);
+}
+
 // v395: what LITE's words read.  Half the time the pitch10s near the wave's root, so the cents fall inside their hold:
 // the coarse tune ±48, the fine ±1000 tenths, Pitch KF 0, 100% or ±100%, the root key within 30 of the key and its
 // offset ±12.  Each switch 0 half the time, the last word 0 or its low byte 0 a time in four each; the start sample at
@@ -93,13 +106,35 @@ void liteDrawn(uint8_t* b, std::mt19937& rng) {
     }
     for (const uint32_t at : kLiteSwitches)
         if (rng() % 2) b[at] = 0;
-    if (rng() % 2) putAt(b, kLiteWaveWordAt, rng() % 2 ? 0u : (uint32_t)rng() & ~0xffu);   // a word, not a byte
+    testedWordDrawn(b, kLiteWaveWordAt, rng);
     uint32_t length;
     std::memcpy(&length, b + kLiteLengthAt, sizeof length);
     if (rng() % 16 == 0) length = 0;
     putAt(b, kLiteLengthAt, length);
     const uint32_t way = rng() % 4;
     if (way < 2) putAt(b, kLiteStartAt, length - way);
+}
+
+// v396: what VariPhrase's words read besides.  The record PCM's a time in four; the Playback Mode EVENT half the
+// time, else one of the four mostly; the key as drawn a time in four, a played one (0…127) half the time, and a whole
+// number of EVENT's periods of 12 below 60 a time in four (where a remainder below 60 and the centre's quotient turn);
+// the events' table always aimed in its region (rom.4 reads it in STEP and EVENT); the events' count 0…24 or 0…2,
+// else any or 32769…32832 (a period of 32768…32832, past a signed halfword: with a key below 60 the centre passes one
+// only for a period within 60 of 32768); the step count small half the time; the table flag and the word +0xac as
+// `testedWordDrawn` draws them
+void variDrawn(uint8_t* b, std::mt19937& rng) {
+    if (rng() % 4 == 0) b[kVariRecordTypeAt] = kVariPcm;
+    b[kVariModeAt] = (uint8_t)(rng() % 8 ? rng() % 2 ? kVariEvent : rng() % 4 : rng());
+    const auto keys = std::to_array<uint8_t>({ b[kLiteKeyAt], (uint8_t)(rng() % 128), (uint8_t)(rng() % 128),
+                                               (uint8_t)(kVariCentre - kVariPeriod * (1 + rng() % 5)) });
+    b[kLiteKeyAt] = setsOneOf(keys, rng);
+    putAt(b, kVariTableAt, kOscEventsAt + (uint32_t)(rng() % kOscEventsAims));
+    const auto counts = std::to_array<uint16_t>(
+        { (uint16_t)(rng() % 25), (uint16_t)(rng() % 3), (uint16_t)rng(), (uint16_t)(kVariPastHalf + rng() % 64) });
+    putAt(b, kVariEventsAt, setsOneOf(counts, rng));
+    if (rng() % 2) putAt(b, kVariStepAt, (uint16_t)(rng() % 64));
+    testedWordDrawn(b, kVariFlagAt, rng);
+    testedWordDrawn(b, kVariWordAt, rng);
 }
 } // namespace
 
@@ -117,6 +152,7 @@ void oscTableDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
         setsNoise(sys, rng);
         if (rng() % 2) sys[kAliasCancelAt] = 0;   // Alias Cancel off half the time, which noise nearly never is
         if (rng() % 2) sys[kExtinSystemAt] = 0;   // v393: EXTIN's +0xb0 flag either way
+        if (rng() % 2) sys[kEventCentreAt] = 0;   // v396: EVENT's centre either way (the part's reader clears it)
         fw.cpu.write(kOscSystemsAt, sys.data(), sizeof sys);
     }
 }
@@ -152,6 +188,11 @@ void oscAroundDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
         const float source = rng() % 2 ? 1.0f : 0.25f + (float)(rng() % 3751) / 1000.0f;
         fw.cpu.wr32(kOscSourceAt, std::bit_cast<uint32_t>(source));
     }
+    if (all) {   // v396: the events' tables
+        std::vector<uint8_t> events(kOscEventsBytes);
+        bytesDrawn(events.data(), kOscEventsBytes, rng);
+        fw.cpu.write(kOscEventsAt, events.data(), kOscEventsBytes);
+    }
     // v395: the part table aimed at the trip objects, each one's word LITE's words read 0 half the time
     for (uint32_t p = 0; p < kOscParts; ++p) {
         const uint32_t trip = kOscTripsAt + kOscTripBytes * p;
@@ -173,19 +214,22 @@ void oscInputDrawn(Vc2SetOscInput& w, std::mt19937& rng) {
     w.matrix = oscMatrixDrawn(rng);
     // v394: the wave's type PCM's start would leave (+0xa7), one of its six mostly, as it calls by it
     reinterpret_cast<uint8_t*>(&w)[kWaveTypeAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
+    variDrawn(reinterpret_cast<uint8_t*>(&w), rng);   // before LITE's, which draw the root about the key
     liteDrawn(reinterpret_cast<uint8_t*>(&w), rng);
 }
 
-// Now and then an input's record put in the first four parts' tables at its kind and OSC, half the time with one of
-// the bytes the refresh compares moved
+// Now and then an input's record put in the first four parts' tables at its kind and OSC (half the time from v396),
+// half the time with one of the bytes the refresh compares moved, a PCM record's one of its own three (v396: a PCM
+// record's last byte was moved too seldom for a run to be sure of it)
 void oscSameRecordsDrawn(Vc2Fw& fw, std::span<const Vc2SetOscInput> inputs, std::mt19937& rng) {
     constexpr uint32_t kCompared[] = { 1, 0x20, 0x3c, 0x5c, 0x59 };   // [FW] the type, waveform and PCM wave's words
-    constexpr uint32_t kFewParts = 4;
+    constexpr uint32_t kFewParts = 4, kPcmType = 1, kPcmFrom = 2;
     for (const Vc2SetOscInput& w : inputs) {
-        if (rng() % 4) continue;
+        if (rng() % 2) continue;
         std::array<uint8_t, kOscRecordBytes> r = w.record;
         if (rng() % 2) {
-            const uint32_t at = kCompared[rng() % std::size(kCompared)];
+            const uint32_t from = r[1] == kPcmType ? kPcmFrom : 0;
+            const uint32_t at = kCompared[from + rng() % (std::size(kCompared) - from)];
             r[at] = (uint8_t)(r[at] ^ (1 + rng() % 255));
         }
         const uint32_t slot = kOscHeaderBytes + kOscKindRow * w.kind + kOscRecordBytes * w.osc;

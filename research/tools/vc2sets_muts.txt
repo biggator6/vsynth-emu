@@ -685,14 +685,13 @@ pcm-formant-lfo-zero|    block[kFormantLfoZero] = 0;\n|\n|vc2oscpcm
 pcm-formant-lfo|block[kFormantLfoDepth] = pcmWord(div(flt(formantLfo), t.pcmDepthTop));|block[kFormantLfoDepth] = pcmWord(flt(formantLfo));|vc2oscpcm
 pcm-gain-pow|const float gain = shared.pow(kTwo, div(flt(s8(input, kGainAt)), t.pcmGainScale));|const float gain = 1.0f;|vc2oscpcm
 pcm-gain-second|block[kGainWord] = pcmWord(mul(mul(first, gain), second));|block[kGainWord] = pcmWord(mul(first, gain));|vc2oscpcm
-pcm-ways-type-at|kWaveTypeAt = 0xa7, kVariWords|kWaveTypeAt = 0xa6, kVariWords|vc2setosckinds
-pcm-ways-vari-address|kVariWords = 0x8939f2a0;|kVariWords = 0x8939efa0;|vc2setosckinds
+pcm-ways-type-at|kWaveTypeAt = 0xa7;   // [FW] the wave's type|kWaveTypeAt = 0xa6;   // [FW] the wave's type|vc2setosckinds
 pcm-ways-lite|kWaveWays { liteWords, variWords,|kWaveWays { variWords, variWords,|vc2setosckinds
 pcm-ways-vari|kWaveWays { liteWords, variWords, noWords,|kWaveWays { liteWords, noWords, noWords,|vc2setosckinds
 pcm-ways-none|noWords, variWords, noWords, variWords };|liteWords, variWords, noWords, variWords };|vc2setosckinds
 pcm-ways-past|(type < kWaveWays.size() ? kWaveWays[type] : noWords)|kWaveWays[type % kWaveWays.size()]|vc2setosckinds
-pcm-ways-call|    reads.unportedOscKind(kVariWords, bytesOf(in), block);\n|\n|vc2setosckinds
-pcm-ways-convert|    vc2OscPcmConvert(bytesOf(in), w, reads.shared(), block);\n|\n|vc2setosckinds
+pcm-ways-call|{ vc2OscPcmVari(bytesOf(in), reads, block); }|{}|vc2setosckinds
+pcm-ways-convert|    vc2OscPcmConvert(bytesOf(in), worldOf(in, reads), reads.shared(), block);\n|\n|vc2setosckinds
 lite-trip-part|reads.tripMoving(in.part)|reads.tripMoving(in.kind)|vc2setosckinds
 pcm-pool-depth-top|{ 0x8939e4b4, &t.pcmDepthTop }|{ 0x8939e4b8, &t.pcmDepthTop }|vc2setoscconvtables
 pcm-pool-velocity|{ 0x8939e4dc, &t.pcmVelocityScale }|{ 0x8939e4b4, &t.pcmVelocityScale }|vc2setoscconvtables
@@ -751,16 +750,16 @@ lite-oneif|return b ? 1u : 0u;|return b ? 2u : 0u;|vc2oscpcmlite
 lite-root-offset-signed|u8(input, kRootAt) - s8(input, kRootOffsetAt)|u8(input, kRootAt) - u8(input, kRootOffsetAt)|vc2oscpcmlite
 lite-root-offset-sign|u8(input, kRootAt) - s8(|u8(input, kRootAt) + s8(|vc2oscpcmlite
 lite-root-signed|static_cast<int16_t>(u8(input, kRootAt)|static_cast<int16_t>(s8(input, kRootAt)|vc2oscpcmlite
-lite-cents-from-a4|p10 - static_cast<uint32_t>(root * kPerKey)|p10 - 69000u|vc2oscpcmlite
-lite-cents-tenth|xtf::div(xtf::flt(static_cast<int32_t>(from)), t.liteTenth)|xtf::mul(xtf::flt(static_cast<int32_t>(from)), 0.1f)|vc2oscpcmlite
-lite-cents-unsigned|xtf::flt(static_cast<int32_t>(from))|xtf::flt(static_cast<int32_t>(from >> 1) * 2)|vc2oscpcmlite
-lite-cents-held-order|vc2OscHeld(cents, t.liteCentsLeast, t.liteCentsMost)|vc2OscHeld(cents, t.liteCentsMost, t.liteCentsLeast)|vc2oscpcmlite
-lite-cents-unheld|    return vc2OscHeld(cents, t.liteCentsLeast, t.liteCentsMost);|    return cents;|vc2oscpcmlite
-lite-pitch-copy|    std::memcpy(input + kPitch10At, copy.data() + kPitch10At, sizeof(uint32_t));\n|\n|vc2oscpcmlite
-lite-pitch-copy-key|    std::memcpy(input + kKeyPitch10At, copy.data() + kKeyPitch10At, sizeof(uint32_t));\n|\n|vc2oscpcmlite
-lite-key|[kKeyByte] = made.key;|[kKeyByte] = 0;|vc2oscpcmlite
-lite-pitch-first|    litePitch(input, in, shared, block);\n|\n|vc2oscpcmlite
-lite-cents-of-key|rootCents(inputWord(input, kPitch10At), input));|rootCents(inputWord(input, kKeyPitch10At), input));|vc2oscpcmlite
+lite-cents-from-a4|vc2OscCentsFrom(u32(input, kPitch10At), root, hold)|vc2OscCentsFrom(u32(input, kPitch10At), 69000u, hold)|vc2oscpcmlite
+lite-cents-tenth|xtf::div(xtf::flt(static_cast<int32_t>(p10 - from)), c.tenth)|xtf::mul(xtf::flt(static_cast<int32_t>(p10 - from)), 0.1f)|vc2oscpcmlite
+lite-cents-unsigned|xtf::flt(static_cast<int32_t>(p10 - from))|xtf::flt(static_cast<int32_t>((p10 - from) >> 1) * 2)|vc2oscpcmlite
+lite-cents-held-order|vc2OscHeld(cents, c.least, c.most)|vc2OscHeld(cents, c.most, c.least)|vc2oscpcmlite
+lite-cents-unheld|    return vc2OscHeld(cents, c.least, c.most);|    return cents;|vc2oscpcmlite
+lite-pitch-copy|    std::memcpy(input + kPitch10At, &p10, sizeof p10);\n|\n|vc2oscpcmlite
+lite-pitch-copy-key|    std::memcpy(input + kKeyPitch10At, &keyP10, sizeof keyP10);\n|\n|vc2oscpcmlite
+lite-key|[kKeyByte] = vc2OscFollowedKey(key, coarse, kf, centre);|[kKeyByte] = 0;|vc2oscpcmlite
+lite-pitch-first|    vc2OscPitchAbout(input, kCentre, block);\n|\n|vc2oscpcmlite
+lite-cents-of-key|vc2OscCentsFrom(u32(input, kPitch10At), root, hold));|vc2OscCentsFrom(u32(input, kKeyPitch10At), root, hold));|vc2oscpcmlite
 lite-mode|u8(input, kModeAt) != 0 ? kModeOn : 0|u8(input, kModeAt) != 0 ? 0 : kModeOn|vc2oscpcmlite
 lite-start-held-equal|start >= length ? length - 1 : start|start > length ? length - 1 : start|vc2oscpcmlite
 lite-start-held-short|start >= length ? length - 1 : start|start >= length ? length : start|vc2oscpcmlite
@@ -773,9 +772,134 @@ lite-ec-and|tripMoving != 0 && u8(input, kSwitchECAt) != 0|tripMoving != 0 \|\| 
 lite-ec-trip|oneIf(tripMoving != 0 &&|oneIf(tripMoving == 0 &&|vc2oscpcmlite
 lite-e8|oneIf(u8(input, kSwitchE8At) != 0)|oneIf(u8(input, kSwitchE8At) == 0)|vc2oscpcmlite
 lite-f0|oneIf(u8(input, kSwitchF0At) != 0)|oneIf(u8(input, kSwitchF0At) == 0)|vc2oscpcmlite
-lite-f4-word-read|oneIf(inputWord(input, kWaveWordAt) != 0)|oneIf(u8(input, kWaveWordAt) != 0)|vc2oscpcmlite
+lite-f4-word-read|oneIf(u32(input, kWaveWordAt) != 0)|oneIf(u8(input, kWaveWordAt) != 0)|vc2oscpcmlite
 lite-wave-bytes-copy|    std::memcpy(block + kWaveBytesWord, input + kWaveBytesAt, kWaveBytes);\n|\n|vc2oscpcmlite
-lite-pool-tenth|{ 0x8939f2dc, &t.liteTenth }|{ 0x8939f2e0, &t.liteTenth }|vc2setoscconvtables
-lite-pool-most|{ 0x8939f2e0, &t.liteCentsMost }|{ 0x8939f2e4, &t.liteCentsMost }|vc2setoscconvtables
-lite-pool-least|{ 0x8939f2e4, &t.liteCentsLeast }|{ 0x8939f2e0, &t.liteCentsLeast }|vc2setoscconvtables
-lite-pool-read|        vc2ReadPool(image, litePoolWords(*this));\n|\n|vc2setoscconvtables
+lite-pool-tenth|{ 0x8939f2dc, &t.lite.tenth }|{ 0x8939f2e0, &t.lite.tenth }|vc2setoscconvtables
+lite-pool-most|{ 0x8939f2e0, &t.lite.most }|{ 0x8939f2e4, &t.lite.most }|vc2setoscconvtables
+lite-pool-least|{ 0x8939f2e4, &t.lite.least }|{ 0x8939f2e0, &t.lite.least }|vc2setoscconvtables
+lite-pool-read|        vc2ReadPool(image, wavePoolWords(*this));\n|\n|vc2setoscconvtables
+# VariPhrase's words (vc2oscpcmvari, Vc2OscPcmVari.cpp; the pitch and cents laws it shares with LITE's in Vc2OscPcmLite.cpp,
+# vc2oscpcmlite; the key sum about a centre in Vc2OscConvert.cpp, vc2setoscconv; its constants, vc2setoscconvtables,
+# v396), not planted: the type 1's +0xb0 as its type (both 1), the type 1's and the others' root holds for each other
+# (the same values; their addresses are planted; A4's least for the root's too), the count's and the period's halfword
+# casts in eventOf (both fit), a key of 60 counted below the centre (0 either way, in eventOf and the centre's), the
+# centre's quotient and its product's period as halfwords (the quotient fits one; the centre is cut to one after) and
+# the period's local as a word (both routines take it as a halfword).
+vari-key-at|kKeyAt = 3, kPitch10At|kKeyAt = 4, kPitch10At|vc2oscpcmvari
+vari-start-at|kStartAt = 0x48,|kStartAt = 0x4c,|vc2oscpcmvari
+vari-tempo-sync-at|kTempoSyncAt = 0x60;|kTempoSyncAt = 0x5f;|vc2oscpcmvari
+vari-robot-at|kRobotAt = 0x61,|kRobotAt = 0x60,|vc2oscpcmvari
+vari-mode-at|kModeAt = 0x62,|kModeAt = 0x61,|vc2oscpcmvari
+vari-loop-at|kLoopAt = 0x63,|kLoopAt = 0x62,|vc2oscpcmvari
+vari-vari-at|kVariAt = 0x64,|kVariAt = 0x65,|vc2oscpcmvari
+vari-energy-at|kEnergyAt = 0x66,|kEnergyAt = 0x65,|vc2oscpcmvari
+vari-time-trip-at|kTimeTripAt = 0x67;|kTimeTripAt = 0x66;|vc2oscpcmvari
+vari-beat-keep-at|kBeatKeepAt = 0x68,|kBeatKeepAt = 0x69,|vc2oscpcmvari
+vari-table-flag-at|kTableFlagAt = 0xa0,|kTableFlagAt = 0xa4,|vc2oscpcmvari
+vari-type-at|kTypeAt = 0xa7,|kTypeAt = 0xa6,|vc2oscpcmvari
+vari-word-ac-at|kWordAcAt = 0xac,|kWordAcAt = 0xa8,|vc2oscpcmvari
+vari-no-wave-at|kNoWaveAt = 0xb0;|kNoWaveAt = 0xb1;|vc2oscpcmvari
+vari-events-at|kEventsAt = 0xb4,|kEventsAt = 0xb6,|vc2oscpcmvari
+vari-length-at|kLengthAt = 0xbc,|kLengthAt = 0xc0,|vc2oscpcmvari
+vari-table-at|kTableAt = 0xc4,|kTableAt = 0xc8,|vc2oscpcmvari
+vari-wave-bytes-at|kWaveBytesAt = 0xcc,|kWaveBytesAt = 0xd0,|vc2oscpcmvari
+vari-step-at|kStepAt = 0x104;|kStepAt = 0x106;|vc2oscpcmvari
+vari-event-centre-at|kEventCentreAt = 4;|kEventCentreAt = 3;|vc2oscpcmvari
+vari-step-mode|kStep = 2;|kStep = 1;|vc2oscpcmvari
+vari-type-one|kTypeOne = 1;|kTypeOne = 3;|vc2oscpcmvari
+vari-entries-at|kEntriesAt = 12;|kEntriesAt = 10;|vc2oscpcmvari
+vari-centre|kCentre = 60;|kCentre = 64;|vc2oscpcmvari
+vari-period-keys|kPeriodKeys = 12, kRound|kPeriodKeys = 11, kRound|vc2oscpcmvari
+vari-round|kRound = 11;|kRound = 12;|vc2oscpcmvari
+vari-a4|kA4 = 69000;|kA4 = 60000;|vc2oscpcmvari
+vari-flags-byte|kFlagsByte = 0xe4,|kFlagsByte = 0xe7,|vc2oscpcmvari
+vari-flags5-byte|kFlags5Byte = 0xe5,|kFlags5Byte = 0xe7,|vc2oscpcmvari
+vari-flags6-byte|kFlags6Byte = 0xe6,|kFlags6Byte = 0xe7,|vc2oscpcmvari
+vari-first-at|kFirstAt = 0xe8,|kFirstAt = 0xea,|vc2oscpcmvari
+vari-last-at|kLastAt = 0xec;|kLastAt = 0xee;|vc2oscpcmvari
+vari-from-at|kFromAt = 0xf0,|kFromAt = 0xf2,|vc2oscpcmvari
+vari-cents-word|kCentsWord = 0x08 / 4,|kCentsWord = 0x0c / 4,|vc2oscpcmvari
+vari-key-cents-word|kKeyCentsWord = 0x68 / 4,|kKeyCentsWord = 0x64 / 4,|vc2oscpcmvari
+vari-level-word|kLevelWord = 0x18 / 4;|kLevelWord = 0x1c / 4;|vc2oscpcmvari
+vari-type-word|kTypeWord = 0xb0 / 4,|kTypeWord = 0xac / 4,|vc2oscpcmvari
+vari-wave-bytes-word|kWaveBytesWord = 0xb4 / 4,|kWaveBytesWord = 0xb8 / 4,|vc2oscpcmvari
+vari-wave-bytes|kWaveBytes = 48;|kWaveBytes = 44;|vc2oscpcmvari
+vari-bit0|kBit0 = 0x01,|kBit0 = 0x08,|vc2oscpcmvari
+vari-bit1|kBit1 = 0x02,|kBit1 = 0x08,|vc2oscpcmvari
+vari-bit2|kBit2 = 0x04,|kBit2 = 0x02,|vc2oscpcmvari
+vari-bit3|kBit3 = 0x08,|kBit3 = 0x04,|vc2oscpcmvari
+vari-bit4|kBit4 = 0x10,|kBit4 = 0x20,|vc2oscpcmvari
+vari-bit5|kBit5 = 0x20,|kBit5 = 0x40,|vc2oscpcmvari
+vari-bit6|kBit6 = 0x40;|kBit6 = 0x10;|vc2oscpcmvari
+vari-bit7|kBit7 = 0x80;|kBit7 = 0x40;|vc2oscpcmvari
+vari-half-signed|static_cast<uint16_t>(s16(input, at))|static_cast<uint16_t>(u8(input, at))|vc2oscpcmvari
+vari-bit-of|b = on ? static_cast<uint8_t>(b \| bit)|b = !on ? static_cast<uint8_t>(b \| bit)|vc2oscpcmvari
+vari-events-table|u32(input, kTableAt) + kEntriesAt|u32(input, kTableAt)|vc2oscpcmvari
+vari-events-first|const uint16_t from = reads.waveHalf(table + 2 * first);|const uint16_t from = reads.waveHalf(table + first);|vc2oscpcmvari
+vari-events-last|reads.waveHalf(table + 2 * last)|reads.waveHalf(table + 2 * first)|vc2oscpcmvari
+vari-events-from|    storeHalf(block, kFromAt, from);\n|\n|vc2oscpcmvari
+vari-event-none|    if (count == 0) return 0;\n|    if (count == 0) return 1;\n|vc2oscpcmvari
+vari-event-low|    if (key < kCentre) within = (within + period) % period;\n|\n|vc2oscpcmvari
+vari-event-low-wrap|(within + period) % period|within + period|vc2oscpcmvari
+vari-event-count|static_cast<uint16_t>(within) % count|static_cast<uint16_t>(within) % (count + 1)|vc2oscpcmvari
+vari-centre-none|if (period == 0) return kCentre;|if (period == 0) return 0;|vc2oscpcmvari
+vari-centre-low|key - (kCentre - 1) - period|key - kCentre - period|vc2oscpcmvari
+vari-centre-short|return static_cast<int16_t>(periods|return static_cast<int>(periods|vc2oscpcmvari
+vari-mode-flags|f = static_cast<uint8_t>(f & ~(kBit0 \| kBit7 \| kBit3));|f = static_cast<uint8_t>(f & ~(kBit0 \| kBit7));|vc2oscpcmvari
+vari-default-bit0-or|u8(input, kLoopAt) != 0 \|\| u8(input, kNoWaveAt) == 0|u8(input, kLoopAt) != 0 && u8(input, kNoWaveAt) == 0|vc2oscpcmvari
+vari-default-bit7|f = static_cast<uint8_t>((f \| kBit7) & ~kBit3);|f = static_cast<uint8_t>(f & ~kBit3);|vc2oscpcmvari
+vari-default-bit3|f = static_cast<uint8_t>((f \| kBit7) & ~kBit3);|f = static_cast<uint8_t>(f \| kBit7);|vc2oscpcmvari
+vari-default-held|start >= length ? length - 1 : start;|start > length ? length - 1 : start;|vc2oscpcmvari
+vari-default-short|start >= length ? length - 1 : start;|start >= length ? length : start;|vc2oscpcmvari
+vari-default-length|storeWord(block, kLastAt, length);|storeWord(block, kLastAt, start);|vc2oscpcmvari
+vari-default-from|storeWord(block, kFromAt, held);|storeWord(block, kFromAt, start);|vc2oscpcmvari
+vari-default-pitch|    vc2OscPitchAbout(input, kCentre, block);\n}\n\n// STEP|    vc2OscPitchAbout(input, kCentre + 1, block);\n}\n\n// STEP|vc2oscpcmvari
+vari-step-count|inputHalf(input, kEventsAt) - 1u;|inputHalf(input, kEventsAt) - 0u;|vc2oscpcmvari
+vari-step-next|eventsFrom(input, e, e + 1u, reads, block);\n    vc2OscPitchAbout(input, kCentre, block);\n}\n\n// EVENT|eventsFrom(input, e, e, reads, block);\n    vc2OscPitchAbout(input, kCentre, block);\n}\n\n// EVENT|vc2oscpcmvari
+vari-step-few|if (inputHalf(input, kEventsAt) < 2) {|if (inputHalf(input, kEventsAt) < 3) {|vc2oscpcmvari
+vari-step-flags|    modeFlags(block);\n    const uint32_t count|    const uint32_t count|vc2oscpcmvari
+vari-event-flags|    modeFlags(block);\n    const uint16_t events|    const uint16_t events|vc2oscpcmvari
+vari-event-flag|if (u32(input, kTableFlagAt) == 0) {|if (u8(input, kTableFlagAt) == 0) {|vc2oscpcmvari
+vari-event-first-last|eventsFrom(input, 0, events - 1u, reads, block);|eventsFrom(input, 0, events, reads, block);|vc2oscpcmvari
+vari-event-period|(count + kRound) / kPeriodKeys * kPeriodKeys|count / kPeriodKeys * kPeriodKeys|vc2oscpcmvari
+vari-event-count-short|const auto count = static_cast<uint16_t>(events - 1);|const auto count = static_cast<uint32_t>(events - 1);|vc2oscpcmvari
+vari-event-next|eventsFrom(input, e, e + 1u, reads, block);\n    vc2OscPitchAbout(input, reads|eventsFrom(input, e, e + 2u, reads, block);\n    vc2OscPitchAbout(input, reads|vc2oscpcmvari
+vari-event-system|reads.oscSystems()[kEventCentreAt] == 0 ? kCentre|reads.oscSystems()[kEventCentreAt] != 0 ? kCentre|vc2oscpcmvari
+vari-fixed-and|u8(input, kVariAt) != 0 && u8(input, kRobotAt) != 0|u8(input, kVariAt) != 0 \|\| u8(input, kRobotAt) != 0|vc2oscpcmvari
+vari-fixed-one|const bool fixed = one && |const bool fixed = |vc2oscpcmvari
+vari-fixed-bit|    bitOf(blockBytes(block)[kFlagsByte], kBit4, fixed);\n|\n|vc2oscpcmvari
+vari-cents-from|const uint32_t from = fixed ? kA4 : vc2OscRootPitch10(input);|const uint32_t from = vc2OscRootPitch10(input);|vc2oscpcmvari
+vari-cents-key|vc2OscCentsFrom(u32(input, kKeyPitch10At), from, hold)|vc2OscCentsFrom(u32(input, kPitch10At), from, hold)|vc2oscpcmvari
+vari-bit5-test|bitOf(f, kBit5, u8(input, kVariAt) == 0);|bitOf(f, kBit5, u8(input, kVariAt) != 0);|vc2oscpcmvari
+vari-level-scale|vc2OscLevelWord(t, u8(input, kEnergyAt))), t.variLevel)|vc2OscLevelWord(t, u8(input, kEnergyAt))), 32767.0f)|vc2oscpcmvari
+vari-level-signed|vc2OscLevelWord(t, u8(input, kEnergyAt))|vc2OscLevelWord(t, static_cast<int8_t>(u8(input, kEnergyAt)))|vc2oscpcmvari
+vari-wave-bytes-copy|    std::memcpy(block + kWaveBytesWord, input + kWaveBytesAt, kWaveBytes);\n|\n|vc2oscpcmvari
+vari-bit6-word|bitOf(f, kBit6, u32(input, kWordAcAt) != 0);|bitOf(f, kBit6, u8(input, kWordAcAt) != 0);|vc2oscpcmvari
+vari-bit2-and|tripMoving != 0 && u8(input, kTimeTripAt) != 0|tripMoving != 0 \|\| u8(input, kTimeTripAt) != 0|vc2oscpcmvari
+vari-bit1|bitOf(f, kBit1, u8(input, kTempoSyncAt) != 0);|bitOf(f, kBit1, u8(input, kTempoSyncAt) == 0);|vc2oscpcmvari
+vari-bit7-e5|kBit7, u8(input, kBeatKeepAt) != 0);|kBit7, u8(input, kBeatKeepAt) == 0);|vc2oscpcmvari
+vari-e6|g = static_cast<uint8_t>(g & ~(kBit2 \| kBit1 \| kBit0));|g = static_cast<uint8_t>(g & ~(kBit1 \| kBit0));|vc2oscpcmvari
+vari-ways-step|kModeWays { stepWay, eventWay }|kModeWays { eventWay, eventWay }|vc2oscpcmvari
+vari-ways-event|kModeWays { stepWay, eventWay }|kModeWays { stepWay, stepWay }|vc2oscpcmvari
+vari-ways-past|(way < kModeWays.size() ? kModeWays[way] : defaultWay)|kModeWays[way % kModeWays.size()]|vc2oscpcmvari
+vari-trip-part|reads.tripMoving(input[0])|reads.tripMoving(input[2])|vc2oscpcmvari
+vari-cents-first|    centsWords(input, block);\n|\n|vc2oscpcmvari
+vari-pitch-centre|vc2OscKeySum(key, coarse, kf, centre) + fine;\n    const uint32_t keyP10|vc2OscKeySum(key, coarse, kf, kCentre) + fine;\n    const uint32_t keyP10|vc2oscpcmlite
+vari-pitch-second-centre|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, centre)|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, kCentre)|vc2oscpcmlite
+vari-key-centre|vc2OscFollowedKey(key, coarse, kf, centre)|vc2OscFollowedKey(key, coarse, kf, kCentre)|vc2oscpcmlite
+vari-pitch-second|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, centre)|vc2OscKeySum(key, coarse, kf, centre)|vc2oscpcmlite
+vari-pitch-fine|vc2OscKeySum(key, coarse, kf, centre) + fine;\n    const uint32_t keyP10|vc2OscKeySum(key, coarse, kf, centre);\n    const uint32_t keyP10|vc2oscpcmlite
+vari-root-signed|u8(input, kRootAt) - s8(input, kRootOffsetAt)|u8(input, kRootAt) - u8(input, kRootOffsetAt)|vc2oscpcmlite
+vari-keysum-centre-coarse|static_cast<uint32_t>(centre + coarse) * static_cast<uint32_t>(kPerKey)|static_cast<uint32_t>(kCentre + coarse) * static_cast<uint32_t>(kPerKey)|vc2setoscconv
+vari-keysum-centre-key|static_cast<uint32_t>(key - centre) * static_cast<uint32_t>(kf);|static_cast<uint32_t>(key - kCentre) * static_cast<uint32_t>(kf);|vc2setoscconv
+vari-pool-a4-tenth|{ 0x8939f8d0, &t.variA4.tenth }|{ 0x8939fb88, &t.variA4.tenth }|vc2setoscconvtables
+vari-pool-a4-most|{ 0x8939f8d8, &t.variA4.most }|{ 0x8939f8dc, &t.variA4.most }|vc2setoscconvtables
+vari-pool-a4-least|{ 0x8939f8dc, &t.variA4.least }|{ 0x8939f8d8, &t.variA4.least }|vc2setoscconvtables
+vari-pool-root-tenth|{ 0x8939f8d0, &t.variRoot.tenth }|{ 0x8939fb88, &t.variRoot.tenth }|vc2setoscconvtables
+vari-pool-root-most|{ 0x8939f8d8, &t.variRoot.most }|{ 0x8939fb78, &t.variRoot.most }|vc2setoscconvtables
+vari-pool-root-least|{ 0x8939fb78, &t.variRoot.least }|{ 0x8939fb80, &t.variRoot.least }|vc2setoscconvtables
+vari-pool-other-tenth|{ 0x8939fb7c, &t.variRootOther.tenth }|{ 0x8939fb88, &t.variRootOther.tenth }|vc2setoscconvtables
+vari-pool-other-most|{ 0x8939fb80, &t.variRootOther.most }|{ 0x8939fb78, &t.variRootOther.most }|vc2setoscconvtables
+vari-pool-other-least|{ 0x8939fb78, &t.variRootOther.least }|{ 0x8939fb80, &t.variRootOther.least }|vc2setoscconvtables
+vari-pool-level|{ 0x8939fb88, &t.variLevel }|{ 0x8939fb7c, &t.variLevel }|vc2setoscconvtables
+vari-ways-lite|    vc2OscPcmLite(bytesOf(in), reads.tripMoving(in.part), block);\n|\n|vc2setosckinds

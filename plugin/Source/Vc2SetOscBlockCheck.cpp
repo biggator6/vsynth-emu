@@ -2,8 +2,8 @@
 // its own blocks (0x89e34060), the step counts (0x89989c84), Random Pitch's seed (0x89996f4c) and notes W, after the COSM
 // inputs' part on the seed after its.  The OSC's four Matrix getters are hooked to answer drawn groups, a place each,
 // and the pitch source (0x89394a40) a drawn ratio, neither logged: rom.4 calls them more often than the port, which
-// reads them once a converter.  PCM's start and the PCM converter, which the port hasn't, are hooked to log their
-// routine and do nothing (EXTIN's converter too until v393).  The velocity curve and powf are rom.4's own (the port's
+// reads them once a converter.  PCM's start, which the port hasn't, is hooked to log its routine and do nothing
+// (EXTIN's converter too until v393, PCM's until v394, its LITE and VariPhrase words until v395 and v396).  The velocity curve and powf are rom.4's own (the port's
 // through SetKeptShared).  The voices (each one's glide key at its +0x38, the glide keys' tables' Hold), the parts, the
 // parts' OSC table (0x89e371e0: the headers, records and systems), the clock, the make's legato structs and four Ms'
 // bends and D-Beam bytes are drawn in rom.4's memory, which the port reads too (Vc2SetOscBlockDraws.cpp).  Each case
@@ -21,9 +21,8 @@
 namespace {
 using Blocks = Vc2SetOscBlocks;
 constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0 }, kPitchSource = 0x89394a40;
-// [FW] PCM's start, and VariPhrase's words PCM's converter calls (v393 ported EXTIN's converter, v394 PCM's, v395
-// LITE's words)
-constexpr uint32_t kUnported[] = { 0x8939e120, 0x8939f2a0 };
+// [FW] PCM's start (v393 ported EXTIN's converter, v394 PCM's, v395 its LITE words, v396 its VariPhrase words)
+constexpr uint32_t kUnported[] = { 0x8939e120 };
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 } // namespace
 
@@ -73,6 +72,10 @@ void SetPortParts::unportedOscKind(uint32_t routine, uint8_t*, uint32_t*) { logg
 
 uint32_t SetPortParts::tripMoving(uint8_t part) {
     return fw_.cpu.rd32(fw_.cpu.rd32(kOscPartTableAt + 4u * part) + kOscTripMovingAt);
+}
+
+uint16_t SetPortParts::waveHalf(uint32_t at) {
+    return static_cast<uint16_t>(fw_.cpu.rd8(at) | fw_.cpu.rd8(at + 1) << 8);
 }
 
 namespace {

@@ -5,6 +5,7 @@
 #include "Vc2OscExtinConvert.h"
 #include "Vc2OscPcmConvert.h"
 #include "Vc2OscPcmLite.h"   // v395
+#include "Vc2OscPcmVari.h"   // v396
 #include "Vc2SetChildHead.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetOscBlock.h"
@@ -17,8 +18,7 @@ using xtf::mul;
 
 namespace {
 constexpr uint32_t kPcmStart = 0x8939e120;   // [FW] not ported
-// [FW] the wave's type, by which PCM's converter calls its words (v395: LITE's ported); VariPhrase's words, not ported
-constexpr uint32_t kWaveTypeAt = 0xa7, kVariWords = 0x8939f2a0;
+constexpr uint32_t kWaveTypeAt = 0xa7;   // [FW] the wave's type, by which PCM's converter calls its words
 constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;          // [FW] EXTIN's converter's two bytes
 constexpr uint32_t kAnalogKind = 3, kExtinKind = 4, kVocoderKind = 5;   // [FW] the starts' kinds
 constexpr uint32_t kSwitchAt = 0, kTypeAt = 1;           // [FW] the record's OSC switch and type
@@ -147,28 +147,24 @@ void vocoderStart(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
 }
 
 // What PCM's converter calls by the wave's type: LITE's words (0x8939efa0, v395) on the input's part's Time Trip,
-// VariPhrase's (0x8939f2a0) not ported yet, or none
-using WaveWay = void (*)(Vc2SetOscInput&, const Vc2OscConvertIn&, uint32_t*, Vc2SetReads&);
-
-void liteWords(Vc2SetOscInput& in, const Vc2OscConvertIn& w, uint32_t* block, Vc2SetReads& reads) {
-    vc2OscPcmLite(bytesOf(in), w, reads.shared(), reads.tripMoving(in.part), block);
+// VariPhrase's (0x8939f2a0, v396), or none
+void liteWords(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
+    vc2OscPcmLite(bytesOf(in), reads.tripMoving(in.part), block);
 }
 
-void variWords(Vc2SetOscInput& in, const Vc2OscConvertIn&, uint32_t* block, Vc2SetReads& reads) {
-    reads.unportedOscKind(kVariWords, bytesOf(in), block);
-}
+void variWords(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) { vc2OscPcmVari(bytesOf(in), reads, block); }
 
-void noWords(Vc2SetOscInput&, const Vc2OscConvertIn&, uint32_t*, Vc2SetReads&) {}
+void noWords(Vc2SetOscInput&, uint32_t*, Vc2SetReads&) {}
 
+using WaveWay = void (*)(Vc2SetOscInput&, uint32_t*, Vc2SetReads&);
 // [FW] 0x8939e8c0's switch on the wave's type, 0…5; past 5 none
 constexpr std::array<WaveWay, 6> kWaveWays { liteWords, variWords, noWords, variWords, noWords, variWords };
 
 // PCM's (0x8939e300, v394): its own part, then its words by the wave's type
 void pcmConvert(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
-    const Vc2OscConvertIn w = worldOf(in, reads);
-    vc2OscPcmConvert(bytesOf(in), w, reads.shared(), block);
+    vc2OscPcmConvert(bytesOf(in), worldOf(in, reads), reads.shared(), block);
     const uint8_t type = bytesOf(in)[kWaveTypeAt];
-    (type < kWaveWays.size() ? kWaveWays[type] : noWords)(in, w, block, reads);
+    (type < kWaveWays.size() ? kWaveWays[type] : noWords)(in, block, reads);
 }
 
 // EXTIN's (0x8939e9e0, v393): the systems' byte +0x10203 and the input's part's header byte +0x1e besides

@@ -125,6 +125,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscExtinConvert.cpp
     Source/Vc2OscPcmConvert.cpp
     Source/Vc2OscPcmLite.cpp
+    Source/Vc2OscPcmVari.cpp
     Source/Vc2PartSettings.cpp
     Source/Vc2PartSettingsTables.cpp
     Source/Vc2PartSettingsWords.cpp

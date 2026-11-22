@@ -198,10 +198,10 @@ conv-lfo-level|kLfoLevel = 4;|kLfoLevel = 3;|vc2oscconv
 conv-held-no-top|int vc2OscHeld(int v, int least, int most) {\n    if (v > most) return most;\n|int vc2OscHeld(int v, int least, int most) {\n|vc2oscconv
 conv-held-float-no-top|float vc2OscHeld(float v, float least, float most) {\n    if (v > most) return most;\n|float vc2OscHeld(float v, float least, float most) {\n|vc2oscconv
 conv-held-float-no-floor|    return least > v ? least : v;|    return v;|vc2oscconv
-conv-keysum-no-centre|(key - kCentre) * kf; }|key * kf; }|vc2oscconv
-conv-follow-down|(keySum(key, coarse, kf) + kPerKey - 1) / kPerKey|keySum(key, coarse, kf) / kPerKey|vc2oscconv
-conv-follow-nearest|(keySum(key, coarse, kf) + kPerKey - 1) / kPerKey|(keySum(key, coarse, kf) + kPerKey / 2) / kPerKey|vc2oscconv
-conv-follow-second-key|    b.key = followedKey(key, coarse, kf);|    b.key = followedKey(u8(input, kSecondKeyAt), coarse, kf);|vc2oscconv
+conv-keysum-no-centre|static_cast<uint32_t>(key - centre) * static_cast<uint32_t>(kf);|static_cast<uint32_t>(key) * static_cast<uint32_t>(kf);|vc2oscconv
+conv-follow-down|vc2OscKeySum(key, coarse, kf, centre) + static_cast<uint32_t>(kPerKey - 1)|vc2OscKeySum(key, coarse, kf, centre)|vc2oscconv
+conv-follow-nearest|vc2OscKeySum(key, coarse, kf, centre) + static_cast<uint32_t>(kPerKey - 1)|vc2OscKeySum(key, coarse, kf, centre) + static_cast<uint32_t>(kPerKey / 2)|vc2oscconv
+conv-follow-second-key|    b.key = vc2OscFollowedKey(key, coarse, kf, kCentre);|    b.key = vc2OscFollowedKey(u8(input, kSecondKeyAt), coarse, kf, kCentre);|vc2oscconv
 conv-cents-no-a4|div(flt((int32_t)(p10 - kA4)), t.perTenth)|div(flt((int32_t)p10), t.perTenth)|vc2oscconv
 conv-cents-no-top|t.perTenth), t.centsLeast, t.centsMost)|t.perTenth), t.centsLeast, 1e9f)|vc2oscconv
 conv-cents-no-floor|t.perTenth), t.centsLeast, t.centsMost)|t.perTenth), -1e9f, t.centsMost)|vc2oscconv
@@ -218,8 +218,8 @@ conv-kf-swapped|d * (uint32_t)c.upper : (0u - d) * (uint32_t)c.lower|d * (uint32
 conv-gain-no-floor|    if (0.0f > g) g = 0.0f;\n|\n|vc2oscconv
 conv-gain-no-one|add(div(flt((int32_t)step), t.kfScale), 1.0f)|div(flt((int32_t)step), t.kfScale)|vc2oscconv
 conv-cal-level-7bit|vc2OscLevelWord(t, c.level)|vc2OscLevelWord(t, c.level & 0x7f)|vc2oscconv
-conv-p10-no-fine|p10 = (uint32_t)keySum(key, coarse, kf) + fine;|p10 = (uint32_t)keySum(key, coarse, kf);|vc2oscconv
-conv-key-p10-first-key|keySum(u8(input, kSecondKeyAt), coarse, kf)|keySum(key, coarse, kf)|vc2oscconv
+conv-p10-no-fine|p10 = vc2OscKeySum(key, coarse, kf, kCentre) + fine;|p10 = vc2OscKeySum(key, coarse, kf, kCentre);|vc2oscconv
+conv-key-p10-first-key|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, kCentre)|vc2OscKeySum(key, coarse, kf, kCentre)|vc2oscconv
 conv-key-cents-p10|    b.keyCents = centsFromA4(keyP10, t);|    b.keyCents = centsFromA4(p10, t);|vc2oscconv
 conv-pitch-sum-unscaled|div(mul(flt(in.sums.osc[kPitch]), t.depthMost), t.sumScale)|div(flt(in.sums.osc[kPitch]), t.sumScale)|vc2oscconv
 conv-pitch-top-64|vc2OscHeld(x, t.depthLeast, t.depthMost)|vc2OscHeld(x, t.depthLeast, t.depthMost + 1.0f)|vc2oscconv

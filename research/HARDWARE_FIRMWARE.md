@@ -3912,6 +3912,73 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's VariPhrase words (2026-11-22, v396) {#vc2-variphrase-words}
+
+What PCM's converter calls last for a wave of type 1, 3 or 5: `0x8939f2a0` (its switch at `0x8939e8c0`). Ported bit
+for bit as `vc2OscPcmVari` (Vc2OscPcmVari.cpp), its pool words in `Vc2OscConvertTables`, checked in xt_vc2sets'
+eighth part with rom.4's own routine running there. With it PCM's converter is whole. Every address is rom.4's; the
+offsets are the converter input's, the record's named as in v395's section.
+
+**Its ways, by the Playback Mode** (the input's +0x62), a switch at `0x8939f2c2` on the mode less 2:
+- STEP (2), at `0x8939f5d0`: with under two events (the wave's halfword +0xb4) it goes the default's way. Else +0xe4's
+  bits 0, 7 and 3 are cleared, and e is the step count (the input's +0x104) modulo the events less one.
+- EVENT (3), at `0x8939f2f0`: the same three bits cleared. With the wave's word +0xa0 clear, the first and the last
+  events. With it set, e is `0x8939c850`'s, the key's entry: the count n less one, a period p of n − 1 rounded up to
+  twelve keys (as a halfword), and ((key − 60) mod p) mod (n − 1), the first remainder made positive below 60; 0 when
+  n − 1 is 0.
+- RETRIGGER, LEGATO and past 3, at `0x8939f6f0`: bit 0 of +0xe4 = Loop Sw or the wave's flag +0xb0 clear, bit 7 set,
+  bit 3 cleared; +0xe8 and +0xf0 the Start Offset held below the length as LITE's, +0xec the length, all words.
+
+STEP's and EVENT's events are halfwords of the wave's events' table: its pointer the wave's word +0xc4, entries from
+its +12, read by `0x89300db0` byte by byte (little-endian; the address needn't be even). +0xe8 takes entry e, +0xec
+entry e + 1 (EVENT without the flag: entry n − 1), +0xf0 the first again, each a halfword. The port reads the table
+through `Vc2SetReads::waveHalf`.
+
+**Its pitch.** The pitch10s and the key as LITE's, about a centre key: 60, but in EVENT with the flag and the systems'
+byte +0x10204 set, 60 moved by whole periods to the key: (key − 60) for a key from 60, else (key − 59 − p), divided
+by p (C's division), times p as halfwords, plus 60. The part's OSC reader clears that byte (+0x10204 is the third
+system block's first, written 0), so rom.4 never takes it; it is ported as rom.4 has it. The key sum about a centre
+(`0x8939c8a0`, `0x8939c910`) is v251's `vc2OscKeySum` and `vc2OscFollowedKey`, which take the centre now, and LITE's
+words call the same, `vc2OscPitchAbout`.
+
+**Its cents** (+8, +0x68): for a type 1 with Vari Sw and Robot Voice Sw on (+0xe4's bit 4 set), against A4
+(pitch10 − 69000) ÷ 10; else against the wave's root key, as LITE's. Each held to ±6000, by three sets of pool words:
+A4's (`0x8939f8d0`, `0x8939f8d8`, `0x8939f8dc`), type 1's root (`0x8939f8d0`, `0x8939f8d8`, `0x8939fb78`) and the
+others' root (`0x8939fb7c`, `0x8939fb80`, `0x8939fb78`). +0xb0: 1 for a type 1, else the type.
+
+**Its last words:** +0xe4's bit 5 = Vari Sw off; +0x18, the level curve's word at Energy ÷ 32768 (`0x8939fb88`); the
+wave's 48 bytes from +0xcc into +0xb4; +0xe4's bit 6 = the wave's word +0xac set, bit 2 = Time Trip under way with
+Time Trip Sw, bit 1 = Tempo Sync Sw; +0xe5's bit 7 = Beat Keep; +0xe6's bits 2, 1 and 0 cleared.
+
+**The check.** VariPhrase's words run as rom.4's own on rom.4's side; only PCM's start stays hooked. At each case's
+start the check fills 136 KB at 0x8C040000 with noise for the events' tables, and every input's table pointer lies in
+its first 256 bytes, so its entries stay inside. A record is PCM's a time in four, the Playback Mode EVENT half the
+time, the key 0…127 half the time and a whole number of periods of 12 below 60 a time in four, the events' count
+0…24 or 0…2 mostly, else any or 32769…32832 (see the results), the step count small half the time, the table flag
+and the word +0xac 0 or a word with its low byte 0 half the time, Robot Voice 0 half the time, and the systems' byte
++0x10204 0 half the time (`variDrawn`). The refresh's records (v391's) are put
+back half the time now, a PCM record's moved byte one of its own three.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99 on the first run, and again on the final draws.
+- Every line and branch of Vc2OscPcmVari.cpp, Vc2OscPcmLite.cpp and Vc2OscConvert.cpp is reached, once EVENT was
+  drawn half the time and the key within 0…127 (before, the centre never saw a key below 60).
+- `mutate_vc2.py --sets`, the first run of 483: ten not caught. Six were no errors and came out of the list (a key of
+  60 counted below the centre, which gives 0 either way; the centre's quotient and its product's period as
+  halfwords, the period's local as a word, all cut to a halfword after; A4's least for the root's, the same value).
+  One had a plant that didn't build. The centre's own halfword cast needed a period from 32768, which the draw adds.
+  v391's refresh plants on a PCM record's last byte, caught at v391…v395, were missed: by the draws' numbers a run
+  had about 1.4 chances to show them; the refresh's draws above give it about 5.
+- The second run, of 477, missed four the first had caught or the draws reached too seldom: the table flag tested as
+  a byte (a word set with its low byte 0, now drawn a time in four when set: `testedWordDrawn`, LITE's last word's
+  draw too), a remainder below 60 made positive and the centre's quotient below 60 (both turn only at a key a whole
+  number of periods below 60, now drawn a time in four), and the centre's halfword cast. That one turns only for a
+  period of 32768…32828: with the quotient −1, the period read as a signed halfword turns the product positive, and
+  the centre passes 32767 only inside that window. The fourth count now aims there, and a record is PCM a time in
+  four.
+- The third run, of every OSC part plant on the final draws (477): all caught.
+- `--carrier`'s whole list, 394, all caught, the six on the key sum re-pointed to its new form.
+
 ### The VC-2's LITE words (2026-11-22, v395) {#vc2-lite-words}
 
 What PCM's converter calls last for a wave of type 0 (the input's +0xa7, from PCM's start): `0x8939efa0`, which it
@@ -3923,7 +3990,8 @@ offsets are the converter input's (the record from +8, the wave's words from +0x
 **Its pitch.** It forms the two pitch10s into the input's +0x94 and +0x98 and the key into the block's byte +4, the
 same integers v251's head forms (the key follow's sum on the key +3 and the second key +0x9c, coarse +0x88, Pitch KF
 +0xe, fine +0x90; the key by `0x8939c910`). PCM's converter writes neither. The port runs `vc2OscBlockConvert` on a
-copy of the input and takes them.
+copy of the input and takes them (from v396 `vc2OscPitchAbout` on v251's key sum, about a centre key, VariPhrase's
+words' too).
 
 **Its cents** (+8 from the first pitch10, +0x68 from the second) are against the wave's root key, not A4: (pitch10 −
 (wave +0xa8 − (signed) wave +0xa5) × 1000) ÷ 10, held to ±6000, the upper bound first. Its 10, 6000 and −6000 are its

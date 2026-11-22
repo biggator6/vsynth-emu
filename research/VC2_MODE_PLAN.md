@@ -739,6 +739,11 @@ version against rom.4's routines with what it calls hooked:
         the wave's root, the start sample held below the length, the switches (Time Trip under way through the part
         table, `Vc2SetReads::tripMoving`) and the wave's bytes; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The
         VC-2's LITE words"). Left: VariPhrase's words `0x8939f2a0` and PCM's start `0x8939e120`.
+      - VariPhrase's words done (v396): `vc2OscPcmVari`, the Playback Mode's ways (STEP's and EVENT's events from the
+        wave's events' table through `Vc2SetReads::waveHalf`, EVENT's key by periods about a moved centre), the pitch
+        about that centre on v251's key sum, which takes the centre now, the cents, the level and the flags;
+        xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase words"). PCM's converter is whole. Left:
+        PCM's start `0x8939e120`.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

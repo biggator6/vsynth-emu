@@ -121,6 +121,9 @@ public:
     // LITE's words' (v395): a part's Time Trip under way, its trip object's +8 (Vc2TripObject::moving) by the part table
     // 0x8993d040
     virtual uint32_t tripMoving(uint8_t part) = 0;
+    // VariPhrase's words' (v396): a halfword of a wave's events' table at its address, two bytes little-endian as
+    // 0x89300db0 reads them (the address needn't be even)
+    virtual uint16_t waveHalf(uint32_t at) = 0;
 };
 
 struct Vc2NoteMatrixWords {

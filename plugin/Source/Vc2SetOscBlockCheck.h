@@ -22,6 +22,9 @@ inline constexpr uint32_t kOscHoldAt = 0x11c, kOscBendAt = 0x174, kOscBeamAt = 0
 // trip objects the draws aim it at, in Vc2Fw's RAM
 inline constexpr uint32_t kOscPartTableAt = 0x8993d040, kOscTripMovingAt = 8;   // [FW]
 inline constexpr uint32_t kOscTripsAt = 0x8C03C000, kOscTripBytes = 0x28;
+// v396: the wave's events' tables VariPhrase's words read, in Vc2Fw's RAM: noise at a case's start, an input's table
+// pointer within its first 256 bytes, so its entries (from +12, up to 65,536 of two bytes) stay in it
+inline constexpr uint32_t kOscEventsAt = 0x8C040000, kOscEventsBytes = 0x22000, kOscEventsAims = 0x100;
 
 // The parts' OSC table (every header and record at a case's first draw, now and then a part's; the systems), the glide
 // keys, legato structs, Ms' bytes, groups and pitch source, an input, one of the four Ms, and the refresh's records

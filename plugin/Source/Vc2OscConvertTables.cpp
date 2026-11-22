@@ -58,10 +58,14 @@ auto pcmWords(Vc2OscConvertTables& t) {
     });
 }
 
-// [FW] LITE's words' (v395)
-auto litePoolWords(Vc2OscConvertTables& t) {
+// [FW] what PCM's converter calls by the wave's type: LITE's words' (v395) and VariPhrase's (v396)
+auto wavePoolWords(Vc2OscConvertTables& t) {
     return std::to_array<Vc2PoolWord>({
-        { 0x8939f2dc, &t.liteTenth }, { 0x8939f2e0, &t.liteCentsMost }, { 0x8939f2e4, &t.liteCentsLeast },
+        { 0x8939f2dc, &t.lite.tenth }, { 0x8939f2e0, &t.lite.most }, { 0x8939f2e4, &t.lite.least },
+        { 0x8939f8d0, &t.variA4.tenth }, { 0x8939f8d8, &t.variA4.most }, { 0x8939f8dc, &t.variA4.least },
+        { 0x8939f8d0, &t.variRoot.tenth }, { 0x8939f8d8, &t.variRoot.most }, { 0x8939fb78, &t.variRoot.least },
+        { 0x8939fb7c, &t.variRootOther.tenth }, { 0x8939fb80, &t.variRootOther.most },
+        { 0x8939fb78, &t.variRootOther.least }, { 0x8939fb88, &t.variLevel },
     });
 }
 
@@ -71,7 +75,7 @@ struct Read : Vc2OscConvertTables {
         vc2ReadPool(image, secondPartWords(*this));
         vc2ReadPool(image, extinWords(*this));
         vc2ReadPool(image, pcmWords(*this));
-        vc2ReadPool(image, litePoolWords(*this));
+        vc2ReadPool(image, wavePoolWords(*this));
         image.read(kFormantRowsAt, formantRows.data(), sizeof formantRows);
         detune[0].slope = 1.0f;   // [FW] 0x8939c744: the first line is x itself (+ fldi0's 0)
         detune[1].slope = 2.0f;   // [FW] 0x8939c75a: fldi1, doubled
