@@ -2,9 +2,9 @@
 // The VC-2 tone's LFO (v268): rom.4's object, 0x98 bytes word for word, over XtLfo.  rom.4's LFO code (0x893ac4f0…
 // 0x893ad720) is rom.2's opcode for opcode but for its pool's addresses, so its laws are XtLfo's, run on rom.4's words
 // and stored back.  The note-on is rom.4's own order on the words as they stand, where XtLfo::noteOn starts from a base
-// just built.  A key-unsynced note starts from another tone's LFO or a free object (v271, Vc2FreeLfos).  Bit for bit:
-// xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2's envelopes and LFOs", "The VC-2's free
-// LFOs".  Audio thread.
+// just built.  A key-unsynced note starts from another tone's LFO or a free object (v271, Vc2FreeLfos).  The settings
+// and release from v315.  Bit for bit: xt_vc2tone against rom.4's own routines.  HARDWARE_FIRMWARE.md, "The VC-2's
+// envelopes and LFOs", "The VC-2's free LFOs", "The VC-2's envelopes' and LFOs' settings and release".  Audio thread.
 #include <cstdint>
 
 class XtLfo;
@@ -68,6 +68,11 @@ public:
     void startFree(const uint32_t* block, float tempo, Vc2FreeLfos& frees);
     void tick(int32_t n);                // 0x893ad100
     void clock(float seconds);           // 0x893ad080
+    // 0x893acff0 (v315): a new block while the note sounds: its wave, rate, delay, fade, offset and fade mode, not its
+    // two syncs; the fade's times again in the direction the note-on chose, and a note value's step
+    void settings(const uint32_t* block);
+    // 0x893ac8c0 (v315): a key let go: the fade starts for the two modes that start it there, by the mode the note-on took
+    void release();
 
     Vc2LfoWords w {};
 

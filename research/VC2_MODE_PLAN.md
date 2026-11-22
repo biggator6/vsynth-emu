@@ -634,9 +634,9 @@ version against rom.4's routines with what it calls hooked:
 
      | Interface | Has a port | No port yet |
      |---|---|---|
-     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269), the free LFOs' manager (v271), the part's lists of tones and the mix's settings update (v273) | the envelopes' and LFOs' settings and release `0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`; the vibrato's key-off `0x893b2b60` (its +0x34 to 0) |
+     | `Vc2ToneParts` | OSC voices, TVA, COSM object, note-on and adapters; update and DSP (v262…v264); the envelopes and LFOs (v268), the mix (v269), the free LFOs' manager (v271), the part's lists of tones and the mix's settings update (v273); the envelopes' and LFOs' settings and release (v315) | the vibrato's key-off `0x893b2b60` (its +0x34 to 0) |
      | `Vc2OscParts` | carrier and kind 6 on the voice (v266), the vibrato (v267), players' installs, seeks | kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by address (`vc2Kind5Update` and `Vc2Kind6::set` are their ports, for the part's wiring) |
-     | `Vc2TvaParts` | the TVA itself | the fade's step, the word at `0x8993eb08`, which the TVA's converter writes (`0x893a67a2`, with a twin from `0x893a6eba`): version 8's; the event is the task's |
+     | `Vc2TvaParts` | the TVA itself; in the tone's parts' host from v317, its envelope and LFOs the tone's, the fade's step the part's word at `0x8993eb08` (`Vc2ToneCommon::fadeStep`, which C's TVA child writes, v285) | the event is the task's (the host's deriving class's `osEvent`) |
      | `Vc2MixerParts` | all nine | none |
      | `Vc2AutoNoteHost` | none | `0x89391dc0` (Auto Note's note + 12, posted when no key holds it), `0x89391e20` |
      | `Vc2MatrixParams` | `Vc2Params`' descriptors | the readers `0x89320760`, `0x89320790`, `0x893207b0`, `0x89320a50`, `0x89320f60` on the getter `0x89324350`: in the plugin, the host parameters |
@@ -660,22 +660,355 @@ version against rom.4's routines with what it calls hooked:
       `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have yet: open, for C's frame (version 7).
    3. The note W: constructor `0x89396520`, note-on `0x893965e0`, end `0x89396590`, the settings pass `0x89396650`, the
       update pass `0x893967a0`, the release `0x893968b0`, `0x89396910`, `0x89396950`.
+      - done (v275): `Vc2Notes`, with the placement `0x893964f0`, the start `0x89396630`, the two routines a tone is
+        given (`0x893964d0`, `0x893964e0`) and the hook word's initializer `0x89396960`; `xt_vc2notes`
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's notes"). The two passes are one code; `0x89396640` is a copy of the start
+        nothing calls. The notes' task sets the hook word to `0x893901a0` (version 10's).
    4. The key table: `0x89392190`, `0x893920c0`, `0x89391e90`, `0x89391ef0`, `0x89392670` and the held-key queries, held
       to `XtKeys.h` where rom.2's layout matches (step 1b found key assign equal).
+      - done (v276): `Vc2Keys`, the 66 key tables and the 129 portamento keys with every routine of theirs (the reset,
+        the pedals, the clear, the velocity factor, the five queries, the portamento keys' constructor, reset, note-on,
+        note-off and two initializers), the portamento keys' laws `XtKeyState`'s; their tables `Vc2KeysTables`;
+        `xt_vc2keys` (HARDWARE_FIRMWARE.md, "The VC-2 part's keys"). Left to the assigner: the voice's held bits
+        (`0x89391760`, `0x89391820`, `0x89391880`) and who aims a portamento key at its own channel's table.
    5. The assigner: `0x89396a80`, `0x89396c90`, `0x893969e0`, `0x89390860`, mono's `0x89390b20` and `0x89390b90`, the
       release path, the pedals, on faked voices' virtuals.
+      - first half done (v277): `Vc2Assigner`, the start `0x89390860` (the partner, the voice's +0x3c, the note-on,
+        the cost against the budget, the start, the prepared list spliced onto the sounding list's front), the class
+        builder `0x893969e0`, the partner `0x89390720`, the matching test `0x893913a0`, mono's retunes, the truncation
+        of a part's voices `0x893907d0` and a voice's `0x89391a50` with `0x89391a90` and `0x89391aa0`; xt_vc2voices'
+        second part (HARDWARE_FIRMWARE.md, "The VC-2 part's assigner, its first part").
+      - second half done (v278): the release path (`0x89391760`, `0x89391820`, `0x89391880`; over a key table's
+        voices `0x89390c00`, `0x89390cd0`, `0x89390d10`, `0x89390d50`, `0x89390da0`, `0x89390e20`) and the part
+        node's note start `0x89396a80` and note-off `0x89396c90` on v276's keys; xt_vc2voices' third part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's assigner, its second part"). Item 5 done.
    6. The voice's virtuals (`0x89397130`, `0x893970b0`, `0x893971f0`, `0x89397280`, `0x893972d0`, `0x893973a0`) and the
       update queue at `0x89989cc4` (`0x89394f30…0x893951b0`).
+      - done (v279): `Vc2VoiceClass`, the six virtuals and the words they set from a portamento key (`0x89391ae0`,
+        `0x89391b40`), C's routines and the note's through `Vc2VoiceClassParts`; `Vc2UpdateQueue`, the one queue word
+        for word with its constructor, initializer, link, unlink, enqueue, move on, pass on, take off, waits and move
+        (a node's constructor `0x89394f30` is v272's `vc2ConstructNode`'s); xt_vc2voices' fourth part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's voices' virtuals and update queue").
    7. C's frame: `0x893a76d0`, `0x893a7a20`, `0x893a7b20`, `0x893a7c50`, `0x893a7cc0`, `0x893a7df0`, `0x893a7f10`, and
       the note's M (`0x893a5db0`, `0x893a5fe0`, `0x893a6010`, `0x893a61f0`), its children behind an interface.
+      - done (v280): `Vc2Sets`, C's 24 sets word for word and its seven routines (and the placement), each a pass over
+        the children by a table of kinds behind `Vc2SetParts`; `Vc2NoteMatrices`, the notes' 24 M word for word, the
+        constructor and update (the end and copy are bare returns); xt_vc2sets (HARDWARE_FIRMWARE.md, "The VC-2 part's
+        conversion sets and the notes' Matrix"). The children of item 8 are the common, mix, envelopes, LFOs and TVA;
+        the OSC blocks' and COSM inputs' are behind the same interface, their converters v251's, v256's and v235's.
    8. C's children with no port, a version each: the common's (`0x893a1940…`), the envelopes' (`0x8939a620…`), the LFOs'
       (`0x8939b690…`), the mix's (`0x8939bd90…`), the TVA's (`0x893a67d0…`).
+      - the common's done (v281): `Vc2SetCommons`, its 24 words, constructor, conversion, update, copy and its twin
+        `0x893a1870` (the block at W+0xc); xt_vc2sets' second part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets'
+        common").
+      - the envelopes' done (v282): `Vc2SetEnvelopes`, the 312 words, constructor (the tempo), conversion, update,
+        copy, release and the block writer `0x8939a3d0` with the Matrix's sums, the time curve, its quarter and the
+        key's factor; their tables `Vc2SetEnvelopeTables`; xt_vc2sets' third part (HARDWARE_FIRMWARE.md, "The VC-2
+        part's sets' envelopes").
+      - the LFOs' done (v283): `Vc2SetLfos`, the 120 words, constructor, conversion, update, copy and the block writer
+        `0x8939b590` (the waveform, the rate by note value or by the rate table with the Matrix's sum `0x8939b450`, the
+        two depths squared, two switches, the key sync); what they share with the envelopes in `Vc2SetChildHead`;
+        xt_vc2sets' fourth part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' LFOs").
+      - the mix's done (v284): `Vc2SetMixes`, the 24 words, constructor, conversion, update, copy and the block writer
+        `0x8939bcc0` (off, the level table by type, the crossfade's two pairs, 1.0, or 0.7); on `Vc2SetChildPool` with
+        the voice's bytes at +1; xt_vc2sets' fifth part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' mix").
+      - the TVA's done (v285): `Vc2SetTvas`, the 24 words, constructor and conversion (the velocity curve's level),
+        update, copy and the block writer `0x893a6260` (the level with CC 7 and 11, two depths, the pan with CC 10,
+        the outputs by a route, two sends with CC 93, the part's gain, the global step); xt_vc2sets' sixth part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' TVA"). Item 8 is done.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.
+      - the readers of item 8's tables done (v286): `Vc2PartSettings`, the common's, envelopes', LFOs', mix's and
+        TVA's readers and their systems', on `Vc2PartParams`; xt_vc2settings (HARDWARE_FIRMWARE.md, "The VC-2 part's
+        settings by ID"). Left: the mode row, the part's bytes, the OSC rows, the COSM inputs, `0x893a72f0`, the
+        dispatchers, the Category and budget and the nodes.
+      - the part's bytes and the COSM inputs done (v287): `0x893a8250` and `0x89399ed0` with their rows, the types'
+        runs by `Vc2PartSettingsTables`; xt_vc2settings' second part. Left: the mode row (it sends messages to the
+        part's channels), the OSC rows, `0x893a72f0`, the dispatchers, the Category and budget and the nodes.
+      - the OSC table's readers done (v288): the systems' `0x893a1000` and `0x893a1060` and the part's `0x893a1410`,
+        its header with rom.4's twelve IDs and each block's six velocity pairs; the OSC block's own reader
+        `0x893a04e0` behind `Vc2PartParams::oscBlock`; xt_vc2settings' third part (HARDWARE_FIRMWARE.md, "The VC-2
+        part's settings by ID: the OSC table"). Left: the OSC block's reader (v289), the mode row, `0x893a72f0`, the
+        dispatchers, the Category and budget and the nodes.
+      - the OSC block's reader done (v289): `0x893a04e0`, its 63 reads as rows in rom.4's order, Random Pitch Depth's
+        switch as its law, the Wave Number's change clearing part 0's step count (`0x89989c84`), kind 0's Type 2 taking
+        the Harm Formant's three; xt_vc2settings' fourth part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID:
+        the OSC block's reader"). The VC-2 takes part 0 alone on this path (the handler `0x89392830`). Left: the mode
+        row, `0x893a72f0`, the dispatchers, the Category and budget and the nodes.
+      - the vocoder reader done (v290): `0x893a72f0`, the vocoder's settings struct (Formant Shift's ratio by powf, a
+        template's offsets from rom.4's records when Auto Note is on with an EXTIN OSC), Unvoice Level into kind 6's
+        global, the part mixer's Direct Sound and sends and its targets, Auto Note's switch and legato, robot human
+        depth, the vocoder's mode and settings, through `Vc2SettingsParts`; xt_vc2settings' fifth part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the vocoder reader"). Left: the mode row, `0x89396f90`,
+        the dispatchers, the Category and budget and the nodes.
+      - the mode row and Auto Note's switch done (v291): `0x89396f70` (`0x89396e20`), the parts' settings at
+        `0x89995390` (the key's offset, mono, Legato, Patch Tempo, the zones' upper keys by `0x89320870`, Vocoder Sw,
+        Split Point, Modulator Key Mode), All Sound Off to the part's nodes' channels when the Mode moves or Vocoder Sw
+        goes off, through `Vc2SettingsParts`; the nodes' words (`Vc2PartNodes`); `0x89396f90`, an EXTIN OSC on kind 0
+        or 1 taking the part's Auto Note On Switch; xt_vc2settings' sixth part (HARDWARE_FIRMWARE.md, "The VC-2 part's
+        settings by ID: the mode row and Auto Note's switch"). Left: the dispatchers, the Category and budget and the
+        nodes.
+      - the dispatchers and G's channel word done (v292): `0x8939b170` (every reader of a part in rom.4's order, the
+        Matrix's settings v247's), `0x8939b0d0`, `0x8939b110`, `0x8939b140`, and `0x893a5050` through
+        `Vc2ChannelStates`; v247's record now tests flag 0 after its reads too, as rom.4's does; xt_vc2settings' seventh
+        part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the dispatchers and G's channel word"). Left: the
+        nodes, the Category and budget, the static M and event 0x200.
+      - the nodes done (v293): `Vc2PartNodes`' routines, the channel's move `0x89393100` on the lists at `0x899890d0`,
+        the class installs `0x893932c0` and `0x89393310` on the part objects at `0x8998246c` with the class bytes, the
+        voices' stop `0x89393360` through `Vc2NodeParts`, and `0x893904d0` on `Vc2Keys`; xt_vc2keys' second part
+        (HARDWARE_FIRMWARE.md, "The VC-2 part's nodes"). The init `0x89393370` is item 10's. Left: the Category and
+        budget, the static M and event 0x200.
+      - the Category and budget done (v294): `0x89392c60`, the budget less 400 for every Category 0…11 but 6, the held
+        note's word `0x899891d0` for 10 and 11, All Notes Off to part 0's node of source 4's channel, the node's word's
+        voices truncated, Auto Note's switch, all notes off with no note held, through `Vc2SettingsParts`;
+        xt_vc2settings' eighth part (HARDWARE_FIRMWARE.md, "The VC-2 part's settings by ID: the Category and budget").
+        Left: the static M's initializers and event 0x200 (the notes' task's: item 10).
+      - the static M done (v295): `Vc2StaticMatrix`, its 0x290 bytes at `0x89997108` (M, links, its queue node and
+        vtables, the levels, its own channel state, the unreceived channel word, three floats), the static initializer
+        `0x893a3020` and the part's init `0x893a2fe0`, the channel state's set-up and the enqueue through
+        `Vc2StaticMatrixParts`; xt_vc2settings' ninth part (HARDWARE_FIRMWARE.md, "The VC-2 part's static M"). Item 9
+        is done but for event 0x200, which the notes' task raises and handles: item 10's.
    10. The front and the tasks: the MIDI dispatcher `0x8938fed0`, the controllers `0x89392f90` and `0x89394440`, the
        mailbox, the three tasks in one block order, the part mixer, vocoder, tracker and Auto Note joined: `Vc2Synth`,
        with `xt_vc2tone` playing rom.4's whole tone.
+       - the system readers the parameters' messages run done (v296): Time Trip's assigns `0x893943f0`, Patch Remain
+         `0x89391520`, the voices' counts `0x89391550` (each against its last read at `0x8993d02c`, to v272's reserve
+         and setters), and the budget `0x893937b0`, the Category routine's second half; xt_vc2settings' tenth part
+         (HARDWARE_FIRMWARE.md, "The VC-2 part's system readers and budget"). Next: the parameters' messages
+         themselves (`0x89392890` by kind, the part's `0x89392830`, `0x89392b10`, `0x89392720`, `0x89392750`,
+         `0x8939b0c0`, `0x89394370`), the receive channel's nodes `0x89393fd0`, then the controllers.
+       - the parameters' messages done (v297): `0x89392890` by kind as a table of ways and the part's `0x89392830`,
+         with `0x89391500`, `0x89392750` and `0x89394370`, on `Vc2PartWorld`; the reload task's request `0x8939af40`
+         and run `0x8939af10`, the receive channel `0x89393fb0`, the routing's reset `0x89393e30` and every voice's
+         truncation `0x89391120` through `Vc2SettingsParts`; xt_vc2settings' eleventh part (HARDWARE_FIRMWARE.md, "The
+         VC-2 part's parameters' messages"). Next: the receive channel `0x89393fd0` and the routing's reset
+         `0x89393e30` (the parameter store's read objects `0x893206f0`/`0x89320700`, `0x89318a20`/`0x89318a90`), the
+         reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the controllers.
+       - the receive channel done (v298): `0x89393fd0` for a part (its Receive Switch and Channel, the store's record
+         IDs 0, 1, 2 and 52 read to no effect, its four sources' nodes moved and glides aimed, part 0's change heard
+         by controllers 121, 123, 120 and all notes off or the held note's event `0x89391e50`) and part 0's
+         `0x89393fb0`, each answering 1; the event through `Vc2SettingsParts::heldNoteOn`; xt_vc2settings' twelfth
+         part (HARDWARE_FIRMWARE.md, "The VC-2 part's receive channel"). Next: the routing's reset `0x89393e30`, the
+         reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the controllers.
+       - the routing's reset done (v299): `0x89393e30` (ChordMemory Switch's change against `0x8993d03c`, all notes
+         off; with its flag every node to no channel, every glide on the spare table and reset, each channel's
+         Hold-press byte at `0x899893e0` set and its key tables reset, part 0's receive channel, part 0's node of
+         source 1 the held class), answering 1; xt_vc2settings' thirteenth part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's routing reset"). Next: the reload task (`0x8939af10`, `0x8939af40`, `0x8939ae50`), then the
+         controllers.
+       - the reload objects done (v300): `Vc2PartReloads`, rom.4's 16 OS timer objects at `0x89996120` and the three
+         floats after them, the static initializer `0x8939b350` with the constructor `0x8939b260`, the cancel
+         `0x8939ae50`, the run `0x8939af10`, the request `0x8939af40`, the fire `0x8939b020` and the notes' message
+         `0x8939b050`; the queue's add and remove and the part's read through `Vc2ReloadParts`; xt_vc2settings'
+         fourteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's reload objects"). Next: the controllers
+         (`0x89392f90`, `0x89394440`), then the part's init (`0x8939b200`, `0x89393370`) and the MIDI dispatcher.
+       - the controllers done (v301): `Vc2PartControllers`, the controller `0x89392f90` (the number's object's virtual,
+         then each node on the source's channel's list through the part's controller) and the part's controller
+         `0x89394440` (Time Trip Assign X and Y on the part's trip object, Reset All Controllers its rest); the number's
+         objects, a word's first byte, the part table and the trip object's `0x893b0610` and `0x893b0460` through
+         `Vc2ControllerParts`; xt_vc2settings' fifteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's controllers").
+         Next: the part's init (`0x89393370`, which makes the 128 number objects, and `0x8939b200`), the Time Trip
+         object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
+       - the controller numbers and the part's init done (v302): `Vc2PartNumbers`, the 128 number objects at
+         `0x89988cd0` and their table `0x899891e0`, made by class (twelve, as rows), the controller's virtual by the
+         object's class through `Vc2NumberParts`, and the init `0x89393370` (part 0's nodes, the keys' and glides'
+         static initializers, the lists cleared, the numbers); v301's call out given the value it left out;
+         xt_vc2settings' sixteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's controller numbers and init"). Next:
+         the classes' handlers (`0x893938d0` with the listeners' `0x89390ea0`, Hold `0x89393980`, `0x89393a10`,
+         `0x89393a70`, `0x89393ac0`, `0x89393ba0`, `0x89393c10`, `0x89393c80`, `0x89393ce0`), then `0x8939b200`, the
+         Time Trip object and the MIDI dispatcher.
+       - the number classes' handlers done (v303): each a class row's way on `Vc2PartNumbers` (the base's listeners,
+         Hold by the channel's Hold-press byte, Sostenuto, CC 84's key, Reset All Controllers, All Sound Off, Mono,
+         Poly, the notes off) and the glides' held flags of a channel's nodes `0x89393000`; the listeners
+         `0x89390ea0`, the vocoder's pedal and v278's release path through `Vc2NumberParts`; v299's byte the Hold's
+         press, not its release (`holdPresses`); xt_vc2settings' seventeenth part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's controller handlers"). Next: the listeners' run `0x89390ea0` (the list at `[0x899826e0]`), `0x8939b200`,
+         the Time Trip object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
+       - the part's start-up done (v304): `vc2PartStartUp`, rom.4's `0x89392ab0`, the notes' task's first call: Time
+         Trip's assigns and the two bytes after them −1, the routing object's bytes and floats (π, π/2 by acosf's
+         constant), the settings object's +0x14, then the part's init, v272's voices' and lists' inits and `0x8939b200`
+         (part 0's reload object idle, eight bare returns, the static M's part init); its words `Vc2PartStartWords`;
+         xt_vc2settings' eighteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's start-up"). Next: the listeners' run
+         `0x89390ea0`, the Time Trip object (`0x893b0610`, `0x893b0460`), then the MIDI dispatcher `0x8938fed0`.
+       - the listeners' run done (v305): `Vc2Assigner::notify`, rom.4's `0x89390ea0`, each sounding voice whose key
+         table's channel state is the one given, its +0x48 virtual (the note's change test) with its +0x3c, through
+         `Vc2AssignParts::changed`; xt_vc2voices' fifth part (HARDWARE_FIRMWARE.md, "The VC-2 part's listeners' run").
+         Next: the Time Trip object (`0x893b0610` the set, `0x893b0460`, `0x893b04d0`, `0x893b0540` the moves, the
+         polar table `0x89543f18` through `0x893b0690`, the steps `0x893b0790`, `0x893b1780`), then the MIDI dispatcher
+         `0x8938fed0`.
+       - the Time Trip done (v306): `Vc2TripRecords`, the 16 part records at `0x89989408` and their static
+         initializer `0x89394570`, the trip object's constructor `0x893b0400`, rate `0x893b05b0`, set `0x893b0610` and
+         X-Y move `0x893b0460` with the position `0x893b0690` (the polar table), the steps `0x893b0790` and the
+         broadcast `0x893b1780` to the sounding tones' +0x48 through `Vc2TripParts`; v301's front the trip object and
+         the pad; xt_vc2settings' nineteenth part (HARDWARE_FIRMWARE.md, "The VC-2 part's Time Trip"). Next: the MIDI
+         dispatcher `0x8938fed0`, the mailbox and the three tasks, then Vc2Synth.
+       - the channel messages done (v307): `Vc2PartChannel`, the note-on `0x89392da0` and note-off `0x89392e70` (Auto
+         Note's source 4 on source 3's tables through the pitch source `0x89989748` and its On Switch, the key
+         tables', the nodes' part objects' +0x0c and +0x18, v278's release over a key table) and the three that tell
+         the listeners (`0x893930a0`, `0x893930c0`, `0x893930e0`, one code); the program change a bare return; v303's
+         key table, channel state and node walk shared; xt_vc2settings' twentieth part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's channel messages"). Next: the dispatcher `0x8938fed0` (the status classes `0x8938fe50`, the parameters'
+         message `0x89390230`, the 0x41 messages, 0x70), the mailbox and the three tasks, then Vc2Synth.
+       - the MIDI dispatcher done (v308): `vc2MidiDispatch`, rom.4's `0x8938fed0` by the status's class `0x8938fe50`:
+         the channel messages to their handlers (a note-on of velocity 0 the note-off at 64, none while `0x89981904`
+         is set), the parameters' messages 0x40 and 0x41 (a kind-3 word's Out DC cut for TG into `0x893955e0` first,
+         then v297's routines) and 0x70's reset `0x89390340`; the calls out through `Vc2MidiParts`; xt_vc2settings'
+         twenty-first part (HARDWARE_FIRMWARE.md, "The VC-2 part's MIDI dispatcher"). Next: the mailbox and the three
+         tasks (to be read: the routines before the dispatcher, `0x8938fc00`…`0x8938fec4`, which set event flags at
+         `0x8994fec8` through `0x89301830`), then Vc2Synth.
+       - the notes' task's pass done (v309): `vc2NotesTaskPass`, rom.4's loop body `0x8938fc72`…`0x8938fdac` on the
+         events its wait gives (the MIDI queue drained, the ended scan, the reset while `0x89981904` is set, the
+         schedule once per count, all notes off on source 3 with Auto Note's key let go, Auto Note's note-off and
+         note-on, the aftertouch, a held C4), each on source 4's part 0 node's channel; through `Vc2NotesTaskParts`;
+         xt_vc2settings' twenty-second part (HARDWARE_FIRMWARE.md, "The VC-2 part's notes' task"). Next: the mailbox
+         (the queue's drain `0x893110b0` and what posts to it), the update task `0x893952b0` and the block task
+         `0x89395ac0`, then Vc2Synth.
+       - the update task's pass done (v310): `vc2UpdateTaskPass`, rom.4's loop body `0x89395316`…`0x89395414` on its
+         wait's events (the timer's: with ticks elapsed, each node on v279's update queue given its +0x0c under the
+         queue's lock and taken off on an answer of 0, then the ticks measured into the time struct `0x8993d084`; the
+         update's: the pitch source and the voices' update `0x893b16a0`); through `Vc2UpdateTaskParts`; xt_vc2voices'
+         sixth part (HARDWARE_FIRMWARE.md, "The VC-2 part's update task"). The queue's drain `0x893110b0` is the OS
+         library's MIDI byte reader: the plugin's host gives parsed messages, as XtSynth's `tgNoteOn` takes them for
+         rom.2, so the wiring may hand them to v308's dispatcher directly. Next: the block task `0x89395ac0`, then
+         Vc2Synth.
+       - the voices' update and schedule done (v311): `Vc2PartMixer::updateTones` and `scheduleTones`, rom.4's
+         `0x893b16a0` (the blocks since its last in 10 ms ticks, at least 1, to each tone's +0x0c, then the vocoder's
+         glue on the carried word) and `0x893b1710` (the blocks since its last in seconds, a block's when none, to the
+         free LFOs' clock and each tone's +0x30 and +0x3c), on v227's words; xt_vc2mixer's second part
+         (HARDWARE_FIRMWARE.md, "The VC-2 part's voices' update and schedule"). The block task `0x89395ac0` is the DMA's
+         and interrupts' plumbing around the part mixer (its input frames' pointer, then `0x893b1820`), which
+         processBlock is in the plugin: the wiring's, not a port. Next: Vc2Synth.
+       - the update queue with the static M's node done (v312): v279's queue given the static M's node at
+         `0x89997278` (`Vc2UpdateQueue::setNode`), every routine and v310's walk reaching a node's words through one
+         view, `slotsOf`, the head's, the node given's or a voice's; the walk runs M's init `0x893a2ee0` on the static
+         M (its class's +0x0c −0x170, +0x14 the routine); xt_vc2voices' seventh part (HARDWARE_FIRMWARE.md, "The VC-2
+         part's update queue with the static M's node"). The update task's timer is the OS's, registered by the task's
+         start `0x893952b0` with a period of 10 (the kernel's unit taken to be ms, as rom.2's note-on takes its
+         clock), its routine `0x893952a0` a tick added to `0x8993d080` and event 2 posted; so Vc2Synth runs the update
+         task's timer pass every 10 ms, 441 samples. Next: Vc2Synth.
+       - rom.4's MIDI channel states done (v313): `Vc2OsMidi`, the OS library's MIDI task's handler `0x89314e90` and
+         its channel-state module, the 32 states and 48 port objects with their initializers `0x89317d00` and
+         `0x89317910`; xt_vc2midi (HARDWARE_FIRMWARE.md, "rom.4's MIDI channel states"). It puts right v310's "the
+         wiring may hand parsed messages to the dispatcher directly": the part only reads the channel states (the
+         controllers, bend and pressures), and only this handler writes them, on the XT most likely before the part's
+         dispatcher sees the message, so Vc2Synth runs it on each message first. The OS's part objects, its listeners,
+         turn some messages into parameter edits: a patch change by Bank Select and Program Change, Portamento Time and
+         Switch by CC 5 and 65, Mono and Poly by CC 126 and 127, the bend range and tunes by RPN 0…2, the scale tunes
+         by SysEx. They are not ported. They are the plugin's side's to decide with the parameters as a host sees them
+         (step 5), and Vc2Synth gives them through `Vc2OsMidiParts`. Next: Vc2Synth.
+       - Vc2Synth's frame and start done (v314): `Vc2Synth`, every port's object of the part at its address, started
+         as rom.4's static initializers leave them in its table's order, with the .data and .bss words and the rows
+         no port runs; xt_vc2synth (HARDWARE_FIRMWARE.md, "The VC-2 part as one object: Vc2Synth's start"). C's
+         `Vc2LfoWords` and `Vc2MixWords` renamed `Vc2SetLfoWords` and `Vc2SetMixWords`: they shared their names with
+         the tone's. Next: the tones' own parts in Vc2Synth (24 tones' two OSC voices, two COSMs, TVA, mix and
+         modulators), C's OSC-block and COSM-input children (unported: 0x8939fe00 and its kin, Random Pitch's seed),
+         then the tasks' wiring: the OS model of events and waits, the three tasks in one block order, MIDI through
+         v313's handler, then v308's dispatcher.
+       - The envelopes' and LFOs' settings and release done (v315): `0x893ac110`, `0x893ac470`, `0x893acff0` and
+         `0x893ac8c0`, rom.2's word for word, as `Vc2ToneEnvelope::settings` and `release` and `Vc2ToneLfo::settings`
+         and `release` on XtEnvelope's and XtLfo's laws, their hooks out of xt_vc2tone (HARDWARE_FIRMWARE.md, "The
+         VC-2's envelopes' and LFOs' settings and release"). The tone's parts' host needed them.
+       - The tones' parts' host done (v316): `Vc2ToneHost`, `Vc2ToneParts` for the parts the port has whole (a tone's
+         envelopes, LFOs and mix, the free LFOs, the lists, the bindings' flags) on what every tone shares
+         (`Vc2ToneCommon`), the code xt_vc2tone's port side joined them with, moved into the plugin; the parts not
+         joined yet a deriving class's (HARDWARE_FIRMWARE.md, "The VC-2 tone's parts' host"). Next: the TVA joined,
+         then the COSMs, then the OSC voices; with the three the host is whole and Vc2Synth holds 24.
+       - The TVA joined (v317): the host's `Vc2Tva`, its envelope and LFOs the tone's own through the modulators, its
+         fade's step the part's word 0x8993eb08 (`Vc2ToneCommon::fadeStep`), the OS's event the deriving class's; the
+         tone's input 0x738 bytes, the TVA's block whole (HARDWARE_FIRMWARE.md, "The TVA in the tone's parts' host").
+         The fade step's entry in the interfaces' table is closed. Next: the COSMs, then the OSC voices.
+       - The COSMs joined (v318): the host's two COSM objects, a `Vc2CosmDsp` each and the note-on frame, the host their
+         bound (`Vc2ToneModulators::wordAt`); `Vc2ToneCommon` gains the pools and the three words past buffer c; a
+         sound takes its note at the install the tone's note-on ends with, and keeps that mode (HARDWARE_FIRMWARE.md,
+         "The COSMs in the tone's parts' host"). Found: rom.4's note-on holds the install pass
+         inline, nothing reaching `0x893b4060`, so a COSM's mode never changes mid-note in the part. Next: the OSC
+         voices, then Vc2Synth's 24 hosts.
+       - The OSC voices joined (v319): the host's two `Vc2OscVoice`s, every part a tone has; each voice's parts a
+         `Vc2ToneOscLink`, its address and the tone's own envelopes' and LFOs' words the host's, the rest (a kind's
+         routines by rom.4's address, the OS's clock, the wave's records, the mic ring, the unvoiced decision) the
+         deriving class's `oscOutside`; `Vc2ToneCommon` gains the shared routines (HARDWARE_FIRMWARE.md, "The OSC voices
+         in the tone's parts' host"). Found: the tone drops the install's answer; an install writes no render for a
+         type or code it has no player for; the analog's install reads the code's copy at +0x248; only a note-on
+         writes a voice's kind and flag. Next: Vc2Synth's 24 hosts, what a voice calls beyond the tone the part's.
+       - The shared routines for the plugin (v320): `Vc2ToneMath`, a `Vc2ToneShared` on XtOsc's velocity curve and exp2
+         (rom.2's ports of rom.4's `0x893a7fb0` and `0x893a8340`, equal over what the part gives) and Vc2LibMath's
+         logf and powf; xt_vc2libm's second part (HARDWARE_FIRMWARE.md, "The VC-2's shared routines for the plugin").
+         The checks keep rom.4's own (`RomShared`). Next: Vc2Synth's 24 hosts on it.
+   11. The OSC kinds' routines the voice still reaches by rom.4's address (the user's choice, 2026-11-20: these before
+       Vc2Synth holds the 24 tone hosts, so that each kind sounds once the hosts are in). The voice calls them through
+       `Vc2OscParts` (`kindCall`, `kindSettings`, `renderBy`, `seek`, `objectCall`, `eventPosition`); xt_vc2osc hooks them
+       (`Vc2OscFakes.cpp`'s table, 59 rows at v320). Each joins the voice as v238…v248 joined the installs and note-ons: a row's
+       way in `Vc2OscVoiceKinds.cpp`, its hook out of the table, rom.4's own running in xt_vc2osc and xt_vc2tone. By
+       what each stands on (VC2_VOCAL_DESIGNER.md, "The VariPhrase players and key assign in rom.4"):
+       1. Kinds 5's and 6's updates, `0x893afff0` and `0x893b0150`: the first ported as `vc2Kind5Update` (v222, on the
+          input stage's peak at `0x899d9a5c`, which `Vc2OscParts` doesn't give yet), the second the note-on's kind-6
+          laws ending in `Vc2Kind6::set`. With them kinds 5 and 6 are whole but for kind 6's first routine, below.
+       2. The EXT IN player, kinds 4 and 7 and kind 6's first update: `0x893c6260` (update), `0x893c62e0` and
+          `0x893c61e0` (renders), on the effect chip's returned words, against rom.2's (`0x895097d0`, v203's
+          `XtOscVoice::extIn`).
+       3. Vari off's renders joined (`0x893c63c0`, `0x893c66e0`, v261's ports), with the wave's samples through the
+          voice's parts.
+       4. LITE: its update `0x893c8280` and settings `0x893c8390`, its object routine `0x893cbf40`, its heads' renders
+          `0x893c6e80`/`0x893c6e8c` on `XtLitePlayer` (rom.4's backward reads the right way up: a switch), kind 1's mode 1
+          (`0x893c9f60`, its set-up `0x893cc760`), its seeks `0x893c6360`, `0x893cc830`, `0x893c6de0`.
+       5. VariPhrase: its update `0x893c88b0` and the routine after it `0x893c8670`, its settings `0x893b0280`, the event
+          lookup `0x893cc0d0`, its seeks `0x893cc630`, `0x893cd090`, `0x893cd440`; the players' renders on rom.2's ports
+          given rom.4's object layout (the insert at +0x94): BACKING `0x893cadc0` and ENSEMBLE `0x893ca1f0` on
+          `XtMbPlayer`, SOLO `0x893c9450` on `XtSoloVoice` (Robot Voice rom.4's own, open), the period-jump player
+          `0x893ca8b0`.
+       6. The analog OSC's 19 renders, its installs' (`0x893c2ad0`, `0x893c3e60`), against rom.2's `XtAnalog`.
+       Then Vc2Synth's 24 hosts, what is left beyond the tone (the OS's clock, the wave's records, the mic ring, the
+       unvoiced decision, the input stage's peak, the chip's words) the part's.
+       - Kinds 5's and 6's updates (v321): `0x893afff0` by v222's `vc2Kind5Update` on the voice's own words, the
+         input stage's peak through `Vc2OscParts::inputPeak` (the tone host's link the deriving class's), and
+         `0x893b0150` (the ratio on its own pool, the formant, the gain and kind 6's level into P, then
+         `Vc2Kind6::set`), rows `Vc2OscUpdate::carrier` and `kind6`; their hooks out of xt_vc2osc, which now draws
+         the peak and P's growl, balance and Dynamics words as a note gives them (HARDWARE_FIRMWARE.md, "The VC-2's
+         kinds 5 and 6 updates on the voice"). Found: those words lie over the block's record pointers a player's
+         note-on reads; the pitch ramp's gain factor is 1 in the part, nothing calling the restart that gives it a
+         depth. Next: the EXT IN player.
+       - The EXT IN player (v322): its update `0x893c6260` (the ratio and gain into the object; kinds 4 and 7, and
+         kind 6's first, a row's flag `extInFirst` where an address was) and its renders `0x893c62e0` and `0x893c61e0`
+         on v203's `XtExtInPlayer`, found by the address the install writes (`renderExtIn`), the frames through
+         `Vc2OscParts::inputFrames` (`[0x8993eadc]`, the part mixer's input); their hooks out of xt_vc2osc
+         (HARDWARE_FIRMWARE.md, "The VC-2's EXT IN player"). Found: rom.4's stereo render is rom.2's player's code on
+         the frame's words 0 and 1, and the mono one the same on word 4; the player's output must stay within full
+         scale for the tone's delay mix, which moves its delay by it. Next: Vari off's renders.
+       - Vari off's renders joined (v323): `0x893c63c0` and `0x893c66e0` (v261's ports) on the wave the object's +0xf4
+         points into, through `Vc2OscParts::waveSamples`; the voice's renders one table by address (`renderOwn`, the
+         EXT IN two its rows too), any other still out; their hooks out of xt_vc2osc, v261's draws of the wave and the
+         words shared (HARDWARE_FIRMWARE.md, "The VC-2's Vari off renders on the voice"). Next: LITE.
+       - LITE's update and settings (v324): `0x893c8280` (the targets into the object by the wave's type, type 2's
+         filter rate) and `0x893c8390` (the object's three bits and their side effects, then type 0's Vari off side
+         or type 2's heads' loops through the record the note-on's head names), kind 1's row's ways; the parts they
+         share with the note-ons factored out of them (HARDWARE_FIRMWARE.md, "The VC-2's LITE update and settings").
+         Next: LITE's object routine, heads' renders, mode 1 and seeks.
+       - The players' beat and seeks (v325): LITE's object routine `0x893cbf40` and the reset `0x893cbfe0` its seeks
+         end in are rom.2's beat start and reset (`0x8950f860`, `0x8950f900`), run as XtBeat's on the object's words;
+         Vari off's seek `0x893c6360` and the heads' `0x893c6de0` (rom.2's `0x89509840`, `0x8950a780`, four bytes up)
+         the voice's own, its seeks one table by address; mode 1's and the band players' seeks still out
+         (HARDWARE_FIRMWARE.md, "The VC-2's players' beat and seeks"). Next: LITE's heads' renders on XtLitePlayer;
+         mode 1 with VariPhrase's band players.
+       - LITE's heads (v326): `0x893c6e80` and `0x893c6e8c` on XtLitePlayer (rom.2's, its words four bytes up from
+         +0x94, its backward reads upright), after rom.4's beat block `0x893c8990` (XtBeat's, its steer reaching four
+         steps, then the tail's step word by byte 3, the loop's positions through the +0xe0 record), the voice's own
+         renders' rows; XtLitePlayer runs on the object's words by its table of them (HARDWARE_FIRMWARE.md, "The VC-2's
+         LITE heads"). Next: mode 1, with VariPhrase's band players.
+       - Mode 1's render (v327): `0x893c9f60` (rom.2's `0x8950d880` on rom.4's object, mono and stereo) the voice's
+         own, on the players' event walk it runs: the event load `0x893c8f00`, the next crossing `0x893c9380`, the
+         crossings `0x893c8f50` and `0x893c9140` with the events' ways byte 2 opens, mode 1's two jumps `0x893ca190`
+         and `0x893ca1a0`, a player's index a row (`Vc2WalkWay`) (HARDWARE_FIRMWARE.md, "The VC-2's mode 1"). Found:
+         mode 1's cached jump writes through the render's mask, an address error on the XT at every One Way or hold
+         loop point; the walk's searches step by an event's own offset. Next: mode 1's set-up `0x893cc760` and seek
+         `0x893cc830`, with SOLO's start `0x893cc1a0` and the lookup `0x893cc100`, which SOLO's walk shares.
+       - Mode 1's set-up (v328): `0x893cc760` the voice's own, with SOLO's start `0x893cc1a0` and its lookup
+         `0x893cc0d0` by a player's row (its seek and jump two more columns of `Vc2WalkWay`) and the loops' rates
+         `0x893ccf50`. Found: the set-up and LITE's settings read the records through the object's head, which a
+         legato's take brings from the earlier tone's voice, so a legato sets the new note up on the earlier note's
+         wave; both read through it now, the link answering a pool tone's voice's words from its host
+         (HARDWARE_FIRMWARE.md, "The VC-2's mode 1 set-up"). Next: mode 1's seek `0x893cc830` with the find
+         `0x893cc100`.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

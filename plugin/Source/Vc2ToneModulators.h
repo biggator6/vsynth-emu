@@ -20,6 +20,9 @@ public:
     float boundFloat(uint32_t self, uint32_t part, uint32_t offset) const;
     Vc2TvaEnvelope tvaEnvelope(uint32_t self, uint32_t part) const;   // the envelope the TVA binds
     float lfoOut(uint32_t self, uint32_t part) const;                 // an LFO's +0x38
+    // The float at `at`, anywhere in an envelope or an LFO of the tone at `self`, 0 elsewhere: what a COSM's note-on and
+    // update hold, its envelopes' levels and rates and its LFOs' levels by address (v318)
+    float wordAt(uint32_t self, uint32_t at) const;
 
     std::array<Vc2ToneEnvelope, Vc2Tone::kEnvelopes> envelopes {};
     std::array<Vc2ToneLfo, Vc2Tone::kLfos> lfos {};

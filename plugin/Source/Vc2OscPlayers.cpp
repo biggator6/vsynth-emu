@@ -9,6 +9,7 @@
 #include "Vc2OscTargets.h"
 #include "XtFloat.h"
 #include <array>
+#include <bit>
 
 using xtf::add;
 using xtf::div;
@@ -23,13 +24,13 @@ constexpr uint32_t kFlagsByte = 0x138, kCopiedFlags = 3;
 constexpr uint8_t kInSamples = 0x80, kVariOff = 0x20, kLoopModes = 0x01, kEventLoops = 0x08;
 
 // [FW] LITE's renders by the wave's type, without the flag (+0xa40) and with it: 0 Vari off's, 1 kind 1's mode 1
-// (which then sets up the object, 0x893cc760), 2 LITE's two heads
+// (which then sets up the object, 0x893cc760, the voice's own from v328), 2 LITE's two heads
 struct LiteRenders {
     uint32_t mono, stereo;
 };
 constexpr std::array<LiteRenders, 3> kLite { { { 0x893c63c0, 0x893c66e0 }, { 0x893c9f60, 0x893c9f60 },
                                                { 0x893c6e80, 0x893c6e8c } } };
-constexpr uint32_t kModeOne = 1, kModeOneSetup = 0x893cc760, kLiteStereo = 3;
+constexpr uint32_t kModeOne = 1, kLiteStereo = 3;
 
 // [FW] VariPhrase's by the wave's type 1…8: its render (0 none), its constant's place in its table (5 more with the
 // flag), and whether the block's Vari off turns it into Vari off's (LITE's type 0)
@@ -73,7 +74,7 @@ void byEvents(Vc2OscVoice& v, Vc2OscParts& parts) {
     const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;
     vc2OscSetVariOff(v, { .start = a, .end = b, .loopStart = a, .loopEnd = b, .bwdEnd = b, .bwdStart = a,
                           .fwdMode = mode, .bwdMode = mode, .fwdRate = 1.0f, .bwdRate = 1.0f });
-    if (v.u16(kSeekTo) != v.u16(kFrom)) parts.seek(kSeek, parts.eventPosition(v.u16(kSeekTo)));
+    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);
 }
 
 // [FW] 0x893af660…: the range in samples, the end's less 1, with the loop record's words; the backward's rate factor
@@ -82,15 +83,15 @@ void bySamples(Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared) 
     Vc2OscVariOff w = vc2OscVariOffOf(v, parts, shared, vc2OscTables().rateTenths, { v.u32(kFrom), v.u32(kTo) - 1 });
     w.bwdRate = mul(w.bwdRate, parts.boundFloat(v.u32(kPairAt), kPairWord));
     vc2OscSetVariOff(v, w);
-    if (v.u32(kSeekTo) != v.u32(kFrom)) parts.seek(kSeek, (int32_t)v.u32(kSeekTo));
+    if (v.u32(kSeekTo) != v.u32(kFrom)) v.seekBy(kSeek, (int32_t)v.u32(kSeekTo), parts);
 }
 } // namespace
 
-void Vc2OscVoice::installLite(Vc2OscParts& parts) {
+void Vc2OscVoice::installLite(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     const uint32_t type = u32(kWave);
     if (type >= kLite.size()) return;
     tail.render = tail.flag != 0 ? kLite[type].stereo : kLite[type].mono;
-    if (type == kModeOne) parts.objectCall(kModeOneSetup);
+    if (type == kModeOne) vc2OscModeOneSetUp(*this, parts, shared);   // v328: 0x893cc760, the voice's own
     tail.installed = vc2OscTables().liteInstalled[type + (tail.flag != 0 ? kLiteStereo : 0)];
 }
 
@@ -146,28 +147,45 @@ void vc2OscPlayerHead(Vc2OscVoice& v, Vc2OscParts& parts, float tenThousand) {
     v.setU32(kHeaderWord, parts.waveHeader(v.u32(kHeaderAt)).word1c);
 }
 
+uint32_t vc2OscHeadWord(const Vc2OscVoice& v, Vc2OscParts& parts, uint32_t at) {
+    return std::bit_cast<uint32_t>(parts.boundFloat(v.u32(kSelf), at));
+}
+
 float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths) {
     return shared.exp2(div(xtf::flt(rate), tenths));
+}
+
+Vc2OscVariOff vc2OscVariOffLoops(const Vc2OscVoice& v, const Vc2OscLoopRecord& loop, Vc2OscFrames range) {
+    const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;
+    return { .start = range.first, .end = range.last, .loopStart = (uint32_t)loop.loopStart,
+             .loopEnd = (uint32_t)loop.loopEnd, .bwdEnd = (uint32_t)loop.bwdEnd, .bwdStart = (uint32_t)loop.bwdStart,
+             .fwdMode = modes ? (uint32_t)loop.fwdMode : 0, .bwdMode = modes ? (uint32_t)loop.bwdMode : 0 };
 }
 
 Vc2OscVariOff vc2OscVariOffOf(const Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared, float tenths,
                               Vc2OscFrames range) {
     const Vc2OscLoopRecord loop = parts.loopRecord(v.u32(kLoopAt));
-    const bool modes = (v.u8(Vc2OscVoice::kObject) & kLoopModes) != 0;
-    return { .start = range.first, .end = range.last, .loopStart = (uint32_t)loop.loopStart,
-             .loopEnd = (uint32_t)loop.loopEnd, .bwdEnd = (uint32_t)loop.bwdEnd, .bwdStart = (uint32_t)loop.bwdStart,
-             .fwdMode = modes ? (uint32_t)loop.fwdMode : 0, .bwdMode = modes ? (uint32_t)loop.bwdMode : 0,
-             .fwdRate = vc2OscLoopRate(loop.rateFwd, shared, tenths),
-             .bwdRate = vc2OscLoopRate(loop.rateBwd, shared, tenths) };
+    Vc2OscVariOff w = vc2OscVariOffLoops(v, loop, range);
+    w.fwdRate = vc2OscLoopRate(loop.rateFwd, shared, tenths);
+    w.bwdRate = vc2OscLoopRate(loop.rateBwd, shared, tenths);
+    return w;
+}
+
+void vc2OscSetVariOffSide(Vc2OscVoice& v, const Vc2OscVariOff& w, bool backward) {
+    v.setU32(kStart, w.start);
+    v.setU32(kEnd, w.end);
+    if (backward) {
+        setLoop(v, kBwd, w.bwdEnd, w.bwdStart, w.bwdEnd - w.bwdStart);
+        v.setU32(kBwdMode, w.bwdMode);
+    } else {
+        setLoop(v, kLoop, w.loopStart, w.loopEnd, w.loopEnd - w.loopStart);
+        v.setU32(kFwdMode, w.fwdMode);
+    }
 }
 
 void vc2OscSetVariOff(Vc2OscVoice& v, const Vc2OscVariOff& w) {
-    v.setU32(kStart, w.start);
-    v.setU32(kEnd, w.end);
-    setLoop(v, kLoop, w.loopStart, w.loopEnd, w.loopEnd - w.loopStart);
-    setLoop(v, kBwd, w.bwdEnd, w.bwdStart, w.bwdEnd - w.bwdStart);
-    v.setU32(kFwdMode, w.fwdMode);
-    v.setU32(kBwdMode, w.bwdMode);
+    vc2OscSetVariOffSide(v, w, false);
+    vc2OscSetVariOffSide(v, w, true);
     v.setF32(kRateFwd, w.fwdRate);
     v.setF32(kRateBwd, w.bwdRate);
 }
@@ -179,4 +197,10 @@ uint32_t vc2OscVariOffStart(Vc2OscVoice& v) {
     v.setU32(kPosition, 0.0f > v.f32(kWalk) ? v.u32(kEnd) : v.u32(kStart));
     v.setU32(kPositionCopy, v.u32(kPosition));
     return v.u32(kPosition);
+}
+
+// [FW] 0x893c6360 (rom.2's 0x89509840, XtLinearPlayer::seek, four bytes up): the position the sample, its fraction 0
+void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample) {
+    v.setU32(kPosition, (uint32_t)sample);
+    v.setF32(kZeroAt, 0.0f);
 }

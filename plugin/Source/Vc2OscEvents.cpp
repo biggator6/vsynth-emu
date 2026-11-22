@@ -11,14 +11,10 @@ namespace {
 constexpr uint32_t kConstruct = 0x893ae070, kInstall = 0x893ae0f0, kUpdate = 0x893ae1c0, kReseek = 0x893aeed0;
 constexpr uint32_t kNoteOn = 0x893ae370, kStart = 0x893ae610, kCount = 0x893ae6c0, kCountMatched = 0x893ae720;
 constexpr uint32_t kSettings = 0x893ae780, kLegato = 0x893ae9b0, kRender = 0x893ae9f0, kTake = 0x893aee20;
-// [FW] the block's words a note-on's draw steers: its kind, its byte +4, the wave's type, the records (its floats by
-// oscBlockFloats)
-constexpr int kKindWord = 0, kByteWord = 1, kWaveWord = 0xb0 / 4, kHeaderWord = 0xd4 / 4;
-constexpr int kLoopWord = 0xdc / 4, kFixedWord = 0xe4 / 4;
-// [FW] v238: VariPhrase's note-on's +0xe0 record, and its range's start and where it seeks to (the block's +0xe8, +0xf0)
-constexpr int kPairWord = 0xe0 / 4, kFromWord = 0xe8 / 4, kSeekToWord = 0xf0 / 4;
-constexpr uint32_t kFixedBit = 0x1000;   // the byte +0x138's 0x10, in its word
-constexpr int kKinds = 8, kWaves = 10;
+// [FW] the block's words LITE's two heads' steer reads: its kind, the wave's type, the records (the block's draw is
+// oscDrawNoteBlock's, Vc2OscDraws.cpp from v319)
+constexpr int kKindWord = 0, kWaveWord = 0xb0 / 4, kHeaderWord = 0xd4 / 4, kLoopWord = 0xdc / 4;
+constexpr int kKinds = 8;
 constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
 constexpr uint32_t kCarrierKind = 5, kKind6Kind = 6;   // [FW] v266's kinds, counted
 using Answer = OscAnswer;
@@ -42,23 +38,48 @@ std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
     }
     if (pick == 3) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);   // a kind-3 voice found: its words so (a settings' copy leaves noise at +0x138)
+    constexpr uint32_t kLite = 1, kModeOne = 1;   // [FW] v328: LITE's install sets mode 1 up, the voice's own
+    Vc2OscVoice& o = s.voices[(size_t)v];
+    if (o.kind() == kLite && o.u32(Vc2OscVoice::kWave) == kModeOne) {
+        constexpr uint8_t kInSamples = 0x80;   // [FW] byte 0's
+        oscSteerModeOneSetUp(o, s.shared, oscVoiceAt(v));
+        oscWriteVoice(s, v);
+        ++s.n.modeOneSetUps;
+        s.n.setUpsInSamples += (o.u8(Vc2OscVoice::kObject) & kInSamples) != 0;
+    }
     return oscBothSides(s, kInstall, { oscVoiceAt(v) }, Answer::none, [&] {
-        s.voices[(size_t)v].install(s.parts[(size_t)v]);
+        s.voices[(size_t)v].install(s.parts[(size_t)v], s.romShared);
         return 0u;
     });
+}
+
+// v321: kind 5's gain takes the pitch ramp's factor (+0x54), which is 1 once its phase has run to its end, a few ticks
+// after the case's start: half the time on a kind-5 voice the factor's phase 0…32768 with a depth, and a count of 0…3,
+// so that the tick before the update leaves it short of its end (its step at most 10000)
+uint32_t steerFactor(Vc2OscVoice& o, std::mt19937& rng, uint32_t n) {
+    constexpr uint32_t kCarrierKind = 5;   // [FW]
+    if (o.kind() != kCarrierKind || rng() % 2) return n;
+    Vc2RampWords& w = o.ramps[Vc2OscVoice::kPitchRamp].w;
+    w.factorPhase = 32768.0f * vc2Unit(rng);
+    w.factorDepth = rng() % 2 ? 1.0f : 2.0f * vc2Unit(rng);
+    return rng() % 4;
 }
 
 std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     // now and then high bits, which it drops; its low half never negative (v236: the ramps' tick reads past the factor's
     // table on a negative count, which the tone never gives)
-    const uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() & ~kCountSign : rng() % 64;
+    uint32_t n = rng() % 3 == 0 ? (uint32_t)rng() & ~kCountSign : rng() % 64;
     // v248: one time in four the analog (its own update); a kind-3 voice's words drawn as its converter could give
     // them, as a note-on's are (noise there could be NaNs, whose FTRC and difference the interpreter takes otherwise)
     if (rng() % 4 == 0) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);
+    n = steerFactor(s.voices[(size_t)v], rng, n);
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
     oscWriteVoice(s, v);
     ++s.n.updates;
+    constexpr uint32_t kLite = 1, kLiteTypes = 3;   // [FW] v324: LITE's kind and the wave types its update has ways for
+    const Vc2OscVoice& o = s.voices[(size_t)v];
+    s.n.liteUpdates += o.kind() == kLite && o.u32(Vc2OscVoice::kWave) < kLiteTypes;
     return oscBothSides(s, kUpdate, { oscVoiceAt(v), n }, Answer::none, [&] {
         s.voices[(size_t)v].update((int32_t)n, s.parts[(size_t)v], s.romShared);
         return 0u;
@@ -72,28 +93,6 @@ std::string onReseek(OscSides& s, std::mt19937&, int v) {
     });
 }
 
-// A note-on's block: noise, its kind 0…7 (past 7 rom.4 reads from address 0), the wave's type, the depth, the records
-std::array<uint32_t, kOscBlockWords> drawNoteBlock(std::mt19937& rng) {
-    std::array<uint32_t, kOscBlockWords> b {};
-    for (uint32_t& w : b) w = (uint32_t)rng();
-    oscBlockFloats(b, rng);   // the depth (+0x1c) among them
-    b[kKindWord] = rng() % kKinds;
-    b[kWaveWord] = rng() % 8 == 0 ? (uint32_t)rng() : rng() % kWaves;
-    b[kHeaderWord] = oscHeaderAt((int)(rng() % kOscRecords));
-    b[kLoopWord] = oscLoopAt((int)(rng() % kOscRecords));
-    b[kPairWord] = oscPairAt((int)(rng() % kOscRecords));   // v238: VariPhrase's note-on reads its +0x2d0
-    if (rng() % 2) b[kSeekToWord] = b[kFromWord];             // v238: no seek when the third is the first
-    if (rng() % 2) b[kByteWord] = 0;
-    if (rng() % 2) b[kFixedWord] &= ~kFixedBit;
-    constexpr uint32_t kAnalog = 3;   // v242: the analog's block words, as its converter could give them
-    if (b[kKindWord] == kAnalog) {
-        for (const auto& [at, bits] : oscAnalogWords(rng)) b[(at - Vc2OscVoice::kOwn) / 4] = bits;
-    }
-    if (oscIsVoiced(b[kKindWord])) oscDrawVoicedWords(b, rng, Vc2OscVoice::kOwn);   // v266: as a note gives them
-    oscDrawVibratoBlock(b, rng);                                                     // v267: the same
-    return b;
-}
-
 // v240: LITE's two heads (kind 1, the wave's type 2) take their period from the root's Hz, so their note-on reads a
 // real wave's records: at 0 Hz the walk's start is 0 × ∞, a NaN, whose FTRC xtf takes otherwise than the interpreter
 void steerTwoHeads(OscSides& s, std::mt19937& rng, std::array<uint32_t, kOscBlockWords>& b) {
@@ -105,7 +104,7 @@ void steerTwoHeads(OscSides& s, std::mt19937& rng, std::array<uint32_t, kOscBloc
 }
 
 std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
-    std::array<uint32_t, kOscBlockWords> block = drawNoteBlock(rng);
+    std::array<uint32_t, kOscBlockWords> block = oscDrawNoteBlock(rng);
     steerTwoHeads(s, rng, block);
     constexpr uint32_t kAnalog = 3;   // v244: the analog's object words, no NaN for its sub oscillator's note-on
     if (block[kKindWord] == kAnalog) {
@@ -157,12 +156,9 @@ std::string onCount(OscSides& s, std::mt19937& rng, int v) {
 }
 
 std::string onSettings(OscSides& s, std::mt19937& rng, int v) {
-    for (uint32_t& w : s.shared.settings) w = (uint32_t)rng();
-    oscBlockFloats(s.shared.settings, rng);
-    auto* bytes = reinterpret_cast<uint8_t*>(s.shared.settings.data());
-    if (rng() % 2) bytes[4] = s.voices[(size_t)v].u8(0x58);   // the byte +4 as the voice holds it, half the time
-    oscDrawVoicedSettings(s.shared.settings, rng);            // v266: the carrier's levels among them, as a note's
-    oscDrawVibratoBlock(s.shared.settings, rng);              // v267: the vibrato's rate and biases
+    oscDrawSettingsBlock(s.shared.settings, rng, s.voices[(size_t)v].u8(kOscBlockByte));
+    s.n.liteSettings += oscSteerLiteSettings(s.voices[(size_t)v], s.shared.settings, oscVoiceAt(v), s.shared.renders);
+    oscWriteVoice(s, v);   // v324
     s.fw.cpu.write(kOscSettingsAt, s.shared.settings.data(), sizeof s.shared.settings);
     ++s.n.settings;
     s.n.carrierSettings += s.voices[(size_t)v].kind() == kCarrierKind;
@@ -191,6 +187,20 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
         const std::string mic = oscMicBlock(s, rng);
         if (!mic.empty()) return mic;
     }
+    // v323: one time in four the render word one of Vari off's, which only LITE's and VariPhrase's installs write (3
+    // blocks in 40 cases else), from the renders' generator so the run's other draws stay; from v326 one time in four
+    // one of LITE's heads', which only LITE's install writes; from v327 one time in four kind 1's mode 1's, the same
+    const uint32_t pick = s.shared.renders() % 4;
+    if (pick < 2) {
+        s.voices[(size_t)v].tail.render = (pick == 0 ? kOscVariOffRenders : kOscHeadsRenders)[s.shared.renders() % 2];
+    }
+    if (pick == 2) s.voices[(size_t)v].tail.render = kOscModeOneRenders[0];
+    s.n.extInBlocks += oscRendersBy(s.voices[(size_t)v], kOscExtInRenders);       // v322
+    s.n.variOffBlocks += oscRendersBy(s.voices[(size_t)v], kOscVariOffRenders);   // v323
+    s.n.headsBlocks += oscRendersBy(s.voices[(size_t)v], kOscHeadsRenders);       // v326
+    s.n.modeOneBlocks += oscRendersBy(s.voices[(size_t)v], kOscModeOneRenders);   // v327
+    oscSteerRenders(s.voices[(size_t)v], s.shared);
+    oscWriteVoice(s, v);
     std::string what = oscBothSides(s, kRender, { oscVoiceAt(v), kOscOutAt }, Answer::r0, [&] {
         return s.voices[(size_t)v].render(s.shared.out.data(), s.parts[(size_t)v]);
     });

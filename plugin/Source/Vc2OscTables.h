@@ -40,6 +40,7 @@ struct Vc2OscTables {
     Vc2OscTargetPool ratio;     // 0x893afdc0…0x893afdd8: the ratios' (0x893afb40, 0x893afb80, 0x893afd10)
     Vc2OscTargetPool noteOn;    // 0x893af35c…0x893af370: the kinds' note-on's own
     float kind6Least = 0;       // 0x893af530: −32, kind 6's ratio's lower bound there
+    Vc2OscTargetPool kind6Update;   // 0x893b0254…0x893b0268: kind 6's update's own (v321)
     Vc2OscBounds walkTarget;    // 0x893afddc, 0x893afde0: ±5 (0x893afc30)
     Vc2OscBounds walk;          // 0x893affd4, 0x893affd8: ±5 (0x893afdf0)
     float formantTargetLeast = 0;   // 0x893afde4: 0.5 (0x893afca0)
@@ -60,12 +61,22 @@ struct Vc2OscTables {
     float litePeriod = 0;           // 0x893c81f0
     float liteHalf = 0;             // 0x893c81f4
     float liteFilter = 0;           // 0x893c81f8
+    // LITE's update's and settings' own copies (v324): the filter's rate per Hz, 2^32
+    float liteUpdateFilter = 0;     // 0x893c84a0
+    float liteSettingsTwo32 = 0;    // 0x893c8650
+    float headsSeekHalf = 0;        // 0x893c6e60 (v325): the heads' seek's, the second window at half the period
     // Vari off's renders' (v261): a sample's scale, the folded way's, the gain's glide, the fade's step at the last sample
     float variOffScale = 0;         // 0x893c6420: 65536
     float variOffFold = 0;          // 0x893c6764: 45875, 70% of it
     float variOffGlide = 0;         // 0x893c6424: 1/32
     float variOffFade = 0;          // 0x893c6428
-    Vc2OscAnalogPool analog;        // the analog note-on's (v242, Vc2OscAnalogPool.h)
+    // kind 1's mode 1's render (v327): the fraction's scale, a sample's
+    float modeOneFraction = 0;      // 0x893ca150: 2^−24
+    float modeOneScale = 0;         // 0x893ca154: 65536
+    // its set-up's (v328): the object's +0x88, the loops' rates' tenths of a cent
+    float modeOneSetUpWord = 0;     // 0x893cc8c0: 1/64
+    float modeOneTenths = 0;        // 0x893ccfd4: 12000
+    Vc2OscAnalogPool analog;       // the analog note-on's (v242, Vc2OscAnalogPool.h)
     Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };
 

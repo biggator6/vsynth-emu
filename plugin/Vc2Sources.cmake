@@ -35,6 +35,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2ToneNoteOn.cpp
     Source/Vc2ToneMethods.cpp
     Source/Vc2ToneLists.cpp
+    Source/Vc2ToneHost.cpp
+    Source/Vc2ToneHostOsc.cpp
     Source/Vc2ToneEnvelope.cpp
     Source/Vc2ToneLfo.cpp
     Source/Vc2ToneModulators.cpp
@@ -51,6 +53,13 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscTargets.cpp
     Source/Vc2OscPlayers.cpp
     Source/Vc2OscLite.cpp
+    Source/Vc2OscBeat.cpp
+    Source/Vc2OscHeads.cpp
+    Source/Vc2OscModeOne.cpp
+    Source/Vc2OscWalk.cpp
+    Source/Vc2OscWalkEvents.cpp
+    Source/Vc2OscWalkStart.cpp
+    Source/Vc2OscModeOneStart.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp
@@ -89,9 +98,54 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2CosmBufferedAdapters.cpp
     Source/Vc2LibMath.cpp
     Source/Vc2LibMathTables.cpp
+    Source/Vc2ToneMath.cpp
     Source/Vc2CosmDsp.cpp
     Source/Vc2PartVoices.cpp
     Source/Vc2PartVoicesTables.cpp
+    Source/Vc2Notes.cpp
+    Source/Vc2Keys.cpp
+    Source/Vc2KeysTables.cpp
+    Source/Vc2Assigner.cpp
+    Source/Vc2AssignRelease.cpp
+    Source/Vc2AssignNotes.cpp
+    Source/Vc2VoiceQueue.cpp
+    Source/Vc2VoiceClass.cpp
+    Source/Vc2NoteMatrix.cpp
+    Source/Vc2Sets.cpp
+    Source/Vc2SetCommon.cpp
+    Source/Vc2SetEnvelope.cpp
+    Source/Vc2SetEnvelopeTables.cpp
+    Source/Vc2SetChildHead.cpp
+    Source/Vc2SetLfo.cpp
+    Source/Vc2SetMix.cpp
+    Source/Vc2SetTva.cpp
+    Source/Vc2PartSettings.cpp
+    Source/Vc2PartSettingsTables.cpp
+    Source/Vc2PartSettingsWords.cpp
+    Source/Vc2PartSettingsOsc.cpp
+    Source/Vc2PartSettingsOscBlock.cpp
+    Source/Vc2PartSettingsVocoder.cpp
+    Source/Vc2PartSettingsModes.cpp
+    Source/Vc2PartSettingsDispatch.cpp
+    Source/Vc2PartNodes.cpp
+    Source/Vc2PartSettingsCategory.cpp
+    Source/Vc2StaticMatrix.cpp
+    Source/Vc2PartSettingsSystem.cpp
+    Source/Vc2PartSettingsMessages.cpp
+    Source/Vc2PartSettingsReceive.cpp
+    Source/Vc2PartReloads.cpp
+    Source/Vc2PartControllers.cpp
+    Source/Vc2PartNumbers.cpp
+    Source/Vc2PartStartUp.cpp
+    Source/Vc2TimeTrip.cpp
+    Source/Vc2PartChannel.cpp
+    Source/Vc2MidiDispatch.cpp
+    Source/Vc2NotesTask.cpp
+    Source/Vc2UpdateTask.cpp
+    Source/Vc2OsMidi.cpp
+    Source/Vc2OsMidiHandler.cpp
+    Source/Vc2OsMidiTables.cpp
+    Source/Vc2Synth.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

@@ -10,6 +10,7 @@
 // the input, the block, M and the calls, word for word.  XT_VC2COSM_MAIN only.
 #ifdef XT_VC2COSM_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2CheckRom2.h"
 #include "Vc2CosmCheck.h"
 #include "Vc2CosmConvert.h"
 #include "Vc2CosmConverters.h"
@@ -173,10 +174,7 @@ void FrameRig::say(const Vc2Run& run) const { sayFrameCounts(run, n); }
 } // namespace
 
 bool vc2LoadCosmAndMatrix(const char* path) {
-    std::string rom2 = path;
-    const size_t at = rom2.rfind("rom.4");
-    if (at != std::string::npos) rom2.replace(at, 5, "rom.2");
-    return vc2LoadCosm(path) && vc2LoadMatrix(path) && xtCosmLoadTables(rom2.c_str());
+    return vc2LoadCosm(path) && vc2LoadMatrix(path) && xtCosmLoadTables(vc2Rom2Of(path).c_str());
 }
 
 long vc2CosmFrameCases(Vc2Fw& fw, const Vc2Run& run) { return vc2CosmPart<FrameRig>(fw, run, 1, kEvents); }

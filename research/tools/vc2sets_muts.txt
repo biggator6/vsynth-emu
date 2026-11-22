@@ -1,0 +1,389 @@
+# Planted errors in the VC-2 part's conversion sets C and the notes' Matrix objects M, for mutate_vc2.py --sets: each
+# must make xt_vc2sets, on rom.4, say something differs.  name|old|new[|port[|seed]]; ports vc2sets (Vc2Sets.cpp, v280)
+# and vc2notematrix (Vc2NoteMatrix.cpp).  Not planted: the make's test of M's address (never 0: a base plus a multiple),
+# the bend's test of 0 (the two other ways give 0 there too). The envelopes (vc2setenvelope, vc2setenvtables, v282), not planted: the time curve's
+# hold at 12000 (the time table tops out at 3035), the outside period's cast as signed (every period past 32767
+# gives under 200 either way), the release's note value scale for the writer's (both 600000).  What the envelopes and
+# LFOs share (vc2setchildhead, Vc2SetChildHead.cpp, v283) and the LFOs (vc2setlfo, Vc2SetLfo.cpp); the pool's
+# conversion, update and copy, a template in Vc2SetChildHead.h, planted at what they call (a header has no port here).
+# The mix (vc2setmix, Vc2SetMix.cpp, v284), not planted: the off gains for the other type's, the two scales for each
+# other (each pair the same value in rom.4; their addresses are planted in the tables), the mix's +1 for the voice's
+# bytes and its placement, in Vc2SetMix.h.  The TVA (vc2settva, Vc2SetTva.cpp, v285), not planted: its on and off
+# scales for each other (both 32768; their addresses are planted), the pan's test at 64 against 65 (the pan is P either
+# way at 64), the off pair 63 and 64 for each other (both 32768), the pan's sum's halfword (the sum with the follow is
+# one, mod 2^16), the curve's answer as a halfword (it answers 0…0x8000), and what Vc2SetTva.h and the pool's
+# madeByKind in Vc2SetChildHead.h hold.
+sets-first-child|kFirstChild = 0x04;|kFirstChild = 0x08;|vc2sets
+sets-osc-stride|kOscStride = In::kOscs[1] - In::kOscs[0],|kOscStride = In::kOscs[1] - In::kOscs[0] + 4,|vc2sets
+sets-cosm-stride|kCosmStride = In::kCosms[1] - In::kCosms[0];|kCosmStride = In::kCosms[1] - In::kCosms[0] + 4;|vc2sets
+sets-common-bytes|0, 0, 10, 0x04, 1, In::kOscSet|0, 0, 12, 0x04, 1, In::kOscSet|vc2sets
+sets-common-block|In::kOscSet, 0 },|In::kStructure, 0 },|vc2sets
+sets-osc-bytes|0x893a0150, 0x108, 0x08, 2,|0x893a0150, 0x100, 0x08, 2,|vc2sets
+sets-osc-refresh|0x893a0310, 0, 0x893a0150,|0x893a0310, 0, 0x893a0151,|vc2sets
+sets-mix-block|In::kMix, 0 },|In::kMix + 4, 0 },|vc2sets
+sets-mix-routine|0x8939bd90, 0x8939bdb0, 0x8939be30, 0x8939be40, 0x8939be60,|0x8939bd90, 0x8939bdb0, 0x8939be30, 0x8939be60, 0x8939be40,|vc2sets
+sets-env-count|0x8939a810, 0, 28, 0x14, 13,|0x8939a810, 0, 28, 0x14, 12,|vc2sets
+sets-env-block|In::kEnvelopes + In::kEnvelopeStride, In::kEnvelopeStride },|In::kEnvelopes, In::kEnvelopeStride },|vc2sets
+sets-env-release|0x8939a800, 0x8939a810, 0, 28|0x8939a800, 0, 0, 28|vc2sets
+sets-env-bytes|0, 28, 0x14, 13,|0, 32, 0x14, 13,|vc2sets
+sets-lfo-block|In::kLfos + In::kLfoStride, In::kLfoStride }|In::kLfos, In::kLfoStride }|vc2sets
+sets-lfo-count|0, 0, 20, 0x48, 5,|0, 0, 20, 0x48, 4,|vc2sets
+sets-lfo-stride|In::kLfos + In::kLfoStride, In::kLfoStride }|In::kLfos + In::kLfoStride, In::kLfoStride * 2 }|vc2sets
+sets-tva-block|In::kTva, 0 },|In::kTva + 4, 0 },|vc2sets
+sets-tva-slot|40, 0x64, 1,|40, 0x60, 1,|vc2sets
+sets-block-stride|return note + row.noteAt + row.noteStride * i;|return note + row.noteAt + row.noteStride * (i + 1);|vc2sets
+make-kind|    c.kind = w.kind;|    c.kind = w.part;|vc2sets
+make-mode-kind|c.mode = parts.modeOf(parts.firstByte(v.part), c.kind);\n    w.input|c.mode = parts.modeOf(parts.firstByte(v.part), 0);\n    w.input|vc2sets
+make-structure|    w.input.at(In::kStructure) = c.mode;\n    const uint32_t m|    const uint32_t m|vc2sets
+make-matrix-number|matrices.addressOf(v.number)|matrices.addressOf(v.key % 24u)|vc2sets
+make-matrix-kind|matrices.construct(m, call, c.kind, in, parts);|matrices.construct(m, call, 0, in, parts);|vc2sets
+make-matrix-store|    c.matrix = m;\n    eachChild|    eachChild|vc2sets
+make-matrix-late|    if (m != 0) matrices.construct(m, call, c.kind, in, parts);\n    c.matrix = m;|    c.matrix = 0;\n    if (m != 0) matrices.construct(m, call, c.kind, in, parts);|vc2sets
+make-common-kind|if (isCommon(row) && c.kind != 0) {|if (isCommon(row) && c.mode != 0) {|vc2sets
+make-common-note|            w.input.at(In::kOscSet) = 0;\n|\n|vc2sets
+make-common-clear|            child = 0;\n            w.input|            w.input|vc2sets
+make-alloc-index|parts.allocate(row, v.number, i)|parts.allocate(row, v.number, 0)|vc2sets
+make-alloc-number|parts.allocate(row, v.number, i)|parts.allocate(row, v.key, i)|vc2sets
+make-construct-test|if (made != 0) parts.construct(|parts.construct(|vc2sets
+make-construct-matrix|childBlock(row, note, i), c.matrix, c.kind, i });|childBlock(row, note, i), 0, c.kind, i });|vc2sets
+make-construct-index|c.matrix, c.kind, i });|c.matrix, c.kind, 0 });|vc2sets
+make-construct-kind|c.matrix, c.kind, i });|c.matrix, c.mode, i });|vc2sets
+make-child-store|        child = made;\n|\n|vc2sets
+end-test|if (child != 0) parts.end(row, child);|parts.end(row, child);|vc2sets
+end-null|    if (set == 0) return;\n|    if (set == 0) set = kAt;\n|vc2sets
+convert-structure|    notes.at(note).input.at(In::kStructure) = c.mode;\n    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.convert|    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.convert|vc2sets
+convert-block|parts.convert(row, child, call, childBlock(row, note, i));|parts.convert(row, child, call, childBlock(row, note, 0));|vc2sets
+live-test|if (!isCommon(row) \|\| child != 0) call(row, child, i);|call(row, child, i);|vc2sets
+live-common|if (!isCommon(row) \|\| child != 0) call(row, child, i);|if (child != 0) call(row, child, i);|vc2sets
+release-velocity|static_cast<uint8_t>(velocity)|velocity|vc2sets
+release-test|if (child != 0) parts.release(|parts.release(|vc2sets
+release-row|const Vc2SetChild& row = kChildren[kEnvelopes];|const Vc2SetChild& row = kChildren[kEnvelopes + 1];|vc2sets
+release-block|static_cast<uint8_t>(velocity), childBlock(row, note, i));|static_cast<uint8_t>(velocity), note);|vc2sets
+update-mode|    c.mode = parts.modeOf(parts.firstByte(v.part), c.kind);\n    matrices.update|    matrices.update|vc2sets
+update-matrix|    matrices.update(c.matrix, call, c.kind, in, parts);\n|\n|vc2sets
+update-matrix-kind|matrices.update(c.matrix, call, c.kind, in, parts);|matrices.update(c.matrix, call, c.mode, in, parts);|vc2sets
+update-call|parts.update(row, child, call); });|parts.update(row, child, Vc2SetCall {}); });|vc2sets
+copy-structure|    notes.at(note).input.at(In::kStructure) = c.mode;\n    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.copy|    eachLive(c, [&](const Vc2SetChild& row, uint32_t child, uint32_t i) {\n        parts.copy|vc2sets
+copy-block|parts.copy(row, child, childBlock(row, note, i));|parts.copy(row, child, note);|vc2sets
+refresh-first|if (parts.refresh(row, childSlot(c, row, 0), call) != 0) return 1;|if (parts.refresh(row, childSlot(c, row, 0), call) != 0) return 0;|vc2sets
+refresh-word|return parts.refresh(row, childSlot(c, row, 1), call) != 0 ? 1 : 0;|return parts.refresh(row, childSlot(c, row, 1), call);|vc2sets
+refresh-row|const Vc2SetChild& row = kChildren[kOsc];|const Vc2SetChild& row = kChildren[kOsc + 1];|vc2sets
+refresh-both|if (parts.refresh(row, childSlot(c, row, 0), call) != 0) return 1;|parts.refresh(row, childSlot(c, row, 0), call);|vc2sets
+matrix-bend-centre|kBendCentre = 8192;|kBendCentre = 8191;|vc2notematrix
+matrix-controls-order|{ 7, 11, 10, 93, 91 }|{ 7, 10, 11, 93, 91 }|vc2notematrix
+matrix-controls-93|{ 7, 11, 10, 93, 91 }|{ 7, 11, 10, 94, 91 }|vc2notematrix
+matrix-half-slots|kHalfSlots = 8;|kHalfSlots = 4;|vc2notematrix
+matrix-bend-shift|(static_cast<uint32_t>(v) * up << 3) >> 16|(static_cast<uint32_t>(v) * up << 2) >> 16|vc2notematrix
+matrix-bend-down|(below * down << 3) >> 16|(below * up << 3) >> 16|vc2notematrix
+matrix-bend-sign|return -static_cast<int32_t>((below|return static_cast<int32_t>((below|vc2notematrix
+matrix-bend-side|if (v > 0) return|if (v > 1) return|vc2notematrix
+matrix-bend-wide|const int16_t v = static_cast<int16_t>(raw - kBendCentre);|const int32_t v = raw - kBendCentre;|vc2notematrix
+matrix-half-at|bytes[0] \| bytes[1] << 8|bytes[1] \| bytes[0] << 8|vc2notematrix
+matrix-bend-down-at|halfAt(rec.head + 2)|halfAt(rec.head + 1)|vc2notematrix
+matrix-main-up|w.bendUp = main ? halfAt(rec.head) : 0;|w.bendUp = halfAt(rec.head);|vc2notematrix
+matrix-main-down|w.bendDown = main ? halfAt(rec.head + 2) : 0;|w.bendDown = halfAt(rec.head + 2);|vc2notematrix
+matrix-part-link|    w.links.part = part;\n|\n|vc2notematrix
+matrix-record|    vc2MatrixFromRecord(w.m, rec);\n|\n|vc2notematrix
+matrix-slots-from|const std::size_t from = main ? kHalfSlots : 0;|const std::size_t from = main ? 0 : kHalfSlots;|vc2notematrix
+matrix-slot-field|w.m.slots[k].dest = 0;|w.m.slots[k].unread = 0;|vc2notematrix
+matrix-cleared|    w.cleared.fill(0);\n|\n|vc2notematrix
+matrix-controls-at|reads.controlOf(channel, kControls[k]);|reads.controlOf(channel, kControls[k] + 1);|vc2notematrix
+matrix-channel|w.links.channel = reads.channelOf(v.keys);|w.links.channel = v.keys;|vc2notematrix
+matrix-head0|w.m.head[0] = kind == 0 ? v.byte43 : 0;|w.m.head[0] = v.byte43;|vc2notematrix
+matrix-head1|w.m.head[1] = v.key;|w.m.head[1] = v.byte42;|vc2notematrix
+matrix-head2|w.m.head[2] = v.byte42;|w.m.head[2] = v.key;|vc2notematrix
+matrix-head-call|    vc2MatrixHead(in.partM, in.partLinks, part, { w.m.head[0], w.m.head[1], w.m.head[2] });\n|\n|vc2notematrix
+matrix-head-part|in.partLinks, part, {|in.partLinks, part + 1, {|vc2notematrix
+matrix-update-kind|fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|fromPart(at(m), reads.firstByte(v.part), 0, in, reads);|vc2notematrix
+matrix-update-channel|    const Vc2SetVoice v = reads.voiceAt(call.channelAt);\n    fromPart(at(m)|    const Vc2SetVoice v = reads.voiceAt(call.channelAt);\n    at(m).links.channel = reads.channelOf(v.keys);\n    fromPart(at(m)|vc2notematrix
+matrix-update-head|    fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|    at(m).m.head[1] = v.key;\n    fromPart(at(m), reads.firstByte(v.part), kind, in, reads);|vc2notematrix
+common-magic|0x82061029u|0x82061028u|vc2setcommon
+common-shift|kBySquare = 13|kBySquare = 12|vc2setcommon
+common-shift-sixteen|kBySquareSixteen = 17|kBySquareSixteen = 16|vc2setcommon
+common-scale|kLevelScale = 10000|kLevelScale = 10001|vc2setcommon
+common-top|kTop = 127|kTop = 128|vc2setcommon
+magic-round|    return q + static_cast<int32_t>(static_cast<uint32_t>(q) >> 31);|    return q;|vc2setchildhead
+magic-add|static_cast<uint32_t>(high) + static_cast<uint32_t>(n)|static_cast<uint32_t>(high)|vc2setchildhead
+magic-sign|if (magic < 0) high|if (magic > 0) high|vc2setchildhead
+common-block-first|block[0] = w.firstSwitch != 0;|block[0] = w.firstSwitch;|vc2setcommon
+common-block-second|block[4] = w.secondSwitch != 0;|block[4] = w.firstSwitch != 0;|vc2setcommon
+common-block-one|    block[1] = 0;\n|\n|vc2setcommon
+common-block-two|    block[2] = 0;\n|\n|vc2setcommon
+common-sens-side|if (sens < 0) {|if (sens < -1) {|vc2setcommon
+common-sens-velocity|velocity = kTop - velocity;|velocity = kTop - velocity + 1;|vc2setcommon
+common-sens-negate|        sens = -sens;\n|\n|vc2setcommon
+common-level-one|x == 1 ? 1 : vc2ByMagic|x == 1 ? 0 : vc2ByMagic|vc2setcommon
+common-level-two|x == 1 ? 1 : vc2ByMagic|x == 2 ? 1 : vc2ByMagic|vc2setcommon
+common-level-wide|const int16_t level = static_cast<int16_t>(square);|const int32_t level = square;|vc2setcommon
+common-velocity-mask|const uint32_t v = velocity & 0xff;|const uint32_t v = velocity;|vc2setcommon
+common-product-sens|asWord(static_cast<int16_t>(sens))|asWord(sens)|vc2setcommon
+common-out-floor|out < 0 ? 0 : out|out|vc2setcommon
+common-out-wide|const auto out = static_cast<int16_t>(level - vc2ByMagic(|const auto out = static_cast<int32_t>(level - vc2ByMagic(|vc2setcommon
+common-voice-key|w.key = v.key;|w.key = v.byte42;|vc2setcommon
+common-voice-velocity|w.velocity = v.byte43;|w.velocity = v.key;|vc2setcommon
+common-part-which|reads.commonOf(reads.firstByte(v.part))|reads.commonOf(0)|vc2setcommon
+common-make-part|    fromVoice(w, call, reads);\n    fromPart(w, call, reads);\n|    fromVoice(w, call, reads);\n|vc2setcommon
+common-make-block|    fromPart(w, call, reads);\n    blockOfCommon(w, block);|    fromPart(w, call, reads);|vc2setcommon
+common-convert-voice|    Vc2CommonWords& w = at(common);\n    fromVoice(w, call, reads);\n    blockOfCommon|    Vc2CommonWords& w = at(common);\n    blockOfCommon|vc2setcommon
+common-convert-part|    fromVoice(w, call, reads);\n    blockOfCommon(w, block);\n}\n\nvoid Vc2SetCommons::update|    fromVoice(w, call, reads);\n    fromPart(w, call, reads);\n    blockOfCommon(w, block);\n}\n\nvoid Vc2SetCommons::update|vc2setcommon
+common-update-voice|    fromPart(at(common), call, reads);|    fromVoice(at(common), call, reads);\n    fromPart(at(common), call, reads);|vc2setcommon
+common-part-at|std::memcpy(&w.firstSwitch, words.data(), sizeof words);|std::memcpy(&w.secondSwitch, words.data(), sizeof words - 1);|vc2setcommon
+common-part-short|std::memcpy(&w.firstSwitch, words.data(), sizeof words);|std::memcpy(&w.firstSwitch, words.data(), sizeof words - 2);|vc2setcommon
+env-unit|kUnit = 0x10000;|kUnit = 0x8000;|vc2setenvelope
+env-head|kHead = 0x124f80;|kHead = 0x124f81;|vc2setenvelope
+env-longest|kLongest = 12000;|kLongest = 12001;|vc2setenvelope
+env-note-from|kNoteFrom = 128, kTop = 127;|kNoteFrom = 127, kTop = 127;|vc2setenvelope
+env-top|kNoteFrom = 128, kTop = 127;|kNoteFrom = 128, kTop = 126;|vc2setenvelope
+env-centre-key|kCentreKey = 60|kCentreKey = 61|vc2setenvelope
+env-centre-velocity|kCentreVelocity = 64|kCentreVelocity = 63|vc2setenvelope
+env-ticks|kTicksTimes = 24|kTicksTimes = 25|vc2setenvelope
+env-internal|kInternalScale = 30000|kInternalScale = 15000|vc2setenvelope
+env-outside|kOutsideScale = 150000|kOutsideScale = 75000|vc2setenvelope
+env-slowest|kSlowest = 200|kSlowest = 199|vc2setenvelope
+env-fastest|kFastest = 2500|kFastest = 2501|vc2setenvelope
+env-slow-held|kSlowHeld = 20|kSlowHeld = 21|vc2setenvelope
+env-fast-held|kFastHeld = 250|kFastHeld = 251|vc2setenvelope
+env-depth-scale|kDepthScale = 256000|kDepthScale = 128000|vc2setenvelope
+env-magic|kMagic = 0x51eb851f|kMagic = 0x28f5c28f|vc2setenvelope
+env-magic-shift|kMagicShift = 11|kMagicShift = 10|vc2setenvelope
+env-velocity-shift|kVelocityShift = 8|kVelocityShift = 7|vc2setenvelope
+env-last|kLastEnvelope = 12|kLastEnvelope = 11|vc2setenvelope
+env-type-three|kTypeEnvelope = 3|kTypeEnvelope = 4|vc2setenvelope
+env-type-from|kTypeFrom = 6|kTypeFrom = 7|vc2setenvelope
+env-fade|kFadeType = 2;|kFadeType = 1;|vc2setenvelope
+env-top-factor|kTopFactor = 2147483648.0f|kTopFactor = 1073741824.0f|vc2setenvelope
+reader-second|{ 0x893a2750, 4, 0 }|{ 0x893a2750, 5, 0 }|vc2setenvelope
+reader-cosm-base|{ 0x893a2960, 8, 4 }|{ 0x893a2960, 8, 2 }|vc2setenvelope
+reader-cosm-two|{ 0x893a2aa0, 10, 4 }|{ 0x893a2aa0, 10, 6 }|vc2setenvelope
+reader-last|{ 0x893a2bf0, 12, 0 }|{ 0x893a2bf0, 12, 2 }|vc2setenvelope
+matrix-stride|r.base + 6 * (index - r.first) + 2 * stage|r.base + 4 * (index - r.first) + 2 * stage|vc2setenvelope
+matrix-stage|+ 2 * stage);|+ stage);|vc2setenvelope
+matrix-hold-low|std::clamp(static_cast<int32_t>(value & 0xff) + sum, 0, kTop)|std::clamp(static_cast<int32_t>(value & 0xff) + sum, 1, kTop)|vc2setenvelope
+matrix-index-test|if (index <= kLastEnvelope) {|if (index < kLastEnvelope) {|vc2setenvelope
+curve-zero|if (time == 0) return 0;|if (time == 0) return 1;|vc2setenvelope
+curve-less|if (less <= 0) return 0;|if (less < 0) return 0;|vc2setenvelope
+curve-one|return (out & 0xffff) == 0 ? 1 : out & 0xffff;|return out & 0xffff;|vc2setenvelope
+curve-above|std::min(out + (factor >> 16) * (held & 0xffff), static_cast<uint32_t>(kLongest))|out + (factor >> 16) * (held & 0xffff)|vc2setenvelope
+curve-low|uint32_t out = ((factor & 0xffff) * (held & 0xffff)) >> 16;|uint32_t out = ((factor & 0xffff) * (held & 0xffff)) >> 15;|vc2setenvelope
+quarter|times[value] >> 2);|times[value] >> 1);|vc2setenvelope
+note-ticks|notes[value - kNoteFrom]|notes[(value - kNoteFrom) ^ 1]|vc2setenvelope
+note-order|xtf::mul(xtf::div(ticks, xtf::flt(static_cast<int16_t>(tempo) * kTicksTimes)), scale)|xtf::div(xtf::mul(ticks, scale), xtf::flt(static_cast<int16_t>(tempo) * kTicksTimes))|vc2setenvelope
+key-steps|static_cast<uint32_t>(key - kCentreKey) * against|static_cast<uint32_t>(kCentreKey - key) * against|vc2setenvelope
+key-two|vc2LibPow(kTwo, x)|vc2LibPow(x, kTwo)|vc2setenvelope
+key-unit|xtf::mul(vc2LibPow(kTwo, x), envelopeTables().unit)|vc2LibPow(kTwo, x)|vc2setenvelope
+key-wrap|    if (!(kTopFactor > y)) y = xtf::sub(y, xtf::add(kTopFactor, kTopFactor));\n|\n|vc2setenvelope
+release-velocity|curveTime(value, w.releaseVelocity, w.releaseSens, w.factor)|curveTime(value, w.velocity, w.releaseSens, w.factor)|vc2setenvelope
+release-factor|curveTime(value, w.releaseVelocity, w.releaseSens, w.factor)|curveTime(value, w.releaseVelocity, w.releaseSens, kUnit)|vc2setenvelope
+attack-factor|curveTime(value, w.velocity, w.attackSens, kUnit)|curveTime(value, w.velocity, w.attackSens, w.factor)|vc2setenvelope
+attack-sens|w.attackSens, kUnit|w.decaySens, kUnit|vc2setenvelope
+decay-quarter|type == 0 ? quarterTime(value) :|type != 0 ? quarterTime(value) :|vc2setenvelope
+decay-sens|curveTime(value, w.velocity, w.decaySens, w.factor)|curveTime(value, w.velocity, w.releaseSens, w.factor)|vc2setenvelope
+stage-attack|matrixTime(w.attack, w.matrix, w.index, 0, reads)|matrixTime(w.attack, w.matrix, w.index, 1, reads)|vc2setenvelope
+stage-decay|matrixTime(w.decay, w.matrix, w.index, 1, reads)|matrixTime(w.decay, w.matrix, w.index, 0, reads)|vc2setenvelope
+stage-release|matrixTime(w.release, w.matrix, w.index, 2, reads)|matrixTime(w.release, w.matrix, w.index, 1, reads)|vc2setenvelope
+tempo-external|c.external == 0|c.external == 1|vc2setenvelope
+tempo-held-low|t < kSlowest ? kSlowHeld|t <= kSlowest ? kSlowHeld|vc2setenvelope
+tempo-held-high|t > kFastest ? kFastHeld|t >= kFastest ? kFastHeld|vc2setenvelope
+block-type|    block[0] = type;|    block[0] = 0;|vc2setenvelope
+block-one|block[1] = floatWord(kOne);|block[1] = floatWord(kZero);|vc2setenvelope
+block-two|    block[2] = 0;\n|\n|vc2setenvelope
+block-head-three|    block[3] = kHead;\n|\n|vc2setenvelope
+block-head-four|    block[4] = kHead;\n|\n|vc2setenvelope
+block-factor|    w.factor = keyFactor(w.key, w.keyfollow);\n|\n|vc2setenvelope
+block-on|const bool on = w.on != 0;|const bool on = true;|vc2setenvelope
+block-six|    block[6] = floatWord(kZero);\n|\n|vc2setenvelope
+block-nine|    block[9] = floatWord(kZero);\n|\n|vc2setenvelope
+block-ten|    block[10] = floatWord(kOne);\n|\n|vc2setenvelope
+block-eleven|    block[11] = floatWord(kOne);\n|\n|vc2setenvelope
+block-thirteen|    block[13] = floatWord(kZero);\n|\n|vc2setenvelope
+block-sustain-off|block[12] = floatWord(on ? sustain : kOne);|block[12] = floatWord(sustain);|vc2setenvelope
+sustain-scale|xtf::div(xtf::flt(envelopeTables().levels[w.sustain]), envelopeTables().levelScale)|xtf::mul(xtf::flt(envelopeTables().levels[w.sustain]), envelopeTables().levelScale)|vc2setenvelope
+make-matrix|    w.matrix = c.matrix;\n|\n|vc2setenvelope
+make-release-velocity|w.releaseVelocity = kCentreVelocity;|w.releaseVelocity = 0;|vc2setenvelope
+make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::envelopeOf, c.call, reads);\n|\n|vc2setenvelope
+make-made|    vc2ChildMade(vc2ChildBytes(w), c, reads);\n|\n|vc2setenvelope
+make-words|&Vc2SetReads::envelopeOf, c.call|&Vc2SetReads::lfoOf, c.call|vc2setenvelope
+make-tempo|    w.tempo = tempoOf(reads.clock());\n|\n|vc2setenvelope
+make-block|    w.tempo = tempoOf(reads.clock());\n    blockOf(w, block, reads);|    w.tempo = tempoOf(reads.clock());|vc2setenvelope
+release-store|w.releaseVelocity = static_cast<uint8_t>(velocity);|w.releaseVelocity = 64;|vc2setenvelope
+release-on|block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|block[8] = floatWord(w.on == 0 ? releaseTime(w, envelopeTables().releaseScale|vc2setenvelope
+release-word|block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|block[7] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|vc2setenvelope
+tables-notes|image.read(0x89542134, notes.data()|image.read(0x89542136, notes.data()|vc2setenvtables
+tables-levels|image.read(0x89541f34, levels.data()|image.read(0x89541f36, levels.data()|vc2setenvtables
+tables-times|image.read(0x8953fc90, times.data()|image.read(0x8953fb90, times.data()|vc2setenvtables
+tables-note-scale|{ 0x8939a66c, &noteScale }|{ 0x8939a67c, &noteScale }|vc2setenvtables
+tables-release-scale|{ 0x8939a8f4, &releaseScale }|{ 0x8939a67c, &releaseScale }|vc2setenvtables
+tables-level-scale|{ 0x8939a67c, &levelScale }|{ 0x8939a66c, &levelScale }|vc2setenvtables
+tables-cents|{ 0x8939ab50, &cents }|{ 0x8939ab58, &cents }|vc2setenvtables
+tables-unit|{ 0x8939ab58, &unit }|{ 0x8939ab50, &unit }|vc2setenvtables
+tables-rates|vc2ReadFloats(image, { 0x8953fdb0,|vc2ReadFloats(image, { 0x8953fdb4,|vc2setenvtables
+tables-depth-top|{ 0x8939b624, &depthTop }|{ 0x8939b628, &depthTop }|vc2setenvtables
+tables-depth-scale|{ 0x8939b628, &depthScale }|{ 0x8939b624, &depthScale }|vc2setenvtables
+head-kind|object[kKind] = static_cast<uint8_t>(c.kind);|object[kKind] = static_cast<uint8_t>(c.index);|vc2setchildhead
+head-index|object[kIndex] = static_cast<uint8_t>(c.index);|object[kIndex] = static_cast<uint8_t>(c.kind);|vc2setchildhead
+head-made-voice|    vc2ChildVoice(object + kKey, c.call, reads);\n|\n|vc2setchildhead
+head-key|at[0] = v.key;|at[0] = v.byte42;|vc2setchildhead
+head-velocity|at[1] = v.byte43;|at[1] = v.key;|vc2setchildhead
+head-key-at|kKind = 0, kIndex = 1, kKey = 2,|kKind = 0, kIndex = 1, kKey = 4,|vc2setchildhead
+head-part-at|std::memcpy(object + kPartWords, words.data(), words.size_bytes());|std::memcpy(object + kPartWords + 1, words.data(), words.size_bytes() - 1);|vc2setchildhead
+head-part-short|std::memcpy(object + kPartWords, words.data(), words.size_bytes());|std::memcpy(object + kPartWords, words.data(), words.size_bytes() - 2);|vc2setchildhead
+head-part-kind|object[kKind], object[kIndex])|object[kIndex], object[kKind])|vc2setchildhead
+head-part-which|return reads.firstByte(reads.voiceAt(call.channelAt).part);|return 0;|vc2setchildhead
+lfo-note-from|kNoteFrom = 128, kTop = 127;|kNoteFrom = 129, kTop = 127;|vc2setlfo
+lfo-top|kNoteFrom = 128, kTop = 127;|kNoteFrom = 128, kTop = 126;|vc2setlfo
+lfo-last-summed|kLastSummed = 4;|kLastSummed = 3;|vc2setlfo
+lfo-wave-table|kWaves { 1, 0, 2, 3, 6, 4, 5, 7 };|kWaves { 1, 0, 2, 3, 4, 6, 5, 7 };|vc2setlfo
+lfo-wave-else|kWaves[w.wave] : 1;|kWaves[w.wave] : 0;|vc2setlfo
+lfo-wave-size|w.wave < kWaves.size()|w.wave < kWaves.size() - 1|vc2setlfo
+lfo-first-most|kFirstSwitchMost = 4,|kFirstSwitchMost = 5,|vc2setlfo
+lfo-first-else|kFirstSwitchElse = 2;|kFirstSwitchElse = 1;|vc2setlfo
+lfo-first-test|b <= kFirstSwitchMost ?|b < kFirstSwitchMost ?|vc2setlfo
+lfo-second-most|kSecondSwitchMost = 3;|kSecondSwitchMost = 4;|vc2setlfo
+lfo-second-low|b >= 1 && b <= kSecondSwitchMost|b >= 2 && b <= kSecondSwitchMost|vc2setlfo
+lfo-sum-first|{ 0x893a26b0, 0 }|{ 0x893a28b0, 0 }|vc2setlfo
+lfo-sum-cosm|{ 0x893a2960, 0x10 }|{ 0x893a2960, 0x12 }|vc2setlfo
+lfo-sum-cosm-two|{ 0x893a2aa0, 0x10 }|{ 0x893a2aa0, 0xe }|vc2setlfo
+lfo-sum-last|{ 0x893a2bf0, 6 }|{ 0x893a2bf0, 4 }|vc2setlfo
+lfo-sum-index|if (index <= kLastSummed)|if (index < kLastSummed)|vc2setlfo
+lfo-sum-matrix|reads.matrixSum(kRateSums[index].routine, matrix,|reads.matrixSum(kRateSums[index].routine, 0,|vc2setlfo
+lfo-hold-low|static_cast<int32_t>(rate) + sum, 0, kTop)|static_cast<int32_t>(rate) + sum, 1, kTop)|vc2setlfo
+lfo-rate-wide|static_cast<int32_t>(rate) + sum|static_cast<int32_t>(static_cast<uint16_t>(rate)) + sum|vc2setlfo
+lfo-depth-top|xtf::div(xtf::flt(x), lfoTables().depthTop)|xtf::mul(xtf::flt(x), lfoTables().depthTop)|vc2setlfo
+lfo-depth-square|xtf::mul(xtf::mul(q, q), lfoTables().depthScale)|xtf::mul(q, lfoTables().depthScale)|vc2setlfo
+lfo-depth-order|xtf::mul(xtf::mul(q, q), lfoTables().depthScale)|xtf::mul(q, xtf::mul(q, lfoTables().depthScale))|vc2setlfo
+lfo-note-ticks|notes[w.rate - kNoteFrom]|notes[(w.rate - kNoteFrom) ^ 1]|vc2setlfo
+lfo-note-flag|block[5] = note ? 1 : 0;|block[5] = 0;|vc2setlfo
+lfo-rate-table|rates[lfoRate(w.rate, w.matrix, w.index, reads)]|rates[lfoRate(w.rate, w.matrix, w.index, reads) ^ 1]|vc2setlfo
+lfo-block-depth-a|block[2] = floatWord(depthOf(w.depthA));|block[2] = floatWord(depthOf(w.depthB));|vc2setlfo
+lfo-block-depth-b|block[3] = floatWord(depthOf(w.depthB));|block[3] = floatWord(depthOf(w.depthA));|vc2setlfo
+lfo-block-first|block[6] = firstSwitch(w.byte0a);|block[6] = firstSwitch(w.byte0c);|vc2setlfo
+lfo-block-second|block[7] = secondSwitch(w.byte0c);|block[7] = secondSwitch(w.byte0a);|vc2setlfo
+lfo-block-sync|block[4] = w.sync != 0;|block[4] = w.sync;|vc2setlfo
+lfo-make-made|    vc2ChildMade(vc2ChildBytes(w), c, reads);\n|\n|vc2setlfo
+lfo-make-matrix|    w.matrix = c.matrix;\n|\n|vc2setlfo
+lfo-make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::lfoOf, c.call, reads);\n|\n|vc2setlfo
+lfo-make-words|&Vc2SetReads::lfoOf, c.call|&Vc2SetReads::envelopeOf, c.call|vc2setlfo
+lfo-make-block|c.call, reads);\n    blockOf(w, block, reads);|c.call, reads);|vc2setlfo
+tables-mix-off|{ 0x8939bcf8, &mixOff }|{ 0x8939bcfc, &mixOff }|vc2setenvtables
+tables-mix-other|{ 0x8939bf08, &mixOther }|{ 0x8939bf0c, &mixOther }|vc2setenvtables
+tables-mix-scale|{ 0x8939bd00, &mixScale }|{ 0x8939bd04, &mixScale }|vc2setenvtables
+tables-mix-scale-two|{ 0x8939bf04, &mixScaleTwo }|{ 0x8939bf08, &mixScaleTwo }|vc2setenvtables
+tables-levels-run|image.read(0x89541f34, levels.data(), sizeof levels);|image.read(0x89541f34, levels.data(), sizeof levels / 2);|vc2setenvtables
+mix-cross-at|kCrossfadeAt = 128;|kCrossfadeAt = 127;|vc2setmix
+mix-cross-top|kCrossTop = 127;|kCrossTop = 128;|vc2setmix
+mix-one|kOne = 1.0f;|kOne = 0.5f;|vc2setmix
+tables-run-float|xtf::div(xtf::flt(tables.t.levels[at]), scale)|xtf::mul(xtf::flt(tables.t.levels[at]), scale)|vc2setenvtables
+mix-even-zero|    block[0] = 0;\n    for (int k = 1;|    block[0] = 1;\n    for (int k = 1;|vc2setmix
+mix-even-count|k <= 4;|k < 4;|vc2setmix
+mix-level-type|    block[0] = w.type;\n    block[2]|    block[0] = 1;\n    block[2]|vc2setmix
+mix-level-byte|runGain(w.level, scale)|runGain(w.first, scale)|vc2setmix
+mix-level-three|    block[3] = floatWord(kOne);\n    block[1]|    block[1]|vc2setmix
+mix-level-one|    block[1] = floatWord(kOne);\n}\n\nvoid typeOne|}\n\nvoid typeOne|vc2setmix
+mix-cross-zero|    block[0] = 0;\n    block[1] = floatWord(runGain(|    block[0] = 3;\n    block[1] = floatWord(runGain(|vc2setmix
+mix-cross-scale|const float scale = mixTables().mixScale;|const float scale = mixTables().mixOff;|vc2setmix
+mix-cross-first|kCrossfadeAt + kCrossTop - w.first, scale|kCrossfadeAt + kCrossTop - w.second, scale|vc2setmix
+mix-cross-pair|block[2] = floatWord(runGain(kCrossfadeAt + w.first, scale));|block[2] = floatWord(runGain(kCrossfadeAt + w.second, scale));|vc2setmix
+mix-cross-second-top|block[3] = floatWord(runGain(kCrossfadeAt + kCrossTop - w.second, scale));|block[3] = floatWord(runGain(kCrossfadeAt + w.second, scale));|vc2setmix
+mix-cross-four|    block[4] = floatWord(runGain(kCrossfadeAt + w.second, scale));\n|\n|vc2setmix
+mix-four-type|    block[0] = w.type;\n    block[1] = floatWord(kOne);|    block[0] = 0;\n    block[1] = floatWord(kOne);|vc2setmix
+mix-four-one|    block[1] = floatWord(kOne);\n}\n\nvoid otherType|}\n\nvoid otherType|vc2setmix
+mix-ways-order|kWays { typeOne, typeTwo, typeThree, typeFour }|kWays { typeOne, typeThree, typeTwo, typeFour }|vc2setmix
+mix-way-less|const uint32_t way = w.type - 1u;|const uint32_t way = w.type;|vc2setmix
+mix-way-test|way < kWays.size() ?|way < kWays.size() - 1 ?|vc2setmix
+mix-off-test|if (w.on == 0) {|if (w.on == 1) {|vc2setmix
+mix-make-block|    blockOf(madeByKind(c, reads), block, reads);|    madeByKind(c, reads);|vc2setmix
+kind-made-matrix|    std::memcpy(object + matrixAt, &c.matrix, sizeof c.matrix);\n|\n|vc2setchildhead
+kind-made-kind|sizeof c.matrix);\n    object[kKind] = static_cast<uint8_t>(c.kind);|sizeof c.matrix);\n    object[kKind] = static_cast<uint8_t>(c.index);|vc2setchildhead
+kind-made-voice|vc2ChildVoice(object + kKindKey, c.call, reads);|vc2ChildVoice(object + kKindKey + 1, c.call, reads);|vc2setchildhead
+kind-key-at|kKindKey = 1;|kKindKey = 2;|vc2setchildhead
+tables-tva-velocity|{ 0x893a6938, &tvaVelocity }|{ 0x893a6934, &tvaVelocity }|vc2setenvtables
+tables-tva-scale|{ 0x893a64f0, &tvaScale }|{ 0x893a64f4, &tvaScale }|vc2setenvtables
+tables-tva-scale-off|{ 0x893a6600, &tvaScaleOff }|{ 0x893a6604, &tvaScaleOff }|vc2setenvtables
+tables-tva-depth|{ 0x893a64f4, &tvaDepthTop }|{ 0x893a64f8, &tvaDepthTop }|vc2setenvtables
+tables-tva-send|{ 0x893a6914, &tvaSend }|{ 0x893a6918, &tvaSend }|vc2setenvtables
+tables-tva-sixths|{ 0x893a6918, &tvaSixths }|{ 0x893a691c, &tvaSixths }|vc2setenvtables
+tables-tva-send-two|{ 0x893a6920, &tvaSendTwo }|{ 0x893a6924, &tvaSendTwo }|vc2setenvtables
+tables-tva-rate|{ 0x893a6928, &tvaRateScale }|{ 0x893a692c, &tvaRateScale }|vc2setenvtables
+tables-tva-sample|{ 0x893a692c, &tvaSampleRate }|{ 0x893a6930, &tvaSampleRate }|vc2setenvtables
+tva-code|kCode = 13;|kCode = 12;|vc2settva
+tva-top|kTop = 127, kCentreKey = 60|kTop = 126, kCentreKey = 60|vc2settva
+tva-centre-key|kCentreKey = 60|kCentreKey = 61|vc2settva
+tva-centre|kCentre = 64;|kCentre = 63;|vc2settva
+tva-depth-most|kDepthMost = 63;|kDepthMost = 62;|vc2settva
+tva-follow-magic|kFollowMagic = 0x057619f1;|kFollowMagic = 0x047619f1;|vc2settva
+tva-follow-shift|kFollowShift = 7, kFollowTimes = 7;|kFollowShift = 6, kFollowTimes = 7;|vc2settva
+tva-follow-times|kFollowShift = 7, kFollowTimes = 7;|kFollowShift = 7, kFollowTimes = 6;|vc2settva
+tva-pan-magic|0x82082083u|0x81082083u|vc2settva
+tva-pan-shift|kPanShift = 5, kPanLowShift = 6;|kPanShift = 4, kPanLowShift = 6;|vc2settva
+tva-pan-low-shift|kPanShift = 5, kPanLowShift = 6;|kPanShift = 5, kPanLowShift = 5;|vc2settva
+tva-crossfade-at|kCrossfadeAt = 128;|kCrossfadeAt = 127;|vc2settva
+tva-off-left|kOffLeft = 63, kOffRight = 64;|kOffLeft = 62, kOffRight = 64;|vc2settva
+tva-off-right|kOffLeft = 63, kOffRight = 64;|kOffLeft = 63, kOffRight = 65;|vc2settva
+tva-reader|kReader = 0x893a2bf0;|kReader = 0x893a2aa0;|vc2settva
+tva-level-sum|kLevelSum = 0xc,|kLevelSum = 0xe,|vc2settva
+tva-depth-a-sum|kDepthASum = 8,|kDepthASum = 0xa,|vc2settva
+tva-depth-b-sum|kDepthBSum = 0xa,|kDepthBSum = 8,|vc2settva
+tva-pan-sum|kPanSum = 0x14;|kPanSum = 0x12;|vc2settva
+tva-output-sum|kOutputSum = 0xe,|kOutputSum = 0xc,|vc2settva
+tva-send-a-sum|kSendASum = 0x12,|kSendASum = 0x10,|vc2settva
+tva-send-b-sum|kSendBSum = 0x10;|kSendBSum = 0x12;|vc2settva
+tva-cc7|kCc7 = 0, kCc11 = 1|kCc7 = 1, kCc11 = 1|vc2settva
+tva-cc11|kCc7 = 0, kCc11 = 1|kCc7 = 0, kCc11 = 0|vc2settva
+tva-cc10|kCc10 = 2,|kCc10 = 3,|vc2settva
+tva-cc93|kCc93 = 3;|kCc93 = 2;|vc2settva
+tva-one|kOne = 1.0f,|kOne = 0.5f,|vc2settva
+tva-two|kTwo = 2.0f;|kTwo = 4.0f;|vc2settva
+tva-follow-key|static_cast<int32_t>(key) - kCentreKey|static_cast<int32_t>(key) + kCentreKey|vc2settva
+tva-follow-n|(n << kFollowTimes) - n|(n << kFollowTimes)|vc2settva
+tva-held-low|std::clamp(v, 0, kTop)|std::clamp(v, 1, kTop)|vc2settva
+tva-depth-hold|std::clamp(d, -kDepthMost, kDepthMost)|std::clamp(d, -kDepthMost - 1, kDepthMost)|vc2settva
+tva-depth-sign|at < 0 ? -x : x|x|vc2settva
+tva-depth-top|xtf::div(xtf::flt(at), tvaTables().tvaDepthTop)|xtf::mul(xtf::flt(at), tvaTables().tvaDepthTop)|vc2settva
+tva-pan-test|if (cc >= kCentre)|if (cc >= kCentre + 2)|vc2settva
+tva-pan-up|(kTop - p) * (cc - kCentre)|(kTop - p) * (cc - kCentre + 1)|vc2settva
+tva-pan-low|p - ((p * (kCentre - cc)) >> kPanLowShift)|p - ((p * (kCentre - cc + 1)) >> kPanLowShift)|vc2settva
+tva-level-wrap|tvaHeld(static_cast<int16_t>(tvaFollowed(w.key, w.levelFollow) + sum))|tvaHeld(tvaFollowed(w.key, w.levelFollow) + sum)|vc2settva
+tva-pan-wrap|tvaHeld(static_cast<int16_t>(tvaFollowed(w.key, w.panFollow) + pan))|tvaHeld(tvaFollowed(w.key, w.panFollow) + pan)|vc2settva
+tva-controls|if (reads.tvaGlobals().controls != 0)|if (reads.tvaGlobals().controls == 0)|vc2settva
+tva-level-velocity|block[3] = floatWord(xtf::mul(level, w.velocityLevel));|block[3] = floatWord(level);|vc2settva
+tva-block-six|    block[6] = floatWord(kZero);\n    block[7] = floatWord(signedDepth|    block[7] = floatWord(signedDepth|vc2settva
+tva-depth-a-byte|summedByte(w, kDepthASum, w.depthA, reads)|summedByte(w, kDepthASum, w.depthB, reads)|vc2settva
+tva-pair-left|pair[0] = vc2LevelRun(kCrossfadeAt + kTop - p, scale);|pair[0] = vc2LevelRun(kCrossfadeAt + p, scale);|vc2settva
+tva-off-level|    block[3] = floatWord(kOne);\n    block[2]|    block[3] = floatWord(kZero);\n    block[2]|vc2settva
+tva-off-depth|    block[2] = floatWord(kZero);\n    block[6]|    block[6]|vc2settva
+tva-pairs-first|block[8] = block[9] = floatWord(first);|block[8] = block[9] = floatWord(second);|vc2settva
+tva-route-second|{ tvaPairs(block, kZero, out); }|{ tvaPairs(block, out, kZero); }|vc2settva
+tva-route-part|g.route == 0 ? out : kZero|g.route != 0 ? out : kZero|vc2settva
+tva-routes-order|kRoutes { routeSecond, routeFirst, routeByPart }|kRoutes { routeFirst, routeSecond, routeByPart }|vc2settva
+tva-route-default|: routeFirst)(block, out, g);|: routeSecond)(block, out, g);|vc2settva
+tva-route-test|w.route < kRoutes.size()|w.route < kRoutes.size() - 1|vc2settva
+tva-scaled|xtf::mul(std::bit_cast<float>(word), by)|std::bit_cast<float>(word)|vc2settva
+tva-velocity-square|w.velocityLevel = xtf::mul(x, x);|w.velocityLevel = x;|vc2settva
+tva-velocity-args|reads.velocityCurve(w.velocity, w.sens, w.curve)|reads.velocityCurve(w.key, w.sens, w.curve)|vc2settva
+tva-block-one|    block[1] = 0;\n    block[4] = 0;|    block[1] = 1;\n    block[4] = 0;|vc2settva
+tva-block-four|    block[4] = 0;\n    block[5] = 0;|    block[4] = 1;\n    block[5] = 0;|vc2settva
+tva-block-five|    block[5] = 0;\n    const float scale|    block[5] = 1;\n    const float scale|vc2settva
+tva-on-test|    if (w.on != 0)\n        onWay|    if (w.on == 0)\n        onWay|vc2settva
+tva-out-byte|summedByte(w, kOutputSum, w.output, reads)|summedByte(w, kOutputSum, w.gain, reads)|vc2settva
+tva-pair-18|block[18] = floatWord(pair[0]);|block[18] = floatWord(pair[1]);|vc2settva
+tva-kind|block[16] = floatWord(w.kind == 0 ? kOne : kZero);|block[16] = floatWord(w.kind == 1 ? kOne : kZero);|vc2settva
+tva-kind-17|block[17] = floatWord(w.kind == 0 ? kZero : kOne);|block[17] = floatWord(kZero);|vc2settva
+tva-send-a|t.tvaSend));|t.tvaSendTwo));|vc2settva
+tva-send-b-cc|vc2LevelRun(reads.matrixControl(w.matrix, kCc93), scale), sendB)|vc2LevelRun(reads.matrixControl(w.matrix, kCc93), scale), kOne)|vc2settva
+tva-gain-sixths|xtf::div(xtf::flt(g.gain), t.tvaSixths)|xtf::flt(g.gain)|vc2settva
+tva-gain-eight|    tvaScaled(block[8], gain);\n|\n|vc2settva
+tva-gain-nine|    tvaScaled(block[9], gain);\n|\n|vc2settva
+tva-gain-common|const float common = xtf::mul(vc2LevelRun(w.gain, scale), gain);|const float common = vc2LevelRun(w.gain, scale);|vc2settva
+tva-twelve|block[12] = floatWord(xtf::mul(common, std::bit_cast<float>(block[12])));|block[12] = floatWord(common);|vc2settva
+tva-gain-thirteen|    tvaScaled(block[13], gain);\n|\n|vc2settva
+tva-gain-ten|    tvaScaled(block[10], gain);\n|\n|vc2settva
+tva-gain-eleven|    tvaScaled(block[11], gain);\n|\n|vc2settva
+tva-fourteen|block[14] = floatWord(xtf::mul(common, t.tvaSendTwo));|block[14] = floatWord(common);|vc2settva
+tva-fifteen|block[15] = floatWord(xtf::mul(gain, out));|block[15] = floatWord(out);|vc2settva
+tva-step|xtf::div(kOne, xtf::mul(xtf::div(xtf::flt(g.rate), t.tvaRateScale), t.tvaSampleRate))|xtf::mul(xtf::div(xtf::flt(g.rate), t.tvaRateScale), t.tvaSampleRate)|vc2settva
+tva-step-rate|xtf::mul(xtf::div(xtf::flt(g.rate), t.tvaRateScale), t.tvaSampleRate)|xtf::mul(xtf::flt(g.rate), t.tvaSampleRate)|vc2settva
+tva-make-level|madeByKind(c, reads);\n    velocityLevelOf(w, reads);|madeByKind(c, reads);|vc2settva
+tva-make-block|madeByKind(c, reads);\n    velocityLevelOf(w, reads);\n    blockOf(w, block, reads);|madeByKind(c, reads);\n    velocityLevelOf(w, reads);|vc2settva
+tva-convert-voice|    vc2ChildVoice(&w.key, call, reads);\n|\n|vc2settva
+tva-convert-level|call, reads);\n    velocityLevelOf(w, reads);|call, reads);|vc2settva
+tva-convert-block|call, reads);\n    velocityLevelOf(w, reads);\n    blockOf(w, block, reads);|call, reads);\n    velocityLevelOf(w, reads);|vc2settva

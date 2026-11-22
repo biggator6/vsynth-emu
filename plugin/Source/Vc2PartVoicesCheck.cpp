@@ -14,6 +14,7 @@
 // XT_VC2VOICES_MAIN only.
 #ifdef XT_VC2VOICES_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2KeysTables.h"
 #include "Vc2PartVoicesCheck.h"
 #include "Vc2PartVoicesTables.h"
 #include <algorithm>
@@ -161,22 +162,24 @@ std::string voicesCase(VoicesSides& s, std::mt19937& rng) {
     for (int k = 0; k < kSteps && what.empty(); ++k, ++s.n.events) {
         steerVoices(s, rng, k == 0);
         voicesPrepare(s, (uint32_t)rng());
-        what = events[rng() % events.size()](s, rng);
+        what = voicesBounded([&] { return events[rng() % events.size()](s, rng); });
         s.n.destroys += vc2CountCalls(s.mine, kVoicesDestroy);
         s.n.ended += vc2CountCalls(s.mine, kVoicesEnded);
     }
     return what;
 }
 
-void sayVoiceCounts(const Vc2Run& run, const VoicesCounts& n, long different) {
+void sayVoiceCounts(const Vc2Run& run, const VoicesCounts& n) {
     std::printf("voices: %d cases, %ld events, %ld inits, %ld takes (%ld from free, %ld stolen, %ld none), %ld "
                 "moves, %ld reserves, %ld ended scans (%ld end tests), %ld stop alls, %ld stops, %ld costs, %ld "
                 "budgets; %ld destroys; %ld splices, %ld lists dealt\n", run.cases, n.events, n.inits, n.takes,
                 n.fromFree, n.stolen, n.none, n.moves, n.reserves, n.scans, n.ended, n.stopAlls, n.stops, n.costs,
                 n.getters, n.destroys, n.splices, n.redraws);
-    std::printf("xt_vc2voices: %ld different\n", different);
 }
 } // namespace
+
+void voicesSteer(VoicesSides& s, std::mt19937& rng, bool all) { steerVoices(s, rng, all); }
+void voicesDrawNotes(Vc2Fw& fw, std::mt19937& rng) { drawNotes(fw, rng); }
 
 std::vector<uint32_t> voicesOf(VoicesSides& s, uint32_t list) {
     std::vector<uint32_t> voices;
@@ -214,7 +217,7 @@ std::string voicesDifference(VoicesSides& s) {
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2voices", vc2LoadPartVoices);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2voices", vc2LoadAll<vc2LoadPartVoices, vc2LoadKeys>);
     if (!run) return 1;
     Vc2PartVoices port;
     VoicesDraws draws;
@@ -224,7 +227,10 @@ int main(int argc, char** argv) {
     voicesInstallRom(fw, draws, rom);
     Vc2Tally tally { "XT_VC2VOICES_FIRST", "XT_VC2VOICES_STOP" };
     vc2RunCases(*run, tally, "", s.n.events, [&](std::mt19937& rng, bool) { return voicesCase(s, rng); });
-    sayVoiceCounts(*run, s.n, tally.different);
+    sayVoiceCounts(*run, s.n);
+    const long assigner = vc2AssignPart(s, *run) + vc2AssignReleasePart(s, *run) + vc2VoiceClassPart(s, *run) +
+                          vc2AssignListenersPart(s, *run) + vc2UpdateTaskPart(s, *run) + vc2QueueNodePart(s, *run);
+    std::printf("xt_vc2voices: %ld different\n", tally.different + assigner);
     return 0;
 }
 #endif

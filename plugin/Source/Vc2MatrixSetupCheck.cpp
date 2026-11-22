@@ -28,13 +28,16 @@ struct SetupCounts {
          depths = 0, draws = 0, reads = 0;
 };
 
-// The port's parameters and 0x893b1ee0: the store's values, each call logged as rom.4's hooks log theirs
+// The port's parameters and 0x893b1ee0: the store's values, each call logged as rom.4's hooks log theirs; the held
+// flag the case's (v292: it doesn't move during a read here, as xt_vc2settings' flips do)
 struct PortParams final : Vc2MatrixParams {
-    PortParams(SetupStore& s, std::vector<SetupCall>& l) : store(s), log(l) {}
+    PortParams(SetupStore& s, std::vector<SetupCall>& l, const bool& h) : store(s), log(l), heldFlag(h) {}
     SetupStore& store;
     std::vector<SetupCall>& log;
+    const bool& heldFlag;
     int32_t partValue(int part, int16_t id) override { return logged(part, id); }
     int32_t systemValue(int16_t id) override { return logged(kSetupSystem, id); }
+    bool held() override { return heldFlag; }
     int32_t logged(int block, int16_t id) {
         log.push_back({ block, id });
         return store.value(block, id);
@@ -59,7 +62,7 @@ struct SetupRig {
     Vc2MatrixSourceState state { &m };
     Vc2MatrixSourceRoutines sources { state };
     Vc2MatrixCore core { sources };
-    PortParams params { store, portCalls };
+    PortParams params { store, portCalls, held };
     PortPart part { portCalls };
     Vc2MatrixSetup setup { params, part };
     SetupCounts n;
@@ -143,12 +146,12 @@ std::string onSettingsDraw(SetupRig& r, std::mt19937& rng) {
 }
 
 std::string onRecord(SetupRig& r, std::mt19937& rng) {
-    return recordOn(r, rng, r.n.records, kRecord, "a record", [&](int p) { return r.setup.record(r.g, p, r.held); });
+    return recordOn(r, rng, r.n.records, kRecord, "a record", [&](int p) { return r.setup.record(r.g, p); });
 }
 
 std::string onPartSettings(SetupRig& r, std::mt19937& rng) {
     return recordOn(r, rng, r.n.settings, kSettings, "the settings",
-                    [&](int p) { return r.setup.settings(r.g, p, r.held); });
+                    [&](int p) { return r.setup.settings(r.g, p); });
 }
 
 std::string onAssigns(SetupRig& r, std::mt19937&) {

@@ -94,6 +94,23 @@ public:
     virtual void render(Vc2MixerFrame* frames) = 0;     // +0x24: into the other buffer
 };
 
+// A tone of the part as the voices' update and schedule ask it (v311): by its methods at +0x0c, +0x30 and +0x3c, v228's
+class Vc2MixerTone {
+public:
+    virtual ~Vc2MixerTone() = default;
+    virtual void update(int32_t n) = 0;      // +0x0c: n ticks of its envelopes, LFOs and OSC voices
+    virtual void clock(float seconds) = 0;   // +0x30: its LFOs' clock
+    virtual void count(uint32_t x) = 0;      // +0x3c: its OSC voices' count
+};
+
+// What the voices' update and schedule call beyond the tones (v311)
+class Vc2MixerTaskParts {
+public:
+    virtual ~Vc2MixerTaskParts() = default;
+    virtual void freeLfosClock(float seconds) = 0;   // 0x893ad870 on the free LFOs 0x8a0c6d84 (v271's)
+    virtual void glue(float carried) = 0;            // 0x893f07a0 on the vocoder 0x89999758 (v220's)
+};
+
 class Vc2PartMixer {
 public:
     static constexpr int kBlock = Vc2MixerBuffers::kBlock;
@@ -110,6 +127,11 @@ public:
     void setExtin(int32_t on) { w.extin = on; }   // 0x893b1370, which nothing calls
     int32_t extin() const { return w.extin; }     // 0x893b1380, the same
     void reset(Vc2MixerParts& parts);       // 0x893b1680: the tracker's, the detector's and the ring's resets
+    // v311: the voices' update 0x893b16a0 (the blocks since its last in 10 ms ticks, at least 1, to each tone's
+    // update, then the glue) and schedule 0x893b1710 (the blocks since its last in seconds, a block's when none, to
+    // the free LFOs' clock and each tone's clock and count of 1); the tones given as the list stands
+    void updateTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts);
+    void scheduleTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts);
 
     Vc2MixerWords w {};
     Vc2MixerBuffers b {};

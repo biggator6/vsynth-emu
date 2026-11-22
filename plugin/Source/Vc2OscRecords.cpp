@@ -1,13 +1,17 @@
 // xt_vc2osc's records (v238; v230's, moved here from Vc2OscCheck.cpp and Vc2OscFakes.cpp as they grew): what the
 // voice reads where its words point (the wave headers, the loop records, the bound envelopes and LFOs, the block's
 // +0xe0 records), their addresses in the interpreter's RAM, their draws and their writing into rom.4's memory, where
-// both sides read them.  XT_VC2OSC_MAIN only.
-#ifdef XT_VC2OSC_MAIN
-#include "Vc2OscSides.h"
+// both sides read them.  From v319 xt_vc2tone's too, its tones' voices reading the same.
+// XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+#if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
+#include "Vc2OscDraws.h"
+#include "XtWord.h"
+#include <cstddef>
 
 namespace {
 // [FW] where a record's fields are (Vc2OscVoice.h's): the wave header's, the loop record's
 constexpr uint32_t kHeaderFlag = 2, kHeaderRate = 8, kHeaderKey = 0xa, kHeaderCents = 0x18, kHeader1c = 0x1c;
+constexpr uint32_t kHeaderFormat = 1;   // [FW] v328: the format byte mode 1's set-up reads
 constexpr uint32_t kLoopStart = 4, kLoopEnd = 8, kBwdEnd = 0xc, kBwdStart = 0x10, kRateFwd = 0x14, kRateBwd = 0x16;
 constexpr uint32_t kFwdMode = 0x18, kBwdMode = 0x19, kLoopFine = 0x1b;
 constexpr uint32_t kLoopsFrom = 0x100, kEnvelopesFrom = 0x200, kLfosFrom = 0x400, kBoundStride = 0x80;
@@ -113,14 +117,47 @@ void oscDrawRecords(OscRecords& r, std::mt19937& rng) {
     }
 }
 
-void oscWriteRecords(Vc2Fw& fw, const OscRecords& r) {
+void oscDrawLoopEvents(OscRecords& r, std::mt19937& rng) {
+    // [FW] the four events' positions, 0xb4 bytes apart: the forward loop's start and end, the backward's end and start
+    constexpr std::array<uint32_t, 4> kEvents { 0x4, 0xb8, 0x16c, 0x220 };
+    constexpr int32_t kFrom = 3000 * 16, kOver = 500 * 16, kSpanLeast = 64 * 16, kSpanOver = 800 * 16;
     for (int k = 0; k < kOscRecords; ++k) {
-        const Vc2OscWaveHeader& h = r.headers[(size_t)k];
-        put(fw, oscHeaderAt(k) + kHeaderFlag, h.flag);
-        put(fw, oscHeaderAt(k) + kHeaderRate, h.rate);
-        put(fw, oscHeaderAt(k) + kHeaderKey, h.rootKey);
-        put(fw, oscHeaderAt(k) + kHeaderCents, h.cents);
-        put(fw, oscHeaderAt(k) + kHeader1c, h.word1c);
+        const int32_t fwd = kFrom + (int32_t)(rng() % kOver), bwd = kFrom + (int32_t)(rng() % kOver);
+        std::array<int32_t, 4> at { fwd, fwd + kSpanLeast + (int32_t)(rng() % kSpanOver),
+                                    bwd + kSpanLeast + (int32_t)(rng() % kSpanOver), bwd };
+        // v327: one time in four one of them at an event of the case's events' table, where a crossing meets both
+        const std::vector<int32_t>& events = r.events.positions;
+        if (!events.empty() && rng() % 4 == 0) {
+            const size_t which = rng() % at.size();
+            at[which] = events[rng() % events.size()];
+        }
+        for (size_t e = 0; e < at.size(); ++e) r.bound[oscPairAt(k) + kEvents[e]] = std::bit_cast<float>(at[e]);
+        // v327: the word before each, an event's number and (at the forward loop's end and the backward's start) the
+        // loop's mode: none, One Way, Alternate, hold, or past them
+        constexpr std::array<int16_t, 6> kModes { 0, 1, 2, 3, -1, 5 };
+        for (size_t e = 0; e < at.size(); ++e) {
+            const uint32_t mode = e % 2 == 1 ? (uint16_t)kModes[rng() % kModes.size()] : rng() & 0xffff;
+            r.bound[oscPairAt(k) + kEvents[e] - 4] = std::bit_cast<float>((rng() & 0xffff) | mode << 16);
+        }
+        // v328: the header's format, the wider events' (3…5) as the case's table is laid out
+        constexpr std::array<uint8_t, 3> kWide { 3, 4, 5 };
+        constexpr std::array<uint8_t, 5> kNarrow { 0, 1, 2, 6, 7 };
+        r.headers[(size_t)k].format = r.events.wide ? kWide[rng() % kWide.size()] : kNarrow[rng() % kNarrow.size()];
+    }
+}
+
+void oscWriteRecords(Vc2Fw& fw, const OscRecords& r) {
+    // a header's fields, each at its place in the record (v328: a table, with the format byte)
+    using H = Vc2OscWaveHeader;
+    constexpr std::array<XtWord, 6> kFields { { { kHeaderFormat, offsetof(H, format), sizeof(H::format) },
+                                                { kHeaderFlag, offsetof(H, flag), sizeof(H::flag) },
+                                                { kHeaderRate, offsetof(H, rate), sizeof(H::rate) },
+                                                { kHeaderKey, offsetof(H, rootKey), sizeof(H::rootKey) },
+                                                { kHeaderCents, offsetof(H, cents), sizeof(H::cents) },
+                                                { kHeader1c, offsetof(H, word1c), sizeof(H::word1c) } } };
+    for (int k = 0; k < kOscRecords; ++k) {
+        const auto* h = reinterpret_cast<const char*>(&r.headers[(size_t)k]);
+        for (const auto& [at, member, bytes] : kFields) fw.cpu.write(oscHeaderAt(k) + at, h + member, bytes);
         putLoop(fw, oscLoopAt(k), r.loops[(size_t)k]);
     }
     for (const auto& [at, x] : r.bound) put(fw, at, x);

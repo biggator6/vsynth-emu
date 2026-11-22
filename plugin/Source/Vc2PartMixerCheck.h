@@ -30,6 +30,7 @@ struct MixDraws {
 enum MixKind : int32_t {
     kInputStage, kMicRing, kUnvoiced, kDetectorRing, kVocoder, kResetTracker, kResetUnvoiced, kResetRing,
     kCarrier, kRenderCarrier, kHeld, kRender,
+    kToneUpdate, kToneClock, kToneCount, kFreeLfosClock, kGlue,   // v311: the second part's, a float's bits as the arg
 };
 enum MixArg : int32_t { kNoBuffer, kSecondBuffer, kMicBuffer, kRingBuffer, kCarrierBuffer, kDirectBuffer, kOther };
 
@@ -95,3 +96,6 @@ void mixVocoder(Vc2MixerFrame* frames, const std::array<Vc2MixerFrame, Vc2PartMi
 // draws and log into `log`
 void mixInstallRom(Vc2Fw& fw, const MixDraws& draws, std::vector<MixCall>& log);
 void mixLinkVoices(Vc2Fw& fw, int count);
+// The second part (v311, Vc2MixerTasksCheck.cpp): the voices' update and schedule on the seed after the run's, on the
+// mixer and rom.4's log of the first's; how many cases differ, its counts said
+long vc2MixerTasksPart(Vc2Fw& fw, Vc2PartMixer& mixer, std::vector<MixCall>& rom, const Vc2Run& run);

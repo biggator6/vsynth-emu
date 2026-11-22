@@ -1,0 +1,34 @@
+# Planted errors in Vc2Synth's start (v314), for mutate_vc2.py --synth: each must make xt_vc2synth, on rom.4, say
+# something differs.  name|old|new[|port[|seed]]; port vc2synth (Vc2Synth.cpp).  Not planted: the static M's node
+# given to the update queue (Vc2Synth's constructor), which only the queue's routines on that node read, and the
+# start reaches none.
+voice-counts|kVoiceCounts = { -1, -1, -1, 0 };|kVoiceCounts = { -1, -1, 0, 0 };|vc2synth
+tva-step|kTvaStep = 0x3bf7adf6;|kTvaStep = 0x3bf7adf7;|vc2synth
+elapsed|kElapsed = 1;|kElapsed = 0;|vc2synth
+receive-on|kReceiveOn = 1;|kReceiveOn = 0;|vc2synth
+no-source|kNoSource = { -1, 0, 0.0f };|kNoSource = { 0, 0, 0.0f };|vc2synth
+notes-unread|kNotesUnread = 0x3c199999;|kNotesUnread = 0x3c19999a;|vc2synth
+robot-start|kRobotStart = 1.0f;|kRobotStart = 0.0f;|vc2synth
+counts-set|    rows.voiceCounts = kVoiceCounts;\n|\n|vc2synth
+step-set|    tvas.step = kTvaStep;\n|\n|vc2synth
+elapsed-set|    time.elapsed = kElapsed;\n|\n|vc2synth
+receive-set|    midi.receiveProgram = midi.receiveBank = kReceiveOn;\n|    midi.receiveProgram = kReceiveOn;\n|vc2synth
+nodes-channel|    for (Vc2PartNode& n : nodes.nodes) n.channel = 0;|    for (Vc2PartNode& n : nodes.nodes) n.channel = 1;|vc2synth
+midi-ports|    midi.staticInitPorts();   // the whole table's 0x893179d0\n|\n|vc2synth
+midi-states|    midi.staticInitStates();  // and 0x89317db0, before the part's rows\n|\n|vc2synth
+voices-init|    voices.staticInit();      // row 4|    // row 4|vc2synth
+glides-init|    keys.constructGlides();   // row 7|    // row 7|vc2synth
+trips-init|    trips.staticInit();       // row 11|    // row 11|vc2synth
+pitch-set|    pitch = kNoSource;        // row 12|    // row 12|vc2synth
+queue-init|    queue.staticInit();       // row 14|    // row 14|vc2synth
+unread-set|    notes.unread = kNotesUnread;   // row 17|    // row 17|vc2synth
+reloads-init|    reloads.staticInit();     // row 26|    // row 26|vc2synth
+static-init|    staticM.staticInit(parts);     // row 37|    // row 37|vc2synth
+robot-set|    rows.robot = kRobotStart;      // row 42|    // row 42|vc2synth
+pools-init|    pools.init();             // row 45|    // row 45|vc2synth
+chaos-set|    chaos = Vc2ToneLfo::kChaosStart;   // row 47|    // row 47|vc2synth
+lfos-init|    freeLfos.construct();     // row 54|    // row 54|vc2synth
+autonote-init|    autoNote.init();          // row 83|    // row 83|vc2synth
+ring-init|    ring.setGlobals();        // row 85|    // row 85|vc2synth
+static-state-back|        std::memcpy(m_.state.data(), &s, sizeof s);\n|\n|vc2synth
+static-state-channel|        vc2ChannelSetUp(s, (uint8_t)channel);|        vc2ChannelSetUp(s, (uint8_t)(channel + 1));|vc2synth

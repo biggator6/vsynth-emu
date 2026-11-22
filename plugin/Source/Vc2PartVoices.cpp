@@ -11,13 +11,13 @@ constexpr uint32_t kPreparedOrder = 0xffffffff;        // [FW] the age a prepare
 constexpr int8_t kStealable = 0, kOneOfKind = 1;       // [FW] a note's kinds: the take steals 0; a cost counts one 1
 constexpr uint32_t kLeastAge = 0xffffffff;             // [FW] the take's first least age
 
-// The update queue's node's constructor 0x89394f30 on a node given: its links to itself
-void constructNode(Vc2VoiceNode& n, uint32_t self) {
+} // namespace
+
+void vc2ConstructNode(Vc2VoiceNode& n, uint32_t self) {
     n.vtable = Vc2PartVoices::kNodeVtable;
     n.queuePrev = self;
     n.queueNext = self;
 }
-} // namespace
 
 Vc2VoiceNode& Vc2PartVoices::at(uint32_t address) {
     const auto& table = vc2PartVoicesTables().voices;
@@ -28,13 +28,16 @@ Vc2VoiceNode& Vc2PartVoices::at(uint32_t address) {
 
 uint32_t Vc2PartVoices::addressOf(int voice) const { return vc2PartVoicesTables().voices[(size_t)voice]; }
 
+// A voice's node is its first member, so the whole voice is at the node's address
+Vc2Voice& Vc2PartVoices::voice(uint32_t address) { return reinterpret_cast<Vc2Voice&>(at(address)); }
+
 void Vc2PartVoices::staticInit() {
     const auto& t = vc2PartVoicesTables();
     g.unread1 = t.unread[1];
     g.unread2 = t.unread[2];
     g.unread0 = t.unread[0];
     for (uint32_t k = 0; k < kLists; ++k) {
-        constructNode(heads[k], kHeadsAt + kHeadBytes * k);
+        vc2ConstructNode(heads[k], kHeadsAt + kHeadBytes * k);
         heads[k].vtable = kVoiceVtable;
     }
 }
@@ -43,7 +46,7 @@ void Vc2PartVoices::initVoices() {
     for (int n = 0; n < kVoices; ++n) {
         const uint32_t self = addressOf(n);
         Vc2VoiceNode& v = at(self);
-        constructNode(v, self);
+        vc2ConstructNode(v, self);
         v.vtable = kVoiceVtable;
         v.number = (uint8_t)n;
         v.age = kZeroAge;

@@ -14,6 +14,8 @@ struct Vc2PartMixerTables {
     float ease[2] = {};             // 0.0009375, a level's step a sample, the two paths' (0x893b1ab8, 0x893b1d44)
     float perLevel = 0;             // 1/127, a setting's (0x893b15d8)
     Vc2MixerTargetPool pool[2] {};  // the level routine's (0x893b15f0, 0x893b17d0), the targets' (0x893b2068, 0x893b2074)
+    float blockSeconds = 0;         // v311: a block's seconds, 32/44100 (0x893b17ec), the update's and the schedule's
+    float updateSeconds = 0;        // v311: the update's tick, 0.01 s (0x893b17f4)
 };
 
 [[nodiscard]] bool vc2LoadMixer(const char* path);

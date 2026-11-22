@@ -30,23 +30,89 @@ SARP+=($( [ -f XtSinc.cpp ] && echo XtSinc.cpp ))   # render's windowed sinc, it
 # descriptors' form, XtPatchStore.cpp, is with each program's own
 source "$REPO/research/tools/vc2_tables.sh"
 V4=($(vc2Tables . .cpp))
-rm -f "$O"/{xt_osc,xt_cosm,xt_lfo,xt_env,xt_fw,xt_enc,xt_analog,xt_synth,xt_tone}
-rm -f "$O"/{xt_fx,xt_files,xt_arp,xt_msm,xt_vc2params,xt_vc2in,xt_vc2legacy,xt_vc2hireso,xt_vc2vocoder}
-rm -f "$O"/{xt_vc2carrier,xt_vc2tracker,xt_vc2kind6,xt_vc2autonote,xt_vc2mixer,xt_vc2tone,xt_vc2osc,classifier_test,rd}
-rm -f "$O"/xt_vc2tva
-rm -f "$O"/xt_vc2cosm
-rm -f "$O"/xt_vc2libm
-rm -f "$O"/xt_vc2voices
-rm -f "$O"/xt_vc2patch
+# Every program this builds, gone first, so one that fails to build isn't run as it was
+BUILT=(xt_osc xt_cosm xt_lfo xt_env xt_fw xt_enc xt_analog xt_synth xt_tone xt_fx xt_files xt_arp xt_msm xt_vc2params
+       xt_vc2in xt_vc2legacy xt_vc2hireso xt_vc2vocoder xt_vc2carrier xt_vc2tracker xt_vc2kind6 xt_vc2autonote
+       xt_vc2mixer xt_vc2tone xt_vc2osc classifier_test rd xt_vc2tva xt_vc2cosm xt_vc2libm xt_vc2voices xt_vc2notes
+       xt_vc2keys xt_vc2sets xt_vc2settings xt_vc2midi xt_vc2synth xt_vc2patch)
+for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # rom.4's patch store and its .p02 reader (v450) against rom.4's own routines, on the disk image's patches
 [ -f Vc2PatchStoreCheck.cpp ] && cc -DXT_VC2PATCH_MAIN Vc2PatchStoreCheck.cpp Vc2PatchFileCheck.cpp Vc2PatchStore.cpp \
    Vc2PatchFile.cpp Vc2Params.cpp XtFxValueText.cpp XtPatchStore.cpp XtDiskImage.cpp "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2patch" &
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
-   Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp "${SH4[@]}" -o "$O/xt_vc2voices" &
+   Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp \
+   $( [ -f Vc2AssignCheck.cpp ] && echo Vc2AssignCheck.cpp Vc2AssignEvents.cpp Vc2Assigner.cpp ) \
+   $( [ -f Vc2AssignReleaseCheck.cpp ] && echo Vc2AssignReleaseCheck.cpp Vc2AssignReleaseEvents.cpp \
+      Vc2AssignRelease.cpp Vc2AssignNotes.cpp Vc2Keys.cpp Vc2KeysTables.cpp ) \
+   $( [ -f Vc2VoiceClassCheck.cpp ] && echo Vc2VoiceClassCheck.cpp Vc2VoiceClassEvents.cpp Vc2VoiceClass.cpp \
+      Vc2VoiceQueue.cpp Vc2VoiceQueueCheck.cpp ) \
+   $( [ -f Vc2AssignListenersCheck.cpp ] && echo Vc2AssignListenersCheck.cpp ) \
+   $( [ -f Vc2UpdateTask.cpp ] && echo Vc2UpdateTask.cpp Vc2UpdateTaskCheck.cpp ) \
+   "${SH4[@]}" -o "$O/xt_vc2voices" &
+# The part's notes W (v275) against rom.4's own routines, every tone method they reach hooked
+[ -f Vc2NotesCheck.cpp ] && cc -DXT_VC2NOTES_MAIN Vc2NotesCheck.cpp Vc2NotesEvents.cpp Vc2NotesFakes.cpp \
+   Vc2Notes.cpp "${SH4[@]}" -o "$O/xt_vc2notes" &
+# The part's keys (v276) against rom.4's own routines, the OS clock hooked
+[ -f Vc2KeysCheck.cpp ] && cc -DXT_VC2KEYS_MAIN Vc2KeysCheck.cpp Vc2KeysEvents.cpp Vc2Keys.cpp Vc2KeysTables.cpp \
+   $( [ -f Vc2PartNodesCheck.cpp ] && echo Vc2PartNodes.cpp Vc2PartNodesCheck.cpp ) \
+   "${SH4[@]}" -o "$O/xt_vc2keys" &
+# The OS MIDI task's handler and the channel states (v313) against rom.4's own, the OS's listeners and routines hooked
+[ -f Vc2OsMidiCheck.cpp ] && cc -DXT_VC2MIDI_MAIN Vc2OsMidiCheck.cpp Vc2OsMidiEvents.cpp Vc2OsMidi.cpp \
+   Vc2OsMidiHandler.cpp Vc2OsMidiTables.cpp Vc2KeysTables.cpp "${SH4[@]}" -o "$O/xt_vc2midi" &
+# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but rom.4's parameter tables, and
+# the patch store and .p02 reader (v450) that read with them
+NOT_SYN=" Vc2Params.cpp Vc2PatchStore.cpp Vc2PatchFile.cpp "
+VSYN=()
+while read -r f; do
+  [[ "$NOT_SYN" == *" $f "* ]] || VSYN+=("$f")
+done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake)
+[ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2SynthCheck.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
+   XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) \
+   "${SH4[@]}" -o "$O/xt_vc2synth" &
+# The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
+[ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
+   Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp \
+   $( [ -f Vc2SetCommonCheck.cpp ] && echo Vc2SetCommon.cpp Vc2SetCommonCheck.cpp ) \
+   $( [ -f Vc2SetEnvelopeCheck.cpp ] && echo Vc2SetEnvelope.cpp Vc2SetEnvelopeTables.cpp Vc2SetEnvelopeCheck.cpp \
+      Vc2LibMath.cpp Vc2LibMathTables.cpp ) \
+   $( [ -f Vc2SetLfoCheck.cpp ] && echo Vc2SetChildHead.cpp Vc2SetLfo.cpp Vc2SetLfoCheck.cpp ) \
+   $( [ -f Vc2SetMixCheck.cpp ] && echo Vc2SetMix.cpp Vc2SetMixCheck.cpp ) \
+   $( [ -f Vc2SetTvaCheck.cpp ] && echo Vc2SetTva.cpp Vc2SetTvaCheck.cpp ) \
+   "${SH4[@]}" -o "$O/xt_vc2sets" &
+# The part's settings by ID (v286) against rom.4's own readers, the read objects and the getter hooked
+[ -f Vc2PartSettingsCheck.cpp ] && cc -DXT_VC2SETTINGS_MAIN Vc2PartSettingsCheck.cpp Vc2PartSettings.cpp \
+   Vc2SetChildHead.cpp $( [ -f Vc2PartSettingsTables.cpp ] && echo Vc2PartSettingsTables.cpp ) \
+   $( [ -f Vc2PartSettingsOsc.cpp ] && echo Vc2PartSettingsWords.cpp Vc2PartSettingsOsc.cpp \
+      Vc2PartSettingsOscCheck.cpp ) $( [ -f Vc2PartSettingsOscBlock.cpp ] && echo Vc2PartSettingsOscBlock.cpp ) \
+   $( [ -f Vc2PartSettingsVocoder.cpp ] && echo Vc2PartSettingsVocoder.cpp Vc2PartSettingsVocoderCheck.cpp \
+      Vc2LibMath.cpp Vc2LibMathTables.cpp ) \
+   $( [ -f Vc2PartSettingsModes.cpp ] && echo Vc2PartSettingsModes.cpp Vc2PartSettingsModesCheck.cpp ) \
+   $( [ -f Vc2PartSettingsDispatch.cpp ] && echo Vc2PartSettingsDispatch.cpp Vc2PartSettingsDispatchCheck.cpp \
+      Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp ) \
+   $( [ -f Vc2PartSettingsCategory.cpp ] && echo Vc2PartSettingsCategory.cpp Vc2PartSettingsCategoryCheck.cpp ) \
+   $( [ -f Vc2StaticMatrix.cpp ] && echo Vc2StaticMatrix.cpp Vc2StaticMatrixCheck.cpp ) \
+   $( [ -f Vc2PartSettingsSystem.cpp ] && echo Vc2PartSettingsSystem.cpp Vc2PartSettingsSystemCheck.cpp ) \
+   $( [ -f Vc2PartSettingsMessages.cpp ] && echo Vc2PartSettingsMessages.cpp Vc2PartSettingsMessagesCheck.cpp \
+      Vc2PartNodes.cpp Vc2Keys.cpp Vc2KeysTables.cpp ) \
+   $( [ -f Vc2PartSettingsReceive.cpp ] && echo Vc2PartSettingsReceive.cpp Vc2PartSettingsReceiveCheck.cpp ) \
+   $( [ -f Vc2PartSettingsRoutingCheck.cpp ] && echo Vc2PartSettingsRoutingCheck.cpp ) \
+   $( [ -f Vc2PartReloads.cpp ] && echo Vc2PartReloads.cpp Vc2PartReloadsCheck.cpp ) \
+   $( [ -f Vc2PartControllers.cpp ] && echo Vc2PartControllers.cpp Vc2PartControllersCheck.cpp ) \
+   $( [ -f Vc2PartNumbers.cpp ] && echo Vc2PartNumbers.cpp Vc2PartNumbersCheck.cpp ) \
+   $( [ -f Vc2PartHandlersCheck.cpp ] && echo Vc2PartHandlersCheck.cpp ) \
+   $( [ -f Vc2PartStartUp.cpp ] && echo Vc2PartStartUp.cpp Vc2PartStartUpCheck.cpp Vc2PartVoices.cpp \
+      Vc2PartVoicesTables.cpp ) \
+   $( [ -f Vc2TimeTrip.cpp ] && echo Vc2TimeTrip.cpp Vc2TimeTripCheck.cpp ) \
+   $( [ -f Vc2PartChannel.cpp ] && echo Vc2PartChannel.cpp Vc2PartChannelCheck.cpp ) \
+   $( [ -f Vc2MidiDispatch.cpp ] && echo Vc2MidiDispatch.cpp Vc2MidiDispatchCheck.cpp ) \
+   $( [ -f Vc2NotesTask.cpp ] && echo Vc2NotesTask.cpp Vc2NotesTaskCheck.cpp ) \
+   "${SH4[@]}" -o "$O/xt_vc2settings" &
 # The library's logf and powf against rom.4's own routines
 [ -f Vc2LibMathCheck.cpp ] && cc -DXT_VC2LIBM_MAIN Vc2LibMathCheck.cpp Vc2LibMath.cpp Vc2LibMathTables.cpp \
+   $( [ -f Vc2ToneMathCheck.cpp ] && echo Vc2ToneMath.cpp Vc2ToneMathCheck.cpp XtOsc.cpp XtEnvelope.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2libm" &
 cc -DXT_OSC_MAIN XtOsc.cpp XtEnvelope.cpp "${FW[@]}" XtMultiBandPlayer.cpp "${SH4[@]}" -o "$O/xt_osc" &
 [ -f XtCosm.cpp ] && cc -DXT_COSM_MAIN XtCosm.cpp XtOsc.cpp XtEnvelope.cpp "${SH4[@]}" -o "$O/xt_cosm" &
@@ -108,7 +174,8 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    "${SH4[@]}" -o "$O/xt_vc2autonote" &
 # The part mixer (v227) against rom.4's own routines, the voices and the calls it makes hooked
 [ -f Vc2PartMixerCheck.cpp ] && cc -DXT_VC2MIXER_MAIN Vc2PartMixerCheck.cpp Vc2PartMixerFakes.cpp Vc2PartMixer.cpp \
-   Vc2MixerBlock.cpp Vc2PartMixerTables.cpp Vc2Math.cpp "${SH4[@]}" -o "$O/xt_vc2mixer" &
+   Vc2MixerBlock.cpp Vc2PartMixerTables.cpp Vc2Math.cpp \
+   $( [ -f Vc2MixerTasksCheck.cpp ] && echo Vc2MixerTasksCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2mixer" &
 # The tone object's frame (v228) against rom.4's own routines, every part routine hooked
 [ -f Vc2ToneCheck.cpp ] && cc -DXT_VC2TONE_MAIN Vc2ToneCheck.cpp Vc2ToneSides.cpp Vc2ToneFakes.cpp Vc2Tone.cpp \
    $( [ -f Vc2ToneNoteOn.cpp ] && echo Vc2ToneNoteOn.cpp Vc2TonePortParts.cpp Vc2ToneEvents.cpp ) \
@@ -117,26 +184,48 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2ToneMix.cpp ] && echo Vc2ToneMix.cpp Vc2ToneMixRender.cpp Vc2ToneMixTables.cpp Vc2ToneMixCheck.cpp ) \
    $( [ -f Vc2FreeLfos.cpp ] && echo Vc2FreeLfos.cpp Vc2FreeLfoCheck.cpp ) \
    $( [ -f Vc2ToneLists.cpp ] && echo Vc2ToneLists.cpp Vc2ToneMethods.cpp Vc2ToneMethodCheck.cpp ) \
+   $( [ -f Vc2ToneHost.cpp ] && echo Vc2ToneHost.cpp ) \
+   $( [ -f Vc2ToneOscCheck.cpp ] && echo Vc2ToneHostOsc.cpp Vc2ToneOscCheck.cpp Vc2OscVoice.cpp Vc2OscVoiceGet.cpp \
+      Vc2OscVoiceKinds.cpp Vc2OscTables.cpp Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2PitchRamp.cpp Vc2PitchRampTick.cpp \
+      Vc2RampTables.cpp Vc2OscPlayers.cpp Vc2OscLite.cpp Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp Vc2OscAnalogSub.cpp \
+      Vc2OscAnalogShape.cpp Vc2OscAnalogUpdate.cpp Vc2OscVibrato.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp Vc2Kind6.cpp \
+      Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2OscDraws.cpp Vc2OscPartDraws.cpp Vc2OscRecords.cpp Vc2OscFakes.cpp \
+      Vc2OscPortParts.cpp Vc2VocoderOsc.cpp XtExtIn.cpp Vc2OscVariOffRender.cpp ) \
+   $( [ -f Vc2OscBeat.cpp ] && echo Vc2OscBeat.cpp XtMultiBandPlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
+   $( [ -f Vc2OscModeOne.cpp ] && echo Vc2OscModeOne.cpp Vc2OscWalk.cpp Vc2OscWalkEvents.cpp Vc2OscWalkDraws.cpp ) \
+   $( [ -f Vc2OscWalkStart.cpp ] && echo Vc2OscWalkStart.cpp Vc2OscModeOneStart.cpp ) \
+   $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
+   $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
+      Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
+      Vc2CosmGrowl.cpp Vc2CosmTables.cpp Vc2Math.cpp XtCosm.cpp Vc2CosmNoteOnDraws.cpp Vc2ToneCosmCheck.cpp \
+      Vc2CosmConvert.cpp XtOsc.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2tone" &
 # The OSC voice's frame (v230) against rom.4's own routines, every routine it calls hooked; its ramps (v236) its own
 [ -f Vc2OscCheck.cpp ] && cc -DXT_VC2OSC_MAIN Vc2OscCheck.cpp Vc2OscEvents.cpp Vc2OscFakes.cpp Vc2OscPortParts.cpp \
    Vc2OscVoice.cpp Vc2OscVoiceGet.cpp Vc2OscVoiceKinds.cpp Vc2OscTables.cpp \
+   $( [ -f Vc2OscDraws.cpp ] && echo Vc2OscDraws.cpp Vc2OscPartDraws.cpp ) \
    $( [ -f Vc2OscNoteOn.cpp ] && echo Vc2OscNoteOn.cpp Vc2OscTargets.cpp Vc2OscGetters.cpp ) \
    $( [ -f Vc2PitchRamp.cpp ] && echo Vc2PitchRamp.cpp Vc2PitchRampTick.cpp Vc2RampTables.cpp Vc2RampCheck.cpp ) \
    $( [ -f Vc2OscPlayers.cpp ] && echo Vc2OscPlayers.cpp Vc2OscRecords.cpp ) \
    $( [ -f Vc2OscLite.cpp ] && echo Vc2OscLite.cpp ) \
+   $( [ -f Vc2OscBeat.cpp ] && echo Vc2OscBeat.cpp XtMultiBandPlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
+   $( [ -f Vc2OscModeOne.cpp ] && echo Vc2OscModeOne.cpp Vc2OscWalk.cpp Vc2OscWalkEvents.cpp Vc2OscWalkDraws.cpp ) \
+   $( [ -f Vc2OscWalkStart.cpp ] && echo Vc2OscWalkStart.cpp Vc2OscModeOneStart.cpp ) \
    $( [ -f Vc2OscAnalog.cpp ] && echo Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp ) \
    $( [ -f Vc2OscAnalogSub.cpp ] && echo Vc2OscAnalogSub.cpp ) \
    $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp ) \
    $( [ -f Vc2OscAnalogUpdate.cpp ] && echo Vc2OscAnalogUpdate.cpp ) \
    $( [ -f Vc2OscVariOffRender.cpp ] && echo Vc2OscVariOffRender.cpp Vc2VariOffCheck.cpp ) \
    $( [ -f Vc2OscKindsCheck.cpp ] && echo Vc2OscKindsCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp Vc2Kind6.cpp \
-   Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2Math.cpp ) \
+   Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2Math.cpp Vc2VocoderOsc.cpp XtExtIn.cpp ) \
    $( [ -f Vc2OscVibrato.cpp ] && echo Vc2OscVibrato.cpp Vc2OscVibratoCheck.cpp ) \
+   $( [ -f Vc2OscModeOneCheck.cpp ] && echo Vc2OscModeOneCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2osc" &
 # The TVA (v233) against rom.4's own routines, the OS's call hooked
 [ -f Vc2TvaCheck.cpp ] && cc -DXT_VC2TVA_MAIN Vc2TvaCheck.cpp Vc2TvaEvents.cpp Vc2TvaFakes.cpp Vc2Tva.cpp \
-   Vc2TvaTables.cpp "${SH4[@]}" -o "$O/xt_vc2tva" &
+   Vc2TvaTables.cpp $( [ -f Vc2TvaDraws.cpp ] && echo Vc2TvaDraws.cpp ) "${SH4[@]}" -o "$O/xt_vc2tva" &
 # COSM (v234): the Growl against rom.4's own routines, the Matrix readers hooked; the converters' frame with the TVF's
 # converter and the Matrix's readers (v235); the converters by type and v237's six; v239's five; v241's two; the
 # Matrix core's part (v243), on the Matrix's own sources (v245); the Matrix set-up's part (v247); the COSM object's

@@ -265,7 +265,8 @@ int main(int argc, char** argv) {
     std::printf("mixer: %d cases, %ld blocks (%ld EXTIN, %ld bypassed), %ld carriers, %ld renders, %ld vocoder calls, "
                 "%ld events, %ld different\n", run->cases, n.blocks, n.extin, n.bypassed, n.carriers, n.renders,
                 n.vocoders, n.events, tally.different);
-    std::printf("xt_vc2mixer: %ld different\n", tally.different);
+    const long tasks = vc2MixerTasksPart(fw, mixer, rom, *run);
+    std::printf("xt_vc2mixer: %ld different\n", tally.different + tasks);
     return 0;
 }
 #endif

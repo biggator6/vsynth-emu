@@ -1,61 +1,11 @@
-// xt_vc2osc's draws for the analog OSC, kind 3 (v242, v244; here from v246): its block words as its converter could
-// give them and the object's words its sub oscillator's note-on reads.  XT_VC2OSC_MAIN only.
+// xt_vc2osc's draws for the analog OSC, kind 3 (v242, v244; here from v246): its steers of a voice's words, a pitch
+// near the root, the sub oscillator's and LA's.  Its block words and its object's words are Vc2OscDraws.cpp's from v319,
+// shared with xt_vc2tone.  XT_VC2OSC_MAIN only.
 #ifdef XT_VC2OSC_MAIN
 #include "Vc2OscSides.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
-
-namespace {
-using AnalogWords = std::array<std::pair<uint32_t, uint32_t>, kOscAnalogWords>;
-
-void setWord(AnalogWords& words, uint32_t at, float x) {
-    const auto word = std::ranges::find(words, at, &std::pair<uint32_t, uint32_t>::first);
-    word->second = std::bit_cast<uint32_t>(x);
-}
-
-// v246: with the sub oscillator on and an LA code, Fat (+0x108) within ±40 and its envelope's and LFO's depths
-// (+0x10c, +0x114) within ±0.04, the bound outputs being at most 1000: its raw sum within ±120 octaves.  rom.4's powf
-// gives ∞ from 128 on, and ∞ × a phase of 0 is a NaN that LA's end (0x893c3cd0) subtracts, where xtf::sub's NaN sign
-// is FSUB's negated.  The other codes take Fat's ∞ through products alone, so they keep the moderate draws
-void steerSubFat(AnalogWords& words, std::mt19937& rng) {
-    constexpr float kFatMost = 40.0f, kDepthMost = 0.04f;
-    setWord(words, 0x108, kFatMost * (2.0f * vc2Unit(rng) - 1.0f));
-    for (uint32_t at : { 0x10cu, 0x114u }) setWord(words, at, kDepthMost * (2.0f * vc2Unit(rng) - 1.0f));
-}
-} // namespace
-
-AnalogWords oscAnalogWords(std::mt19937& rng) {
-    constexpr uint32_t kCodes = 11, kPast = 8, kToneKfs = 15;   // [FW] the codes 0…10; the Tone KF table's 15
-    constexpr uint32_t kLaFirst = 9, kLaCodes = 2;              // [FW] LA-SQUARE's and LA-SAW's codes
-    constexpr std::array<float, 6> kSubOn { 1.0f, 2.0f, -1.0f, 0.99f, 1e9f, -0.0f };
-    uint32_t code = rng() % kPast == 0 ? kCodes + (uint32_t)rng() % kPast : (uint32_t)rng() % kCodes;
-    // v246: the sub oscillator's switch drawn one time in two (one in four before), and with it on an LA code one time
-    // in three, so that the shape's LA way is reached at 40 cases
-    const float subOn = rng() % 2 == 0 ? kSubOn[rng() % kSubOn.size()] : 0.0f;
-    if (std::trunc(subOn) != 0.0f && rng() % 3 == 0) code = kLaFirst + (uint32_t)rng() % kLaCodes;
-    const float toneKf = (float)(rng() % kToneKfs) + 0.9f * vc2Unit(rng);
-    // Impact as the converter gives it, Impact·4/40: its tenths 0…4, 1 (the default) one time in four; else moderate
-    constexpr uint32_t kTenths = 41;
-    const float tenths = (float)(rng() % kTenths) / 10.0f;
-    const float impact = rng() % 4 == 0 ? 1.0f : rng() % 2 ? tenths : oscDrawFloat(rng, OscRange::moderate);
-    AnalogWords words { { { 0x104, code }, { 0x138, std::bit_cast<uint32_t>(subOn) },
-                          { 0x144, std::bit_cast<uint32_t>(toneKf) }, { 0x130, std::bit_cast<uint32_t>(impact) } } };
-    constexpr std::array<uint32_t, 9> kModerate { 0x108, 0x10c, 0x114, 0x11c, 0x120, 0x124, 0x134, 0x140, 0x13c };
-    for (size_t k = 0; k < kModerate.size(); ++k) {
-        words[4 + k] = { kModerate[k], std::bit_cast<uint32_t>(oscDrawFloat(rng, OscRange::moderate)) };
-    }
-    if (code - kLaFirst < kLaCodes && std::trunc(subOn) != 0.0f) steerSubFat(words, rng);
-    return words;
-}
-
-void oscAnalogObject(Vc2OscVoice& o, std::mt19937& rng) {
-    // [FW] Fat's and the Pulse Width's targets, the phase, the second wave's Pulse Width target, the level's target,
-    // RAMP's last segment, the two words nothing writes, LA's steepness targets, SQUARE's and JUNO's
-    constexpr std::array<uint32_t, 12> kWords { 0x24c, 0x254, 0x260, 0x278, 0x28c, 0x294, 0x298, 0x2a0, 0x2b0, 0x2b8,
-                                                0x2c0, 0x2c8 };
-    for (uint32_t at : kWords) o.setF32(at, oscDrawFloat(rng, OscRange::moderate));
-}
 
 namespace {
 // v242: a pitch within an octave of `centre` cents (the root's, or from v246 five octaves up): the pitch's word
@@ -96,11 +46,35 @@ void steerSub(Vc2OscVoice& o, std::mt19937& rng) {
     constexpr uint32_t kSubOn = 0x138, kCode = 0x104, kImpact = 0x130, kPhase = 0x260, kHqLast = 1, kNoise = 8;
     if (std::trunc(o.f32(kSubOn)) == 0.0f) return;
     if (rng() % 2 == 0) steerHighWave(o, rng);
+    // v321: one time in three HQ-SQUARE, HQ-SAW or NOISE: a negative phase at their end (the chain of a kind-3 note,
+    // the sub on, one of these codes and the phase) came up too rarely at 40 cases once v321's draws moved the run
+    if (rng() % 3 == 0) o.setU32(kCode, rng() % 3 == 0 ? kNoise : (uint32_t)rng() % (kHqLast + 1));
     const uint32_t code = o.u32(kCode);
     if ((code <= kHqLast || code == kNoise) && rng() % 2 == 0) {
         o.setF32(kImpact, -vc2Unit(rng));
         o.setF32(kPhase, -vc2Unit(rng));
     }
+}
+
+// v326: a SQUARE's pitch near the root in one of its edge's steps, each as likely: below the least, below 1, below
+// each of the three rows' bounds, or up to an octave; the update's bounds (the note-on's the same) read from rom.4's
+// memory, not the port's tables, which a plant may change; and the code's copy (+0x248), which the update reads and a
+// note-on writes, SQUARE too.  The update's first row, a semitone of steerPitch's two octaves on a copy a note-on had
+// left SQUARE, came up about once in 40 cases, too rarely to rely on once v326's draws moved the run.  From the renders'
+// generator, so the run's other draws stay
+void steerSquareSteps(OscSides& s, Vc2OscVoice& o) {
+    // [FW] the pitch's word (cents); the least, and the three rows' bounds (0x893c3084…: bound, step, bound, …)
+    constexpr uint32_t kPitch = 0x5c, kLeastAt = 0x893c307c, kRowsAt = 0x893c3084, kRowBytes = 8, kRows = 3;
+    constexpr uint32_t kCodeCopy = 0x248, kSquare = 3;   // [FW]
+    o.setU32(kCodeCopy, kSquare);
+    constexpr float kHalf = 0.5f, kOne = 1.0f, kDouble = 2.0f, kOctave = 1200.0f;
+    std::array<float, kRows + 4> edges { kHalf, std::bit_cast<float>(s.fw.cpu.rd32(kLeastAt)), kOne };
+    for (uint32_t k = 0; k < kRows; ++k) edges[3 + k] = std::bit_cast<float>(s.fw.cpu.rd32(kRowsAt + kRowBytes * k));
+    edges.back() = kDouble;
+    std::mt19937& rng = s.shared.renders;
+    const size_t step = rng() % (edges.size() - 1);
+    const float ratio = edges[step] + (edges[step + 1] - edges[step]) * vc2Unit(rng);
+    o.setF32(kPitch, kOctave * std::log2(ratio));
 }
 
 // v267: one time in two the sub oscillator off, whose note-on otherwise takes the place of LA's, and Fat alone and well
@@ -139,6 +113,7 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v) {
     if (rng() % 2) {
         steerPitch(o, rng, 0.0f);
         if (rng() % 2) o.setU32(kCode, kSquare);
+        if (o.u32(kCode) == kSquare) steerSquareSteps(s, o);   // v326
     }
     oscAnalogObject(o, rng);
     steerSub(o, rng);

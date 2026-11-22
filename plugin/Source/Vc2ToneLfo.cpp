@@ -11,6 +11,10 @@ constexpr uint32_t kVtable = 0x898cd490;                 // [FW] 0x893acc1e
 constexpr float kFull = 131072.0f;                       // [FW] 0x893ac6a8: the fade's full amplitude
 constexpr uint32_t kBlockBytes = 8 * sizeof(uint32_t);   // [FW] 0x893acda0 copies the block to +0x4c…+0x6b
 constexpr int32_t kFirstOffMode = 2;                     // [FW] 0x893ac928: modes 2 and 3 start the fade at note-off
+constexpr uint32_t kOffModes = 2;                        // [FW] 0x893ac8ce: the release's test, mode − 2 unsigned
+// [FW] 0x893acff8…0x893ad01c: the block's words the settings copy, each to its place from +0x4c as the note-on's: the
+// wave, rate, delay, fade, offset and fade mode (not the key sync or the note value's switch)
+constexpr uint32_t kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };
 constexpr float kFewestClocks = 3.0f, kMostClocks = 192.0f;   // [FW] 0x893acfd4, 0x893acfd8
 constexpr float kPhaseSpan = 65535.0f, kMinute = 60.0f, kClocksABeat = 24.0f;   // [FW] 0x893acfdc…0x893acfe4
 } // namespace
@@ -177,5 +181,26 @@ void Vc2ToneLfo::clock(float seconds) {
     XtLfo l;
     load(l);
     l.clock(seconds);
+    store(l);
+}
+
+void Vc2ToneLfo::settings(const uint32_t* block) {
+    for (uint32_t k : kSettingsWords) {
+        std::memcpy(reinterpret_cast<char*>(&w.wave) + k * sizeof(uint32_t), block + k, sizeof(uint32_t));
+    }
+    XtLfo l;
+    load(l);
+    l.update(l.p);   // XtLfo's update (rom.2's 0x894f0f40) on the words as they now stand
+    store(l);
+    w.clockStep = l.s84;
+}
+
+void Vc2ToneLfo::release() {
+    if (w.active == 0) return;
+    w.active = 0;
+    if (w.mode - (uint32_t)kFirstOffMode >= kOffModes) return;
+    XtLfo l;
+    load(l);
+    l.fadeStart();   // rom.4's through the vtable's +0x0c, 0x893ac580 (rom.2's 0x894f04d0)
     store(l);
 }

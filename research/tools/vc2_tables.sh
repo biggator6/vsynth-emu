@@ -26,6 +26,10 @@ VC2_TABLES=(
     Vc2LibMathTables            # the library's logf and powf
     Vc2ToneMixTables            # the tone's OSC mix's (v269)
     Vc2PartVoicesTables         # the part's voices' (v272)
+    Vc2KeysTables               # the part's keys' (v276)
+    Vc2SetEnvelopeTables        # C's envelopes' (v282)
+    Vc2PartSettingsTables       # the part's settings' (v287)
+    Vc2OsMidiTables             # the OS MIDI task's (v313)
     "Vc2PatchFile Vc2PatchStore"   # the image a .p02's read runs on, and the store it reads into (v450)
 )
 

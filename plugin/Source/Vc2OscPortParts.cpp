@@ -1,6 +1,7 @@
 // xt_vc2osc's port side: the voice's fake parts (Vc2OscCheck.h, v230, v232), logging each call as rom.4's hooks do and
-// answering from the same draws and records.  XT_VC2OSC_MAIN only.
-#ifdef XT_VC2OSC_MAIN
+// answering from the same draws and records.  From v319 xt_vc2tone's too: what its tones' real voices call beyond the
+// tone.  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+#if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2OscCheck.h"
 #include <bit>
 
@@ -26,6 +27,10 @@ void OscPortParts::seek(uint32_t routine, int32_t at) {
 }
 
 float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
+    const uint32_t in = part + offset - address();   // v328: the voice's own words, which its head names
+    if (in - Vc2OscVoice::kOwn <= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) return self_.f32(in);
+    const OscEventTable& events = s_.records.events;   // v327: mode 1's events' table, as rom.4's memory holds it
+    if (events.holds(part + offset)) return std::bit_cast<float>(events.wordAt(part + offset));
     const auto word = s_.records.bound.find(part + offset);
     return word == s_.records.bound.end() ? 0.0f : word->second;
 }

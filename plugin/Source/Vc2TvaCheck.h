@@ -5,6 +5,7 @@
 // XT_VC2TVA_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2Tva.h"
+#include "Vc2TvaDraws.h"
 #include <array>
 #include <functional>
 #include <span>
@@ -17,7 +18,6 @@ inline constexpr uint32_t kTvaOutAt = 0x8C05a000;     // and its output
 inline constexpr uint32_t kTvaRecordsAt = 0x8C05b000; // the envelopes, then the LFOs the TVA reads, 0x80 apart
 inline constexpr uint32_t kTvaRecordStride = 0x80, kTvaLfosFrom = 0x400;
 inline constexpr int kTvaRecords = 2;                 // of each kind
-inline constexpr uint32_t kTvaBlockWords = 0x50 / 4;
 inline constexpr uint32_t kTvaFadeStep = 0x8993eb08;  // [FW] the fade's step, rom.4's word in .data
 inline constexpr uint32_t kTvaState = 0x00, kTvaLfoOut = 0x38;   // [FW] an envelope's state, an LFO's output
 
@@ -76,11 +76,6 @@ using TvaEvent = std::function<std::string(TvaSides&, std::mt19937&)>;
 std::span<const TvaEvent> tvaEvents();
 // The TVA's words against rom.4's, then the output, then the calls; empty when nothing differs
 std::string tvaDifference(TvaSides& s);
-// A float for a word the TVA multiplies, adds or compares: its usual range most often, its edges now and then; never a
-// NaN, an infinity or a denormal, which the interpreter's host floats and xtf's doubles may give otherwise
-float tvaDrawFloat(std::mt19937& rng);
-// A note-on's or a new block's block: noise, the words the TVA reads drawn as floats it can use
-std::array<uint32_t, kTvaBlockWords> tvaDrawBlock(std::mt19937& rng);
 // rom.4's side: the OS's call hooked to log into `log`
 void tvaInstallRom(Vc2Fw& fw, std::vector<TvaCall>& log);
 // The first call the two logs differ at; empty when they don't

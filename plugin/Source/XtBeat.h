@@ -19,6 +19,9 @@ struct XtBeat {
     int32_t step = 0, budget = 0;                   // +0x50 one clock at the Original Tempo, +0x54
     int32_t syncPos = 0, tripPos = 0, walkPos = 0, beatPos = 0;   // +0x58, +0x5c, +0x60, +0x64
     float factor = 1.0f, integ = 0.0f;              // +0x8c, +0x90
+    // v326: how far past the target the steer gives up, in clocks as a power of two: rom.2's one (0), rom.4's four (2,
+    // its 0x893c8c30: SHLL2 on the step), which the VC-2's players set (Vc2OscBeat.cpp)
+    int pastShift = 0;
 
     // 0x8950f860, a note's start; `pos16` the player's position (+0x38, 1/16 sample)
     void start(uint32_t tempo_, uint32_t orig_, int32_t pos16);
@@ -32,4 +35,5 @@ struct XtBeat {
 private:
     void advance(int32_t by, float walk, const int32_t* lp);
     float steer(int32_t err, int sign);
+    int32_t reach() const { return (int32_t)((uint32_t)step << pastShift); }   // the step, past which the steer stops
 };

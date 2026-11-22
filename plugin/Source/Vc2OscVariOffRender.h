@@ -6,18 +6,6 @@
 #include "Vc2OscVoice.h"
 #include <cstdint>
 
-// A wave's halfwords, reached by the addresses rom.4's object holds: `samples` is what rom.4 has at `address`; a read
-// outside them gives 0
-struct Vc2OscSamples {
-    const int16_t* samples = nullptr;
-    uint32_t address = 0;
-    uint32_t count = 0;
-    int at(uint32_t word) const {
-        const uint32_t index = (word - address) / 2;
-        return index < count ? samples[index] : 0;
-    }
-};
-
 // 32 frames into `out` (left, right), on the voice's object.  The object's +0x10c picks the way: 1 a loop, 2 a loop that
 // turns, the way back read inverted; 0 writes nothing.  The stereo render folds its two channels at 70% when the
 // object's +0x124 isn't 0.

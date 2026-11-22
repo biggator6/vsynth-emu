@@ -29,14 +29,19 @@ float floatU(int32_t v) { float f = (float)v; if (0 > v) f = f + 4294967296.0f; 
 }
 
 // A sample as the firmware reads it, an int16.  Past the wave, zeros here; on an XT, what lies there.
-int32_t XtLitePlayer::sample(const std::vector<float>& v, int32_t i) const {
+int32_t XtLiteSamples::at(int32_t i) const {
+    if (memory != nullptr) {   // v326: the VC-2's wave memory, by the address the SH-4 forms
+        const uint32_t index = (first + frame * (uint32_t)i - base) / 2;
+        return index < count ? memory[index] : 0;
+    }
+    const std::vector<float>& v = *floats;
     return i >= 0 && (size_t)i < v.size() ? (int32_t)(v[(size_t)i] * 32768.0f) : 0;
 }
 
 void XtLitePlayer::noteOn(const std::vector<float>& left, const std::vector<float>& right, float pitch_, float formant_, float walk_, float root) {
     const RoundToZero round;
-    x = &left;
-    y = right.empty() ? nullptr : &right;
+    x = XtLiteSamples { &left };
+    y = right.empty() ? XtLiteSamples {} : XtLiteSamples { &right };
     pitch = pitch_; formant = formant_; walk = walk_;
     const int32_t frames = (int32_t)left.size();
     // 0x8950b8d0: the wave's ends, the loops' rates (the record's +0x14, +0x16), the period
@@ -152,10 +157,14 @@ template <bool Forward>
 void XtLitePlayer::frame(float* lr, float at, float rate, int32_t end) {
     const float wa = window(winA, clkA, hA, at, rate);
     const float wb = window(winB, clkB, hB, at, rate);
-    const auto read = [&](const std::vector<float>& v, int32_t head, float frac, float w) {
+    const auto read = [&](const XtLiteSamples& v, int32_t head, float frac, float w) {
         float a = (float)sample(v, head);
         if (Forward) {
             float d = (float)sample(v, head + 1);
+            d = d - a;
+            a = d * frac + a;
+        } else if (upright) {   // v326: rom.4's, the sample as it is (FSUB where rom.2 has FNEG and FADD)
+            float d = (float)sample(v, head - 1);
             d = d - a;
             a = d * frac + a;
         } else {
@@ -174,15 +183,20 @@ void XtLitePlayer::frame(float* lr, float at, float rate, int32_t end) {
     };
     float aL = 0.0f, aR = 0.0f, bL = 0.0f, bR = 0.0f;
     if (Forward ? end > hA : hA > end) {
-        aL = read(*x, hA, fracA, wa);
-        if (y) aR = read(*y, hA, fracA, wa);
+        aL = read(x, hA, fracA, wa);
+        if (y) aR = read(y, hA, fracA, wa);
         step(hA, fracA);
     }
     if (Forward ? end > hB : hB > end) {
-        bL = read(*x, hB, fracB, wb);
-        if (y) bR = read(*y, hB, fracB, wb);
+        bL = read(x, hB, fracB, wb);
+        if (y) bR = read(y, hB, fracB, wb);
         step(hB, fracB);
     }
+    out(lr, aL, aR, bL, bR);
+}
+
+// The heads' sum through the gain and the filter: the one sum on both outputs (mono), or each its own (stereo)
+void XtLitePlayer::out(float* lr, float aL, float aR, float bL, float bR) {
     if (y) {                                              // 0x8950b41a
         float l = bL + aL, r = bR + aR;
         l = l * gain; r = r * gain;
@@ -213,7 +227,7 @@ void XtLitePlayer::block(float* lr) {
     const RoundToZero round;
     // 0x8950a808: the walk step from the beat (0x8950c270, +0x34), × 2^-25
     const float fs = [&] { const RoundNearest nearest; return beat_.block(flags0, walk, lp); }();
-    const float step = (float)xtf::ftrc(fs) * 0x1p-25f;
+    const float step = (float)(walkGiven ? walkWord : xtf::ftrc(fs)) * 0x1p-25f;   // v326: the VC-2's own beat's
     float pr = pitch;
     if (step > 0.0f) {
         const int32_t end = xtf::ftrc(lastF);

@@ -173,6 +173,36 @@ if [ -x "$X/xt_vc2voices" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4")
   part xt_vc2voices 'echo "== xt_vc2voices"; "$X/xt_vc2voices" "$ROM4" 40 2024 | grep -v "^  "'
 fi
+# rom.4's part's notes W against its own (v275): on rom.4
+if [ -x "$X/xt_vc2notes" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2notes 'echo "== xt_vc2notes"; "$X/xt_vc2notes" "$ROM4" 40 2024 | grep -v "^  "'
+fi
+# rom.4's part's keys against its own (v276): on rom.4
+if [ -x "$X/xt_vc2keys" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2keys 'echo "== xt_vc2keys"; "$X/xt_vc2keys" "$ROM4" 40 2024 | grep -v "^  "'
+fi
+# rom.4's part's conversion sets and notes' Matrix objects against its own (v280): on rom.4
+if [ -x "$X/xt_vc2sets" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2sets 'echo "== xt_vc2sets"; "$X/xt_vc2sets" "$ROM4" 40 2024 | grep -v "^  "'
+fi
+# rom.4's part's settings by ID against its own readers (v286): on rom.4
+if [ -x "$X/xt_vc2settings" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2settings 'echo "== xt_vc2settings"; "$X/xt_vc2settings" "$ROM4" 40 2024 | grep -v "^  "'
+fi
+# rom.4's OS MIDI task's handler and channel states against its own (v313): on rom.4
+if [ -x "$X/xt_vc2midi" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2midi 'echo "== xt_vc2midi"; "$X/xt_vc2midi" "$ROM4" 40 2024 | grep -v "^  "'
+fi
+# Vc2Synth's start against rom.4's own static initializers (v314): on rom.4
+if [ -x "$X/xt_vc2synth" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4")
+  part xt_vc2synth 'echo "== xt_vc2synth"; "$X/xt_vc2synth" "$ROM4" 1 2024 | grep -v "^  "'
+fi
 # rom.4's patch store and its .p02 reader against rom.4's own routines (v450): on rom.4 and the disk image's patches
 if [ -x "$X/xt_vc2patch" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4" "$DISK")

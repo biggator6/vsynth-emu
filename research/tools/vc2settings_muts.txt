@@ -1,0 +1,900 @@
+# Planted errors in the VC-2 part's settings by ID, for mutate_vc2.py --settings: each must make xt_vc2settings, on
+# rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2settings (Vc2PartSettings.cpp, v286),
+# vc2settingstables (Vc2PartSettingsTables.cpp, v287), vc2settingswords (Vc2PartSettingsWords.cpp), vc2settingsosc
+# (Vc2PartSettingsOsc.cpp, v288), vc2settingsblock (Vc2PartSettingsOscBlock.cpp, v289), vc2settingsvocoder
+# (Vc2PartSettingsVocoder.cpp, v290), vc2settingsmodes (Vc2PartSettingsModes.cpp, v291; Vc2PartNodes.h's `of`
+# planted at its call, by the source and part it's given), vc2settingsdispatch (Vc2PartSettingsDispatch.cpp, v292) and
+# vc2settingsmatrix (Vc2MatrixSetup.cpp's flag tests, v292, which xt_vc2settings' flips reach and xt_vc2cosm's
+# don't; the dispatcher's part given to the Matrix's set-up is not planted: the check gives part 0 alone, as rom.4's
+# handler does), vc2settingscategory (Vc2PartSettingsCategory.cpp, v294; the held Categories' test of `known` is
+# not planted: 10 and 11 are known either way), vc2staticmatrix (Vc2StaticMatrix.cpp, v295; the order of its
+# stores isn't planted, as no store reads another) and vc2settingssystem (Vc2PartSettingsSystem.cpp, v296; the sum's
+# 32-bit wrap isn't planted: the holds keep both below 25; nor its test at 24 by one: at a sum of 24, 24 − offset is the
+# count itself) and vc2settingsmessages (Vc2PartSettingsMessages.cpp, v297) and vc2settingsreceive
+# (Vc2PartSettingsReceive.cpp, v298; its test of part 0 isn't planted: another part's moves leave part 0's node of
+# source 3 as it was, so the test of a change after them says none either way; nor the glides' table by the channel
+# moved onto, which past 15 is −1, the spare table either way; v299's routing reset there too: not its move's channel
+# alone, as with no source a node ends on no channel whatever the channel, nor the receive channel's answer, always
+# 1) and vc2partreloads (Vc2PartReloads.cpp, v300; not the fire's state while it reads, as the read is hooked and
+# nothing looks at the state then, nor the OS base's vtable, which the object's overwrites, nor the request's test of
+# its posted word: posted, the switch after it ends as the test's way does, asked with the remove held once if it was
+# reading and nothing posted again) and vc2partcontrollers (Vc2PartControllers.cpp, v301; not the Y way's set with the
+# trip stopped given its Y field for the value, which it has just stored) and vc2partnumbers (Vc2PartNumbers.cpp, v302;
+# not the init's glides' reset in the nodes' loop, whose every word the glides' static initializer after it writes
+# again) and vc2partstartup (Vc2PartStartUp.cpp, v304) and vc2timetrip (Vc2TimeTrip.cpp, v306; not the steps' distance taken the other way, as the fold
+# that follows gives a turn and its negative the same) and vc2partchannel (Vc2PartChannel.cpp, v307,
+# v303's shared code's plants among them; not the count's rise before Auto Note's release, which leaves the count
+# alone, nor the floor's test at 0 by one, at 0 the same) and vc2mididispatch (Vc2MidiDispatch.cpp,
+# v308; not the class's bounds by one, 0x80 being its own class and 0xf0 none either way) and vc2notestask (Vc2NotesTask.cpp, v309).  Not
+# planted: the depth
+# law's tests at 0, ±32 by one (−0 is 0, and at ±32 both ways give ±100), its byte casts within ±32 (the same there),
+# the curve's test at 7 (7 either way), the products' 32-bit wrap (no read reaches it), what Vc2PartSettings.h and
+# Vc2PartSettingsWords.h hold (the held flags' numbers are planted where each is tested), the OSC header's +1 and +5
+# one byte wider (what the next store overwrites), the loader's test of the twelve IDs (rom.4's are never 0); in the
+# block reader, its part (the check gives part 0 alone, as rom.4's handler does) and the guard on a part past 0, and a
+# once-past-OSC-1 step taken by the OSC (the same for OSCs 0 and 1, all the part's reader gives); in the vocoder
+# reader, the templates' bound by one (template 15's records hold 64, an offset of 0).
+kinds|    for (int kind = 0; kind < kKinds; ++kind)|    for (int kind = 0; kind < kKinds - 1; ++kind)|vc2settingswords
+envelope-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 12, kLfos = 5;|vc2settings
+lfo-rows|kEnvelopes = 13, kLfos = 5;|kEnvelopes = 13, kLfos = 4;|vc2settings
+held-common|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.commons|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.commons|vc2settings
+held-kind|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.mixes|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.mixes|vc2settings
+held-envelope|    if (p_.held(kHeldEnvelope)) return false;\n    const auto get|    if (p_.held(kHeldLfo)) return false;\n    const auto get|vc2settings
+held-lfo|    if (p_.held(kHeldLfo)) return false;\n    uint8_t* row = t.lfos|    if (p_.held(kHeldEnvelope)) return false;\n    uint8_t* row = t.lfos|vc2settings
+tva-envelope|kTvaEnvelope = 12;|kTvaEnvelope = 11;|vc2settings
+common-bytes|kCommonBytes = 6;|kCommonBytes = 4;|vc2settings
+envelope-part|kEnvelopePart = 2080,|kEnvelopePart = 2070,|vc2settings
+envelope-kind|kEnvelopeKind = 130,|kEnvelopeKind = 120,|vc2settings
+envelope-bytes|kEnvelopeBytes = 10;|kEnvelopeBytes = 8;|vc2settings
+lfo-part|kLfoPart = 800,|kLfoPart = 790,|vc2settings
+lfo-kind|kLfoKind = 50,|kLfoKind = 40,|vc2settings
+lfo-bytes|kLfoBytes = 10,|kLfoBytes = 8,|vc2settings
+lfo-system-at|kLfoSystemAt = 0x3200;|kLfoSystemAt = 0x3201;|vc2settings
+mix-part|kMixPart = 352,|kMixPart = 342,|vc2settings
+mix-kind|kMixKind = 22;|kMixKind = 20;|vc2settings
+tva-part|kTvaPart = 384,|kTvaPart = 374,|vc2settings
+tva-kind|kTvaKind = 24,|kTvaKind = 22,|vc2settings
+tva-gain-at|kTvaGainAt = 0x1800,|kTvaGainAt = 0x1801,|vc2settings
+tva-rate-at|kTvaRateAt = 0x1802,|kTvaRateAt = 0x1800,|vc2settings
+tva-route-at|kTvaRouteAt = 0x1804;|kTvaRouteAt = 0x1805;|vc2settings
+id-common|kCommonIds[] = { 0x132, 0x134, 0x135 }|kCommonIds[] = { 0x133, 0x134, 0x135 }|vc2settings
+id-common-sens|kCommonSens = 0x136;|kCommonSens = 0x137;|vc2settings
+id-envelope-on|kEnvelopeOn = 0x2d9,|kEnvelopeOn = 0x2da,|vc2settings
+id-envelope|kEnvelopeIds = 0x390,|kEnvelopeIds = 0x391,|vc2settings
+id-envelope-stride|kEnvelopeStride = 13;|kEnvelopeStride = 12;|vc2settings
+id-lfo|kLfoIds = 0x439,|kLfoIds = 0x438,|vc2settings
+id-lfo-stride|kLfoStride = 8,|kLfoStride = 7,|vc2settings
+id-mix|kMixIds = 0x2d4,|kMixIds = 0x2d3,|vc2settings
+id-tva|kTvaIds = 0x2d9,|kTvaIds = 0x2d8,|vc2settings
+id-tva-gain|kTvaGainId = 0x195;|kTvaGainId = 0x196;|vc2settings
+id-curve|kCurveId = 0x432,|kCurveId = 0x431,|vc2settings
+id-depth|kDepthId = 0x433;|kDepthId = 0x434;|vc2settings
+id-lfo-system|kLfoSystemId = 67,|kLfoSystemId = 68,|vc2settings
+id-tva-route|kTvaRouteId = 66,|kTvaRouteId = 65,|vc2settings
+id-trailer-gain|kTvaTrailerGain = 0x533,|kTvaTrailerGain = 0x532,|vc2settings
+id-trailer-rate|kTvaTrailerRate = 0x52c;|kTvaTrailerRate = 0x52d;|vc2settings
+id-controls|kControlsId = 0xbb;|kControlsId = 0xba;|vc2settings
+magic-63|0x82082083u|0x81082083u|vc2settings
+magic-63-shift|kSixtyThirdShift = 5;|kSixtyThirdShift = 4;|vc2settings
+magic-31|0x84210843u|0x83210843u|vc2settings
+magic-31-shift|kThirtyFirstShift = 4,|kThirtyFirstShift = 3,|vc2settings
+shift-32|kThirtySecondShift = 5;|kThirtySecondShift = 4;|vc2settings
+hundred|kHundred = 100,|kHundred = 99,|vc2settings
+ten|kTen = 10,|kTen = 9,|vc2settings
+depth-edge|kDepthEdge = 32;|kDepthEdge = 31;|vc2settings
+put16-short|std::memcpy(at, &h, sizeof h);|std::memcpy(at, &h, 1);|vc2settingswords
+percent-times|vc2ByMagic(times(v, kHundred), kSixtyThird|vc2ByMagic(v, kSixtyThird|vc2settings
+every-stop|            if (!row(kind, i)) return false;|            row(kind, i);|vc2settingswords
+curve-top|code > 6 ? 7 : code|code > 5 ? 7 : code|vc2settings
+curve-less|static_cast<uint32_t>(x) - 1u;|static_cast<uint32_t>(x) - 0u;|vc2settings
+depth-low-sign|return -(kHundred + vc2ByMagic(|return -(kHundred - vc2ByMagic(|vc2settings
+depth-low-byte|static_cast<uint8_t>(-kDepthEdge - x)|static_cast<uint16_t>(-kDepthEdge - x)|vc2settings
+depth-neg-sign|if (x < 0) return -(times(|if (x < 0) return (times(|vc2settings
+depth-high-byte|static_cast<uint8_t>(x - kDepthEdge)|static_cast<uint16_t>(x - kDepthEdge)|vc2settings
+depth-high-base|return kHundred + vc2ByMagic(|return vc2ByMagic(|vc2settings
+common-before|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.commons|    uint8_t* row = t.commons|vc2settings
+common-after|    return !p_.held(kHeldCommon);\n}\n\nbool Vc2PartSettings::envelopeRow|    return true;\n}\n\nbool Vc2PartSettings::envelopeRow|vc2settings
+common-count|for (int k = 0; k < 3; ++k) put8(row + k,|for (int k = 0; k < 2; ++k) put8(row + k,|vc2settings
+common-sens-wide|put16(row + 4, p_.value(Block::kPart, part, 0, kCommonSens));|put8(row + 4, p_.value(Block::kPart, part, 0, kCommonSens));|vc2settings
+common-block|p_.value(Block::kPart, part, 0, kCommonIds[k])|p_.value(Block::kKindA, part, 0, kCommonIds[k])|vc2settings
+envelope-on|        row[0] = 1;|        row[0] = 0;|vc2settings
+envelope-which|if (i != kTvaEnvelope)|if (i == kTvaEnvelope)|vc2settings
+envelope-on-block|p_.value(Block::kKindA, part, kind, kEnvelopeOn)|p_.value(Block::kKindB, part, kind, kEnvelopeOn)|vc2settings
+envelope-on-before|    } else {\n        if (p_.held(kHeldKind)) return false;\n|    } else {\n|vc2settings
+envelope-on-after|kEnvelopeOn));\n        if (p_.held(kHeldKind)) return false;\n|kEnvelopeOn));\n|vc2settings
+envelope-before|    if (p_.held(kHeldEnvelope)) return false;\n    const auto get|    const auto get|vc2settings
+envelope-block|Block::kKindB, part, kind, (int16_t)(kEnvelopeIds + at)|Block::kKindC, part, kind, (int16_t)(kEnvelopeIds + at)|vc2settings
+envelope-four|put8(row + 4, get(b + 5));|put8(row + 4, get(b + 4));|vc2settings
+envelope-percent|put8(row + 5, percentOf63(get(b + 8)));|put8(row + 5, get(b + 8));|vc2settings
+envelope-seven|put8(row + 7, percentOf63(get(b + 0xa)));|put8(row + 7, percentOf63(get(b + 0xb)));|vc2settings
+envelope-eight-ten|put16(row + 8, times(get(b + 0xb), kTen));|put16(row + 8, get(b + 0xb));|vc2settings
+envelope-after|    return !p_.held(kHeldEnvelope);\n}\n\nbool Vc2PartSettings::envelopes|    return true;\n}\n\nbool Vc2PartSettings::envelopes|vc2settings
+lfo-before|    if (p_.held(kHeldLfo)) return false;\n    uint8_t* row = t.lfos|    uint8_t* row = t.lfos|vc2settings
+lfo-after|    return !p_.held(kHeldLfo);|    return true;|vc2settings
+lfo-block|Block::kKindC, part, kind, (int16_t)(kLfoIds + at)|Block::kKindA, part, kind, (int16_t)(kLfoIds + at)|vc2settings
+lfo-rate-wide|put16(row + 2, get(b + 2));|put8(row + 2, get(b + 2));|vc2settings
+lfo-count|for (int k = 3; k <= 7; ++k)|for (int k = 3; k < 7; ++k)|vc2settings
+lfo-system-block|Block::kSystemB, 0, 0, kLfoSystemId|Block::kSystemC, 0, 0, kLfoSystemId|vc2settings
+mix-count|for (int k = 0; k < 5; ++k) put8(row + k, p_.value(Block::kKindA|for (int k = 0; k < 4; ++k) put8(row + k, p_.value(Block::kKindA|vc2settings
+mix-before|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.mixes|    uint8_t* row = t.mixes|vc2settings
+mix-after|    return !p_.held(kHeldKind);\n}\n\nbool Vc2PartSettings::mixes|    return true;\n}\n\nbool Vc2PartSettings::mixes|vc2settings
+mix-stop|return mixRow(t, part, kind); });|mixRow(t, part, kind);\n        return true;\n    });|vc2settings
+tva-first|put8(row + 4, get(0));|put8(row + 4, get(1));|vc2settings
+tva-level-ten|put16(row + 8, times(get(2), kTen));|put16(row + 8, get(2));|vc2settings
+tva-pan-wide|put16(row + 0xe, times(get(5), kTen));|put8(row + 0xe, times(get(5), kTen));|vc2settings
+tva-depth-b|put8(row + 0x10, get(6));|put8(row + 0x10, get(7));|vc2settings
+tva-count|for (int k = 0; k < 4; ++k) put8(row + 0x12 + k, get(7 + k));|for (int k = 0; k < 3; ++k) put8(row + 0x12 + k, get(7 + k));|vc2settings
+tva-before|    if (p_.held(kHeldKind)) return false;\n    uint8_t* row = t.tvas|    uint8_t* row = t.tvas|vc2settings
+tva-mid-kind|if (p_.held(kHeldKind) \|\| p_.held(kHeldCommon)) return false;|if (p_.held(kHeldCommon)) return false;|vc2settings
+tva-mid-common|if (p_.held(kHeldKind) \|\| p_.held(kHeldCommon)) return false;|if (p_.held(kHeldKind)) return false;|vc2settings
+tva-gain-block|p_.value(Block::kPart, part, 0, kTvaGainId)|p_.value(Block::kKindA, part, kind, kTvaGainId)|vc2settings
+tva-after|    return !p_.held(kHeldCommon);\n}\n\nbool Vc2PartSettings::tvaVelocityRow|    return true;\n}\n\nbool Vc2PartSettings::tvaVelocityRow|vc2settings
+velocity-before|    if (p_.held(kHeldEnvelope)) return false;\n    uint8_t* row = t.tvas|    uint8_t* row = t.tvas|vc2settings
+velocity-curve-at|put8(row, vc2CurveOf(|put8(row + 1, vc2CurveOf(|vc2settings
+velocity-depth-law|put16(row + 2, vc2DepthOf(|put16(row + 2, (|vc2settings
+velocity-after|    return !p_.held(kHeldEnvelope);\n}\n\nbool Vc2PartSettings::tvas|    return true;\n}\n\nbool Vc2PartSettings::tvas|vc2settings
+tvas-order|tvaRow(t, part, kind) && tvaVelocityRow(t, part, kind)|tvaVelocityRow(t, part, kind) && tvaRow(t, part, kind)|vc2settings
+tvas-and|tvaRow(t, part, kind) && tvaVelocityRow(t, part, kind)|tvaRow(t, part, kind) \|\| tvaVelocityRow(t, part, kind)|vc2settings
+trailer-gain-wide|put8(&t.tvas[kTvaGainAt]|put16(&t.tvas[kTvaGainAt]|vc2settings
+trailer-block|Block::kSystemC, 0, 0, kTvaTrailerRate|Block::kSystemB, 0, 0, kTvaTrailerRate|vc2settings
+route-block|Block::kSystemB, 0, 0, kTvaRouteId|Block::kSystem, 0, 0, kTvaRouteId|vc2settings
+controls-block|Block::kSystem, 0, 0, kControlsId|Block::kSystemB, 0, 0, kControlsId|vc2settings
+held-cosm|kHeldCosm = 4,|kHeldCosm = 3,|vc2settings
+cosm-count|return everyRow(kCosms, [&](int kind, int cosm) {|return everyRow(1, [&](int kind, int cosm) {|vc2settings
+bytes-part|kBytesPart = 16,|kBytesPart = 15,|vc2settings
+cosm-part|kCosmPart = 0x540,|kCosmPart = 0x530,|vc2settings
+cosm-kind|kCosmKind = 84,|kCosmKind = 82,|vc2settings
+cosm-bytes|kCosmBytes = 42,|kCosmBytes = 40,|vc2settings
+cosm-ids-at|kCosmIdsAt = 10;|kCosmIdsAt = 12;|vc2settings
+id-bytes|kBytesId = 0x2d3,|kBytesId = 0x2d2,|vc2settings
+id-cosm-first|kCosmFirst = 0x462,|kCosmFirst = 0x461,|vc2settings
+id-cosm-type|kCosmTypeId = 0x463,|kCosmTypeId = 0x464,|vc2settings
+id-velocity|kVelocityIds = 0x389;|kVelocityIds = 0x38a;|vc2settings
+cosm-envelopes|{ { 9, 10 }, { 11, 12 } }|{ { 9, 10 }, { 12, 11 } }|vc2settings
+cosm-envelope-first|{ { 9, 10 }, { 11, 12 } }|{ { 8, 10 }, { 11, 12 } }|vc2settings
+byte-before|    if (p_.held(kHeldKind)) return false;\n    put8(&t.bytes|    put8(&t.bytes|vc2settings
+byte-block|p_.value(Block::kKindA, part, kind, kBytesId)|p_.value(Block::kKindB, part, kind, kBytesId)|vc2settings
+byte-at|&t.bytes[kBytesPart * part + kind]|&t.bytes[kBytesPart * kind + part]|vc2settings
+byte-after|kBytesId));\n    return !p_.held(kHeldKind);|kBytesId));\n    return true;|vc2settings
+cosm-before|    if (p_.held(kHeldCosm)) return false;\n|\n|vc2settings
+cosm-after|    return !p_.held(kHeldCosm);|    return true;|vc2settings
+cosm-first|put8(row, p_.cosmValue(part, kind, cosm, kCosmFirst));|put8(row, p_.cosmValue(part, kind, cosm, kCosmTypeId));|vc2settings
+cosm-type-store|    row[1] = type;\n|\n|vc2settings
+cosm-run-first|for (int id = runs[2 * type], k = 0;|for (int id = runs[2 * type] + 1, k = 0;|vc2settings
+cosm-run-last|id <= runs[2 * type + 1];|id < runs[2 * type + 1];|vc2settings
+cosm-run-at|put16(row + kCosmIdsAt + 2 * k,|put8(row + kCosmIdsAt + 2 * k,|vc2settings
+cosm-run-sub|p_.cosmValue(part, kind, cosm, static_cast<int16_t>(id))|p_.cosmValue(part, kind, 0, static_cast<int16_t>(id))|vc2settings
+velocity-cosm-test|static_cast<uint32_t>(cosm) >= kCosms|static_cast<uint32_t>(cosm) > kCosms|vc2settings
+velocity-cosm-held|if (p_.held(kHeldEnvelope) \|\| static_cast<uint32_t>(cosm) >= kCosms) return false;|if (static_cast<uint32_t>(cosm) >= kCosms) return false;|vc2settings
+velocity-cosm-curve-at|velocityPair(row + 2 + 4 * k,|velocityPair(row + 1 + 4 * k,|vc2settings
+velocity-cosm-depth|static_cast<int16_t>(b + 1))));|static_cast<int16_t>(b + 2))));|vc2settings
+velocity-cosm-block|p_.value(Block::kKindB, part, kind, static_cast<int16_t>(b))|p_.value(Block::kKindA, part, kind, static_cast<int16_t>(b))|vc2settings
+velocity-cosm-after|kCosmEnvelopes[cosm][k]);\n    return !p_.held(kHeldEnvelope);|kCosmEnvelopes[cosm][k]);\n    return true;|vc2settings
+cosms-and|cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm)|cosmRow(t, part, kind, cosm) \|\| cosmVelocityRow(t, part, kind, cosm)|vc2settings
+cosms-order|cosmRow(t, part, kind, cosm) && cosmVelocityRow(t, part, kind, cosm)|cosmVelocityRow(t, part, kind, cosm) && cosmRow(t, part, kind, cosm)|vc2settings
+tables-cosm-runs|image.read(0x8953fb40,|image.read(0x8953fb44,|vc2settingstables
+put8-or|*at = static_cast<uint8_t>(v);|*at = static_cast<uint8_t>(v \| 1);|vc2settingswords
+times-sum|static_cast<uint32_t>(v) * static_cast<uint32_t>(by)|static_cast<uint32_t>(v) + static_cast<uint32_t>(by)|vc2settingswords
+tables-osc-ids|image.read(0x8954012c,|image.read(0x8954012e,|vc2settingstables
+osc-kinds|kOscs = 2;|kOscs = 1;|vc2settingsosc
+osc-part|kOscPart = 0x1020,|kOscPart = 0x1000,|vc2settingsosc
+osc-blocks-at|kBlocksAt = 32,|kBlocksAt = 30,|vc2settingsosc
+osc-kind|kOscKind = 0x100,|kOscKind = 0xf0,|vc2settingsosc
+osc-bytes|kOscBytes = 0x80;|kOscBytes = 0x40;|vc2settingsosc
+osc-trailer-at|kTrailerAt = 0x10200,|kTrailerAt = 0x101fc,|vc2settingsosc
+osc-calibration-at|kCalibrationAt = 0x10204;|kCalibrationAt = 0x10208;|vc2settingsosc
+osc-header-octave-id|{ 0x12f, 0x12d,|{ 0x12e, 0x12d,|vc2settingsosc
+osc-header-order|{ 0x12f, 0x12d, 0x12e,|{ 0x12f, 0x12e, 0x12d,|vc2settingsosc
+osc-header-switch-id|0x130, 0x133 }|0x131, 0x133 }|vc2settingsosc
+osc-header-five-id|0x130, 0x133 }|0x130, 0x134 }|vc2settingsosc
+osc-twelve-on|kTwelveOn = 0x151,|kTwelveOn = 0x150,|vc2settingsosc
+osc-header-last|kHeaderLast = 0x193;|kHeaderLast = 0x192;|vc2settingsosc
+osc-twelve-at|kTwelveAt = 6,|kTwelveAt = 8,|vc2settingsosc
+osc-header-last-at|kHeaderLastAt = 0x1e;|kHeaderLastAt = 0x1f;|vc2settingsosc
+osc-octave|kOctave = 12,|kOctave = 11,|vc2settingsosc
+osc-ten|kTen = 10;|kTen = 9;|vc2settingsosc
+osc-header-part|p_.value(Block::kPart, part, 0, id)|p_.value(Block::kPart, 0, 0, id)|vc2settingsosc
+osc-header-one|put8(row + 1, get(kHeaderIds[1]));|put8(row + 1, get(kHeaderIds[0]));|vc2settingsosc
+osc-header-tens|put16(row + 2, times(get(kHeaderIds[2]), kTen));|put16(row + 2, get(kHeaderIds[2]));|vc2settingsosc
+osc-header-two-byte|put16(row + 2,|put8(row + 2,|vc2settingsosc
+osc-header-zero|get(kHeaderIds[3]) == 0 ? 1 : 0|get(kHeaderIds[3]) != 0 ? 1 : 0|vc2settingsosc
+osc-header-five-at|put8(row + 5, get(kHeaderIds[4]));|put8(row + 0x1f, get(kHeaderIds[4]));|vc2settingsosc
+osc-twelve-switch|const bool twelve = get(kTwelveOn) != 0;|const bool twelve = get(kTwelveOn) == 0;|vc2settingsosc
+osc-twelve-off|twelve ? times(get(ids[k]), kTen) : 0)|twelve ? times(get(ids[k]), kTen) : 1)|vc2settingsosc
+osc-twelve-reads|twelve ? times(get(ids[k]), kTen) : 0)|times(get(ids[k]), kTen) * twelve)|vc2settingsosc
+osc-twelve-count|for (size_t k = 0; k < ids.size(); ++k)|for (size_t k = 0; k + 1 < ids.size(); ++k)|vc2settingsosc
+osc-twelve-tens|times(get(ids[k]), kTen) : 0)|get(ids[k]) : 0)|vc2settingsosc
+osc-before|    if (p_.held(kHeldCommon)) return false;\n    uint8_t* row = t.oscs|    uint8_t* row = t.oscs|vc2settingsosc
+osc-after|    oscHeader(row, part);\n    if (p_.held(kHeldCommon)) return false;\n|    oscHeader(row, part);\n|vc2settingsosc
+osc-row-part|t.oscs.data() + kOscPart * part;|t.oscs.data() + kOscPart * (part & 7);|vc2settingsosc
+osc-block-stop|return block(kind, osc) &&|return (block(kind, osc) \|\| true) &&|vc2settingsosc
+osc-block-args|return block(kind, osc) &&|return block(osc, kind) &&|vc2settingsosc
+osc-block-after|block(kind, osc) && oscVelocityRow(oscBlockAt(t, part, kind, osc), part, kind, osc)|oscVelocityRow(oscBlockAt(t, part, kind, osc), part, kind, osc) && block(kind, osc)|vc2settingsosc
+osc-own-block-args|{ return oscBlock(t, part, kind, osc); }|{ return oscBlock(t, part, osc, kind); }|vc2settingsosc
+osc-own-block-stop|{ return oscBlock(t, part, kind, osc); }|{ return oscBlock(t, part, kind, osc) \|\| true; }|vc2settingsosc
+osc-velocity-before|    if (p_.held(kHeldEnvelope)) return false;\n    for (size_t k|    for (size_t k|vc2settingsosc
+osc-velocity-flag|    if (p_.held(kHeldEnvelope)) return false;\n    for (size_t k|    if (p_.held(kHeldKind)) return false;\n    for (size_t k|vc2settingsosc
+osc-velocity-after|    return !p_.held(kHeldEnvelope);|    return true;|vc2settingsosc
+osc-velocity-envelopes|{ 1, 2, 3, 2, 3, 4 }|{ 1, 2, 3, 2, 3, 5 }|vc2settingsosc
+osc-velocity-first|{ 1, 2, 3, 2, 3, 4 }|{ 2, 2, 3, 2, 3, 4 }|vc2settingsosc
+osc-envelope-step|kOscEnvelopeStep = 4;|kOscEnvelopeStep = 5;|vc2settingsosc
+osc-curve-at|{ 0xa, 0x28,|{ 0xb, 0x28,|vc2settingsosc
+osc-curve-last|0x54, 0x19 }|0x54, 0x18 }|vc2settingsosc
+osc-depth-at|{ 0xc, 0x2a,|{ 0xe, 0x2a,|vc2settingsosc
+osc-depth-last|0x56, 0x1a }|0x56, 0x1c }|vc2settingsosc
+osc-trailer-block|put16(u, p_.value(Block::kSystemB,|put16(u, p_.value(Block::kSystem,|vc2settingsosc
+osc-trailer-ids|{ 62, 63, 122 }|{ 62, 63, 121 }|vc2settingsosc
+osc-trailer-order|{ 62, 63, 122 }|{ 63, 62, 122 }|vc2settingsosc
+osc-trailer-wide|put16(u, p_.value|put8(u, p_.value|vc2settingsosc
+osc-trailer-three|put8(u + 3,|put8(u + 1,|vc2settingsosc
+osc-calibration-block|p_.value(Block::kSystemC, 0, 0,|p_.value(Block::kSystemB, 0, 0,|vc2settingsosc
+osc-calibration-clear|    u[0] = 0;|    u[0] = 1;|vc2settingsosc
+osc-calibration-order|{ 1, 3, 2, 4, 5 }|{ 1, 2, 3, 4, 5 }|vc2settingsosc
+osc-calibration-ids|kCalibrationIds = 0x534,|kCalibrationIds = 0x535,|vc2settingsosc
+osc-halfword-ids|kHalfwordIds = 0x53a,|kHalfwordIds = 0x53b,|vc2settingsosc
+osc-halfword-narrow|put16(u + 8, get(kHalfwordIds + 1));|put8(u + 8, get(kHalfwordIds + 1));|vc2settingsosc
+osc-groups-on-id|kGroupsOn = 0x53c,|kGroupsOn = 0x53b,|vc2settingsosc
+osc-group-ids|kGroupIds = 0x53d;|kGroupIds = 0x53e;|vc2settingsosc
+osc-groups-switch|const bool on = get(kGroupsOn) != 0;|const bool on = get(kGroupsOn) == 0;|vc2settingsosc
+osc-groups-reads|on ? get(kGroupIds + kGroupLength * g + k) : kGroupOff[g]|on ? get(kGroupIds + kGroupLength * g + k) : get(kGroupIds) * 0 + kGroupOff[g]|vc2settingsosc
+osc-group-at|{ 0xa, 0xc, 0xb, 0xd }|{ 0xa, 0xb, 0xc, 0xd }|vc2settingsosc
+osc-group-off-first|{ 60, 0, 0, 127 }|{ 64, 0, 0, 127 }|vc2settingsosc
+osc-group-off-middle|{ 60, 0, 0, 127 }|{ 60, 0, 1, 127 }|vc2settingsosc
+osc-group-off-last|{ 60, 0, 0, 127 }|{ 60, 0, 0, 126 }|vc2settingsosc
+osc-group-length|kGroupLength = 11,|kGroupLength = 10,|vc2settingsosc
+osc-group-stride|kGroupStride = 4;|kGroupStride = 3;|vc2settingsosc
+block-held-before|    if (p_.held(kHeldKind)) return false;\n    uint8_t* block|    uint8_t* block|vc2settingsblock
+block-held-flag|    if (p_.held(kHeldKind)) return false;\n    uint8_t* block|    if (p_.held(kHeldEnvelope)) return false;\n    uint8_t* block|vc2settingsblock
+block-held-after|    return !p_.held(kHeldKind);|    return true;|vc2settingsblock
+block-kind-a|p_.value(Block::kKindA, part, kind, oscReadId|p_.value(Block::kKindB, part, kind, oscReadId|vc2settingsblock
+block-first-id|{ 0x2e4, 52, false, 0x00, put8 },|{ 0x2e3, 52, false, 0x00, put8 },|vc2settingsblock
+block-first-order|{ 0x2e4, 52, false, 0x00, put8 }, { 0x2e5, 52, false, 0x01, put8 },|{ 0x2e5, 52, false, 0x01, put8 }, { 0x2e4, 52, false, 0x00, put8 },|vc2settingsblock
+block-type-at|{ 0x2e5, 52, false, 0x01, put8 }|{ 0x2e5, 52, false, 0x03, put8 }|vc2settingsblock
+block-hundreds-row|{ 0x2e8, 52, false, 0x06, hundreds }|{ 0x2e8, 52, false, 0x06, tens }|vc2settingsblock
+block-hundreds|put16(at, times(v, 100));|put16(at, times(v, 99));|vc2settingsblock
+block-tens|put16(at, times(v, 10));|put16(at, times(v, 11));|vc2settingsblock
+block-random-row|{ 0x2ed, 52, false, 0x12, randomPitch }|{ 0x2ed, 52, false, 0x12, put16 }|vc2settingsblock
+block-random-tens|{ 10, 10, 0 }|{ 10, 10, 1 }|vc2settingsblock
+block-random-tens-end|{ 10, 10, 0 }|{ 9, 10, 0 }|vc2settingsblock
+block-random-hundreds|{ 20, 100, 9 }|{ 20, 100, 10 }|vc2settingsblock
+block-random-hundreds-step|{ 20, 100, 9 }|{ 20, 99, 9 }|vc2settingsblock
+block-random-thousands|{ 30, 1000, 18 }|{ 30, 1000, 19 }|vc2settingsblock
+block-random-thousands-end|{ 30, 1000, 18 }|{ 29, 1000, 18 }|vc2settingsblock
+block-random-past|kRandomPast = 12000;|kRandomPast = 11000;|vc2settingsblock
+block-random-signed|const auto u = static_cast<uint32_t>(v);|const auto u = static_cast<uint32_t>(v < 0 ? 0 : v);|vc2settingsblock
+block-step-52|{ 0x2f1, 52, false, 0x20, put8 }|{ 0x2f1, 51, false, 0x20, put8 }|vc2settingsblock
+block-vibrato-step|{ 0x37c, 4, false, 0x1c, put8 }|{ 0x37c, 3, false, 0x1c, put8 }|vc2settingsblock
+block-vibrato-at|{ 0x37e, 4, false, 0x1e, put8 }|{ 0x37e, 4, false, 0x1f, put8 }|vc2settingsblock
+block-detune-step|{ 0x34d, 3, true, 0x36, put8 }|{ 0x34d, 2, true, 0x36, put8 }|vc2settingsblock
+block-carrier-step|{ 0x354, 14, false, 0x64, put8 }|{ 0x354, 13, false, 0x64, put8 }|vc2settingsblock
+block-carrier-at|{ 0x359, 14, false, 0x74, put8 }|{ 0x359, 14, false, 0x69, put8 }|vc2settingsblock
+block-carrier-tens|{ 0x35c, 14, false, 0x6c, tens }|{ 0x35c, 14, false, 0x6c, put16 }|vc2settingsblock
+block-wave-id|kWave = { 0x2fe, 52, false, 0x3c, put16 };|kWave = { 0x2fd, 52, false, 0x3c, put16 };|vc2settingsblock
+block-wave-at|kWave = { 0x2fe, 52, false, 0x3c, put16 };|kWave = { 0x2fe, 52, false, 0x3e, put16 };|vc2settingsblock
+block-wave-test-wide|if (static_cast<uint16_t>(v) == was) return;|if (v == was) return;|vc2settingsblock
+block-wave-test-never|if (static_cast<uint16_t>(v) == was) return;|if (v == was - 0x10000) return;|vc2settingsblock
+block-wave-old-late|    std::memcpy(&was, at, sizeof was);\n    put16(at, v);|    put16(at, v);\n    std::memcpy(&was, at, sizeof was);|vc2settingsblock
+block-step-osc|kStepPart = 64, kStepKind = 4, kStepOsc = 2;|kStepPart = 64, kStepKind = 4, kStepOsc = 1;|vc2settingsblock
+block-step-kind|kStepPart = 64, kStepKind = 4, kStepOsc = 2;|kStepPart = 64, kStepKind = 2, kStepOsc = 2;|vc2settingsblock
+block-step-narrow|put16(t.steps.data() + step, 0);|put8(t.steps.data() + step, 0);|vc2settingsblock
+block-start-word|{ 0x306, 52, false, 0x40, put32 }|{ 0x306, 52, false, 0x40, put16 }|vc2settingsblock
+block-time-offset-order|{ 0x315, 52, false, 0x5e, put8 },\n    { 0x30b, 52, false, 0x5d, put8 },|{ 0x30b, 52, false, 0x5d, put8 },\n    { 0x315, 52, false, 0x5e, put8 },|vc2settingsblock
+block-last|{ 0x317, 52, false, 0x60, put8 }|{ 0x318, 52, false, 0x60, put8 }|vc2settingsblock
+block-harm-any-kind|if (kind == kHarmKind && block[kTypeAt] == kHarmType)|if (block[kTypeAt] == kHarmType)|vc2settingsblock
+block-harm-kind|kHarmKind = 0,|kHarmKind = 1,|vc2settingsblock
+block-harm-type|kHarmType = 2,|kHarmType = 3,|vc2settingsblock
+block-harm-type-at|kTypeAt = 1;|kTypeAt = 0;|vc2settingsblock
+block-harm-step|{ 0x371, 5, true, 0x4e, put8 }|{ 0x371, 4, true, 0x4e, put8 }|vc2settingsblock
+block-harm-tens|{ 0x372, 5, true, 0x50, tens }|{ 0x372, 5, true, 0x50, put16 }|vc2settingsblock
+block-harm-style|{ 0x375, 5, true, 0x5e, put8 }|{ 0x374, 5, true, 0x5e, put8 }|vc2settingsblock
+block-once|const int n = r.once ? (osc != 0 ? 1 : 0) : osc;|const int n = r.once ? 0 : osc;|vc2settingsblock
+put32-short|void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, sizeof v); }|void put32(uint8_t* at, int32_t v) { std::memcpy(at, &v, 3); }|vc2settingswords
+vocoder-held-before|    if (p_.held(kHeldCommon)) return false;\n    const auto get|    const auto get|vc2settingsvocoder
+vocoder-held-after|    return !p_.held(kHeldCommon);|    return true;|vc2settingsvocoder
+vocoder-kind-held-first|    if (!p_.held(kHeldKind)) {|    if (true) {|vc2settingsvocoder
+vocoder-kind-held-second|    if (p_.held(kHeldKind)) return false;\n    const int32_t secondType|    const int32_t secondType|vc2settingsvocoder
+vocoder-shift-id|kFormantShift = 0x19f,|kFormantShift = 0x19e,|vc2settingsvocoder
+vocoder-shift-zero|if (shift == 0.0f) shift = 1.0f;|if (shift == 0.0f) shift = 0.0f;|vc2settingsvocoder
+vocoder-pow-order|vc2LibPow(kTwo, formantExponent(shift))|vc2LibPow(formantExponent(shift), kTwo)|vc2settingsvocoder
+vocoder-ratio-right|s.ratio[1] = s.ratio[0];|s.ratio[1] = shift;|vc2settingsvocoder
+vocoder-exponent|xtf::add(xtf::mul(x, tb.shiftStep), tb.shiftBase)|xtf::mul(xtf::add(x, tb.shiftBase), tb.shiftStep)|vc2settingsvocoder
+vocoder-per127|xtf::mul(xtf::flt(v), vc2PartSettingsTables().per127)|xtf::mul(xtf::flt(v + 1), vc2PartSettingsTables().per127)|vc2settingsvocoder
+vocoder-sound-id|kSoundLevel = 0x196,|kSoundLevel = 0x197,|vc2settingsvocoder
+vocoder-sound-order|    s.soundLevel = per127(get(kSoundLevel));\n    s.depth = per127(get(kDepth));|    s.depth = per127(get(kDepth));\n    s.soundLevel = per127(get(kSoundLevel));|vc2settingsvocoder
+vocoder-detect|kDetectFrom = 24;|kDetectFrom = 23;|vc2settingsvocoder
+vocoder-spread|s.spread = get(kSpread) != 0 ? 1 : 0;|s.spread = get(kSpread);|vc2settingsvocoder
+vocoder-template-id|kTemplate = 0x1a0;|kTemplate = 0x1a1;|vc2settingsvocoder
+vocoder-dump-id|kDump = 0x19e,|kDump = 0x19d,|vc2settingsvocoder
+vocoder-unvoice-out|out.setUnvoiceLevel(s.unvoiceLevel);|out.setUnvoiceLevel(s.depth);|vc2settingsvocoder
+vocoder-direct-id|kDirect = 0x195,|kDirect = 0x196,|vc2settingsvocoder
+vocoder-sends|kReverbSend = 0x2e2, kMfxSend = 0x2e0,|kReverbSend = 0x2e0, kMfxSend = 0x2e2,|vc2settingsvocoder
+vocoder-send-kind|kindGet(kFirstKind, kReverbSend)|kindGet(kSecondKind, kReverbSend)|vc2settingsvocoder
+vocoder-type-id|kOscType = 0x2e5;|kOscType = 0x2e6;|vc2settingsvocoder
+vocoder-targets|    out.mixerTargets();\n|\n|vc2settingsvocoder
+vocoder-extin|kExtin = 2,|kExtin = 3,|vc2settingsvocoder
+vocoder-extin-second|firstType == kExtin \|\| secondType == kExtin|firstType == kExtin|vc2settingsvocoder
+vocoder-extin-first|firstType == kExtin \|\| secondType == kExtin|secondType == kExtin|vc2settingsvocoder
+vocoder-legato-read|        get(kLegato);   // read, its answer tested and dropped\n|\n|vc2settingsvocoder
+vocoder-robot-id|kRobot = 0x1a3;|kRobot = 0x1a2;|vc2settingsvocoder
+vocoder-robot-kept|    t.robot = 0.0f;\n    if (firstType|    if (firstType|vc2settingsvocoder
+vocoder-autonote|out.setAutoNote(on);|out.setAutoNote(on > 0);|vc2settingsvocoder
+vocoder-legato|    out.setAutoNoteLegato();\n|\n|vc2settingsvocoder
+vocoder-offset-on|if (on > 0 && record < kTemplates)|if (on >= 0 && record < kTemplates)|vc2settingsvocoder
+vocoder-offset-bound|if (on > 0 && record < kTemplates)|if (on > 0 && record < kTemplates / 2)|vc2settingsvocoder
+vocoder-offset-right|formantExponent(shifts[record + kTemplates])|formantExponent(shifts[record])|vc2settingsvocoder
+vocoder-mode-plus|static_cast<uint32_t>(type) + 1u|static_cast<uint32_t>(type) + 0u|vc2settingsvocoder
+vocoder-mode-order|    const int32_t vocoderOn = get(kVocoderSw);\n    const int32_t type = get(kVocoderType);|    const int32_t type = get(kVocoderType);\n    const int32_t vocoderOn = get(kVocoderSw);|vc2settingsvocoder
+vocoder-stereo|get(kStereo) == kStereoOn ? 1 : 0|get(kStereo) != 0 ? 1 : 0|vc2settingsvocoder
+vocoder-stereo-id|kStereo = 0x1a4;|kStereo = 0x1a5;|vc2settingsvocoder
+tables-records-at|kRecordsAt = 0x89540904,|kRecordsAt = 0x89540908,|vc2settingstables
+tables-records-bytes|kRecordBytes = 140,|kRecordBytes = 136,|vc2settingstables
+tables-records-shift|kShiftAt = 8;|kShiftAt = 4;|vc2settingstables
+tables-pool-base|{ 0x893a75ec, &shiftBase }|{ 0x893a75f0, &shiftBase }|vc2settingstables
+tables-pool-127|{ 0x893a75f8, &per127 }|{ 0x893a75f0, &per127 }|vc2settingstables
+modes-octave-id|kOctave = 0x12f,|kOctave = 0x12e,|vc2settingsmodes
+modes-monopoly-id|kMonoPoly = 0x130,|kMonoPoly = 0x132,|vc2settingsmodes
+modes-legato-id|kLegato = 0x131;|kLegato = 0x132;|vc2settingsmodes
+modes-tempo-id|kTempo = 0x13a,|kTempo = 0x13b,|vc2settingsmodes
+modes-zone-id|kZoneUpper = 0x141,|kZoneUpper = 0x142,|vc2settingsmodes
+modes-split-id|kSplit = 0x1a1,|kSplit = 0x1a3,|vc2settingsmodes
+modes-keymode-id|kKeyMode = 0x1a2,|kKeyMode = 0x1a3,|vc2settingsmodes
+modes-vocoder-id|kVocoderSw = 0x193;|kVocoderSw = 0x194;|vc2settingsmodes
+modes-autonote-id|kAutoNote = 0x19c,|kAutoNote = 0x19d,|vc2settingsmodes
+modes-type-id|kOscType = 0x2e5;|kOscType = 0x2e6;|vc2settingsmodes
+modes-bytes|kModeBytes = 32,|kModeBytes = 30,|vc2settingsmodes
+modes-key-at|kKeyAt = 0,|kKeyAt = 3,|vc2settingsmodes
+modes-mono-at|kMonoAt = 1,|kMonoAt = 3,|vc2settingsmodes
+modes-legato-at|kLegatoAt = 2,|kLegatoAt = 3,|vc2settingsmodes
+modes-tempo-at|kTempoAt = 4,|kTempoAt = 2,|vc2settingsmodes
+modes-zones-at|kZonesAt = 6,|kZonesAt = 7,|vc2settingsmodes
+modes-split-at|kSplitAt = 0x17;|kSplitAt = 0x19;|vc2settingsmodes
+modes-vocoder-at|kVocoderAt = 0x16,|kVocoderAt = 0x19,|vc2settingsmodes
+modes-keymode-at|kKeyModeAt = 0x18;|kKeyModeAt = 0x19;|vc2settingsmodes
+modes-zones|kZones = 15,|kZones = 14,|vc2settingsmodes
+modes-sources-fewer|kSources = 3,|kSources = 2,|vc2settingsmodes
+modes-sources-more|kSources = 3,|kSources = 4,|vc2settingsmodes
+modes-part-zero|kPartZero = 0,|kPartZero = 1,|vc2settingsmodes
+modes-first-kind|kFirstKind = 0,|kFirstKind = 2,|vc2settingsmodes
+modes-second-kind|kSecondKind = 1;|kSecondKind = 2;|vc2settingsmodes
+modes-top-key|kTopKey = 127,|kTopKey = 126,|vc2settingsmodes
+modes-octave-keys|kOctaveKeys = 12,|kOctaveKeys = 11,|vc2settingsmodes
+modes-extin|kExtin = 2;|kExtin = 3;|vc2settingsmodes
+modes-most-from|    int32_t most = 0;|    int32_t most = -1;|vc2settingsmodes
+modes-most-running|most = std::max(most, p_.value(|most = std::max(0, p_.value(|vc2settingsmodes
+modes-zone-top|    put8(at + kZones, kTopKey);\n|\n|vc2settingsmodes
+modes-held|    if (p_.held(kHeldCommon)) return false;\n    const auto get|    if (p_.held(kHeldKind)) return false;\n    const auto get|vc2settingsmodes
+modes-held-after|    return !p_.held(kHeldCommon);|    return true;|vc2settingsmodes
+modes-block|return p_.value(Block::kPart, part, 0, id); };|return p_.value(Block::kKindA, part, 0, id); };|vc2settingsmodes
+modes-mono|get(kMonoPoly) == 0 ? 1 : 0|get(kMonoPoly) != 0 ? 1 : 0|vc2settingsmodes
+modes-tempo-width|    put16(row + kTempoAt, get(kTempo));|    put8(row + kTempoAt, get(kTempo));|vc2settingsmodes
+modes-split-store|    put8(row + kSplitAt, get(kSplit));\n|\n|vc2settingsmodes
+modes-read-order|    const int32_t mode = get(kKeyMode);\n    const int32_t vocoder = get(kVocoderSw);|    const int32_t vocoder = get(kVocoderSw);\n    const int32_t mode = get(kKeyMode);|vc2settingsmodes
+modes-moved-sign|static_cast<int8_t>(row[kKeyModeAt]) != mode|static_cast<uint8_t>(row[kKeyModeAt]) != mode|vc2settingsmodes
+modes-moved-only|if (moved \|\| (vocoder == 0 && row[kVocoderAt] != 0))|if (moved)|vc2settingsmodes
+modes-went-off-new|if (moved \|\| (vocoder == 0 && row[kVocoderAt] != 0))|if (moved \|\| vocoder == 0)|vc2settingsmodes
+modes-went-off-old|if (moved \|\| (vocoder == 0 && row[kVocoderAt] != 0))|if (moved \|\| row[kVocoderAt] != 0)|vc2settingsmodes
+modes-channel-test|            if (channel >= 0) out.allSoundOff|            if (channel > 0) out.allSoundOff|vc2settingsmodes
+modes-source-from|for (int source = 1; source <= kSources; ++source)|for (int source = 2; source <= kSources; ++source)|vc2settingsmodes
+modes-source-told|out.allSoundOff(source, channel);|out.allSoundOff(source - 1, channel);|vc2settingsmodes
+modes-node-part|nodes.of(source, part).channel|nodes.of(source, 0).channel|vc2settingsmodes
+modes-node-source|nodes.of(source, part).channel|nodes.of(source + 1, part).channel|vc2settingsmodes
+modes-keymode-store|    put8(row + kKeyModeAt, mode);\n|\n|vc2settingsmodes
+modes-vocoder-store|    put8(row + kVocoderAt, vocoder);\n|\n|vc2settingsmodes
+modes-autonote-held-first|    if (p_.held(kHeldKind)) return;\n    const int32_t first|    if (p_.held(kHeldCommon)) return;\n    const int32_t first|vc2settingsmodes
+modes-autonote-held-second|    if (p_.held(kHeldKind)) return;\n    const int32_t second|    const int32_t second|vc2settingsmodes
+modes-autonote-block|p_.value(Block::kKindA, kPartZero, kFirstKind, kOscType)|p_.value(Block::kKindB, kPartZero, kFirstKind, kOscType)|vc2settingsmodes
+modes-autonote-first|first == kExtin \|\| second == kExtin|second == kExtin|vc2settingsmodes
+modes-autonote-second|first == kExtin \|\| second == kExtin|first == kExtin|vc2settingsmodes
+modes-leftover|p_.held(kHeldCommon) ? Block::kLeftover : Block::kPart|Block::kPart|vc2settingsmodes
+modes-leftover-flag|p_.held(kHeldCommon) ? Block::kLeftover|p_.held(kHeldKind) ? Block::kLeftover|vc2settingsmodes
+modes-autonote-legato-read|        p_.value(block, kPartZero, 0, kLegato);   // read, its answer tested and dropped\n|\n|vc2settingsmodes
+modes-autonote-off|    int32_t on = 0;|    int32_t on = 1;|vc2settingsmodes
+modes-autonote-set|    out.setAutoNote(on);|    out.setAutoNote(on != 0);|vc2settingsmodes
+modes-autonote-legato|    out.setAutoNoteLegato();\n|\n|vc2settingsmodes
+dispatch-no-modes|    return modes(t, part, nodes, out) && bytes(t, part)|    return bytes(t, part)|vc2settingsdispatch
+dispatch-no-bytes|&& bytes(t, part) && common(t, part)|&& common(t, part)|vc2settingsdispatch
+dispatch-no-common|&& common(t, part) && oscs(t, part)|&& oscs(t, part)|vc2settingsdispatch
+dispatch-no-oscs|&& oscs(t, part) && mixes(t, part)|&& mixes(t, part)|vc2settingsdispatch
+dispatch-no-mixes| && mixes(t, part) &&\n| &&\n|vc2settingsdispatch
+dispatch-no-envelopes|           envelopes(t, part) && lfos(t, part)|           lfos(t, part)|vc2settingsdispatch
+dispatch-no-lfos|&& lfos(t, part) && cosms(t, part)|&& cosms(t, part)|vc2settingsdispatch
+dispatch-no-cosms|&& cosms(t, part) && tvas(t, part)|&& tvas(t, part)|vc2settingsdispatch
+dispatch-no-tvas|&& tvas(t, part) && setup.settings(g, part)|&& setup.settings(g, part)|vc2settingsdispatch
+dispatch-no-matrix| && setup.settings(g, part) &&\n| &&\n|vc2settingsdispatch
+dispatch-no-vocoder|setup.settings(g, part) &&\n           vocoder(t, part, out);|setup.settings(g, part);|vc2settingsdispatch
+dispatch-bytes-common|bytes(t, part) && common(t, part)|common(t, part) && bytes(t, part)|vc2settingsdispatch
+dispatch-mixes-envelopes|&& mixes(t, part) &&\n           envelopes(t, part) &&|&& envelopes(t, part) &&\n           mixes(t, part) &&|vc2settingsdispatch
+dispatch-matrix-vocoder|setup.settings(g, part) &&\n           vocoder(t, part, out);|vocoder(t, part, out) &&\n           setup.settings(g, part);|vc2settingsdispatch
+dispatch-matrix-record|setup.settings(g, part) &&|setup.record(g, part) &&|vc2settingsdispatch
+system-no-trailer|    oscTrailer(t);\n|\n|vc2settingsdispatch
+system-no-lfo|    lfoSystem(t);\n|\n|vc2settingsdispatch
+system-no-route|    tvaRoute(t);\n|\n|vc2settingsdispatch
+system-no-channel|    matrixChannel(g, states);\n|\n|vc2settingsdispatch
+system-order|    lfoSystem(t);\n    tvaRoute(t);|    tvaRoute(t);\n    lfoSystem(t);|vc2settingsdispatch
+assigns-no-assigns|    setup.assigns(g);\n|\n|vc2settingsdispatch
+assigns-no-controls|    tvaControls(t);\n|\n|vc2settingsdispatch
+assigns-order|    setup.assigns(g);\n    tvaControls(t);|    tvaControls(t);\n    setup.assigns(g);|vc2settingsdispatch
+calibration-no-osc|    oscCalibration(t);\n|\n|vc2settingsdispatch
+calibration-no-trailer|    tvaTrailer(t);\n|\n|vc2settingsdispatch
+calibration-order|    oscCalibration(t);\n    tvaTrailer(t);|    tvaTrailer(t);\n    oscCalibration(t);|vc2settingsdispatch
+channel-switch-id|kReceiveSwitch = 71,|kReceiveSwitch = 70,|vc2settingsdispatch
+channel-channel-id|kReceiveChannel = 72;|kReceiveChannel = 73;|vc2settingsdispatch
+channel-switch-test|kReceiveSwitch) == 0) {|kReceiveSwitch) != 0) {|vc2settingsdispatch
+channel-state-at|kStateAt = 2;|kStateAt = 0;|vc2settingsdispatch
+channel-unreceived-at|        g.channel = states.unreceived();|        g.channel = states.unreceived() + kStateAt;|vc2settingsdispatch
+channel-block|p_.value(Block::kSystemB, 0, 0, kReceiveSwitch)|p_.value(Block::kSystem, 0, 0, kReceiveSwitch)|vc2settingsdispatch
+channel-falls-on|        return;\n    }\n    g.channel = states.receiving|    }\n    g.channel = states.receiving|vc2settingsdispatch
+matrix-held-end|    return !params_.held();\n}|    return true;\n}|vc2settingsmatrix
+matrix-held-start|    if (params_.held()) return false;\n|\n|vc2settingsmatrix
+category-id|kCategory = 0x12c,|kCategory = 0x12d,|vc2settingscategory
+category-power-id|kPower = 0x530;|kPower = 0x531;|vc2settingscategory
+category-count-fewer|kCategories = 12;|kCategories = 11;|vc2settingscategory
+category-count-more|kCategories = 12;|kCategories = 13;|vc2settingscategory
+category-free|kFreeCategory = 6,|kFreeCategory = 5,|vc2settingscategory
+category-held|kHeldCategories[] = { 10, 11 };|kHeldCategories[] = { 9, 11 };|vc2settingscategory
+category-held-last|kHeldCategories[] = { 10, 11 };|kHeldCategories[] = { 10, 10 };|vc2settingscategory
+category-less|kLess = 400;|kLess = 300;|vc2settingscategory
+category-control-source|kControlSource = 3,|kControlSource = 2,|vc2settingscategory
+category-node-source|kNodeSource = 4,|kNodeSource = 3,|vc2settingscategory
+category-given-source|kGivenSource = 1,|kGivenSource = 2,|vc2settingscategory
+category-part-zero|kPartZero = 0;|kPartZero = 1;|vc2settingscategory
+category-notes-off-number|kAllNotesOff = 123,|kAllNotesOff = 120,|vc2settingscategory
+category-no-value|kNoValue = -1;|kNoValue = 0;|vc2settingscategory
+category-first-read|    p_.value(Block::kPart, kPartZero, 0, kCategory);\n    budget(t, out);|    budget(t, out);|vc2settingscategory
+category-power-block|p_.value(Block::kSystemC, 0, 0, kPower)|p_.value(Block::kSystemB, 0, 0, kPower)|vc2settingscategory
+category-less-past|    if (known && category != kFreeCategory) power -= kLess;|    if (category != kFreeCategory) power -= kLess;|vc2settingscategory
+category-less-free|    if (known && category != kFreeCategory) power -= kLess;|    if (known) power -= kLess;|vc2settingscategory
+category-no-less|    if (known && category != kFreeCategory) power -= kLess;\n||vc2settingscategory
+category-held-word|    t.heldNote = held ? 1 : 0;|    t.heldNote = 0;|vc2settingscategory
+category-control-part|nodes.of(kNodeSource, kPartZero).channel|nodes.of(kNodeSource, part).channel|vc2settingscategory
+category-truncate-word|nodes.of(kGivenSource, part).word8|nodes.of(kGivenSource, part).object|vc2settingscategory
+category-truncate-part|nodes.of(kGivenSource, part).word8|nodes.of(kGivenSource, kPartZero).word8|vc2settingscategory
+category-no-autonote|    autoNoteSwitch(out);\n    if (t.heldNote|    if (t.heldNote|vc2settingscategory
+category-notes-off-test|    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote != 0) out.allNotesOff();|vc2settingscategory
+category-notes-off-first|    autoNoteSwitch(out);\n    if (t.heldNote == 0) out.allNotesOff();|    if (t.heldNote == 0) out.allNotesOff();\n    autoNoteSwitch(out);|vc2settingscategory
+category-control-first|    budget(t, out);\n    out.controller(|    out.controller(|vc2settingscategory
+category-budget-unset|    out.setBudget(static_cast<int32_t>(power));\n}|}|vc2settingscategory
+system-trip-order|kTripIds[] = { 0x93, 0x94 };|kTripIds[] = { 0x94, 0x93 };|vc2settingssystem
+system-trip-none|kNoAssign = 0,|kNoAssign = 1,|vc2settingssystem
+system-trip-none-too|kNoAssignToo = 32,|kNoAssignToo = 31,|vc2settingssystem
+system-trip-none-stored|kNone = -1;|kNone = 0;|vc2settingssystem
+system-trip-block|p_.value(Block::kSystem, 0, 0, kTripIds[k])|p_.value(Block::kSystemB, 0, 0, kTripIds[k])|vc2settingssystem
+system-remain-id|kPatchRemain = 0x41;|kPatchRemain = 0x42;|vc2settingssystem
+system-remain-block|p_.value(Block::kSystemB, 0, 0, kPatchRemain)|p_.value(Block::kSystemC, 0, 0, kPatchRemain)|vc2settingssystem
+system-voices-id|kVoices = 0x52d,|kVoices = 0x52c,|vc2settingssystem
+system-offset-id|kVoiceOffset = 0x52e,|kVoiceOffset = 0x52f,|vc2settingssystem
+system-power-id|kPowerMax = 0x530,|kPowerMax = 0x52f,|vc2settingssystem
+system-power-offset-id|kPowerOffset = 0x531;|kPowerOffset = 0x532;|vc2settingssystem
+system-most-voices|kMostVoices = 24,|kMostVoices = 23,|vc2settingssystem
+system-most-offset|kMostOffset = 23;|kMostOffset = 24;|vc2settingssystem
+system-voices-sum|    if (both > kMostVoices) count = kMostVoices - offset;\n||vc2settingssystem
+system-voices-order|    int32_t count = std::min(get(kVoices), kMostVoices);\n    const int32_t offset = std::min(get(kVoiceOffset), kMostOffset);|    const int32_t offset = std::min(get(kVoiceOffset), kMostOffset);\n    int32_t count = std::min(get(kVoices), kMostVoices);|vc2settingssystem
+system-count-only|if (last[0] != count \|\| last[1] != offset)|if (last[0] != count)|vc2settingssystem
+system-offset-only|if (last[0] != count \|\| last[1] != offset)|if (last[1] != offset)|vc2settingssystem
+system-count-stored|        last[0] = static_cast<int16_t>(count);|        last[0] = static_cast<int16_t>(offset);|vc2settingssystem
+system-reserve-args|out.reserve(count, offset);|out.reserve(offset, count);|vc2settingssystem
+system-power-test|    if (last[2] != power) {|    if (last[2] == power) {|vc2settingssystem
+system-power-unstored|        last[2] = static_cast<int16_t>(power);\n||vc2settingssystem
+system-no-budget|        budget(t, out);\n    }\n    if (last[3]|    }\n    if (last[3]|vc2settingssystem
+system-offset-test|    if (last[3] != powerOffset) {|    if (last[3] == powerOffset) {|vc2settingssystem
+system-offset-value|out.setPowerOffset(powerOffset);|out.setPowerOffset(power);|vc2settingssystem
+static-float-first|    floats[0] = f[0];|    floats[0] = f[1];|vc2staticmatrix
+static-float-second|    floats[1] = f[1];|    floats[1] = f[0];|vc2staticmatrix
+static-scale|    scale = f[2];|    scale = f[1];|vc2staticmatrix
+static-node-prev|    node.prev = kNodeAt;|    node.prev = kStateAt;|vc2staticmatrix
+static-node-next|    node.next = kNodeAt;|    node.next = 0;|vc2staticmatrix
+static-node-class|kNodeClass = 0x898cd460,|kNodeClass = 0x898cd340,|vc2staticmatrix
+static-matrix-class|kMatrixClass = 0x898cd448;|kMatrixClass = 0x898cd460;|vc2staticmatrix
+static-no-vtable|    vtable = kMatrixClass;\n||vc2staticmatrix
+static-state-at|    parts.channelStateInit(kStateAt, kNoArg);|    parts.channelStateInit(kNodeAt, kNoArg);|vc2staticmatrix
+static-state-arg|kNoArg = 0;|kNoArg = 1;|vc2staticmatrix
+static-no-state|    parts.channelStateInit(kStateAt, kNoArg);\n||vc2staticmatrix
+static-part|    links.part = 0;|    links.part = 1;|vc2staticmatrix
+static-velocity|kNoVelocity = 0,|kNoVelocity = 1,|vc2staticmatrix
+static-keys|kMiddleKey = 60;|kMiddleKey = 64;|vc2staticmatrix
+static-poly-key|    m.head[2] = kMiddleKey;\n||vc2staticmatrix
+static-key|    m.head[1] = kMiddleKey;\n||vc2staticmatrix
+static-channel|    links.channel = unreceived;|    links.channel = 0;|vc2staticmatrix
+static-enqueue-node|parts.enqueue(Vc2UpdateQueue::kAt, kNodeAt);|parts.enqueue(Vc2UpdateQueue::kAt, kAt);|vc2staticmatrix
+static-no-enqueue|    parts.enqueue(Vc2UpdateQueue::kAt, kNodeAt);\n||vc2staticmatrix
+tables-static-first|{ 0x893a3098, &staticFloats[0] }|{ 0x893a309c, &staticFloats[0] }|vc2settingstables
+tables-static-last|{ 0x893a30a4, &staticFloats[2] }|{ 0x893a30a0, &staticFloats[2] }|vc2settingstables
+messages-routing-bit|kRoutingOn = 0x80;|kRoutingOn = 0x40;|vc2settingsmessages
+messages-node-bytes|kNodeBytes = 16;|kNodeBytes = 32;|vc2settingsmessages
+messages-stop-node|w.nodes.stop(partNode(0), w.nodeParts); }|w.nodes.stop(partNode(1), w.nodeParts); }|vc2settingsmessages
+messages-routing-no-matrix|    w.setup.settings(w.g, 0);\n||vc2settingsmessages
+messages-routing-matrix-part|    w.setup.settings(w.g, 0);|    w.setup.settings(w.g, 1);|vc2settingsmessages
+messages-routing-test|if (w.out.routing(on)) s.heldNoteSwitch|if (!w.out.routing(on)) s.heldNoteSwitch|vc2settingsmessages
+messages-routing-flag|s.heldNoteSwitch(w.t, on, w.out);|s.heldNoteSwitch(w.t, true, w.out);|vc2settingsmessages
+messages-calibration-no-dispatch|    s.readCalibration(w.t);\n||vc2settingsmessages
+messages-calibration-no-counts|    s.voiceCounts(w.t, w.out);\n||vc2settingsmessages
+messages-calibration-no-stop|    s.voiceCounts(w.t, w.out);\n    stopPartZero(w);|    s.voiceCounts(w.t, w.out);|vc2settingsmessages
+messages-system-no-dispatch|    s.readSystem(w.t, w.g, w.states);\n||vc2settingsmessages
+messages-system-no-receive|    if (w.out.receive()) s.patchRemain(w.t);|    s.patchRemain(w.t);|vc2settingsmessages
+messages-system-receive-test|    if (w.out.receive()) s.patchRemain(w.t);|    if (!w.out.receive()) s.patchRemain(w.t);|vc2settingsmessages
+messages-assigns-no-dispatch|    s.readAssigns(w.t, w.g, w.setup);\n||vc2settingsmessages
+messages-assigns-no-run|    w.out.reloadRun(0);\n||vc2settingsmessages
+messages-assigns-no-trip|    s.tripAssigns(w.t);\n||vc2settingsmessages
+messages-part-refuse|    if (part != 0) return;\n    w.out.reloadRun(part);|    w.out.reloadRun(part);|vc2settingsmessages
+messages-part-no-stop|    w.nodes.stop(partNode(part), w.nodeParts);\n||vc2settingsmessages
+messages-ways-3-4|routingWay, nullptr, nullptr, calibrationWay, systemWay,|routingWay, nullptr, nullptr, systemWay, calibrationWay,|vc2settingsmessages
+messages-ways-1|{ routingWay, nullptr, nullptr,|{ routingWay, routingWay, nullptr,|vc2settingsmessages
+messages-ways-9|nullptr,    nullptr, nullptr, partWay,        partWay,|nullptr,    nullptr, partWay, partWay,        partWay,|vc2settingsmessages
+messages-ways-13|partWay,   partWay,    partWay };|partWay,   partWay,    nullptr };|vc2settingsmessages
+messages-ways-6|systemWay, assignsWay, partWay,|systemWay, assignsWay, nullptr,|vc2settingsmessages
+messages-part-kind|if (kind != 0 \|\| part != 0) return;|if (part != 0) return;|vc2settingsmessages
+messages-part-part|if (kind != 0 \|\| part != 0) return;|if (kind != 0) return;|vc2settingsmessages
+messages-part-no-request|    w.out.reloadRequest(part);\n||vc2settingsmessages
+messages-part-class|    nodeClass(w, part, 0);|    nodeClass(w, part, 1);|vc2settingsmessages
+messages-part-no-category|    category(w.t, w.nodes, part, w.out);\n||vc2settingsmessages
+messages-part-no-steps|    clearSteps(w.t);\n}|}|vc2settingsmessages
+messages-held-word|if (t.heldNote == 0 && on) out.truncateAll();|if (on) out.truncateAll();|vc2settingsmessages
+messages-held-flag|if (t.heldNote == 0 && on) out.truncateAll();|if (t.heldNote == 0) out.truncateAll();|vc2settingsmessages
+messages-steps|t.steps.fill(0);|t.steps.fill(1);|vc2settingsmessages
+messages-class-flag|plain == 0 ? Vc2NodeClass::kHeld : Vc2NodeClass::kPlain|plain != 0 ? Vc2NodeClass::kHeld : Vc2NodeClass::kPlain|vc2settingsmessages
+receive-switch-id|kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;|kSwitchId = 73, kChannelId = 72, kIdsAPart = 2;|vc2settingsreceive
+receive-channel-id|kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;|kSwitchId = 71, kChannelId = 74, kIdsAPart = 2;|vc2settingsreceive
+receive-ids-a-part|kSwitchId = 71, kChannelId = 72, kIdsAPart = 2;|kSwitchId = 71, kChannelId = 72, kIdsAPart = 1;|vc2settingsreceive
+receive-record-id|kRecordIds[] = { 0, 1, 2, 52 };|kRecordIds[] = { 0, 1, 2, 53 };|vc2settingsreceive
+receive-record-order|kRecordIds[] = { 0, 1, 2, 52 };|kRecordIds[] = { 1, 0, 2, 52 };|vc2settingsreceive
+receive-record-block|p_.value(Block::kSystemD, 0, 0, record);|p_.value(Block::kSystemB, 0, 0, record);|vc2settingsreceive
+receive-switch-block|if (p_.value(Block::kSystemB, 0, 0, id(kSwitchId)) != 0)|if (p_.value(Block::kSystem, 0, 0, id(kSwitchId)) != 0)|vc2settingsreceive
+receive-channel-block|channel = p_.value(Block::kSystemB, 0, 0, id(kChannelId));|channel = p_.value(Block::kSystemC, 0, 0, id(kChannelId));|vc2settingsreceive
+receive-switch-test|id(kSwitchId)) != 0) channel|id(kSwitchId)) > 0) channel|vc2settingsreceive
+receive-switch-always|id(kSwitchId)) != 0) channel|id(kSwitchId)) != 0 \|\| part >= 0) channel|vc2settingsreceive
+receive-switch-off|    int32_t channel = kNoChannel;|    int32_t channel = 0;|vc2settingsreceive
+receive-heard-source|kPartZero = 0, kHeardSource = 3, kControlSource = 3;|kPartZero = 0, kHeardSource = 4, kControlSource = 3;|vc2settingsreceive
+receive-control-source|kPartZero = 0, kHeardSource = 3, kControlSource = 3;|kPartZero = 0, kHeardSource = 3, kControlSource = 2;|vc2settingsreceive
+receive-onto-past|channel >= Vc2Keys::kChannels ? kNoChannel : channel;|channel > Vc2Keys::kChannels ? kNoChannel : channel;|vc2settingsreceive
+receive-onto-early|channel >= Vc2Keys::kChannels ? kNoChannel : channel;|channel >= Vc2Keys::kChannels - 1 ? kNoChannel : channel;|vc2settingsreceive
+receive-sources|for (int s = 0; s < Vc2PartNodes::kSources; ++s) {|for (int s = 0; s < Vc2PartNodes::kSources - 1; ++s) {|vc2settingsreceive
+receive-move-part|w.nodes.move(Vc2PartNodes::addressOf(s + 1, part), s, onto);|w.nodes.move(Vc2PartNodes::addressOf(s + 1, 0), s, onto);|vc2settingsreceive
+receive-move-onto|w.nodes.move(Vc2PartNodes::addressOf(s + 1, part), s, onto);|w.nodes.move(Vc2PartNodes::addressOf(s + 1, part), s, kNoChannel);|vc2settingsreceive
+receive-last-table|if (source == kLastSource) return Vc2Keys::tableAt(static_cast<uint32_t>(source), 0);|if (source == kLastSource) return Vc2Keys::tableAt(static_cast<uint32_t>(source), 1);|vc2settingsreceive
+receive-last-source|constexpr int kLastSource = Vc2PartNodes::kSources - 1;|constexpr int kLastSource = Vc2PartNodes::kSources - 2;|vc2settingsreceive
+receive-table-below|if (channel < 0 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|if (channel < -1 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|vc2settingsreceive
+receive-table-past|if (channel < 0 \|\| channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|if (channel < 0 \|\| channel > Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|vc2settingsreceive
+receive-table-spare|channel >= Vc2Keys::kChannels) return Vc2Keys::kSpareAt;|channel >= Vc2Keys::kChannels) return Vc2Keys::kOwnAt;|vc2settingsreceive
+receive-glides-one|for (int n = 0; n < kGlidesAPart; ++n) glideOf(keys, source, part, n).table = table;|for (int n = 0; n < kGlidesAPart - 1; ++n) glideOf(keys, source, part, n).table = table;|vc2settingsreceive
+receive-glides-source|kGlidesASource = kGlidesAPart * Vc2Keys::kChannels;|kGlidesASource = kGlidesAPart * Vc2Keys::kSources;|vc2settingsreceive
+receive-glides-part|kGlidesASource * source + kGlidesAPart * part + n|kGlidesASource * source + part + n|vc2settingsreceive
+receive-unchanged|    if (after == before) return true;|    if (after == before && after == kNoChannel) return true;|vc2settingsreceive
+receive-before-none|    if (before != kNoChannel)|    if (before != 0)|vc2settingsreceive
+receive-controls-order|{ { 121, 0 }, { 123, -1 }, { 120, 0 } }|{ { 123, -1 }, { 121, 0 }, { 120, 0 } }|vc2settingsreceive
+receive-controls-value|{ { 121, 0 }, { 123, -1 }, { 120, 0 } }|{ { 121, 0 }, { 123, 0 }, { 120, 0 } }|vc2settingsreceive
+receive-controls-number|{ { 121, 0 }, { 123, -1 }, { 120, 0 } }|{ { 121, 0 }, { 123, -1 }, { 121, 0 } }|vc2settingsreceive
+receive-controls-old|w.out.controller(kControlSource, before, number, value);|w.out.controller(kControlSource, after, number, value);|vc2settingsreceive
+receive-after-none|    if (after == kNoChannel) return true;|    if (after == 0) return true;|vc2settingsreceive
+receive-held-test|    if (w.t.heldNote == 0) {|    if (w.t.heldNote != 1) {|vc2settingsreceive
+receive-held-on|    w.out.heldNoteOn();\n    return true;|    w.out.allNotesOff();\n    return true;|vc2settingsreceive
+receive-part-zero|{ return receiveChannel(w, kPartZero); }|{ return receiveChannel(w, 1); }|vc2settingsreceive
+routing-chord-id|constexpr int16_t kChordMemoryId = 55;|constexpr int16_t kChordMemoryId = 56;|vc2settingsreceive
+routing-chord-block|p_.value(Block::kSystemD, 0, 0, kChordMemoryId);|p_.value(Block::kSystemB, 0, 0, kChordMemoryId);|vc2settingsreceive
+routing-chord-keep|        w.t.chordMemory = chordMemory;\n|\n|vc2settingsreceive
+routing-chord-test|    if (chordMemory != w.t.chordMemory) {|    if (chordMemory > w.t.chordMemory) {|vc2settingsreceive
+routing-chord-notes-off|        w.out.allNotesOff();\n    }\n    if (!on)|    }\n    if (!on)|vc2settingsreceive
+routing-off|    if (!on) return true;|    if (on) return true;|vc2settingsreceive
+routing-off-answer|    if (!on) return true;|    if (!on) return false;|vc2settingsreceive
+routing-sources|    for (int s = 0; s < Vc2PartNodes::kSources; ++s)\n        for (int p|    for (int s = 0; s < Vc2PartNodes::kSources - 1; ++s)\n        for (int p|vc2settingsreceive
+routing-parts|for (int p = 0; p < Vc2PartNodes::kParts; ++p) release(w, s, p);|for (int p = 0; p < Vc2PartNodes::kParts - 1; ++p) release(w, s, p);|vc2settingsreceive
+release-move-onto|addressOf(source + 1, part), kNoSource, kNoChannel);|addressOf(source + 1, part), source, 0);|vc2settingsreceive
+release-node-part|addressOf(source + 1, part), kNoSource, kNoChannel);|addressOf(source + 1, 0), kNoSource, kNoChannel);|vc2settingsreceive
+release-spare|        g.table = Vc2Keys::kSpareAt;|        g.table = Vc2Keys::kOwnAt;|vc2settingsreceive
+release-no-reset|        g.reset();\n|\n|vc2settingsreceive
+release-glides|    for (int n = 0; n < kGlidesAPart; ++n) {\n        w.nodes.move|    for (int n = 0; n < kGlidesAPart - 1; ++n) {\n        w.nodes.move|vc2settingsreceive
+release-glide-n|        Vc2KeyGlide& g = glideOf(w.keys, source, part, n);|        Vc2KeyGlide& g = glideOf(w.keys, source, part, 0);|vc2settingsreceive
+routing-hold-lift|        w.t.holdPresses[static_cast<size_t>(c)] = 1;|        w.t.holdPresses[static_cast<size_t>(c)] = 0;|vc2settingsreceive
+routing-key-channels|    for (int c = 0; c < Vc2Keys::kChannels; ++c) {|    for (int c = 0; c < Vc2Keys::kChannels - 1; ++c) {|vc2settingsreceive
+routing-key-sources|        for (int s = 0; s < Vc2Keys::kSources; ++s)\n            w.keys.table|        for (int s = 0; s < Vc2Keys::kSources - 1; ++s)\n            w.keys.table|vc2settingsreceive
+routing-key-reset|static_cast<uint32_t>(c))).reset();|static_cast<uint32_t>(c))).clear();|vc2settingsreceive
+routing-no-receive|    receiveChannel(w, kPartZero);\n    w.nodes.install|    w.nodes.install|vc2settingsreceive
+routing-receive-part|    receiveChannel(w, kPartZero);\n    w.nodes.install|    receiveChannel(w, 1);\n    w.nodes.install|vc2settingsreceive
+routing-class|Vc2NodeClass::kHeld, w.keys);\n    return true;|Vc2NodeClass::kPlain, w.keys);\n    return true;|vc2settingsreceive
+routing-class-node|w.nodes.install(Vc2PartNodes::addressOf(1, kPartZero)|w.nodes.install(Vc2PartNodes::addressOf(2, kPartZero)|vc2settingsreceive
+reload-class|constexpr uint32_t kReloadClass = 0x898cd430;|constexpr uint32_t kReloadClass = 0x898c6ba8;|vc2partreloads
+reload-next|n = { object, object, n.word8, kReloadClass };|n = { 0, object, n.word8, kReloadClass };|vc2partreloads
+reload-prev|n = { object, object, n.word8, kReloadClass };|n = { object, 0, n.word8, kReloadClass };|vc2partreloads
+reload-word8|n = { object, object, n.word8, kReloadClass };|n = { object, object, 0, kReloadClass };|vc2partreloads
+reload-floats|floats = vc2PartSettingsTables().reloadFloats;|floats = vc2PartSettingsTables().staticFloats;|vc2partreloads
+reload-objects|for (uint32_t k = 0; k < kObjects; ++k) construct(|for (uint32_t k = 0; k < kObjects - 1; ++k) construct(|vc2partreloads
+reload-at|objects[(object - kAt) / sizeof(Vc2Reload)]|objects[(object - kAt) / sizeof(Vc2Reload) % 8]|vc2partreloads
+reload-held|    held_.fill(kHeld);\n    parts_.unpost(object);|    held_.fill(kFree);\n    parts_.unpost(object);|vc2partreloads
+reload-free|    parts_.unpost(object);\n    held_.fill(kFree);|    parts_.unpost(object);\n    held_.fill(kHeld);|vc2partreloads
+reload-held-order|    held_.fill(kHeld);\n    parts_.unpost(object);|    parts_.unpost(object);\n    held_.fill(kHeld);|vc2partreloads
+reload-stop-state|if (at(object).state == kReading) unpostHeld(object);|if (at(object).state == kAsked) unpostHeld(object);|vc2partreloads
+reload-cancel|void Vc2PartReloads::cancel(uint32_t object) { unpostHeld(object); }|void Vc2PartReloads::cancel(uint32_t object) { unpostNow(object); }|vc2partreloads
+reload-run-stop|bool Vc2PartReloads::run(uint32_t object) {\n    stopReading(object);|bool Vc2PartReloads::run(uint32_t object) {|vc2partreloads
+reload-run-idle|    r.state = kIdle;\n    return parts_.readPart(r.part);|    return parts_.readPart(r.part);|vc2partreloads
+reload-post-asked|    r.state = kAsked;\n    if (r.posted != 0) return;|    r.state = kReading;\n    if (r.posted != 0) return;|vc2partreloads
+reload-post-test|    if (r.posted != 0) return;\n    r.posted = 1;|    if (r.posted == 1) return;\n    r.posted = 1;|vc2partreloads
+reload-post-mark|    r.posted = 1;\n    parts_.post(object);|    r.posted = 2;\n    parts_.post(object);|vc2partreloads
+reload-post-call|    r.posted = 1;\n    parts_.post(object);\n}|    r.posted = 1;\n}|vc2partreloads
+reload-repost|void Vc2PartReloads::repost(uint32_t object) {\n    unpostHeld(object);|void Vc2PartReloads::repost(uint32_t object) {\n    unpostNow(object);|vc2partreloads
+reload-request-asked|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|{ &Vc2PartReloads::post, &Vc2PartReloads::post, &Vc2PartReloads::repost }|vc2partreloads
+reload-request-idle|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|{ &Vc2PartReloads::ignore, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|vc2partreloads
+reload-request-reading|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::repost }|{ &Vc2PartReloads::post, &Vc2PartReloads::ignore, &Vc2PartReloads::post }|vc2partreloads
+reload-request-past|r.state < std::size(kWays) ? kWays[r.state] : kWays[kIdle]|r.state < std::size(kWays) ? kWays[r.state] : kWays[kAsked]|vc2partreloads
+reload-request-posted-idle|        stopReading(object);\n        r.state = kIdle;\n    }|        stopReading(object);\n    }|vc2partreloads
+reload-fire-test|    if (r.state != kIdle) {\n        r.state = kReading;|    if (r.state == kAsked) {\n        r.state = kReading;|vc2partreloads
+reload-fire-read|        r.state = kReading;\n        parts_.readPart(r.part);\n        r.state = kIdle;|        r.state = kReading;\n        r.state = kIdle;|vc2partreloads
+reload-fire-idle|        parts_.readPart(r.part);\n        r.state = kIdle;\n    }|        parts_.readPart(r.part);\n    }|vc2partreloads
+reload-fire-posted|    r.posted = 0;\n    return 0;|    r.posted = 1;\n    return 0;|vc2partreloads
+reload-fire-answer|    r.posted = 0;\n    return 0;|    r.posted = 0;\n    return 1;|vc2partreloads
+reload-read-now-idle|    r.state = kIdle;\n    parts_.readPart(r.part);\n}|    parts_.readPart(r.part);\n}|vc2partreloads
+reload-message-idle|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|{ &Vc2PartReloads::readNow, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|vc2partreloads
+reload-message-asked|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|{ &Vc2PartReloads::ignore, &Vc2PartReloads::ignore, &Vc2PartReloads::unpostNow }|vc2partreloads
+reload-message-reading|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostNow }|{ &Vc2PartReloads::ignore, &Vc2PartReloads::readNow, &Vc2PartReloads::unpostHeld }|vc2partreloads
+reload-message-past|s < std::size(kWays) ? kWays[s] : kWays[kAsked]|s < std::size(kWays) ? kWays[s] : kWays[kIdle]|vc2partreloads
+tables-reload-float|{ 0x8939b390, &reloadFloats[0] }|{ 0x8939b394, &reloadFloats[0] }|vc2settingstables
+tables-reload-order|{ 0x8939b380, &reloadFloats[1] }, { 0x8939b388, &reloadFloats[2] }|{ 0x8939b388, &reloadFloats[1] }, { 0x8939b380, &reloadFloats[2] }|vc2settingstables
+ctl-no-number|    parts_.numberChanged(number, source, channel, value);\n|\n|vc2partcontrollers
+ctl-number-args|parts_.numberChanged(number, source, channel, value);|parts_.numberChanged(number, channel, source, value);|vc2partcontrollers
+ctl-number-value|parts_.numberChanged(number, source, channel, value);|parts_.numberChanged(number, source, channel, 0);|vc2partcontrollers
+ctl-list|Vc2PartNodes::kChannels * (source - 1) + channel;|Vc2PartNodes::kChannels * (source - 1) + (channel & 7);|vc2partcontrollers
+ctl-list-walk|at != 0; at = nodes_.node(at).next)|at != 0; at = 0)|vc2partcontrollers
+ctl-part-byte|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8) & 7, number, value);|vc2partcontrollers
+ctl-part-args|partController(parts_.firstByte(nodes_.node(at).word8), number, value);|partController(parts_.firstByte(nodes_.node(at).word8), value, number);|vc2partcontrollers
+padx-moving|    if (t.trip.moving == 0 \|\| v > 0) {|    if (t.trip.moving == 0 && v > 0) {|vc2partcontrollers
+padx-sign|    if (t.trip.moving == 0 \|\| v > 0) {|    if (t.trip.moving == 0 \|\| v >= 0) {|vc2partcontrollers
+padx-store|        t.x = v;\n        return;|        t.y = v;\n        return;|vc2partcontrollers
+padx-stop|    parts_.tripSet(at, kStop, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|    parts_.tripSet(at, kStart, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|vc2partcontrollers
+padx-level|    t.level = kRest;\n}\n\nvoid Vc2PartControllers::padY|    t.level = 0;\n}\n\nvoid Vc2PartControllers::padY|vc2partcontrollers
+pady-moving|    if (t.trip.moving == 0) {\n        if (v <= 0) return;|    if (t.trip.moving != 0) {\n        if (v <= 0) return;|vc2partcontrollers
+pady-off-sign|        if (v <= 0) return;|        if (v < 0) return;|vc2partcontrollers
+pady-off-store|        t.y = v;\n        if (t.x > 0)|        if (t.x > 0)|vc2partcontrollers
+pady-off-x|        if (t.x > 0) parts_.tripSet(at, kStart, t.x, v);|        if (t.x >= 0) parts_.tripSet(at, kStart, t.x, v);|vc2partcontrollers
+pady-off-start|parts_.tripSet(at, kStart, t.x, v);|parts_.tripSet(at, kStop, t.x, v);|vc2partcontrollers
+pady-on-sign|    if (v > 0) {\n        t.y = v;\n        t.level|    if (v >= 0) {\n        t.y = v;\n        t.level|vc2partcontrollers
+pady-on-store|        t.y = v;\n        t.level = parts_.tripMove|        t.level = parts_.tripMove|vc2partcontrollers
+pady-move-level|        t.level = parts_.tripMove(at, t.x, v);|        parts_.tripMove(at, t.x, v);|vc2partcontrollers
+pady-move-args|parts_.tripMove(at, t.x, v);|parts_.tripMove(at, v, t.x);|vc2partcontrollers
+pady-stop|    parts_.tripSet(at, kStop, t.x, t.y);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::rest|    parts_.tripSet(at, kStop, t.y, t.x);\n    t.level = kRest;\n}\n\nvoid Vc2PartControllers::rest|vc2partcontrollers
+rest-zero|parts_.tripSet(at, kStop, 0, 0);|parts_.tripSet(at, kStop, 0, 1);|vc2partcontrollers
+rest-level|parts_.trip(at).level = kRest;|parts_.trip(at).level = 0;|vc2partcontrollers
+ctl-rest|constexpr uint8_t kRest = 127;|constexpr uint8_t kRest = 126;|vc2partcontrollers
+ctl-reset-all|constexpr int32_t kResetAll = 121;|constexpr int32_t kResetAll = 120;|vc2partcontrollers
+ctl-start|constexpr int32_t kStop = 0, kStart = 1;|constexpr int32_t kStop = 0, kStart = 2;|vc2partcontrollers
+ctl-match-x|{ rows_.tripAssigns[0], rows_.tripAssigns[1], kResetAll }|{ rows_.tripAssigns[1], rows_.tripAssigns[1], kResetAll }|vc2partcontrollers
+ctl-ways|{ &Vc2PartControllers::padX, &Vc2PartControllers::padY, &Vc2PartControllers::rest }|{ &Vc2PartControllers::padY, &Vc2PartControllers::padX, &Vc2PartControllers::rest }|vc2partcontrollers
+ctl-ways-count|for (size_t k = 0; k < std::size(kWays); ++k)|for (size_t k = 0; k + 1 < std::size(kWays); ++k)|vc2partcontrollers
+ctl-first-match|if (number == matches[k]) (this->*kWays[k])(part, value);|if (number == matches[k]) {\n            (this->*kWays[k])(part, value);\n            break;\n        }|vc2partcontrollers
+num-class-vtable|{ 0x898cd250, 0x89393920, base, false },|{ 0x898cd268, 0x89393920, base, false },|vc2partnumbers
+num-class-handler|{ 0x898cd268, 0x89393950, base, false },|{ 0x898cd268, 0x89393920, base, false },|vc2partnumbers
+num-hold-lifts|{ 0x898cd238, 0x89393980, hold, true },|{ 0x898cd238, 0x89393980, hold, false },|vc2partnumbers
+num-hold-class|{ 64, 3 },|{ 64, 4 },|vc2partnumbers
+num-switch-5|{ 5, 2 },|{ 5, 1 },|vc2partnumbers
+num-switch-6|{ 6, 11 },|{ 6, 0 },|vc2partnumbers
+num-default|row == std::end(kNumberClasses) ? 0 : row->second|row == std::end(kNumberClasses) ? 1 : row->second|vc2partnumbers
+num-number|o.number = static_cast<uint8_t>(n);|o.number = 0;|vc2partnumbers
+num-table|table[static_cast<size_t>(n)] = kObjectsAt + kObjectBytes * static_cast<uint32_t>(n);|table[static_cast<size_t>(n)] = kObjectsAt;|vc2partnumbers
+num-lifts-value|if (c.holdPresses) t.holdPresses.fill(1);|if (c.holdPresses) t.holdPresses.fill(2);|vc2partnumbers
+num-changed-table|{ return table[static_cast<size_t>(number)]; }|{ return kObjectsAt + kObjectBytes * static_cast<uint32_t>(number); }|vc2partnumbers
+num-changed-object|return classAt(*this, objectOf(number)).handler;|return classAt(*this, kObjectsAt).handler;|vc2partnumbers
+num-changed-value|classAt(*this, objectOf(number)).way(w, { source, channel, value });|classAt(*this, objectOf(number)).way(w, { source, channel, 0 });|vc2partnumbers
+init-plain|constexpr uint32_t kPlainClass = 0x898cd184;|constexpr uint32_t kPlainClass = 0x898cd1fc;|vc2partnumbers
+init-vtable|        object.vtable = kPlainClass;\n|\n|vc2partnumbers
+init-object|n.object = Vc2PartNodes::kObjectsAt;|n.object = 0;|vc2partnumbers
+init-byte-e|        n.byteE = 0;|        n.byteE = 1;|vc2partnumbers
+init-source|n.source = static_cast<int8_t>(s);|n.source = 0;|vc2partnumbers
+init-channel|        n.channel = kNoChannel;|        n.channel = 0;|vc2partnumbers
+init-held|        w.t.heldNote = 0;|        w.t.heldNote = 1;|vc2partnumbers
+init-word|n.word8 = vc2PartSettingsTables().nodeWord;|n.word8 = 0;|vc2partnumbers
+init-index|        object.index = 0;|        object.index = 1;|vc2partnumbers
+init-sources|for (int s = 0; s < Vc2PartNodes::kSources; ++s) {|for (int s = 0; s < Vc2PartNodes::kSources - 1; ++s) {|vc2partnumbers
+init-node|w.nodes.nodes[static_cast<size_t>(Vc2PartNodes::kParts * s)]|w.nodes.nodes[static_cast<size_t>(Vc2PartNodes::kParts * s + 1)]|vc2partnumbers
+init-static|    w.keys.staticInit();\n|\n|vc2partnumbers
+init-glides-init|    w.keys.glidesInit();\n|\n|vc2partnumbers
+init-lists|w.nodes.lists.fill(0);|w.nodes.lists.fill(1);|vc2partnumbers
+init-numbers|    w.numbers.make(w.t);\n|\n|vc2partnumbers
+tables-node-word|nodeWord = image.rd32(0x8950d7a0);|nodeWord = image.rd32(0x8950d7a4);|vc2settingstables
+h-no-channel|    if (h.channel == kNoChannel) return;\n    w.parts.notify|    if (h.channel == 0) return;\n    w.parts.notify|vc2partnumbers
+h-state-word|constexpr uint32_t kStateWord = 2;|constexpr uint32_t kStateWord = 3;|vc2partchannel
+h-state-row|k.sources[static_cast<size_t>(source - 1)]|k.sources[0]|vc2partchannel
+h-hold-press|if (h.value >= kPressed && w.t.holdPresses|if (h.value < kPressed && w.t.holdPresses|vc2partnumbers
+h-hold-pressed|kNoChannel = -1, kPressed = 64, kMonoMost = 16;|kNoChannel = -1, kPressed = 65, kMonoMost = 16;|vc2partnumbers
+h-hold-byte|w.t.holdPresses[static_cast<size_t>(h.channel)] == 0) return;|w.t.holdPresses[static_cast<size_t>(h.channel)] != 0) return;|vc2partnumbers
+h-hold-set|w.keys.table(k).setHold(static_cast<uint32_t>(h.value));|w.keys.table(k).setHold(0);|vc2partnumbers
+h-hold-off|    w.parts.holdOff(k);\n    w.parts.vocoderHold(h.value);|    w.parts.vocoderHold(h.value);|vc2partnumbers
+h-hold-pedal|w.parts.vocoderHold(h.value);|w.parts.vocoderHold(0);|vc2partnumbers
+h-hold-base|void hold(Vc2NumberWorld& w, const Hand& h) {\n    base(w, h);|void hold(Vc2NumberWorld& w, const Hand& h) {|vc2partnumbers
+h-sost|w.keys.table(k).setSostenuto(h.value);|w.keys.table(k).setSostenuto(0);|vc2partnumbers
+h-sost-off|    w.parts.sostenutoOff(k);\n}\n\n// 0x89393a70|}\n\n// 0x89393a70|vc2partnumbers
+h-key84|.wasReset = static_cast<uint8_t>(h.value);|.wasReset = 0;|vc2partnumbers
+h-key84-base|void portamentoKey(Vc2NumberWorld& w, const Hand& h) {\n    base(w, h);|void portamentoKey(Vc2NumberWorld& w, const Hand& h) {|vc2partnumbers
+h-reset-hold|    t.setHold(0);|    t.setHold(1);|vc2partnumbers
+h-reset-sost|    t.setSostenuto(0);|    t.setSostenuto(1);|vc2partnumbers
+h-reset-key|t.wasReset = kNoKey;|t.wasReset = 0;|vc2partnumbers
+h-reset-order|    w.parts.holdOff(k);\n    w.parts.sostenutoOff(k);|    w.parts.sostenutoOff(k);\n    w.parts.holdOff(k);|vc2partnumbers
+h-reset-notify|    w.parts.notify(stateOf(h));\n    w.parts.vocoderHold(0);|    w.parts.vocoderHold(0);|vc2partnumbers
+h-reset-pedal|w.parts.vocoderHold(0);|w.parts.vocoderHold(1);|vc2partnumbers
+h-soundoff-held|if (w.t.heldNote != 0 \|\| h.value != 0) return;|if (h.value != 0) return;|vc2partnumbers
+h-soundoff-value|if (w.t.heldNote != 0 \|\| h.value != 0) return;|if (w.t.heldNote != 0) return;|vc2partnumbers
+h-soundoff-then|clearThen(w, h, &Vc2NumberParts::truncateTable);|clearThen(w, h, &Vc2NumberParts::releaseBut);|vc2partnumbers
+h-mono|if (h.value > kMonoMost) return;|if (h.value >= kMonoMost) return;|vc2partnumbers
+h-mono-then|    clearThen(w, h, &Vc2NumberParts::releaseBut);\n}\n\n// 0x89393c80|    clearThen(w, h, &Vc2NumberParts::releaseAll);\n}\n\n// 0x89393c80|vc2partnumbers
+h-poly|    if (h.value != 0) return;\n    clearThen(w, h, &Vc2NumberParts::releaseBut);\n}\n\n// 0x89393ce0|    if (h.value > 0) return;\n    clearThen(w, h, &Vc2NumberParts::releaseBut);\n}\n\n// 0x89393ce0|vc2partnumbers
+h-notes-neg|    if (h.value < 0) {|    if (h.value < -1) {|vc2partnumbers
+h-notes-all|clearThen(w, h, &Vc2NumberParts::releaseAll);|clearThen(w, h, &Vc2NumberParts::releaseBut);|vc2partnumbers
+h-notes-held|if (h.value != 0 \|\| w.t.heldNote != 0) return;|if (h.value != 0) return;|vc2partnumbers
+h-clear|    w.keys.table(k).clear();\n|\n|vc2partnumbers
+h-clear-glides|    clearGlideHolds(w, h);\n    (w.parts.*then)(k);|    (w.parts.*then)(k);|vc2partnumbers
+h-glides-flag|p.lastMonoHeld = 0;|p.lastMonoHeld = 1;|vc2partnumbers
+h-glides-prev|            p.prevMonoHeld = 0;\n|\n|vc2partnumbers
+h-glides-index|kGlidesASource * n.source + 2 * n.byteE + g|kGlidesASource * n.source + 2 * n.byteE|vc2partnumbers
+h-glides-list|Vc2PartNodes::kChannels * (source - 1) + channel)|Vc2PartNodes::kChannels * (source - 1) + (channel & 7))|vc2partchannel
+h-glides-walk|at != 0; at = nodes.node(at).next)|at != 0; at = 0)|vc2partchannel
+h-table|return Vc2Keys::tableAt(static_cast<uint32_t>(source - 1), static_cast<uint32_t>(channel));|return Vc2Keys::tableAt(static_cast<uint32_t>(source % 4), static_cast<uint32_t>(channel));|vc2partchannel
+h-class-sost|{ 0x898cd280, 0x89393a10, sostenuto, false },|{ 0x898cd280, 0x89393a10, hold, false },|vc2partnumbers
+h-class-11|{ 0x898cd328, 0x89393d90, base, false },|{ 0x898cd328, 0x89393d90, poly, false },|vc2partnumbers
+h-class-1|{ 0x898cd250, 0x89393920, base, false },|{ 0x898cd250, 0x89393920, soundOff, false },|vc2partnumbers
+start-off|constexpr int8_t kOff = -1;|constexpr int8_t kOff = 1;|vc2partstartup
+start-trips|t.tripAssigns.fill(kOff);|t.tripAssigns.fill(0);|vc2partstartup
+start-after|s.after.fill(kOff);|s.after.fill(0);|vc2partstartup
+start-pi|halfPi * kTwo;|halfPi;|vc2partstartup
+start-float-0|s.floats[0] = pi;|s.floats[0] = pi / kTwo;|vc2partstartup
+start-float-1|s.floats[1] = pi / kTwo;|s.floats[1] = pi;|vc2partstartup
+start-routing-0|s.routing[0] = kRoutingFirst;|s.routing[0] = kRoutingSecond;|vc2partstartup
+start-routing-1|s.routing[1] = kRoutingSecond;|s.routing[1] = kRoutingFirst;|vc2partstartup
+start-routing-127|kRoutingSecond = 127;|kRoutingSecond = 126;|vc2partstartup
+start-remain|kSettingsObjectAt + 1;|kSettingsObjectAt;|vc2partstartup
+start-init|    vc2PartInit(w.init);\n|\n|vc2partstartup
+start-voices|    w.voices.initVoices();\n|\n|vc2partstartup
+start-lists|    w.voices.initLists();\n|\n|vc2partstartup
+start-reload|w.reloads.objects[0];|w.reloads.objects[1];|vc2partstartup
+start-reload-part|r.part = 0;|r.part = 1;|vc2partstartup
+start-reload-state|r.state = 0;|r.state = 1;|vc2partstartup
+start-reload-posted|r.posted = 0;|r.posted = 1;|vc2partstartup
+start-static|    w.staticM.partInit(w.staticParts);\n|\n|vc2partstartup
+tables-half-pi|halfPi = std::bit_cast<float>(image.rd32(0x898c5710));|halfPi = std::bit_cast<float>(image.rd32(0x898c5714));|vc2settingstables
+trip-stop-moving|void stop(Vc2TripObject& t) {\n    t.moving = 0;|void stop(Vc2TripObject& t) {\n    t.moving = 1;|vc2timetrip
+trip-stop-turning|    t.moving = 0;\n    t.turning = 0;\n    t.x = kCentre;|    t.moving = 0;\n    t.turning = 1;\n    t.x = kCentre;|vc2timetrip
+trip-stop-x|    t.turning = 0;\n    t.x = kCentre;|    t.turning = 0;\n    t.x = 0;|vc2timetrip
+trip-stop-angle|    t.angle = kNoAngle;\n    t.lastRadius = kNoRadius;|    t.angle = 0;\n    t.lastRadius = kNoRadius;|vc2timetrip
+trip-stop-last-angle|    t.lastAngle = kNoAngle;\n    t.byte14 = 0;|    t.byte14 = 0;|vc2timetrip
+trip-stop-byte15|    t.byte15 = 0;\n}|}|vc2timetrip
+trip-q-base|{ true, -1, -1, 64, false },|{ true, -1, -1, 63, false },|vc2timetrip
+trip-q-row|{ false, 1, -1, 96, false },|{ true, 1, -1, 96, false },|vc2timetrip
+trip-q-base-32|{ false, -1, 1, 32, false },|{ false, -1, 1, 31, false },|vc2timetrip
+trip-q-zero|{ true, 1, 1, 128, true },|{ true, 1, 1, 128, false },|vc2timetrip
+trip-q-order|kQuarters[2 * (dx > 0) + (dy > 0)]|kQuarters[(dx > 0) + 2 * (dy > 0)]|vc2timetrip
+trip-q-centre|kQuarters[2 * (dx > 0) + (dy > 0)]|kQuarters[2 * (dx >= 0) + (dy > 0)]|vc2timetrip
+trip-pos-side|T::kTripSide * row + column|T::kTripSide * column + row|vc2timetrip
+trip-pos-radius|t.radius = entry[0];|t.radius = entry[1];|vc2timetrip
+trip-pos-shift|((uint32_t)angle << 2)|((uint32_t)angle << 1)|vc2timetrip
+trip-pos-sign|q.base - entry[1]|q.base + entry[1]|vc2timetrip
+trip-fraction|constexpr int kFraction = 9;|constexpr int kFraction = 8;|vc2timetrip
+trip-quant-back|    return (int32_t)((uint32_t)fixed << kFraction) / steps;|    return fixed;|vc2timetrip
+trip-keep-most|if (s.turn * way > kHeld) {|if (s.turn * way >= kHeld) {|vc2timetrip
+trip-keep-dropped|        t.carry = 0;\n        return 0;\n    }\n    if (t.turning == -way|        return 0;\n    }\n    if (t.turning == -way|vc2timetrip
+trip-keep-against|if (t.turning == -way && t.carry * way <= 0) {|if (t.turning == way && t.carry * way <= 0) {|vc2timetrip
+trip-keep-carry-sign|t.carry * way <= 0|t.carry * way < 0|vc2timetrip
+trip-keep-held|        t.carry = (int16_t)s.turn;|        t.carry = 0;|vc2timetrip
+trip-keep-from|    s.from -= t.carry;|    s.from += t.carry;|vc2timetrip
+trip-start-half|if (s.to == 0) return s.from >= kHalfTurn ? 1 : -1;|if (s.to == 0) return s.from > kHalfTurn ? 1 : -1;|vc2timetrip
+trip-start-zero|if (s.to == 0) return|if (s.to == 1) return|vc2timetrip
+trip-start-way|return s.turn >= 0 ? 1 : -1;|return s.turn >= 0 ? -1 : 1;|vc2timetrip
+trip-make-part|    t.part = part;\n    t.mask = mask;|    t.part = mask;\n    t.mask = mask;|vc2timetrip
+trip-make-offset|t.offset = tables.tripOffsets[kMadeRate];|t.offset = tables.tripOffsets[kInitRate];|vc2timetrip
+trip-make-steps|t.steps = tables.tripSteps[kMadeRate];|t.steps = tables.tripOffsets[kMadeRate];|vc2timetrip
+trip-make-carry|    t.turning = 0;\n    t.carry = 0;\n    t.offset|    t.turning = 0;\n    t.offset|vc2timetrip
+trip-make-byte14|t.byte14 = kCentre;|t.byte14 = 0;|vc2timetrip
+trip-make-last|    t.lastRadius = kNoRadius;\n    t.lastAngle = kNoAngle;\n    t.x = kCentre;|    t.lastRadius = kNoRadius;\n    t.x = kCentre;|vc2timetrip
+trip-rate-bound|if (index >= T::kTripRates) return;|if (index > T::kTripRates) return;|vc2timetrip
+trip-rate-swap|    t.steps = tables.tripSteps[(size_t)index];\n    t.offset = tables.tripOffsets[(size_t)index];|    t.steps = tables.tripOffsets[(size_t)index];\n    t.offset = tables.tripSteps[(size_t)index];|vc2timetrip
+trip-rate-stop|if (index == 0) stop(t);|if (index == 1) stop(t);|vc2timetrip
+trip-set-on|    if (on == 0) {\n        stop(t);|    if (on <= 0) {\n        stop(t);|vc2timetrip
+trip-set-steps|if (t.steps <= 0) return;|if (t.steps < 0) return;|vc2timetrip
+trip-set-moving|    t.moving = 1;\n    t.x = x;|    t.moving = 2;\n    t.x = x;|vc2timetrip
+trip-set-y|    t.y = y;\n}|    t.y = x;\n}|vc2timetrip
+trip-steps-none|if (s.from == kNoAngle \|\| s.from == s.to) return 0;|if (s.from == s.to) return 0;|vc2timetrip
+trip-steps-same|if (s.from == kNoAngle \|\| s.from == s.to) return 0;|if (s.from == kNoAngle) return 0;|vc2timetrip
+trip-steps-wrap-up|if (s.turn > kHalfTurn) s.turn -= kTurn;|if (s.turn >= kHalfTurn) s.turn -= kTurn;|vc2timetrip
+trip-steps-wrap-down|if (s.turn < -kHalfTurn) s.turn += kTurn;|if (s.turn <= -kHalfTurn) s.turn += kTurn;|vc2timetrip
+trip-steps-way|    t.turning = way;\n    t.carry = 0;|    t.carry = 0;|vc2timetrip
+trip-steps-carry|    t.turning = way;\n    t.carry = 0;|    t.turning = way;|vc2timetrip
+trip-steps-back|way < 0 ? s.from + t.offset + 1 : s.from|way < 0 ? s.from + t.offset : s.from|vc2timetrip
+trip-steps-fwd|way < 0 ? s.from + t.offset + 1 : s.from|way < 0 ? s.from + t.offset + 1 : s.from + t.offset + 1|vc2timetrip
+trip-steps-mask|& (kTurn - 1)|& kTurn|vc2timetrip
+trip-steps-half|if (s.turn > kHalfTurn) s.turn = kTurn - s.turn;|if (s.turn > kHalfTurn) s.turn = kHalfTurn - s.turn;|vc2timetrip
+trip-steps-sign|return way < 0 ? -count : count;|return count;|vc2timetrip
+trip-bc-args|parts.stepTone(tone, count, part, mask);|parts.stepTone(tone, count, mask, part);|vc2timetrip
+trip-bc-first|tone = parts.nextTone(tone))|tone = 0)|vc2timetrip
+trip-move-moving|if (t.moving != 0) {|if (t.moving == 1) {|vc2timetrip
+trip-move-chunk|constexpr int32_t kChunk = 127;|constexpr int32_t kChunk = 128;|vc2timetrip
+trip-move-back-end|first < 0 ? count < 0 : count > 0|first < 0 ? count <= 0 : count > 0|vc2timetrip
+trip-move-fwd-end|first < 0 ? count < 0 : count > 0|first < 0 ? count < 0 : count >= 0|vc2timetrip
+trip-move-last-radius|    t.lastRadius = t.radius;\n    t.lastAngle = t.angle;\n    return t.radius;|    t.lastAngle = t.angle;\n    return t.radius;|vc2timetrip
+trip-move-last-angle|    t.lastRadius = t.radius;\n    t.lastAngle = t.angle;\n    return t.radius;|    t.lastRadius = t.radius;\n    return t.radius;|vc2timetrip
+trip-move-part|vc2TripBroadcast(count, t.part, t.mask, parts);|vc2TripBroadcast(count, t.mask, t.part, parts);|vc2timetrip
+trip-init-part-word|vc2TripConstruct(r.front.trip, (uint32_t)k, kRecordMask);|vc2TripConstruct(r.front.trip, 0, kRecordMask);|vc2timetrip
+trip-init-mask|constexpr uint32_t kRecordMask = 0xffff;|constexpr uint32_t kRecordMask = 0xfffe;|vc2timetrip
+trip-init-part|r.part = (uint8_t)k;|r.part = 0;|vc2timetrip
+trip-init-pad|        r.front.x = 0;\n|\n|vc2timetrip
+trip-init-level|r.front.level = kRest;|r.front.level = 0;|vc2timetrip
+trip-init-bytes|        r.front.byte22.fill(0);\n|\n|vc2timetrip
+trip-init-rate|kMadeRate = 4, kInitRate = 2;|kMadeRate = 4, kInitRate = 3;|vc2timetrip
+trip-init-rate-call|        vc2TripRate(r.front.trip, kInitRate);\n|\n|vc2timetrip
+trip-init-per-rate|r.perRate = xtf::div(scale, (float)r.rate);|r.perRate = xtf::div((float)r.rate, scale);|vc2timetrip
+tables-trip-polar|image.read(0x89543f18, tripPolar.data()|image.read(0x89543f1a, tripPolar.data()|vc2settingstables
+tables-trip-steps|image.read(0x8954601a, tripSteps.data()|image.read(0x8954601c, tripSteps.data()|vc2settingstables
+tables-trip-offsets|image.read(0x8954602c, tripOffsets.data()|image.read(0x8954602e, tripOffsets.data()|vc2settingstables
+tables-trip-scale|image.rd32(0x893948ec)|image.rd32(0x893948e8)|vc2settingstables
+ch-auto-source|constexpr int32_t kAutoNote = 4, kAutoNoteTables = 3;|constexpr int32_t kAutoNote = 3, kAutoNoteTables = 3;|vc2partchannel
+ch-auto-tables|constexpr int32_t kAutoNote = 4, kAutoNoteTables = 3;|constexpr int32_t kAutoNote = 4, kAutoNoteTables = 4;|vc2partchannel
+ch-releasing|constexpr int32_t kReleasing = 1;|constexpr int32_t kReleasing = 2;|vc2partchannel
+ch-release-velocity|constexpr uint32_t kReleaseVelocity = 64;|constexpr uint32_t kReleaseVelocity = 63;|vc2partchannel
+ch-note-seen|constexpr uint8_t kNoteSeen = 0xff;|constexpr uint8_t kNoteSeen = 0xfe;|vc2partchannel
+ch-on-held|if (p.others > 0) return;|if (p.others > 1) return;|vc2partchannel
+ch-on-auto-key|        p.note = (int32_t)key;\n|\n|vc2partchannel
+ch-on-auto-from|        from = kAutoNoteTables;\n|\n|vc2partchannel
+ch-on-release-zero|if (p.note >= 0 && w.autoNoteSwitch == kReleasing)|if (p.note > 0 && w.autoNoteSwitch == kReleasing)|vc2partchannel
+ch-on-release-switch|if (p.note >= 0 && w.autoNoteSwitch == kReleasing)|if (p.note >= 0 && w.autoNoteSwitch != 0)|vc2partchannel
+ch-on-release-key|vc2ChannelNoteOff(w, kAutoNote, channel, (uint32_t)p.note, kReleaseVelocity);|vc2ChannelNoteOff(w, kAutoNote, channel, key, kReleaseVelocity);|vc2partchannel
+ch-on-count|p.others = (int32_t)((uint32_t)p.others + 1);|p.others = (int32_t)((uint32_t)p.others + 2);|vc2partchannel
+ch-on-key|k.noteOn(key, velocity);|k.noteOn(key, velocity / 2);|vc2partchannel
+ch-on-node-args|w.parts.objectNoteOn(n.object, table, n.word8, key, velocity);|w.parts.objectNoteOn(n.object, table, n.word8, velocity, key);|vc2partchannel
+ch-on-seen|    k.wasReset = kNoteSeen;\n|\n|vc2partchannel
+ch-off-from|const int32_t from = autoNote ? kAutoNoteTables : source;|const int32_t from = source;|vc2partchannel
+ch-off-key|k.noteOff(key, velocity);|k.noteOff(key, 0);|vc2partchannel
+ch-off-node|w.parts.objectNoteOff(n.object, table, n.word8);|w.parts.objectNoteOff(n.object, table, 0);|vc2partchannel
+ch-off-release|    w.parts.releaseTable(table);\n|\n|vc2partchannel
+ch-off-even|if (k.ons[key] == k.offs[key]) {|if (k.ons[key] != k.offs[key]) {|vc2partchannel
+ch-off-clear-offs|        k.offs[key] = 0;\n        k.ons[key] = 0;|        k.ons[key] = 0;|vc2partchannel
+ch-off-clear-ons|        k.offs[key] = 0;\n        k.ons[key] = 0;|        k.offs[key] = 0;|vc2partchannel
+ch-off-auto|        p.note = -1;\n        return;|        return;|vc2partchannel
+ch-off-auto-count|        p.note = -1;\n        return;|        p.note = -1;|vc2partchannel
+ch-off-floor|p.others = left > 0 ? left : 0;|p.others = left;|vc2partchannel
+ch-heard-state|w.parts.notify(vc2ChannelStateOf(source, channel));|w.parts.notify(vc2ChannelStateOf(source, 0));|vc2partchannel
+md-class-low|return status >= kChannelFirst && status < kSystemFirst|return status >= 0x40 && status < kSystemFirst|vc2mididispatch
+md-class-mask|kClassBits = 0xf0, kChannelBits|kClassBits = 0xe0, kChannelBits|vc2mididispatch
+md-channel|kChannelBits = 0x0f;|kChannelBits = 0x07;|vc2mididispatch
+md-off-velocity|constexpr uint32_t kOffVelocity = 64;|constexpr uint32_t kOffVelocity = 63;|vc2mididispatch
+md-gate|    if (c.w.noteGate == 0) handled(c, h);|    handled(c, h);|vc2mididispatch
+md-zero|    if (c.data2 == 0) {|    if (c.data2 == 1) {|vc2mididispatch
+md-zero-key|c.w.parts.channelMessage(H::kNoteOff, c.source, c.channel, c.data1, kOffVelocity);|c.w.parts.channelMessage(H::kNoteOff, c.source, c.channel, c.data2, kOffVelocity);|vc2mididispatch
+md-kind|constexpr uint32_t kSystemKind = 3, kKindBits = 0xff;|constexpr uint32_t kSystemKind = 2, kKindBits = 0xff;|vc2mididispatch
+md-kind-bits|constexpr uint32_t kSystemKind = 3, kKindBits = 0xff;|constexpr uint32_t kSystemKind = 3, kKindBits = 0x7f;|vc2mididispatch
+md-dccut-id|constexpr int16_t kDcCut = 0x532;|constexpr int16_t kDcCut = 0x533;|vc2mididispatch
+md-dccut-block|Vc2ParamBlock::kSystemC, 0, 0, kDcCut|Vc2ParamBlock::kSystem, 0, 0, kDcCut|vc2mididispatch
+md-params-first|    dcCutFirst(c);\n    c.w.parts.parameters(c.word);|    c.w.parts.parameters(c.word);|vc2mididispatch
+md-part-params-first|    dcCutFirst(c);\n    c.w.parts.partParameters(c.word);|    c.w.parts.partParameters(c.word);|vc2mididispatch
+md-params-swap|{ 0x40, parameters, H::kNoteOff },  { 0x41, partParameters, H::kNoteOff },|{ 0x40, partParameters, H::kNoteOff },  { 0x41, parameters, H::kNoteOff },|vc2mididispatch
+md-reset-held|const bool held = c.w.rows.heldNote != 0;|const bool held = false;|vc2mididispatch
+md-reset-sound|        if (!held) p.channelMessage(H::kController, c.source, channel, kSoundOff, 0);|        if (held) p.channelMessage(H::kController, c.source, channel, kSoundOff, 0);|vc2mididispatch
+md-reset-order|kSoundOff = 120, kResetAll = 121, kNotesOff = 123;|kSoundOff = 123, kResetAll = 121, kNotesOff = 120;|vc2mididispatch
+md-reset-all|kResetAll = 121, kNotesOff|kResetAll = 122, kNotesOff|vc2mididispatch
+md-reset-channels|constexpr int32_t kChannels = 16;|constexpr int32_t kChannels = 15;|vc2mididispatch
+md-reset-notes-off|    if (!held) p.allNotesOff();\n|\n|vc2mididispatch
+md-reset-source|p.channelMessage(H::kController, c.source, channel, kResetAll, 0);|p.channelMessage(H::kController, 1, channel, kResetAll, 0);|vc2mididispatch
+md-row-poly|{ 0xa0, handled, H::kPolyPressure }|{ 0xa0, handled, H::kBend }|vc2mididispatch
+md-row-program|{ 0xc0, handled, H::kProgram }|{ 0xc0, handled, H::kPressure }|vc2mididispatch
+md-row-noteon|{ 0x90, noteOn, H::kNoteOn }|{ 0x90, handled, H::kNoteOn }|vc2mididispatch
+md-row-reset|{ 0x70, reset, H::kNoteOff },|{ 0x71, reset, H::kNoteOff },|vc2mididispatch
+md-data|const MidiCall c { w, m.source, m.status & kChannelBits, m.data1, m.data2, word };|const MidiCall c { w, m.source, m.status & kChannelBits, m.data2, m.data1, word };|vc2mididispatch
+nt-inputs|constexpr int32_t kInputs = 3, kAutoNote = 4;|constexpr int32_t kInputs = 2, kAutoNote = 4;|vc2notestask
+nt-auto-source|constexpr int32_t kInputs = 3, kAutoNote = 4;|constexpr int32_t kInputs = 3, kAutoNote = 3;|vc2notestask
+nt-notes-off-number|constexpr uint32_t kNotesOffNumber = 123;|constexpr uint32_t kNotesOffNumber = 120;|vc2notestask
+nt-off-velocity|kOffVelocity = 64, kOnVelocity = 100;|kOffVelocity = 63, kOnVelocity = 100;|vc2notestask
+nt-on-velocity|kOffVelocity = 64, kOnVelocity = 100;|kOffVelocity = 64, kOnVelocity = 101;|vc2notestask
+nt-c4|kC4 = 60, kC4Velocity = 127;|kC4 = 61, kC4Velocity = 127;|vc2notestask
+nt-c4-velocity|kC4 = 60, kC4Velocity = 127;|kC4 = 60, kC4Velocity = 126;|vc2notestask
+nt-node|Vc2PartNodes::kParts * (kAutoNote - 1);|Vc2PartNodes::kParts * (kAutoNote - 2);|vc2notestask
+nt-reset-gate|    if (w.noteGate == 0) return true;|    if (w.noteGate != 0) return true;|vc2notestask
+nt-reset-from|for (int32_t source = 1; source <= kInputs; ++source)|for (int32_t source = 0; source <= kInputs; ++source)|vc2notestask
+nt-schedule-clear|    w.scheduled = 0;\n|\n|vc2notestask
+nt-schedule-count|for (; count > 0; --count)|for (; count > 1; --count)|vc2notestask
+nt-notesoff-count|    w.pitch.others = 0;\n|\n|vc2notestask
+nt-notesoff-release|if (w.pitch.note >= 0) w.parts.autoNoteRelease();|if (w.pitch.note > 0) w.parts.autoNoteRelease();|vc2notestask
+nt-notesoff-key|    w.pitch.note = -1;\n    return true;|    return true;|vc2notestask
+nt-on-gate|if (w.noteGate != 0 \|\| w.pitch.others > 0) return false;|if (w.pitch.others > 0) return false;|vc2notestask
+nt-on-others|if (w.noteGate != 0 \|\| w.pitch.others > 0) return false;|if (w.noteGate != 0 \|\| w.pitch.others > 1) return false;|vc2notestask
+nt-on-end|if (w.noteGate != 0 \|\| w.pitch.others > 0) return false;|if (w.noteGate != 0 \|\| w.pitch.others > 0) return true;|vc2notestask
+nt-c4-gate|    if (w.noteGate != 0) return false;\n    w.parts.channelMessage(H::kNoteOn, kInputs|    w.parts.channelMessage(H::kNoteOn, kInputs|vc2notestask
+nt-pressure-data|w.parts.channelMessage(H::kPolyPressure, kInputs, autoNoteChannel(w), 0, 0);|w.parts.channelMessage(H::kPolyPressure, kInputs, autoNoteChannel(w), 0, 1);|vc2notestask
+nt-order-auto|{ 0x040, autoNoteOff }, { 0x020, autoNoteOn },|{ 0x020, autoNoteOn }, { 0x040, autoNoteOff },|vc2notestask
+nt-order-notesoff|{ 0x080, inputsNotesOff }, { 0x040, autoNoteOff },|{ 0x040, autoNoteOff }, { 0x080, inputsNotesOff },|vc2notestask
+nt-bit-queue|{ 0x002, taskQueue }|{ 0x001, taskQueue }|vc2notestask
+nt-bit-c4|{ 0x200, heldC4 }|{ 0x400, heldC4 }|vc2notestask
+nt-bit-pressure|{ 0x100, taskPressure }|{ 0x080, taskPressure }|vc2notestask
+nt-pass-end|if ((events & bit) != 0 && !way(w)) return;|if ((events & bit) != 0) way(w);|vc2notestask
+nt-ended|    w.parts.endedScan();\n|\n|vc2notestask

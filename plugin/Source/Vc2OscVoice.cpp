@@ -1,9 +1,12 @@
 // The VC-2's OSC voice's frame: see Vc2OscVoice.h (v230).  Every address is rom.4's; each routine's switch on the kind
 // is a row of Vc2OscVoiceKinds.cpp.  The settings and the getters are Vc2OscVoiceGet.cpp's.
 #include "Vc2OscVoice.h"
+#include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
+#include "Vc2OscVariOffRender.h"
 #include "Vc2OscVoiceKinds.h"
 #include "XtFloat.h"
+#include <algorithm>
 
 using xtf::add;
 using xtf::div;
@@ -42,7 +45,34 @@ float installedOf(int which, const Vc2OscTables& t) {
     const std::array<float, 3> constants { t.installed4, t.installed5, t.installed6 };
     return constants[(size_t)(which - 4)];
 }
+
+// [FW] the renders the voice has as its own (v322, v323), by the address an install writes at +0xa44: the EXT IN
+// player's, kind 4's on the frame's words 0 and 1 and kind 7's on word 4 to both sides (Vc2OscNoteOn.cpp), and Vari
+// off's, mono and stereo (Vc2OscVariOffRender.cpp, v261), on the wave its object's +0xf4 points into
+void extInStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { v.renderExtIn(0, 1, out, p); }
+void extInMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { v.renderExtIn(4, 4, out, p); }
+void variOffMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscVariOffMono(v, out, p.waveSamples()); }
+void variOffStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscVariOffStereo(v, out, p.waveSamples()); }
+// v326: LITE's heads', mono and stereo (Vc2OscHeads.cpp), on XtLitePlayer
+void headsMono(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscHeads(v, out, p, false); }
+void headsStereo(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscHeads(v, out, p, true); }
+struct OwnRender {
+    uint32_t at;
+    void (*render)(Vc2OscVoice&, float*, Vc2OscParts&);
+};
+// v327: kind 1's mode 1's (Vc2OscModeOne.cpp), one routine for mono and stereo
+constexpr std::array<OwnRender, 7> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
+                                                   { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
+                                                   { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo },
+                                                   { 0x893c9f60, vc2OscModeOne } } };
 } // namespace
+
+bool Vc2OscVoice::renderOwn(uint32_t routine, float* out, Vc2OscParts& parts) {
+    const auto* own = std::ranges::find(kOwnRenders, routine, &OwnRender::at);
+    if (own == kOwnRenders.end()) return false;
+    own->render(*this, out, parts);
+    return true;
+}
 
 void Vc2OscVoice::construct() {
     vibrato.build();
@@ -53,10 +83,10 @@ void Vc2OscVoice::construct() {
     tail.seekPending = 0;
 }
 
-void Vc2OscVoice::install(Vc2OscParts& parts) {
+void Vc2OscVoice::install(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     switch (row.installs) {   // a kind's own install runs in the frame's place (v238: LITE's and VariPhrase's ported)
-        case Vc2OscInstall::lite: installLite(parts); return;
+        case Vc2OscInstall::lite: installLite(parts, shared); return;
         case Vc2OscInstall::vari: installVari(); return;
         case Vc2OscInstall::analog: installAnalog(); return;   // v248
         case Vc2OscInstall::frame: break;
@@ -75,12 +105,19 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
         if (f32(kLevel) > vc2OscTables().waitLevel) return;
         reseek(parts);
     }
-    if (row.updateFirst != 0) parts.kindCall(row.updateFirst);
+    if (row.extInFirst) updateExtIn(parts, shared);   // v322: 0x893c6260
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
         if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
-    if (row.updates == Vc2OscUpdate::analog) updateAnalog(parts, shared);   // v248
-    else if (row.update != 0) parts.kindCall(row.update);
+    switch (row.updates) {   // the port's (v248, v321, v322), or the kind's by its address
+        case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;
+        case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;
+        case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;
+        case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;
+        case Vc2OscUpdate::lite: updateLite(parts, shared); return;   // v324
+        case Vc2OscUpdate::routine: break;
+    }
+    if (row.update != 0) parts.kindCall(row.update);
 }
 
 void Vc2OscVoice::reseek(Vc2OscParts& parts) {
@@ -93,7 +130,7 @@ void Vc2OscVoice::reseek(Vc2OscParts& parts) {
     if (kind() == 1 && type < kSeeks1.size()) seek = kSeeks1[type];
     if (kind() == 2 && type - 1 < kSeeks2.size()) seek = kSeeks2[type - 1];
     const uint32_t routine = bit ? seek.set : seek.clear;
-    if (routine != 0) parts.seek(routine, at);
+    if (routine != 0) seekBy(routine, at, parts);   // v325: the voice's own seeks too
     const uint8_t now = u8(kFlags);
     setU8(kFlags, (was & kHeld) ? (uint8_t)(now | kHeld) : (uint8_t)(now & ~kHeld));
     tail.seekPending = 0;
@@ -166,7 +203,9 @@ void Vc2OscVoice::legato(const uint32_t* ramp) {
 uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
     switch (vc2OscKindRow(kind()).renders) {
         case Vc2OscRender::zero: std::fill(out, out + kOut, 0.0f); return 0;
-        case Vc2OscRender::byRender: parts.renderBy(tail.render, out, kRenderThird); return 0;
+        case Vc2OscRender::byRender:   // v322, v323: the voice's own renders, any other by its address
+            if (!renderOwn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);
+            return 0;
         case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
         case Vc2OscRender::carrier: carrier.render(out); return 0;                                  // 0x893ebfa0
         case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;   // 0x893ec730

@@ -1,13 +1,14 @@
 #pragma once
-// The VC-2 tone's note-on's input (v229): the part's settings for a note as rom.4 lays them out, 0x700 bytes, by the
+// The VC-2 tone's note-on's input (v229): the part's settings for a note as rom.4 lays them out, 0x738 bytes, by the
 // offsets the note-on (0x893b3390) reads.  Its blocks go to the parts as they stand; the note-on writes one word back
-// (the fix-up).  HARDWARE_FIRMWARE.md, "The VC-2's tone's note-on".
+// (the fix-up).  0x700 until v317, when the TVA's note-on came in: its block, from +0x6e8, is 0x50 bytes, to the end of
+// the note W's first 0x738.  HARDWARE_FIRMWARE.md, "The VC-2's tone's note-on".
 #include <array>
 #include <bit>
 #include <cstdint>
 
 struct Vc2ToneInput {
-    static constexpr uint32_t kBytes = 0x700;
+    static constexpr uint32_t kBytes = 0x738;
     // [FW] the offsets the note-on reads
     static constexpr uint32_t kStructure = 0x000;   // into the tail's +0x1b24, and the render member pointer by it
     static constexpr uint32_t kPrevious = 0x004;    // the serial of the tone a legato takes from, −1 none

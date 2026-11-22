@@ -27,9 +27,15 @@
 # (vc2cosmdrive), the Resonator's, Frequency Shifter's and Lo-Fi's (vc2cosmbalanced), under xt_vc2cosm; the Side Band
 # Filters' (vc2cosmsideband, v241), under xt_vc2cosm; the Matrix core's refresh and groups (v243) in vc2matrix's file;
 # the Matrix's sources (vc2matrixsources, v245), under xt_vc2cosm; the library's logf and powf (vc2libm) and their
-# constants (vc2libmtables) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
-# (vc2voicestables) under xt_vc2voices; the patch store (vc2patch, v450), the .p02's reader (vc2patchfile) and the
-# store's reads both images share (vc2patchxt, XtPatchStore.cpp) under xt_vc2patch.
+# constants (vc2libmtables) and the plugin's shared routines (vc2tonemath, v320) under xt_vc2libm; the part's voices and their lists (vc2voices, v272) and their constants
+# (vc2voicestables) under xt_vc2voices; the part's notes W (vc2notes, v275) under xt_vc2notes; the part's keys
+# (vc2keys, v276) and their tables (vc2keystables) under xt_vc2keys; the assigner's first part (vc2assign, v277)
+# under xt_vc2voices, its second part; its second part (vc2release, vc2nodenotes, v278) under its third; the voice's
+# virtuals (vc2class, v279) and the update queue (vc2queue) under its fourth; the conversion sets C (vc2sets, v280) and
+# the notes' Matrix objects M (vc2notematrix) under xt_vc2sets; C's common (vc2setcommon, v281) under its second part;
+# C's envelopes (vc2setenvelope, v282) and their tables (vc2setenvtables) under its third; the patch store (vc2patch,
+# v450), the .p02's reader (vc2patchfile) and the store's reads both images share (vc2patchxt, XtPatchStore.cpp) under
+# xt_vc2patch.
 
 # Each check's files, without .cpp
 VC2PARAMS=(Vc2Params Vc2ParamsCheck XtFxValueText)
@@ -46,24 +52,65 @@ VC2TRACK=(Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate Vc2T
 VC2K6=(Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2Kind6Check Vc2TrackerSignal)
 VC2AN=(Vc2AutoNote Vc2AutoNoteTables Vc2AutoNoteCheck Vc2Tracker Vc2TrackerTables Vc2TrackerAnalysis Vc2TrackerEstimate
        Vc2TrackerSignal)
-VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes)
+VC2MIX=(Vc2PartMixer Vc2MixerBlock Vc2PartMixerTables Vc2Math Vc2PartMixerCheck Vc2PartMixerFakes Vc2MixerTasksCheck)
 VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePortParts Vc2ToneEvents Vc2ToneModulators
          Vc2ToneEnvelope Vc2ToneLfo Vc2ToneModCheck XtEnvelope XtLfo Vc2ToneMix Vc2ToneMixRender Vc2ToneMixTables
-         Vc2ToneMixCheck Vc2FreeLfos Vc2FreeLfoCheck Vc2ToneLists Vc2ToneMethods Vc2ToneMethodCheck)
+         Vc2ToneMixCheck Vc2FreeLfos Vc2FreeLfoCheck Vc2ToneLists Vc2ToneMethods Vc2ToneMethodCheck Vc2ToneHost
+         Vc2Tva Vc2TvaTables Vc2TvaDraws Vc2ToneTvaCheck Vc2CosmObject Vc2CosmPools Vc2CosmNoteOn Vc2CosmAdapters
+         Vc2CosmAdapterWords Vc2CosmAdapterBlocks Vc2CosmTbAdapter Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmGrowl
+         Vc2CosmTables Vc2Math XtCosm Vc2CosmNoteOnDraws Vc2ToneCosmCheck Vc2CosmConvert XtOsc Vc2ToneHostOsc
+         Vc2ToneOscCheck Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets
+         Vc2PitchRamp Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa
+         Vc2OscAnalogSub Vc2OscAnalogShape Vc2OscAnalogUpdate Vc2OscVibrato Vc2Carrier Vc2CarrierTables Vc2Kind6
+         Vc2Kind6Core Vc2Kind6Tables Vc2OscDraws Vc2OscPartDraws Vc2OscRecords Vc2OscFakes Vc2OscPortParts
+         Vc2VocoderOsc XtExtIn Vc2OscVariOffRender Vc2OscBeat Vc2OscHeads XtLitePlayer
+         Vc2OscModeOne Vc2OscWalk Vc2OscWalkEvents Vc2OscWalkDraws Vc2OscWalkStart Vc2OscModeOneStart)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
         Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub
         Vc2OscAnalogShape Vc2OscAnalogDraws Vc2OscAnalogUpdate Vc2OscVariOffRender Vc2VariOffCheck Vc2OscKindsCheck
-        Vc2Carrier Vc2CarrierTables Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2OscVibrato Vc2OscVibratoCheck)
-VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes)
+        Vc2Carrier Vc2CarrierTables Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2OscVibrato Vc2OscVibratoCheck
+        Vc2OscDraws Vc2OscPartDraws Vc2VocoderOsc XtExtIn Vc2OscBeat Vc2OscHeads XtLitePlayer
+        Vc2OscModeOne Vc2OscWalk Vc2OscWalkEvents Vc2OscWalkDraws Vc2OscModeOneCheck Vc2OscWalkStart
+        Vc2OscModeOneStart)
+VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes Vc2TvaDraws)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
          Vc2CosmBalanced Vc2CosmSideBand Vc2MatrixCheck Vc2MatrixSources Vc2MatrixSetup Vc2MatrixSetupCheck
          Vc2MatrixSetupDraws Vc2CosmObject Vc2CosmObjectCheck Vc2CosmPools Vc2CosmNoteOn Vc2CosmNoteOnCheck
          Vc2CosmNoteOnDraws Vc2CosmAdapters Vc2CosmAdapterWords Vc2CosmAdapterBlocks Vc2CosmTbAdapter
          Vc2CosmBufferedAdapters Vc2CosmDsp Vc2CosmDspCheck Vc2CosmDspKinds Vc2CosmDspSlots XtCosm XtOsc XtEnvelope)
-VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck)
-VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes)
+VC2LIBM=(Vc2LibMath Vc2LibMathTables Vc2LibMathCheck Vc2ToneMath Vc2ToneMathCheck XtOsc XtEnvelope)
+VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEvents Vc2PartVoicesFakes
+           Vc2Assigner Vc2AssignCheck Vc2AssignEvents Vc2AssignRelease Vc2AssignNotes Vc2AssignReleaseCheck
+           Vc2AssignReleaseEvents Vc2Keys Vc2KeysTables Vc2VoiceClass Vc2VoiceQueue Vc2VoiceClassCheck
+           Vc2VoiceClassEvents Vc2VoiceQueueCheck Vc2AssignListenersCheck Vc2UpdateTask Vc2UpdateTaskCheck)
+VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
+VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
+VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
+# xt_vc2synth's (v314): every VC-2 port the plugin's build lists but rom.4's parameter tables and the patch store and
+# .p02 reader that read with them (v450), then the rom.2 ports they lean on, the shared compares and the check
+NOT_SYN=" Vc2Params Vc2PatchStore Vc2PatchFile "
+VC2SYNTH=()
+while read -r f; do
+    [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")
+done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\)\.cpp$|\1|p' "$REPO/plugin/Vc2Sources.cmake")
+VC2SYNTH+=(Vc2SynthCheck Vc2CheckWords XtLfo XtEnvelope XtCosm XtOsc XtExtIn XtLitePlayer)
+VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
+         Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
+         Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck
+         Vc2SetTva Vc2SetTvaCheck)
+VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSettingsTables Vc2PartSettingsWords
+    Vc2PartSettingsOsc Vc2PartSettingsOscCheck Vc2PartSettingsOscBlock Vc2PartSettingsVocoder
+    Vc2PartSettingsVocoderCheck Vc2LibMath Vc2LibMathTables Vc2PartSettingsModes Vc2PartSettingsModesCheck
+    Vc2PartSettingsDispatch Vc2PartSettingsDispatchCheck Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources
+    Vc2PartSettingsCategory Vc2PartSettingsCategoryCheck Vc2StaticMatrix Vc2StaticMatrixCheck
+    Vc2PartSettingsSystem Vc2PartSettingsSystemCheck Vc2PartSettingsMessages Vc2PartSettingsMessagesCheck
+    Vc2PartNodes Vc2Keys Vc2KeysTables Vc2PartSettingsReceive Vc2PartSettingsReceiveCheck
+    Vc2PartSettingsRoutingCheck Vc2PartReloads Vc2PartReloadsCheck Vc2PartControllers Vc2PartControllersCheck
+    Vc2PartNumbers Vc2PartNumbersCheck Vc2PartHandlersCheck Vc2PartStartUp Vc2PartStartUpCheck Vc2PartVoices
+    Vc2PartVoicesTables Vc2TimeTrip Vc2TimeTripCheck Vc2PartChannel Vc2PartChannelCheck Vc2MidiDispatch
+    Vc2MidiDispatchCheck Vc2NotesTask Vc2NotesTaskCheck)
 VC2PATCH=(Vc2PatchStore Vc2PatchFile Vc2PatchStoreCheck Vc2PatchFileCheck Vc2Params XtFxValueText)
 
 # port|the planted file|its check's define|the kept objects' folder|the check's files
@@ -114,6 +161,10 @@ VC2PORTS=(
     "vc2freelfos|Vc2FreeLfos.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
     "vc2tonelists|Vc2ToneLists.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
     "vc2tonemethods|Vc2ToneMethods.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
+    "vc2tonehost|Vc2ToneHost.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
+    "vc2tonehostosc|Vc2ToneHostOsc.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
+    "vc2toneplayers|Vc2OscPlayers.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
+    "vc2tonelite|Vc2OscLite.cpp|XT_VC2TONE_MAIN|vc2tone_obj|VC2TONE"
     "vc2osc|Vc2OscVoice.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscget|Vc2OscVoiceGet.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2osckinds|Vc2OscVoiceKinds.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
@@ -129,6 +180,16 @@ VC2PORTS=(
     "vc2oscanalogupdate|Vc2OscAnalogUpdate.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscvarioff|Vc2OscVariOffRender.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscvibrato|Vc2OscVibrato.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtextin|XtExtIn.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscbeat|Vc2OscBeat.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtbeat|XtMultiBandPlayer.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscheads|Vc2OscHeads.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtlite|XtLitePlayer.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscmodeone|Vc2OscModeOne.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscwalk|Vc2OscWalk.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscwalkevents|Vc2OscWalkEvents.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscwalkstart|Vc2OscWalkStart.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscmodeonestart|Vc2OscModeOneStart.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptables|Vc2RampTables.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
@@ -161,8 +222,54 @@ VC2PORTS=(
     "vc2cosmbalanced|Vc2CosmBalanced.cpp|XT_VC2COSM_MAIN|vc2cosm_obj|VC2COSM"
     "vc2libm|Vc2LibMath.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
     "vc2libmtables|Vc2LibMathTables.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
+    "vc2tonemath|Vc2ToneMath.cpp|XT_VC2LIBM_MAIN|vc2libm_obj|VC2LIBM"
     "vc2voices|Vc2PartVoices.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
     "vc2voicestables|Vc2PartVoicesTables.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2assign|Vc2Assigner.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2release|Vc2AssignRelease.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2nodenotes|Vc2AssignNotes.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2class|Vc2VoiceClass.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2queue|Vc2VoiceQueue.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2updatetask|Vc2UpdateTask.cpp|XT_VC2VOICES_MAIN|vc2voices_obj|VC2VOICES"
+    "vc2notes|Vc2Notes.cpp|XT_VC2NOTES_MAIN|vc2notes_obj|VC2NOTES"
+    "vc2keys|Vc2Keys.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
+    "vc2nodes|Vc2PartNodes.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
+    "vc2keystables|Vc2KeysTables.cpp|XT_VC2KEYS_MAIN|vc2keys_obj|VC2KEYS"
+    "vc2osmidi|Vc2OsMidi.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
+    "vc2osmidihandler|Vc2OsMidiHandler.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
+    "vc2osmiditables|Vc2OsMidiTables.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
+    "vc2synth|Vc2Synth.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setcommon|Vc2SetCommon.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setenvelope|Vc2SetEnvelope.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setenvtables|Vc2SetEnvelopeTables.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setchildhead|Vc2SetChildHead.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setlfo|Vc2SetLfo.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setmix|Vc2SetMix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2settva|Vc2SetTva.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2settings|Vc2PartSettings.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingstables|Vc2PartSettingsTables.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingswords|Vc2PartSettingsWords.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsosc|Vc2PartSettingsOsc.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsblock|Vc2PartSettingsOscBlock.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsvocoder|Vc2PartSettingsVocoder.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsmodes|Vc2PartSettingsModes.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsdispatch|Vc2PartSettingsDispatch.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsmatrix|Vc2MatrixSetup.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingscategory|Vc2PartSettingsCategory.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2staticmatrix|Vc2StaticMatrix.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingssystem|Vc2PartSettingsSystem.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsmessages|Vc2PartSettingsMessages.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2settingsreceive|Vc2PartSettingsReceive.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2partreloads|Vc2PartReloads.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2partcontrollers|Vc2PartControllers.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2partnumbers|Vc2PartNumbers.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2partstartup|Vc2PartStartUp.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2timetrip|Vc2TimeTrip.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2partchannel|Vc2PartChannel.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2mididispatch|Vc2MidiDispatch.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
+    "vc2notestask|Vc2NotesTask.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2patch|Vc2PatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
     "vc2patchfile|Vc2PatchFile.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
     "vc2patchxt|XtPatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"

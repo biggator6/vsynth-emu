@@ -39,6 +39,7 @@ void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneS
     vibrato.settings(rates);
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248
+    else if (row.settingsWay == Vc2OscSettings::lite) settingsLite(s + kKindFrom / 4, parts);   // v324
     else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);
     if (!row.carrier) return;
     std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);

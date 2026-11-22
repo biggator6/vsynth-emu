@@ -13,25 +13,28 @@ constexpr uint8_t kR0 = kVc2OscRamp0, kR1 = kVc2OscRamp1, kR2 = kVc2OscRamp2;
 
 // [FW] kinds 0…7, then a kind past 7.  Kinds 1 and 2's installs (0x893af7a0, 0x893af870) and kind 2's note-on
 // (0x893af420) are ported from v238 (Vc2OscPlayers.cpp), kind 1's note-on (0x893c7c30) from v240 (Vc2OscLite.cpp),
-// kind 3's (0x893c22e0) from v242 (Vc2OscAnalog.cpp), kind 3's install, update and settings (0x893c2ad0, 0x893c2ce0,
-// 0x893c3460) from v248 (Vc2OscAnalogUpdate.cpp)
+// kind 3's (0x893c22e0) from v242 (Vc2OscAnalog.cpp), kinds 5's and 6's updates (0x893afff0, 0x893b0150) from v321
+// (Vc2OscNoteOn.cpp), kind 3's install, update and settings (0x893c2ad0, 0x893c2ce0,
+// 0x893c3460) from v248 (Vc2OscAnalogUpdate.cpp), the EXT IN player's update (0x893c6260; kinds 4 and 7, and kind 6's
+// first) and the two renders kinds 4's and 7's installs write (0x893c62e0, 0x893c61e0) from v322 (Vc2OscNoteOn.cpp),
+// kind 1's update and settings (0x893c8280, 0x893c8390) from v324 (Vc2OscLite.cpp)
 constexpr std::array<Vc2OscKindRow, kVc2OscKinds + 1> kRows { {
     { .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },
-    { .installs = Install::lite, .waits = true, .ticks = kR0 | kR2, .update = 0x893c8280,
-      .records = Records::fromBlock, .ramp = true, .settings = 0x893c8390, .pitch = Pitch::tuned,
+    { .installs = Install::lite, .waits = true, .ticks = kR0 | kR2, .updates = Vc2OscUpdate::lite,
+      .records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::lite, .pitch = Pitch::tuned,
       .noteOn = NoteOn::lite },
     { .installs = Install::vari, .waits = true, .ticks = kR0 | kR1 | kR2, .update = 0x893c88b0,
       .records = Records::fromBlock, .settings = 0x893b0280, .pitch = Pitch::tuned, .noteOn = NoteOn::vari },
     { .installs = Install::analog, .ticks = kR0, .updates = Vc2OscUpdate::analog, .ramp = true,
       .settingsWay = Vc2OscSettings::analog, .renders = Render::byAnalog, .pitch = Pitch::bounded,
       .noteOn = NoteOn::analog },
-    { .render = 0x893c62e0, .installed = 4, .ticks = kR0, .update = 0x893c6260, .flagByWave = true,
+    { .render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn, .flagByWave = true,
       .noteOn = NoteOn::extIn },
-    { .installed = 5, .ticks = kR0, .update = 0x893afff0, .ramp = true, .carrier = true, .renders = Render::carrier,
-      .pitch = Pitch::bounded, .noteOn = NoteOn::carrier },
-    { .installed = 6, .updateFirst = 0x893c6260, .ticks = kR0 | kR1, .update = 0x893b0150, .ramp = true,
+    { .installed = 5, .ticks = kR0, .updates = Vc2OscUpdate::carrier, .ramp = true, .carrier = true,
+      .renders = Render::carrier, .pitch = Pitch::bounded, .noteOn = NoteOn::carrier },
+    { .installed = 6, .extInFirst = true, .ticks = kR0 | kR1, .updates = Vc2OscUpdate::kind6, .ramp = true,
       .renders = Render::kind6, .pitch = Pitch::bounded, .noteOn = NoteOn::kind6 },
-    { .render = 0x893c61e0, .installed = 4, .ticks = kR0, .update = 0x893c6260, .flagByWave = true,
+    { .render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn, .flagByWave = true,
       .noteOn = NoteOn::extIn },
     { .clearsFlag = true, .records = Records::atZero },
 } };

@@ -7,7 +7,6 @@
 # constant is planted where Vc2Tone.cpp uses it), the install pass's read of OSC 1's flag before OSC 2's install (with
 # the installs hooked nothing writes the flag between, so no input tells the two orders apart), and the destructor's
 # vtable word (it never differs from the constructor's: nothing else writes it).
-build-osc-order|{ Piece::osc1, Piece::osc2, Piece::cosm1|{ Piece::osc2, Piece::osc1, Piece::cosm1|vc2tone
 build-no-mix|Piece::tva, Piece::mix, Piece::envelopes|Piece::tva, Piece::envelopes|vc2tone
 build-list-kept|    head.next = head.prev = 0;   // the base's list node, 0x893ad920\n||vc2tone
 build-next-only|    head.next = head.prev = 0;|    head.next = 0;|vc2tone
@@ -26,7 +25,6 @@ destroy-unfollow-0|    for (int lfo = 1; lfo < kLfos; ++lfo) {   // LFO 0 is nev
 destroy-unfollow-all|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|        parts.unfollow(lfo);|vc2tone
 destroy-unfollow-on|        if (parts.lfoFollows(lfo)) parts.unfollow(lfo);|        if (parts.lfoOn(lfo)) parts.unfollow(lfo);|vc2tone
 destroy-unlist-sounding|    parts.unlist(head.state == kFromOne);|    parts.unlist(head.state == kSounding);|vc2tone
-destroy-cosm-order|{ Piece::lfos, Piece::cosm2, Piece::cosm1 }|{ Piece::lfos, Piece::cosm1, Piece::cosm2 }|vc2tone
 update-any-state|    if (head.state != kSounding) return;\n||vc2tone
 update-built-state|    if (head.state != kSounding) return;|    if (head.state != kBuilt) return;|vc2tone
 update-no-exts|static_cast<int32_t>(static_cast<int16_t>(n))|n|vc2tone
@@ -40,7 +38,6 @@ update-osc-order|    parts.updateOsc(kVc2ToneOsc1, ticks);\n    parts.updateOsc(
 update-cosm2|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm2, parts.oscValue(kVc2ToneOsc1));|vc2tone
 update-cosm-level|parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|parts.updateCosm(kVc2ToneCosm1, parts.tvaLevel());|vc2tone
 update-stopped-unasked|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaOver()) {|vc2tone
-update-tests-order|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaStopped() && !parts.tvaOver()) {|vc2tone
 update-tva-lost|        parts.updateTva();\n        return;|        return;|vc2tone
 update-ended-state|    head.state = kEnded;\n    parts.ended();|    parts.ended();|vc2tone
 update-ended-call-lost|    parts.ended();\n}|}|vc2tone
@@ -60,7 +57,6 @@ count-osc1-only|    parts.countOsc(kVc2ToneOsc1, x);\n    parts.countOsc(kVc2Ton
 count-matched-routine|    parts.countOsc(kVc2ToneOsc2, x);|    parts.countOscMatched(kVc2ToneOsc2, x);|vc2tone
 matched-any-ignored|    if (value != kAnyValue && (head.id & mask) != static_cast<uint32_t>(value)) return;|    if ((head.id & mask) != static_cast<uint32_t>(value)) return;|vc2tone
 matched-unmasked|(head.id & mask) != static_cast<uint32_t>(value)|head.id != static_cast<uint32_t>(value)|vc2tone
-matched-order|    parts.countOscMatched(kVc2ToneOsc1, x);\n    parts.countOscMatched(kVc2ToneOsc2, x);|    parts.countOscMatched(kVc2ToneOsc2, x);\n    parts.countOscMatched(kVc2ToneOsc1, x);|vc2tone
 matched-any-value|constexpr int32_t kAnyValue = -1;|constexpr int32_t kAnyValue = -2;|vc2tone
 sounds-at-zero|return parts.tvaLevel() > 0.0f;|return parts.tvaLevel() >= 0.0f;|vc2tone
 held-not|return parts.tvaHeld();|return !parts.tvaHeld();|vc2tone
@@ -68,7 +64,6 @@ start-built|void Vc2Tone::start() { head.state = kSounding; }|void Vc2Tone::star
 install-kind-not|parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);|parts.installMix(parts.oscKind(kVc2ToneOsc1) != kMixKind);|vc2tone
 install-kind-osc2|parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);|parts.installMix(parts.oscFlag(kVc2ToneOsc1) == kMixKind);|vc2tone
 install-kind-2|constexpr int32_t kMixKind = 3;|constexpr int32_t kMixKind = 2;|vc2tone
-install-cosm2-flag|    parts.installCosm(kVc2ToneCosm2, given);|    parts.installCosm(kVc2ToneCosm2, flag);|vc2tone
 install-cosm1-zero|parts.installCosm(kVc2ToneCosm1, flag);|parts.installCosm(kVc2ToneCosm1, 0);|vc2tone
 install-osc2-lost|    parts.installOsc(kVc2ToneOsc2);\n||vc2tone
 install-mix-after|    parts.installMix(parts.oscKind(kVc2ToneOsc1) == kMixKind);\n    const uint32_t given|    const uint32_t given|vc2tone
@@ -115,7 +110,6 @@ oscbind-kind6-env|    { 6, { 0x20, 0, 0x30, 0x38 }|    { 6, { 0x20, 0x28, 0x30, 
 numbers-zero-read|        if (offsets[k] != 0) numbers[k] =|        numbers[k] =|vc2tonenoteon
 cosmbind-one|        parts.bindCosm(cosm, bindingOf<2>(in.block(In::kCosms[(size_t)cosm]), kCosmBinds, &CosmBinds::type));|        parts.bindCosm(cosm, bindingOf<2>(in.block(In::kCosms[0]), kCosmBinds, &CosmBinds::type));|vc2tonenoteon
 cosmbind-type20|{ 20, { 0x24, 0x34 }, { 0x2c, 0x3c } },|{ 20, { 0x24, 0x34 }, { 0x2c, 0x38 } },|vc2tonenoteon
-cosmbind-type17|{ 17, { 0x20, 0xc }, { 0x28, 0x14 } },|{ 17, { 0xc, 0x20 }, { 0x14, 0x28 } },|vc2tonenoteon
 cosmbind-type4-envb|{ 4, { 0x10, 0 }, { 0x18, 0 } },|{ 4, { 0x10, 0x24 }, { 0x18, 0 } },|vc2tonenoteon
 cosmbind-type5|{ 4, { 0x10, 0 }, { 0x18, 0 } },|{ 4, { 0x10, 0 }, { 0x18, 0 } }, { 5, { 0x10, 0x24 }, { 0x18, 0x2c } },|vc2tonenoteon
 fixup-lost|    if (in.at(In::kMix) == kFixMix && in.at(In::kOscs[kVc2ToneOsc2]) == kFixKind && fixed == kFixFrom) fixed = kFixTo;|    if (false) fixed = kFixTo;|vc2tonenoteon
@@ -600,13 +594,10 @@ methods-mix|parts.settingsMix(block); }|}|vc2tonemethods
 methods-tva|parts.newBlockTva(block); }|}|vc2tonemethods
 methods-legato|for (int osc : kOscs) parts.legatoOsc(osc, ramp);|parts.legatoOsc(kVc2ToneOsc1, ramp);|vc2tonemethods
 methods-keyoff-state|    if (head.state != kSounding) return;\n    for (int lfo|    if (head.state == kBuilt) return;\n    for (int lfo|vc2tonemethods
-methods-keyoff-lfo0|for (int lfo = 0; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);|for (int lfo = 1; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);|vc2tonemethods
 methods-keyoff-envelope0|for (int envelope = 0; envelope < kEnvelopes; ++envelope)|for (int envelope = 1; envelope < kEnvelopes; ++envelope)|vc2tonemethods
 methods-keyoff-osc|for (int osc : kOscs) parts.keyOffOsc(osc);|parts.keyOffOsc(kVc2ToneOsc1);|vc2tonemethods
-methods-keyoff-order|    for (int lfo = 0; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);   // all eight, LFO 0 too\n    for (int envelope = 0; envelope < kEnvelopes; ++envelope) parts.releaseEnvelope(envelope);|    for (int envelope = 0; envelope < kEnvelopes; ++envelope) parts.releaseEnvelope(envelope);\n    for (int lfo = 0; lfo < kLfos; ++lfo) parts.releaseLfo(lfo);|vc2tonemethods
 methods-truncate-told|    parts.truncateTvaTold();\n    while|    while|vc2tonemethods
 methods-truncate-once|while (parts.tvaFade() > 0.0f) parts.waitFade();|if (parts.tvaFade() > 0.0f) parts.waitFade();|vc2tonemethods
-methods-truncate-floor|while (parts.tvaFade() > 0.0f) parts.waitFade();|while (parts.tvaFade() > 0.5f) parts.waitFade();|vc2tonemethods
 methods-truncated-lost|    parts.truncated();\n||vc2tonemethods
 methods-truncate-now|{ parts.truncateTva(); }|{ parts.truncateTvaTold(); }|vc2tonemethods
 methods-cost-osc2|parts.oscCost(kVc2ToneOsc2)|parts.oscCost(kVc2ToneOsc1)|vc2tonemethods
@@ -635,3 +626,194 @@ mix-settle-other-row|false, settleNone }|false, settleFour }|vc2tonemix
 mix-settle-type|typeOf(w.type).settings(w, block, tail)|typeOf((int32_t)block[0]).settings(w, block, tail)|vc2tonemix
 mixt-settings|{ 0x893adea8, &t.settingsScale }|{ 0x893e4988, &t.settingsScale }|vc2tonemixtables
 noteon-walk-heads|node != 0 && pool.holds(node);|node != 0;|vc2tonenoteon
+# v315: the envelopes' settings and release (vc2toneenv) and the LFOs' (vc2tonelfo).  Not planted: the LFO release's test
+# taken signed (mode < 2), which differs from rom.4's unsigned mode − 2 only for a mode past 3, which no converter gives.
+# Taken out, as the real releases made them equivalent: v273's methods-keyoff-lfo0 (LFO 0's release finds it inactive:
+# its constructor clears +0x28 and no note-on starts LFO 0, so the release returns at once) and methods-keyoff-order (an
+# envelope's release and an LFO's touch no word of each other's, and no log orders them now).
+env-settings-scale-word|kScaleWord = 1,|kScaleWord = 0,|vc2toneenv
+env-settings-times-word|kTimesWord = 5,|kTimesWord = 4,|vc2toneenv
+env-settings-levels-word|kLevelsWord = 9;|kLevelsWord = 8;|vc2toneenv
+env-settings-no-scale|    w.scale = std::bit_cast<float>(block[kScaleWord]);\n||vc2toneenv
+env-settings-no-times|    std::memcpy(w.time.data(), block + kTimesWord, sizeof w.time);\n||vc2toneenv
+env-settings-no-levels|    std::memcpy(w.level.data(), block + kLevelsWord, sizeof w.level);\n||vc2toneenv
+env-settings-not-run|    e.update(e.p);   // the words as they now stand\n||vc2toneenv
+env-release-not-run|    e.noteOff();\n||vc2toneenv
+env-release-ticked|    e.noteOff();|    e.tick(1);|vc2toneenv
+env-load-release|    e.rel = w.release;\n||vc2toneenv
+env-store-release|    w.release = e.rel;\n||vc2toneenv
+lfo-off-modes|kOffModes = 2;|kOffModes = 1;|vc2tonelfo
+lfo-settings-key-sync|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 4, 6, 7 };|vc2tonelfo
+lfo-settings-sync|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 5, 6, 7 };|vc2tonelfo
+lfo-settings-no-wave|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 1, 2, 3, 6, 7 };|vc2tonelfo
+lfo-settings-no-rate|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 2, 3, 6, 7 };|vc2tonelfo
+lfo-settings-no-delay|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 3, 6, 7 };|vc2tonelfo
+lfo-settings-no-fade|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 6, 7 };|vc2tonelfo
+lfo-settings-no-offset|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 7 };|vc2tonelfo
+lfo-settings-no-fade-mode|kSettingsWords[] = { 0, 1, 2, 3, 6, 7 };|kSettingsWords[] = { 0, 1, 2, 3, 6 };|vc2tonelfo
+lfo-settings-not-updated|    l.update(l.p);   // XtLfo's update (rom.2's 0x894f0f40) on the words as they now stand\n||vc2tonelfo
+lfo-settings-no-step|    w.clockStep = l.s84;\n||vc2tonelfo
+lfo-release-always|    if (w.active == 0) return;\n||vc2tonelfo
+lfo-release-stays-active|    w.active = 0;\n    if (w.mode|    if (w.mode|vc2tonelfo
+lfo-release-block-mode|if (w.mode - (uint32_t)kFirstOffMode|if ((uint32_t)w.fadeMode - (uint32_t)kFirstOffMode|vc2tonelfo
+lfo-release-no-fade|    l.fadeStart();   // rom.4's through the vtable's +0x0c, 0x893ac580 (rom.2's 0x894f04d0)\n||vc2tonelfo
+# v316: the tones' parts' host (vc2tonehost, Vc2ToneHost.cpp), what xt_vc2tone's port side joined until v316.  Not
+# planted: freeValue's word (startFree, its one caller, reads the free object's phase itself and drops the value).
+host-build-envelopes|if (piece == Piece::envelopes) mods.buildEnvelopes();|if (piece == Piece::envelopes) {}|vc2tonehost
+host-build-lfos|else if (piece == Piece::lfos) mods.buildLfos(c_.chaos);|else if (piece == Piece::lfos) {}|vc2tonehost
+host-build-mix|else if (piece == Piece::mix) mix.construct(tail());|else if (piece == Piece::mix) {}|vc2tonehost
+host-lfo-follows|return mods.lfos[(size_t)lfo].w.follow != 0; }|return mods.lfos[(size_t)lfo].w.on != 0; }|vc2tonehost
+host-lfo-follow|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[(size_t)lfo].w.follow; }|uint32_t Vc2ToneHost::lfoFollow(int lfo) { return mods.lfos[0].w.follow; }|vc2tonehost
+host-lfo-listed|return mods.lfos[(size_t)lfo].w.sync != 0; }|return mods.lfos[(size_t)lfo].w.keySync != 0; }|vc2tonehost
+host-envelope-on|return mods.envelopes[(size_t)envelope].w.on != 0; }|return mods.envelopes[(size_t)envelope].w.on == 0; }|vc2tonehost
+host-lfo-on|bool Vc2ToneHost::lfoOn(int lfo) { return mods.lfos[(size_t)lfo].w.on != 0; }|bool Vc2ToneHost::lfoOn(int lfo) { return mods.lfos[(size_t)lfo].w.on == 0; }|vc2tonehost
+host-unfollow|c_.frees.release(mods.lfos[(size_t)lfo].w.follow);|c_.frees.release(mods.lfos[0].w.follow);|vc2tonehost
+host-unlist-swapped|if (fromOne) c_.lists.unlistNew(self(), c_.pool);|if (fromOne) c_.lists.unlistSounding(self(), c_.pool);|vc2tonehost
+host-tick-envelope|mods.envelopes[(size_t)envelope].tick(n); }|mods.envelopes[(size_t)envelope].tick(1); }|vc2tonehost
+host-tick-lfo|mods.lfos[(size_t)lfo].tick(n); }|mods.lfos[(size_t)lfo].tick(n + 1); }|vc2tonehost
+host-clock-lfo|mods.lfos[(size_t)lfo].clock(x); }|mods.lfos[(size_t)lfo].clock(0.0f); }|vc2tonehost
+host-render-mix|mix.render(a, b, c, tail(), c_.rings);|mix.render(b, a, c, tail(), c_.rings);|vc2tonehost
+host-install-mix|mix.install(kind3, tail());|mix.install(false, tail());|vc2tonehost
+host-note-on-envelope|    mods.envelopes[(size_t)envelope].noteOn(block);|    mods.envelopes[(size_t)envelope].settings(block);|vc2tonehost
+host-note-on-lfo|mods.lfos[(size_t)lfo].noteOn(block, x); }|mods.lfos[(size_t)lfo].noteOn(block, 120.0f); }|vc2tonehost
+host-follow-itself|follow(hostOf(tone).mods.lfos[(size_t)lfo], block, c_.frees);|follow(mods.lfos[(size_t)lfo], block, c_.frees);|vc2tonehost
+host-free-take|return c_.frees.take(id, lfo); }|return c_.frees.take(id, 0); }|vc2tonehost
+host-attach|mods.lfos[(size_t)lfo].attach(free, c_.frees); }|mods.lfos[0].attach(free, c_.frees); }|vc2tonehost
+host-start-free|    mods.lfos[(size_t)lfo].startFree(block, x, c_.frees);|    mods.lfos[(size_t)lfo].startFree(block, 120.0f, c_.frees);|vc2tonehost
+host-relist|c_.frees.addClock(follow, id, lfo); }|c_.frees.addClock(follow, id, 0); }|vc2tonehost
+host-list|c_.frees.removeClock(id, lfo); }|c_.frees.removeClock(id, 0); }|vc2tonehost
+host-mark-lfo|    o.lfo = lfo;\n||vc2tonehost
+host-mark-id|    o.id = id;\n||vc2tonehost
+host-note-on-mix|mix.noteOn(block, flag1, flag2, tail(), c_.rings);|mix.noteOn(block, flag2, flag1, tail(), c_.rings);|vc2tonehost
+host-enlist|c_.lists.enlist(self(), c_.pool); }|c_.lists.enlist(c_.pool.addressOf(0), c_.pool); }|vc2tonehost
+host-settings-lfo|mods.lfos[lfo].settings(block); }|mods.lfos[0].settings(block); }|vc2tonehost
+host-settings-envelope|    mods.envelopes[envelope].settings(block);|    mods.envelopes[0].settings(block);|vc2tonehost
+host-settings-mix|{ mix.settings(block, tail()); }|{ (void)block; }|vc2tonehost
+host-release-lfo|mods.lfos[(size_t)lfo].release(); }|mods.lfos[0].release(); }|vc2tonehost
+host-release-envelope|mods.envelopes[(size_t)envelope].release(); }|mods.envelopes[0].release(); }|vc2tonehost
+host-flags-envelopes|mods.envelopes[(size_t)e].w.on = 1;|mods.envelopes[(size_t)e].w.on = 0;|vc2tonehost
+host-flags-lfos|mods.lfos[(size_t)l].w.on = 0;|mods.lfos[(size_t)l].w.on = 1;|vc2tonehost
+# v317: the TVA joined into the host (vc2tonehost).  Not planted: the input's size (Vc2ToneInput.h), which the note W's
+# static_assert holds at 0x744 with the tone's word at +0x738.  Taken out, as the real TVA made them equivalent: v228's
+# update-tests-order (the stopped word asked before the end test: both read alone, and no log orders them now) and
+# v273's methods-truncate-floor (the wait's loop on a fade above 0.5: the told truncation sets the fade to 1, which the
+# waits end at 0, so the loop sees no other value).
+host-build-tva|else if (piece == Piece::tva) tva.construct();|else if (piece == Piece::tva) {}|vc2tonehost
+host-tva-over|bool Vc2ToneHost::tvaOver() { return tva.over(*this); }|bool Vc2ToneHost::tvaOver() { return tva.silent(*this); }|vc2tonehost
+host-tva-stopped|tva.stoppedWord() != 0; }|tva.stoppedWord() == 0; }|vc2tonehost
+host-update-tva|void Vc2ToneHost::updateTva() { tva.update(*this); }|void Vc2ToneHost::updateTva() {}|vc2tonehost
+host-render-tva|tva.render(in, out, *this);|tva.render(out, out, *this);|vc2tonehost
+host-tva-level|kTvaLevelAt = 0x40;|kTvaLevelAt = 0x44;|vc2tonehost
+host-tva-held|bool Vc2ToneHost::tvaHeld() { return tva.silent(*this); }|bool Vc2ToneHost::tvaHeld() { return tva.over(*this); }|vc2tonehost
+host-bind-envelope|tva.w.envelope = envelopeAt(envelope);|tva.w.envelope = envelopeAt(0);|vc2tonehost
+host-bind-lfo|tva.w.lfo = lfoAt(lfoA);|tva.w.lfo = lfoAt(lfoB);|vc2tonehost
+host-bind-pan-lfo|tva.w.panLfo = lfoAt(lfoB);|tva.w.panLfo = lfoAt(lfoA);|vc2tonehost
+host-bind-serial|    tva.w.serial = (uint32_t)serial;\n||vc2tonehost
+host-bind-tva-flags|    const int32_t envelopes[] = { envelope }, lfos[] = { lfoA, lfoB };\n    bindFlags(envelopes, lfos);\n||vc2tonehost
+host-note-on-tva|tva.noteOn(block, flag, *this);|tva.noteOn(block, 0, *this);|vc2tonehost
+host-new-block-tva|{ tva.newBlock(block); }|{ (void)block; }|vc2tonehost
+host-truncate-told|void Vc2ToneHost::truncateTvaTold() { tva.truncateTold(); }|void Vc2ToneHost::truncateTvaTold() { tva.truncate(); }|vc2tonehost
+host-truncate|void Vc2ToneHost::truncateTva() { tva.truncate(); }|void Vc2ToneHost::truncateTva() { tva.truncateTold(); }|vc2tonehost
+host-tva-fade|{ return tva.w.fade; }|{ return tva.w.one; }|vc2tonehost
+host-tva-envelope|return mods.tvaEnvelope(self(), at);|return mods.tvaEnvelope(self(), envelopeAt(0));|vc2tonehost
+host-tva-lfo|return mods.lfoOut(self(), at);|return mods.lfoOut(self(), lfoAt(1));|vc2tonehost
+host-fade-step|{ return c_.fadeStep; }|{ return 0.0f; }|vc2tonehost
+host-os-event|{ osEvent(event, flags); }|{ osEvent(event, 0); }|vc2tonehost
+host-envelope-at|Mods::kEnvelopeBytes * (uint32_t)envelope;|Mods::kEnvelopeBytes * ((uint32_t)envelope / 2);|vc2tonehost
+host-lfo-at|Mods::kLfoBytes * (uint32_t)lfo; }|Mods::kLfoBytes * ((uint32_t)lfo / 2); }|vc2tonehost
+# v318: the COSMs joined into the host (vc2tonehost) and the modulators' word by address (vc2tonemods).  Not planted:
+# the destructor's flags (2, rom.4's tone's; vc2CosmDestroy reads them only for its answer, whether to delete, which the
+# host doesn't take).  Taken out, as the real COSMs made them equivalent or unreachable: v228's destroy-cosm-order (each
+# COSM frees its own pool's slot alone), v228's install-cosm2-flag (COSM 1's install answers 1 for stereo, else whether
+# its code is 10, which no converter writes, so COSM 2 is given OSC 1's flag's either way), v229's cosmbind-type17 (no
+# converter writes code 17) and v316's host-destroy-lfos (with the COSMs the host's, the LFOs' destructor writes only the
+# vtable word the constructor wrote, as v268 found, and no log is left to see it).
+host-build-cosm|else if (isCosmPiece(piece)) vc2CosmConstruct(cosms[cosmOfPiece(piece)]);|else if (isCosmPiece(piece)) {}|vc2tonehost
+host-destroy-cosm-one|else vc2CosmDestroy(cosms[cosmOfPiece(piece)], c_.pools|else vc2CosmDestroy(cosms[0], c_.pools|vc2tonehost
+host-update-cosm-pitch|cosmFrame_.update(cosms[(size_t)cosm], x);|cosmFrame_.update(cosms[(size_t)cosm], 1.0f);|vc2tonehost
+host-update-cosm-sound|    sounds[(size_t)cosm].update(cosms[(size_t)cosm], *this);\n||vc2tonehost
+host-render-cosm-past|render(cosms[(size_t)cosm], buffer, c_.past);|render(cosms[(size_t)cosm], buffer, buffer);|vc2tonehost
+host-render-cosm-none|    sounds[(size_t)cosm].render(cosms[(size_t)cosm], buffer, c_.past);\n||vc2tonehost
+host-install-cosm-flag|const uint32_t given = vc2CosmInstall(cosms[k], flag);|const uint32_t given = vc2CosmInstall(cosms[k], 0);|vc2tonehost
+host-install-no-sound|    if (pending_[k]) sounds[k].noteOn(cosms[k], started_[k], *this, flag != 0);\n||vc2tonehost
+host-install-pending-kept|    pending_[k] = false;\n    return given;|    return given;|vc2tonehost
+host-bind-cosm-envelopes|{ envelopeAt(b.envelopes[0]), envelopeAt(b.envelopes[1]), lfoAt|{ envelopeAt(b.envelopes[1]), envelopeAt(b.envelopes[0]), lfoAt|vc2tonehost
+host-bind-cosm-lfos|lfoAt(b.lfos[0]), lfoAt(b.lfos[1]) });|lfoAt(b.lfos[1]), lfoAt(b.lfos[0]) });|vc2tonehost
+host-bind-cosm-flags|lfoAt(b.lfos[1]) });\n    bindFlags(b.envelopes, b.lfos);|lfoAt(b.lfos[1]) });|vc2tonehost
+host-setup-cosm-byte|{ s.value, s.other, 0, s.byte }|{ s.value, s.other, 0, 0 }|vc2tonehost
+host-setup-cosm-other|{ s.value, s.other, 0, s.byte }|{ s.value, s.value, 0, s.byte }|vc2tonehost
+host-start-cosm-pool|cosmFrame_.noteOn(cosms[k], started_[k], (uint32_t)which);|cosmFrame_.noteOn(cosms[k], started_[k], 0);|vc2tonehost
+host-start-cosm-waits-not|    pending_[k] = true;\n||vc2tonehost
+host-new-block-cosm-frame|    cosmFrame_.newBlock(cosms[(size_t)cosm], b);\n||vc2tonehost
+host-new-block-cosm-sound|    sounds[(size_t)cosm].newBlock(cosms[(size_t)cosm], b, *this);\n||vc2tonehost
+host-cosm-cost|{ return cosms[0].factor; }|{ return cosms[1].factor; }|vc2tonehost
+host-cosm-word|{ return mods.wordAt(self(), at); }|{ return mods.wordAt(self(), at + 4); }|vc2tonehost
+mods-word-at-envelope|envelope % kEnvelopeBytes, word)) return word;|0, word)) return word;|vc2tonemods
+mods-word-at-lfo|boundWordIn(lfos, lfo, kLfoBytes, lfo % kLfoBytes, word);|boundWordIn(lfos, lfo, kLfoBytes, lfo % kEnvelopeBytes, word);|vc2tonemods
+# v319: the OSC voices joined into the host (vc2tonehost: the build's branch and the links; vc2tonehostosc: every join
+# and each link's method).  v316's to v318's build plants planted a call of buildPart, which v319 took out; from v319
+# they plant the part left unbuilt.  Not planted: the shared routines the host passes the voices (c_.shared, the
+# check's rom.4 own), whose plants would be the voices' own, xt_vc2osc's.  Taken out, as the real voices made them
+# equivalent: v228's build-osc-order and matched-order (each OSC voice's constructor and matched count write that
+# voice alone, so their order shows nowhere; the fakes' log showed it).
+host-build-osc|else voice(oscOfPiece(piece)).construct();|else voice(0).construct();|vc2tonehost
+host-build-osc-none|else voice(oscOfPiece(piece)).construct();|else {}|vc2tonehost
+host-links-osc2|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 1)|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 0)|vc2tonehost
+host-update-osc-link|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n, link(1 - osc), c_.shared);|vc2tonehostosc
+host-update-osc-count|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n + 1, link(osc), c_.shared);|vc2tonehostosc
+host-osc-value|{ return voice(osc).f32(kRatio); }|{ return voice(osc).f32(kRatio + 4); }|vc2tonehostosc
+host-render-osc-buffer|{ voice(osc).render(buffer, link(osc)); }|{ voice(osc).render(buffer + 2, link(osc)); }|vc2tonehostosc
+host-count-osc|{ voice(osc).count(x); }|{ voice(osc).count(x + 1); }|vc2tonehostosc
+host-count-osc-matched|{ voice(osc).countMatched(x); }|{ voice(osc).countMatched(0); }|vc2tonehostosc
+host-install-osc-none|::installOsc(int osc) { voice(osc).install(link(osc), c_.shared); }|::installOsc(int) {}|vc2tonehostosc
+host-osc-kind|{ return (int32_t)voice(osc).kind(); }|{ return (int32_t)voice(0).kind(); }|vc2tonehostosc
+host-osc-flag|{ return voice(osc).tail.flag; }|{ return voice(1 - osc).tail.flag; }|vc2tonehostosc
+host-bind-osc-envelopes|binds[k] = envelopeAt(b.envelopes[k]);|binds[k] = envelopeAt(b.envelopes[0]);|vc2tonehostosc
+host-bind-osc-lfos|binds[kEnvelopeBinds + k] = lfoAt(b.lfos[k]);|binds[kEnvelopeBinds + k] = lfoAt(b.lfos[3 - k]);|vc2tonehostosc
+host-bind-osc-count|kEnvelopeBinds = 4;|kEnvelopeBinds = 3;|vc2tonehostosc
+host-bind-osc-flags|    bindFlags(b.envelopes, b.lfos);\n||vc2tonehostosc
+host-osc-wave|{ return voice(osc).u32(Vc2OscVoice::kWave); }|{ return voice(osc).u32(Vc2OscVoice::kWave + 4); }|vc2tonehostosc
+host-set-osc-wave|voice(osc).setU32(Vc2OscVoice::kWave, wave);|voice(osc).setU32(Vc2OscVoice::kWave, wave + 1);|vc2tonehostosc
+host-note-on-osc-legato|legato ? 1u : 0u|legato ? 0u : 1u|vc2tonehostosc
+host-take-player-osc|voice(osc).take(hostOf(tone).oscs[(size_t)osc]);|voice(osc).take(hostOf(tone).oscs[0]);|vc2tonehostosc
+host-set-osc-start|voice(osc).start(block, link(osc), c_.shared);|voice(osc).start(block + 1, link(osc), c_.shared);|vc2tonehostosc
+host-cosm-setup-ratio|{ v.f32(kRatio), v.tail.hz, v.u8(kByte) }|{ v.tail.hz, v.tail.hz, v.u8(kByte) }|vc2tonehostosc
+host-cosm-setup-root|{ v.f32(kRatio), v.tail.hz, v.u8(kByte) }|{ v.f32(kRatio), v.f32(kRatio), v.u8(kByte) }|vc2tonehostosc
+host-cosm-setup-byte|{ v.f32(kRatio), v.tail.hz, v.u8(kByte) }|{ v.f32(kRatio), v.tail.hz, 0 }|vc2tonehostosc
+host-settings-osc|voice(osc).settings(block, link(osc), c_.shared);|voice(osc).settings(block + 1, link(osc), c_.shared);|vc2tonehostosc
+host-legato-osc|{ voice(osc).legato(ramp); }|{ voice(osc).legato(ramp + 1); }|vc2tonehostosc
+host-key-off-osc|vibrato.w.active = 0;|vibrato.w.falling = 0;|vc2tonehostosc
+host-osc-cost|{ return voice(osc).tail.installed; }|{ return voice(osc).tail.factor; }|vc2tonehostosc
+host-osc-word168|{ return voice(osc).word168(); }|{ return voice(1 - osc).word168(); }|vc2tonehostosc
+host-osc-position|{ return voice(osc).position(); }|{ return (uint32_t)voice(osc).word168(); }|vc2tonehostosc
+link-kind-call|{ outside().kindCall(routine); }|{ outside().kindCall(routine + 4); }|vc2tonehostosc
+link-kind-settings|outside().kindSettings(routine, from);|outside().kindSettings(routine, from + 1);|vc2tonehostosc
+link-render-by|return outside().renderBy(routine, out, third);|return outside().renderBy(routine, out, 0);|vc2tonehostosc
+link-seek|outside().seek(routine, at);|outside().seek(routine, at + 16);|vc2tonehostosc
+link-os-clock|{ return outside().osClock(); }|{ return outside().osClock() + 1; }|vc2tonehostosc
+link-mic-ring|{ return outside().micRing(); }|{ static Vc2MicRing other; return other; }|vc2tonehostosc
+link-unvoiced|{ return outside().unvoiced(); }|{ return outside().unvoiced() + 1; }|vc2tonehostosc
+link-bound-tone|return host_.mods.boundFloat(self, part, offset);|return host_.mods.boundFloat(self, part, offset + 4);|vc2tonehostosc
+link-bound-in-tone|if (part - self < Vc2Tone::kSize)|if (part - self < Vc2Tone::kSize / 2)|vc2tonehostosc
+link-bound-outside|return outside().boundFloat(part, offset);|return 0.0f;|vc2tonehostosc
+link-address|{ return host_.self() + kOscsAt[(size_t)osc_]; }|{ return host_.self() + kOscsAt[0]; }|vc2tonehostosc
+link-event-position|{ return outside().eventPosition(event); }|{ return outside().eventPosition(event + 1); }|vc2tonehostosc
+link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHeader(at + 4); }|vc2tonehostosc
+link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc
+# v321: the input stage's peak, which kind 5's update (ported in the voice) asks of the link (vc2tonehostosc)
+link-input-peak|{ return outside().inputPeak(); }|{ return 0.0f; }|vc2tonehostosc
+# v322: the effect chip's frames, which the EXT IN player (ported in the voice) asks of the link (vc2tonehostosc)
+link-input-frames|{ return outside().inputFrames(); }|{ return outside().inputFrames() + 1; }|vc2tonehostosc
+# v323: the wave Vari off's renders (ported in the voice) read, which the link passes on (vc2tonehostosc)
+link-wave-samples|{ return outside().waveSamples(); }|{ return Vc2OscSamples {}; }|vc2tonehostosc
+# v328: the records an object's head names, read through it (vc2toneplayers, Vc2OscPlayers.cpp's head word, and
+# vc2tonelite, Vc2OscLite.cpp's LITE settings' loop record, xt_vc2osc's ports under xt_vc2tone), and a pool tone's OSC
+# voice's words, which the link gives from that tone's host (vc2tonehostosc): after a legato's take, the earlier
+# tone's voice's, which only xt_vc2tone takes.  v319's link-object-call went with the object call, whose last caller
+# was the set-up
+hd-own|return std::bit_cast<uint32_t>(parts.boundFloat(v.u32(kSelf), at));|return v.u32(kSelfAt + at);|vc2toneplayers
+hd-settings-own|parts.loopRecord(vc2OscHeadWord(*this, parts, kHeadLoop))|parts.loopRecord(u32(kLoopAt))|vc2tonelite
+link-voice-own|return host_.hostOf(pool.indexOf(at)).oscs[osc].f32(in);|return host_.oscs[osc].f32(in);|vc2tonehostosc
+link-voice-osc|- kOscsAt[osc];|- kOscsAt[0];|vc2tonehostosc
+link-voice-end|<= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) {|<= 0xb0 - sizeof(float)) {|vc2tonehostosc
+link-voice-pool|pool.holds(at) && osc < kOscsAt.size()|false && osc < kOscsAt.size()|vc2tonehostosc

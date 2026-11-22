@@ -748,7 +748,7 @@ float XtBeat::steer(int32_t err, int sign) {
     float x = xtf::add(xtf::mul(k1, e), integ);                      // fmac
     integ = x;
     x = xtf::add(xtf::mul(k2, e), x);
-    const bool past = sign >= 0 ? wrapSub(0, err) > step : err > step;
+    const bool past = sign >= 0 ? wrapSub(0, err) > reach() : err > reach();
     if (past) { integ = factor = 0.0f; return x; }
     if (x > 32.0f) x = 32.0f;
     else if (-32.0f > x) x = -32.0f;

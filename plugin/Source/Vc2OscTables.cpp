@@ -4,8 +4,8 @@
 #include "Vc2RomTables.h"
 
 namespace {
-// [FW] the update's, the note-on's, the settings', the pitch getter's and the install's; then the targets'; then
-// VariPhrase's note-on's (v238) and LITE's (v240)
+// [FW] the update's, the note-on's, the settings', the pitch getter's and the install's; then the targets', kind 6's
+// update's among them (v321); then VariPhrase's note-on's (v238) and LITE's (v240)
 auto oscWords(Vc2OscTables& t) {
     return std::to_array<Vc2PoolWord>({
         { 0x893ae3d0, &t.waitLevel }, { 0x893ae3f4, &t.depthScale }, { 0x893ae48c, &t.plainHz },
@@ -18,13 +18,18 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893afdd4, &t.ratio.cents.most }, { 0x893afdd8, &t.ratio.cents.least }, { 0x893af35c, &t.noteOn.cents.most },
         { 0x893af360, &t.noteOn.cents.least }, { 0x893af364, &t.noteOn.perOctave },
         { 0x893af36c, &t.noteOn.ratio.most }, { 0x893af370, &t.noteOn.ratio.least }, { 0x893af530, &t.kind6Least },
+        { 0x893b0254, &t.kind6Update.cents.most }, { 0x893b0258, &t.kind6Update.cents.least },
+        { 0x893b025c, &t.kind6Update.perOctave }, { 0x893b0264, &t.kind6Update.ratio.most },
+        { 0x893b0268, &t.kind6Update.ratio.least },
         { 0x893afddc, &t.walkTarget.most }, { 0x893afde0, &t.walkTarget.least }, { 0x893affd4, &t.walk.most },
         { 0x893affd8, &t.walk.least }, { 0x893afde4, &t.formantTargetLeast }, { 0x893affe0, &t.formantLeast },
         { 0x893af53c, &t.timesTenThousand }, { 0x893af7c8, &t.rateTenths }, { 0x893c7d78, &t.liteTimes },
         { 0x893c7f64, &t.liteTenths }, { 0x893c81ec, &t.liteHeadsTenths }, { 0x893c81e4, &t.liteTwo32 },
         { 0x893c81f0, &t.litePeriod }, { 0x893c81f4, &t.liteHalf }, { 0x893c81f8, &t.liteFilter },
         { 0x893c6420, &t.variOffScale }, { 0x893c6764, &t.variOffFold }, { 0x893c6424, &t.variOffGlide },
-        { 0x893c6428, &t.variOffFade },
+        { 0x893c6428, &t.variOffFade }, { 0x893c84a0, &t.liteUpdateFilter }, { 0x893c8650, &t.liteSettingsTwo32 },
+        { 0x893c6e60, &t.headsSeekHalf }, { 0x893ca150, &t.modeOneFraction }, { 0x893ca154, &t.modeOneScale },
+        { 0x893cc8c0, &t.modeOneSetUpWord }, { 0x893ccfd4, &t.modeOneTenths },
     });
 }
 // [FW] each word where its routine reads it; an address of 0 is a word the routine doesn't read, left 0

@@ -31,7 +31,11 @@
 # vc2oscanalogla: the analog's note-on, v242, in Vc2OscAnalog.cpp and Vc2OscAnalogLa.cpp; vc2oscanalogsub: its sub
 # oscillator's, v244, in Vc2OscAnalogSub.cpp; vc2oscanalogshape: its shape, v246, in Vc2OscAnalogShape.cpp, its LA
 # way vc2oscanalogla's; vc2oscanalogupdate: the analog's install, update and settings, v248, in
-# Vc2OscAnalogUpdate.cpp; vc2oscvibrato: the vibrato, v267, in Vc2OscVibrato.cpp), through xt_vc2osc, [cases]
+# Vc2OscAnalogUpdate.cpp; vc2oscvibrato: the vibrato, v267, in Vc2OscVibrato.cpp; vc2oscbeat: the players' beat and
+# the voice's own seeks, v325, in Vc2OscBeat.cpp; vc2xtbeat: XtBeat's start and reset, in XtMultiBandPlayer.cpp,
+# which the beat runs; vc2oscheads: LITE's heads' renders, v326, in Vc2OscHeads.cpp; vc2xtlite: XtLitePlayer.cpp's
+# lines the heads run; vc2oscmodeone: kind 1's mode 1's render, v327, in Vc2OscModeOne.cpp; vc2oscwalk and
+# vc2oscwalkevents: the players' event walk, Vc2OscWalk.cpp and Vc2OscWalkEvents.cpp), through xt_vc2osc, [cases]
 # its cases (40).  --tva:
 # vc2tva_muts.txt, in
 # Vc2Tva.cpp and Vc2TvaTables.cpp (PORT=vc2tva, vc2tvatables: the TVA, v233), through xt_vc2tva, [cases] its cases
@@ -43,7 +47,12 @@
 # Vc2LibMath.cpp and Vc2LibMathTables.cpp (PORT=vc2libm, vc2libmtables: the library's logf and powf), through
 # xt_vc2libm, [cases] its draws a routine (20000, fcheck's).  --voices: vc2voices_muts.txt, in Vc2PartVoices.cpp and
 # Vc2PartVoicesTables.cpp (PORT=vc2voices, vc2voicestables: the part's voices and their lists, v272), through
-# xt_vc2voices, [cases] its cases (40).  --patch: vc2patch_muts.txt, in Vc2PatchStore.cpp, Vc2PatchFile.cpp and
+# xt_vc2voices, [cases] its cases (40).  --notes: vc2notes_muts.txt, in Vc2Notes.cpp (PORT=vc2notes: the part's
+# notes W, v275), through xt_vc2notes, [cases] its cases (40).  --keys: vc2keys_muts.txt, in Vc2Keys.cpp and
+# Vc2KeysTables.cpp (PORT=vc2keys, vc2keystables: the part's keys, v276), through xt_vc2keys, [cases] its cases
+# (40).  --sets: vc2sets_muts.txt, in Vc2Sets.cpp, Vc2NoteMatrix.cpp and Vc2SetCommon.cpp (PORT=vc2sets, vc2notematrix,
+# vc2setcommon: the part's conversion sets, the notes' Matrix objects, v280, and C's common, v281), through
+# xt_vc2sets, [cases] its cases (40).  --patch: vc2patch_muts.txt, in Vc2PatchStore.cpp, Vc2PatchFile.cpp and
 # XtPatchStore.cpp's reads (PORT=vc2patch, vc2patchfile, vc2patchxt: rom.4's patch store and its .p02 reader, v450),
 # through xt_vc2patch, [cases] its random stores beside the disk image's 128 patches (4).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
@@ -78,6 +87,18 @@ HARNESSES = {
               '40'),
     '--voices': (mutlist.Harness('mutate_vc2', 'xt_vc2voices', 'vc2voices_muts.txt', ('vc2voices', '2024'),
                                  'XT_VC2VOICES_STOP'), '40'),
+    '--notes': (mutlist.Harness('mutate_vc2', 'xt_vc2notes', 'vc2notes_muts.txt', ('vc2notes', '2024'),
+                                'XT_VC2NOTES_STOP'), '40'),
+    '--keys': (mutlist.Harness('mutate_vc2', 'xt_vc2keys', 'vc2keys_muts.txt', ('vc2keys', '2024'), 'XT_VC2KEYS_STOP'),
+               '40'),
+    '--midi': (mutlist.Harness('mutate_vc2', 'xt_vc2midi', 'vc2midi_muts.txt', ('vc2osmidi', '2024'),
+                               'XT_VC2MIDI_STOP'), '40'),
+    '--synth': (mutlist.Harness('mutate_vc2', 'xt_vc2synth', 'vc2synth_muts.txt', ('vc2synth', '2024'),
+                                'XT_VC2SYNTH_STOP'), '1'),
+    '--sets': (mutlist.Harness('mutate_vc2', 'xt_vc2sets', 'vc2sets_muts.txt', ('vc2sets', '2024'), 'XT_VC2SETS_STOP'),
+               '40'),
+    '--settings': (mutlist.Harness('mutate_vc2', 'xt_vc2settings', 'vc2settings_muts.txt', ('vc2settings', '2024'),
+                                   'XT_VC2SETTINGS_STOP'), '40'),
     '--patch': (mutlist.Harness('mutate_vc2', 'xt_vc2patch', 'vc2patch_muts.txt', ('vc2patch', '2024')), '4'),
     '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
                '40'),

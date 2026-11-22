@@ -15,8 +15,23 @@
 // rate); +0x14c the period, +0x150 its inverse.  The walk, pitch, formant and gain are +0x7c, +0x70, +0x74 and +0x84.
 #include "XtBeat.h"
 #include "XtLoop.h"
+#include "XtWord.h"
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
+
+// What a head reads, as an int16 (v326): rom.2's wave as the plugin holds it, floats ±1, past it 0; or the VC-2's wave
+// memory as rom.4 reads it, halfwords from the address `base` (`count` of them): sample i of a channel at `first` + i ×
+// `frame` bytes, the address wrapping as the SH-4's, past the memory 0
+struct XtLiteSamples {
+    const std::vector<float>* floats = nullptr;
+    const int16_t* memory = nullptr;
+    uint32_t base = 0, count = 0, first = 0, frame = 2;
+    int32_t at(int32_t i) const;
+    explicit operator bool() const { return floats != nullptr || memory != nullptr; }
+};
 
 class XtLitePlayer {
 public:
@@ -54,6 +69,22 @@ public:
     void blockUpdate(const XtLoop& l, int32_t start, int32_t frames);
     // 32 frames, L/R pairs, in the XT's units (int16 × 65536 × the gain).
     void block(float* lr);
+    // v326, the VC-2's heads (rom.4's 0x893c6e80 and 0x893c6e8c, Vc2OscHeads.cpp), which run this player on rom.4's
+    // object's words: the block after the beat, given the walk step's word the beat left (+0x34); the heads' samples;
+    // rom.4's backward reads, each sample as it is (rom.2's take it negated); and each word the block reads or writes,
+    // its place in rom.2's object (the map above), its member here and its bytes
+    void walkBlock(float* lr, int32_t word) {
+        walkGiven = true;
+        walkWord = word;
+        block(lr);
+        walkGiven = false;
+    }
+    void setSamples(const XtLiteSamples& left, const XtLiteSamples& right) {
+        x = left;
+        y = right;
+    }
+    void setUpright(bool on) { upright = on; }
+    static std::span<const XtWord> words();
 
     // For the check: +0x38 (as the note-on left it), +0x110, +0xf4, +0xf8, +0x108, +0x10c, +0x100.
     int32_t position() const { return pos16; }
@@ -70,11 +101,13 @@ public:
     int bwdLoopMode() const { return bwdMode; }
 
 private:
-    const std::vector<float>* x = nullptr;
-    const std::vector<float>* y = nullptr;
-    int32_t sample(const std::vector<float>& v, int32_t i) const;
+    XtLiteSamples x, y;
+    bool upright = false, walkGiven = false;
+    int32_t walkWord = 0;
+    int32_t sample(const XtLiteSamples& v, int32_t i) const { return v.at(i); }
     float window(float& win, float& clk, int32_t& head, float at, float rate) const;
     template <bool Forward> void frame(float* lr, float at, float rate, int32_t end);
+    void out(float* lr, float aL, float aR, float bL, float bR);
 
     float pitch = 1.0f, formant = 1.0f, walk = 1.0f, gainTarget = 0.0f, gain = 0.0f;
     float dcRate = 0.0f, dcL = 0.0f, dcR = 0.0f, fracA = 0.0f, fracB = 0.0f, walkPos = 0.0f;
@@ -91,3 +124,43 @@ private:
     uint8_t flags0 = 0;
     int32_t lp[4] = { 0, 0x7fffffff, 0x7fffffff, 0 };
 };
+
+// v326: the words the block reads and writes, by their places in rom.2's object (the map above): the pitch, the
+// formant, the gain's target and the gain; the loops' modes, the heads, the filter's rate and state, the heads'
+// fractions, the walk's position, the windows' phases and clocks, the last sample, the forward loop and its rate, the
+// first sample, the backward loop and its rate, the period and its inverse
+inline std::span<const XtWord> XtLitePlayer::words() {
+    static constexpr std::array<XtWord, 30> kWords { {
+        { 0x70, offsetof(XtLitePlayer, pitch), sizeof pitch },
+        { 0x74, offsetof(XtLitePlayer, formant), sizeof formant },
+        { 0x80, offsetof(XtLitePlayer, gainTarget), sizeof gainTarget },
+        { 0x84, offsetof(XtLitePlayer, gain), sizeof gain },
+        { 0xe8, offsetof(XtLitePlayer, fwdMode), sizeof fwdMode },
+        { 0xec, offsetof(XtLitePlayer, bwdMode), sizeof bwdMode },
+        { 0xf4, offsetof(XtLitePlayer, hA), sizeof hA },
+        { 0xf8, offsetof(XtLitePlayer, hB), sizeof hB },
+        { 0xfc, offsetof(XtLitePlayer, dcRate), sizeof dcRate },
+        { 0x100, offsetof(XtLitePlayer, dcL), sizeof dcL },
+        { 0x104, offsetof(XtLitePlayer, dcR), sizeof dcR },
+        { 0x108, offsetof(XtLitePlayer, fracA), sizeof fracA },
+        { 0x10c, offsetof(XtLitePlayer, fracB), sizeof fracB },
+        { 0x110, offsetof(XtLitePlayer, walkPos), sizeof walkPos },
+        { 0x114, offsetof(XtLitePlayer, winA), sizeof winA },
+        { 0x118, offsetof(XtLitePlayer, clkA), sizeof clkA },
+        { 0x11c, offsetof(XtLitePlayer, winB), sizeof winB },
+        { 0x120, offsetof(XtLitePlayer, clkB), sizeof clkB },
+        { 0x124, offsetof(XtLitePlayer, lastF), sizeof lastF },
+        { 0x128, offsetof(XtLitePlayer, fwdStartF), sizeof fwdStartF },
+        { 0x12c, offsetof(XtLitePlayer, fwdEndF), sizeof fwdEndF },
+        { 0x130, offsetof(XtLitePlayer, fwdLenF), sizeof fwdLenF },
+        { 0x134, offsetof(XtLitePlayer, fwdRate), sizeof fwdRate },
+        { 0x138, offsetof(XtLitePlayer, firstF), sizeof firstF },
+        { 0x13c, offsetof(XtLitePlayer, bwdEndF), sizeof bwdEndF },
+        { 0x140, offsetof(XtLitePlayer, bwdStartF), sizeof bwdStartF },
+        { 0x144, offsetof(XtLitePlayer, bwdLenF), sizeof bwdLenF },
+        { 0x148, offsetof(XtLitePlayer, bwdRate), sizeof bwdRate },
+        { 0x14c, offsetof(XtLitePlayer, period), sizeof period },
+        { 0x150, offsetof(XtLitePlayer, invPeriod), sizeof invPeriod },
+    } };
+    return kWords;
+}

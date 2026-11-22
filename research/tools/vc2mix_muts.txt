@@ -3,7 +3,8 @@
 # vc2mixtables (Vc2PartMixerTables.cpp) and vc2mixmath (Vc2Math.cpp's clamp).
 # Not planted, as no input tells them apart: the two paths' ease words swapped (0x893b1ab8 and 0x893b1d44 both hold
 # 0.0009375), the level routine's and the targets' pools swapped (both 0.025 and 2147483392), suspend's count set to 1
-# rather than added to (it runs only from 0), and the clamp's ceiling at or above 1 (both give 1).
+# rather than added to (it runs only from 0), and the clamp's ceiling at or above 1 (both give 1); in the voices'
+# update (v311), its least count's test at 1 by one (a whole number of ticks below 2 truncates to 1 either way).
 levels-extin-first-only|p.oscType[0] == kExtin \|\| p.oscType[1] == kExtin|p.oscType[0] == kExtin|vc2mix
 levels-extin-second-only|p.oscType[0] == kExtin \|\| p.oscType[1] == kExtin|p.oscType[1] == kExtin|vc2mix
 levels-extin-both|p.oscType[0] == kExtin \|\| p.oscType[1] == kExtin|p.oscType[0] == kExtin && p.oscType[1] == kExtin|vc2mix
@@ -88,3 +89,17 @@ tables-ease-lost|{ 0x893b1ab8, &t.ease[0] }, |{ 0x893b1d44, &t.ease[1] }, |vc2mi
 tables-extin-ease-lost|{ 0x893b1ab8, &t.ease[0] }, { 0x893b1d44, &t.ease[1] },|{ 0x893b1ab8, &t.ease[0] },|vc2mixtables
 mix-clamp-no-ceiling|    return v > 1.0f ? 1.0f : v;|    return v;|vc2mixmath
 mix-clamp-no-floor|    if (0.0f > v) v = 0.0f;\n||vc2mixmath
+mx-blocks-since|static_cast<uint32_t>(blocks) - static_cast<uint32_t>(at)|static_cast<uint32_t>(at) - static_cast<uint32_t>(blocks)|vc2mix
+mx-at-kept|    at = blocks;\n    return d;|    return d;|vc2mix
+mx-update-scale|t.blockSeconds), t.updateSeconds);|t.blockSeconds), t.blockSeconds);|vc2mix
+mx-update-least|ticks > 1.0f ? static_cast<int32_t>(ticks) : 1;|ticks > 1.0f ? static_cast<int32_t>(ticks) : 0;|vc2mix
+mx-update-n|tone->update(n);|tone->update(n + 1);|vc2mix
+mx-glue|parts.glue(w.carried);|parts.glue(0.0f);|vc2mix
+mx-schedule-zero|    if (seconds == 0.0f) seconds = t.blockSeconds;\n|\n|vc2mix
+mx-schedule-at|blocksSince(w.scheduledAt, w.blocks)|blocksSince(w.updatedAt, w.blocks)|vc2mix
+mx-schedule-lfos|    parts.freeLfosClock(seconds);\n|\n|vc2mix
+mx-schedule-count|tone->count(1);|tone->count(0);|vc2mix
+mx-schedule-order|        tone->clock(seconds);\n        tone->count(1);|        tone->count(1);\n        tone->clock(seconds);|vc2mix
+mx-schedule-clock|tone->clock(seconds);|tone->clock(t.blockSeconds);|vc2mix
+mixtables-block-seconds|{ 0x893b17ec, &t.blockSeconds }|{ 0x893b17f0, &t.blockSeconds }|vc2mixtables
+mixtables-update-seconds|{ 0x893b17f4, &t.updateSeconds }|{ 0x893b17f8, &t.updateSeconds }|vc2mixtables

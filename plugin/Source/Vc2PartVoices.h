@@ -46,7 +46,9 @@ static_assert(sizeof(Vc2VoiceNode) == 0x50, "rom.4's layout, a list's head and a
 struct Vc2Voice {
     Vc2VoiceNode node {};
     uint8_t byte50 = 0, byte51 = 0, byte52 = 0, byte53 = 0;   // +0x50…+0x53: the note's class's (0, −1 at +0x52)
-    uint32_t word54 = 0, word58 = 0;                         // +0x54, +0x58
+    uint8_t byte54 = 0, byte55 = 0;                          // +0x54, +0x55: the prepare's copies of +0x52, +0x50
+    uint16_t half56 = 0;                                     // +0x56
+    uint32_t word58 = 0;                                     // +0x58: 1 when C's refresh found a change
     uint32_t set = 0;                                        // +0x5c: its conversion set C, 0 none
 };
 static_assert(sizeof(Vc2Voice) == 0x60, "rom.4's layout, a voice's 0x60 bytes");
@@ -60,6 +62,9 @@ struct Vc2VoiceGlobals {
     float unread0 = 0.0f, unread1 = 0.0f, unread2 = 0.0f;   // 0x899826f0…0x899826f8: the static initializer's, unread
 };
 static_assert(sizeof(Vc2VoiceGlobals) == 0x28, "rom.4's layout, 0x899826d4…0x899826fc");
+
+// The update queue's node's constructor 0x89394f30 on a node given: its vtable, its links to itself
+void vc2ConstructNode(Vc2VoiceNode& n, uint32_t self);
 
 // What the voices call and read beyond themselves
 class Vc2VoiceParts {
@@ -113,6 +118,8 @@ public:
     // A head's or a voice's words by its address; a voice's address by its index
     Vc2VoiceNode& at(uint32_t address);
     uint32_t addressOf(int voice) const;
+    Vc2Voice& voice(uint32_t address);   // a voice's whole words, by its address (a voice's, never a head's)
+    uint32_t ageOf(uint32_t voice);      // the word its +0x1c points at
 
     std::array<Vc2Voice, kVoices> voices {};
     std::array<Vc2VoiceNode, kLists> heads {};
@@ -124,5 +131,4 @@ private:
     void leave(uint32_t voice, Vc2VoiceParts& parts);
     void move(uint32_t voice, int list, uint8_t state, Vc2VoiceParts& parts);
     void stopped(uint32_t voice, int list, uint8_t state, Vc2VoiceParts& parts);
-    uint32_t ageOf(uint32_t voice);
 };

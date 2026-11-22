@@ -508,8 +508,8 @@ beat-k0|k0 = 0x1.999998p-18f|k0 = 0x1.99999ap-18f|toneband
 beat-k1|k1 = 0x1.ba5e34p-6f|k1 = 0x1.ba5e36p-6f|toneband
 beat-k2|k2 = 0x1.47ae14p-4f|k2 = 0x1.47ae16p-4f|toneband
 beat-integ|    integ = x;\n    x = xtf::add(xtf::mul(k2, e), x);|    x = xtf::add(xtf::mul(k2, e), x);|toneband
-beat-past|const bool past = sign >= 0 ? wrapSub(0, err) > step : err > step;|const bool past = false;|toneband
-beat-past-sign|const bool past = sign >= 0 ? wrapSub(0, err) > step : err > step;|const bool past = sign >= 0 ? err > step : wrapSub(0, err) > step;|toneband
+beat-past|const bool past = sign >= 0 ? wrapSub(0, err) > reach() : err > reach();|const bool past = false;|toneband
+beat-past-sign|const bool past = sign >= 0 ? wrapSub(0, err) > reach() : err > reach();|const bool past = sign >= 0 ? err > reach() : wrapSub(0, err) > reach();|toneband
 beat-past-return|    if (past) { integ = factor = 0.0f; return x; }|    if (past) { integ = factor = 0.0f; return 0.0f; }|toneband
 beat-limit|    if (x > 32.0f) x = 32.0f;\n|    if (x > 16.0f) x = 16.0f;\n|toneband
 beat-limit-neg|    else if (-32.0f > x) x = -32.0f;\n|    else if (-16.0f > x) x = -16.0f;\n|toneband
@@ -970,7 +970,7 @@ xfg-oneway|                    while (walkPos > fwdEndF && fwdLenF > 0.0f) walkP
 xfg-mirror|                    if (!(fwdEndF > walkPos)) { at = -at; at = at + fwdEndF; at = at + fwdEndF; }|                    if (!(fwdEndF > walkPos)) { at = fwdEndF; }|tonelite
 xfg-oneway-bwd|                    while (bwdStartF > walkPos && bwdLenF > 0.0f) walkPos = walkPos + bwdLenF;|                    while (bwdStartF > walkPos && bwdLenF > 0.0f) walkPos = bwdEndF;|tonelite
 xfg-mirror-bwd|                    if (!(walkPos > bwdStartF)) { at = -at; at = at + bwdStartF; at = at + bwdStartF; }|                    ;|tonelite
-xfg-step|    const float step = (float)xtf::ftrc(fs) * 0x1p-25f;|    const float step = fs * 0x1p-25f;|tonelite
+xfg-step|    const float step = (float)(walkGiven ? walkWord : xtf::ftrc(fs)) * 0x1p-25f;|    const float step = (walkGiven ? (float)walkWord : fs) * 0x1p-25f;|tonelite
 xfg-seek-win|    winB = period * 0.5f;\n    clkB = period * 0.5f;\n    beat_|    winB = 0.0f;\n    clkB = period * 0.5f;\n    beat_|tonelite
 xfg-seek-frac|    fracA = fracB = 0.0f;\n    hA = hB = s;|    hA = hB = s;|tonelite
 check-lite-events|        for (uint32_t k = 0; k < 4; ++k) f.c.wr32(W2 + 0xb4 * k + 4, (uint32_t)(pts[k] * 16));|        ;|tonecheck

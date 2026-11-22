@@ -39,6 +39,8 @@ public:
     virtual ~Vc2MatrixParams() = default;
     virtual int32_t partValue(int part, int16_t id) = 0;
     virtual int32_t systemValue(int16_t id) = 0;
+    // rom.4's 0x8993d0c0, the common's flag, which a record tests before its reads and after (v292)
+    virtual bool held() = 0;
 };
 
 // What the levels reach past M: 0x893b1ee0, called when they are new
@@ -56,12 +58,13 @@ struct Vc2MatrixLevels {
 class Vc2MatrixSetup {
 public:
     Vc2MatrixSetup(Vc2MatrixParams& params, Vc2MatrixPart& part) : params_(params), part_(part) {}
-    // 0x893a46f0: part `part`'s record from its parameters; nothing while `held` (rom.4's 0x8993d0c0), false then
-    bool record(Vc2MatrixSettings& g, int part, bool held);
+    // 0x893a46f0: part `part`'s record from its parameters; nothing while held (rom.4's 0x8993d0c0), false then, and
+    // false too when held after its reads (v292)
+    bool record(Vc2MatrixSettings& g, int part);
     // 0x893a50b0: the system's assignments
     void assigns(Vc2MatrixSettings& g);
     // 0x893a51c0: the assignments, then the record as 0x893a46f0 makes it
-    bool settings(Vc2MatrixSettings& g, int part, bool held);
+    bool settings(Vc2MatrixSettings& g, int part);
     // 0x893a2ee0: M from its part's record (links.part) and G's channel word, then the levels
     void init(Vc2MatrixWords& m, Vc2MatrixLinks& links, const Vc2MatrixSettings& g, Vc2MatrixRefresh& refresh);
     // 0x893a2e50: the levels from Matrix group 2's reader
@@ -73,6 +76,9 @@ private:
     Vc2MatrixPart& part_;
 };
 
+// M's words from a part's record, as 0x893a2ee0 and a note's M (0x893a5db0, v280) take them: the record's sources,
+// uses, slots and routines, then +0x084…+0x165 the zeros' run (rom.4's 0xe2 bytes from 0x895402f6)
+void vc2MatrixFromRecord(Vc2MatrixWords& m, const Vc2MatrixFront& rec);
 // 0x893a2eb0: a note's velocity, key and poly key into M's head when it is M's part
 void vc2MatrixHead(Vc2MatrixWords& m, const Vc2MatrixLinks& links, int32_t part, const std::array<uint8_t, 3>& bytes);
 // 0x893a30d0: a patch's destination as M's, its uses bit set; 0 for none (no source, no sensitivity, past 78)

@@ -41,3 +41,11 @@ Vc2TvaEnvelope Vc2ToneModulators::tvaEnvelope(uint32_t self, uint32_t part) cons
 }
 
 float Vc2ToneModulators::lfoOut(uint32_t self, uint32_t part) const { return boundFloat(self, part, kLfoOut); }
+
+float Vc2ToneModulators::wordAt(uint32_t self, uint32_t at) const {
+    float word = 0.0f;
+    const uint32_t envelope = at - self - kEnvelopesAt, lfo = at - self - kLfosAt;
+    if (boundWordIn(envelopes, envelope, kEnvelopeBytes, envelope % kEnvelopeBytes, word)) return word;
+    boundWordIn(lfos, lfo, kLfoBytes, lfo % kLfoBytes, word);
+    return word;
+}

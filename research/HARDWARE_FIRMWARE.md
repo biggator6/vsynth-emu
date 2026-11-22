@@ -1546,6 +1546,3216 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's mode 1 set-up (2026-11-21, v328) {#vc2-osc-mode-one-set-up}
+
+Step 4.3's fifty-sixth version, the fourth piece of item 11's fourth part's second half. Mode 1's set-up `0x893cc760`,
+which LITE's install runs for a wave of type 1, is the voice's own (`Vc2OscModeOneStart.cpp`). So are the walk's start
+it runs, SOLO's start `0x893cc1a0`, and that start's event lookup `0x893cc0d0` (`Vc2OscWalkStart.cpp`). The seek
+`0x893cc830` the start makes with the range in samples still goes out.
+
+**The set-up.** It reads the wave's records through the object's head (+0x44, the voice's +0x1a0): +0 the events'
+table, +4 the samples, +0x20 the header, +0x28 the loop record, +0x2c the +0xe0 record. Then:
+- the table to +0x10, the +0xe0 record to +0x6c, the samples to +0xec;
+- byte 3 keeps 0x70, the end byte +4 is 0, +0x88 is 1/64 (its pool word `0x893cc8c0`);
+- the events' layout by the header's format (+1) and the frame (byte 0's 0x40): format 3…5 (a signed byte) the first
+  half word 14, the stride 46 mono or 88 stereo; any other 8, 10 or 16. A frame's bytes (+9) are 6 or 12;
+- the walk's start with mode 1's row;
+- `0x893ccf50`: the rate factor (+0xa0) 1, the loops' (+0xa4, +0xa8) exp2 of the loop record's +0x14 and +0x16 over
+  12000 (its pool word `0x893ccfd4`);
+- the beat's start (v325's `beatStart`), which keeps byte 3's 0x81 alone.
+
+**The walk's start.** `0x893cc1a0` is SOLO's start, given a player's index (r5) like the walk's crossings (v327). It
+picks its seek and its jump from the tables at `0x8993fc00` and `0x8993fc14`: two more columns of a player's row,
+`Vc2WalkWay`'s `seekTo` and `startJump`. Mode 1's are the seek `0x893cc830`, still out, and `0x893ca160`, which wraps
+the jump `0x893ca190`. The start:
+- the last event (+0xe): the table's count less 1. The count is the high half of the table's word at +8 (`0x893cc0d0`
+  forms an event's entry as v327's load does: (stride × n + first) half words, the bytes unsigned). The last event's
+  position goes to +0x20.
+- with the range in samples (byte 0's 0x80): the current event (+0xc) 0, then the seek to the range's start (+0x18),
+  or its end (+0x1c) when the walk (+0x7c) is negative. That is all.
+- else the range's two events (+0x14, +0x16) are each held to the last, compared unsigned. Their positions become the
+  range's start and end. The current event is the first, or the last walking back. The position is 0, then the jump to
+  the current event, which writes the position again.
+
+**Through the head.** The head is the voice's own +0x108 as its note-on leaves it (`vc2OscPlayerHead`, v238). A
+legato's take copies the earlier tone's voice's object whole and keeps six words (v230's `take`), so the head comes with
+it. It still names the earlier voice's +0x108. The install pass the note-on ends with then sets the new note up on the
+earlier note's table, samples, header, loop record and +0xe0 record: in rom.4, a legato between two notes of different
+waves of the same type plays the new note on the old wave's events. Kept as rom.4 has it. LITE's settings (v324) read
+the loop record through the head too. The port read the voice's own words in both places, which equals rom.4's only
+while the head is the voice's own. From v328 both read through the head (`vc2OscHeadWord`, `Vc2OscPlayers.cpp`), by
+`Vc2OscParts::boundFloat`. The link answers a pool tone's OSC voice's own words from that tone's host
+(`Vc2ToneOscLink::boundFloat` by `hostOf`, the take's way to the other tone). The set-up was the last of a player's
+routines on the object that went out, so `Vc2OscParts::objectCall` is gone.
+
+**The checks.** The set-up's hook is gone from both checks: rom.4's own runs in the voice. The event lookup's hook
+answers only calls from VariPhrase's note-on (`OscHook::from`, by the caller's PR), so the start's lookups run rom.4's
+own. The draws:
+- in xt_vc2osc, the mode 1 part plays 16 runs more a case after its 32, each from a set-up on both sides, the voice
+  compared after it. As half of the 32 they took the walk's state the steers draw, and three of v327's plants went
+  missed.
+- an install of a mode 1 voice is steered first (`oscSteerModeOneSetUp`, `Vc2OscWalkDraws.cpp`). The records at the
+  voice's +0x108…+0x134, as a note's block gives them. The head its own. The head's two tempo words 40…250 BPM: at 0
+  the beat's start divides 0 by 0, and xtf's FTRC takes the NaN otherwise than the interpreter. Byte 0's frame is
+  the table's, as a wave's table follows its own frame: the other frame's stride reads across entries, and positions
+  made of their halves leave the wave (seed 31337 found one). The range in samples half the time. The range's events past the last now
+  and then, one time in eight 0x8000 up (the hold is unsigned). The range's samples about the events'. The walk
+  ±0.1…3.
+- the events' table moves 32 KB up (0x8C0C8000). Its count is written at +0xa. Its stride and first follow a layout
+  drawn per case, wide or narrow, mono or stereo. Each header's format is drawn to match it (3…5 wide, else 0…2, 6,
+  7). One case in two the header's first half word is a mark, and one in two the entry past the last event a return
+  or a turn, each at an event's position. From a first of 8 or 14 half words, v327's searches meet these two, where
+  they had read zeros and two of its plants went missed. The bounce's steer (v327) leaves its mark closed one time in
+  four, where the walk back un-bounces: v327 reached that by chance alone.
+- in xt_vc2tone, a note-on's LITE type 1 blocks get the records too, after the legato's draws, which can make a block
+  so (`oscModeOneBlock`). An install pass's mode 1 voices are steered as above.
+- the legato's earlier mode 1 voice is steered as its note-on left it. One time in six an earlier voice bound to its own
+  tone's parts is made one and installed on both sides, which sets it up. A voice no note bound reads through address
+  0 once a player.
+- half the time a note-on whose take left a LITE voice's head on the earlier tone's goes on into that OSC's settings,
+  on type 0 or 2, whose ways read the loop record. LITE settings' steer keeps such a head where v324's made it the
+  voice's own (`toneSettingsVoice`).
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc's mode 1 part sets up 640,
+  6400 and 6400 times, its installs 16, 189 and 169. xt_vc2tone's install passes and note-ons set up 133, 1181 and
+  1089 times, 19, 175 and 173 of them through an earlier tone's head. 8, 103 and 92 LITE settings read through one.
+- at 400 cases in xt_vc2osc, `Vc2OscWalkStart.cpp`, `Vc2OscModeOneStart.cpp` and `Vc2OscPlayers.cpp` are wholly
+  reached, every line and branch. At 40 cases in xt_vc2tone, so are the first two and `Vc2ToneHostOsc.cpp`, whose new
+  test is one unsigned compare, so both of its sides are reached.
+- `mutate_vc2.py --osc`: 55 new plants on the set-up, the start, the lookup, the head's word, the pool words and the
+  row. `--tone`: 6 on the reads through a take's head, in `Vc2OscPlayers.cpp` and `Vc2OscLite.cpp` under xt_vc2tone
+  (two new port rows) and in the link. All caught. Five older plants follow the text v328 changed. `lite-setup` and
+  `link-object-call` went with what they planted. The whole `--osc` (1,643) and `--tone` (759) lists caught. Not
+  planted, as nothing could show them:
+  - the position the start writes before mode 1's jump writes it again;
+  - the hold of a range's event equal to the last;
+  - the format's sign;
+  - byte 3's 0x40…0x10 the set-up keeps, which the beat's start clears before anything reads them.
+  No rom.2 port changed, so no `mutate_tone.py` plants, by the rule from v327.
+
+**Next.** Mode 1's seek `0x893cc830`: the position held to the range's ends, the find `0x893cc100`, the jump
+`0x893ca160`, the beat's reset. Then the players VariPhrase's band waves use.
+
+### The VC-2's mode 1 (2026-11-21, v327) {#vc2-osc-mode-one}
+
+Step 4.3's fifty-fifth version, the third piece of item 11's fourth part's second half. Kind 1's mode 1, the render
+LITE's install writes for a wave of type 1, `0x893c9f60`, is the voice's own (`Vc2OscModeOne.cpp`), with the players'
+event walk it runs (`Vc2OscWalk.cpp`, `Vc2OscWalkEvents.cpp`). Its set-up `0x893cc760` and its seek `0x893cc830` still
+go out.
+
+**The render.** It is rom.2's `0x8950d880`, which nothing ported (rom.2's converter never makes mode 1), on rom.4's
+object: the words four bytes up from +0x94 (the rate factor +0xa0, the samples +0xec), one routine for mono and stereo
+(the object's 0x40). It runs the beat's block (`0x893c89a0`, v326's `beatBlock`). It scales the step's word by the pitch
+(+0x70) × the rate factor, then finds the next crossing. Then each of its 32 frames:
+- moves by half the step, the fraction 20 bits under the position ×16, inside the range (+0x18 to +0x1c);
+- crossing the next crossing (+0x2c), walks the events and loops that way, then finds the next;
+- at the range's end, holds there, its fraction 0, the end byte +4 set to 1 or −1;
+- reads between two samples by the 24 bits below the position's whole samples. Mono reads half words, stereo left and
+  right ones. The gain at the voice's +0xe0 glides to its target (+0xdc) by its rate (+0xe4), the object's −0x80…, and
+  is ×65536 from rom.4's pool.
+
+Walking back, rom.4 then compares the range's start with the next crossing just found (r1, as `0x893c9380` leaves it),
+not with the position: the forward path reads the position again, this one doesn't.
+
+**The walk.** Its routines are SOLO's walk (rom.2's `0x8950c7e0`, `0x8950ccc0`, `0x8950c880`, `0x8950ca70`; XtSoloVoice
+ports them on its own state, without what follows byte 2), on the object's words. The loop points and modes are read
+through the record at +0x6c, as v326's beat block reads the positions:
+- the event load (`0x893c8f00`): the entry at the table (+0x10) + (number × stride + first) half words, as the SH-4
+  forms it (MULU.W on the low halves). Its kind (flags & 0x0b) goes to +5 and its position to +0x24.
+- the next crossing (`0x893c9380`) is XtSoloVoice's `crossings`;
+- a crossing (`0x893c8f50` forward, `0x893c9140` back) first does the loops' part. A bounce's end turns the walk round.
+  A loop's last point leaves the loop when the loops are off (byte 0's 0x01); otherwise it loops by the mode in its
+  record (One Way, Alternate, hold). Past mode 3, the forward way keeps the loop's bit and rate and the backward way
+  clears them, as XtSoloVoice has it.
+- then, at the event, its kind's way: forward at the next event, back at the current one. A mark (1) gives a sample's
+  step under byte 2's 0x05. A return (2) or a turn (3) acts only when byte 2 opens it (0x01 set; 0x02 set passes one
+  and is cleared). Walking forward, a return goes back to the last mark and jumps there, and a turn turns the walk.
+  Walking back, a mark searches forward to the first return or turn and acts on it. LITE's note-on clears byte 2, and
+  nothing sets it, so these ways wait on a byte nothing writes, as XtSoloVoice notes for rom.2.
+- each player passes its index, r5: 0 mode 1, 4 and 8 SOLO's, 12 and 16 two others. It picks the two event jumps from
+  the tables at `0x893c9350` and `0x893c9364`, and at 16 a turn leaves the step's sign. A row, `Vc2WalkWay`, mode 1's
+  alone so far.
+
+**Found in rom.4's code, kept as it is:**
+- the searches step by an event's own offset, (n × stride + first) half words, not by the stride. A return's search
+  back visits the current event, then the table's start, then below it. A mark's search forward visits the next event,
+  then beyond it.
+- mode 1's jump to the current event (`0x893ca190`) takes the −8 meant for its entry off r4 (which nothing reads after
+  it) where its cached twin (`0x893ca1a0`) takes it off r6. So it reads the next event 8 bytes past where it is.
+- mode 1's jump to a loop's cached event (`0x893ca1a0`) writes the event's number to r4 + 0xc before it sets r4. From
+  the render, r4 is its mask 0xfffff, so the half word goes to 0x0010000b, an odd address: an address error on the XT,
+  at every One Way or hold loop point mode 1 meets. The object's +0xc keeps its number. The port writes it nowhere. The
+  check maps a page there, so the rest of the jump is compared.
+- One Way's, a hold's and a return's writes of the position are written again by mode 1's jumps, so for mode 1 they
+  are dead.
+
+**The port.** The object's words are read and written through `Vc2WalkWords` (`Vc2OscWalk.h`). The events' table and
+the record are read through `Vc2OscParts::boundFloat` by address: a word aligned, as an SH-4 MOV.L must be (so a real
+table's stride and first are even), and a half word as its aligned word's low or high half (`memoryHalf`; the loops'
+modes sit 2 bytes into theirs). The loops' part of the two crossings is one routine over a row (`Crossing`), each mode's way
+a row. The events' ways are rows by kind, each way its own table, since they don't mirror. The render's pool words
+(2^−24, 65536) are in `Vc2OscTables`.
+
+**The checks.** xt_vc2osc no longer hooks `0x893c9f60`, so rom.4's own runs in the voice, in xt_vc2tone too. A part
+of its own runs first (`oscModeOnePart`, `Vc2OscModeOneCheck.cpp`), after the hooks' install and before the voice part.
+It calls rom.4's `0x893c9f60` on voice 0's object against `vc2OscModeOne`. Each case draws a wave and a table, then
+plays 32 runs of 8 blocks, the words drawn before each run, so the walk goes on through its events and loops: 10240
+blocks at 40 cases, where the voice part, drawing the words before every block, gives about 240. It draws from a
+generator of its own and puts the renders' back after. The first plant run, without the part, missed 19 of 161 at 40
+cases. With 8 runs a case, each move of the draws lost a few others, caught by one or two cases; at 32 all but one of
+the 161 are caught at 20 cases too. The draws, the voice part's and the part's alike:
+- each case at the wave's draw, an events' table at 0x8C0C0000 (`oscDrawEventTable`, `Vc2OscWalkDraws.cpp`): 4…12
+  events of a stride of 4, 6 or 8 half words from a first of 0 or 2, rising through frames 2500…4900 about the loop
+  events'. Their kinds are a mark, a return or a turn three times in four, the first a mark half the time, where a
+  return's search ends. The region about the table is zeros, which the searches reach. It goes into rom.4's memory and
+  the records (`OscRecords::events`), which the port's parts read (`OscPortParts::boundFloat`).
+- the +0xe0 records gain their cached events' numbers and the two loops' modes, 0…3 or past them, and one loop point
+  in four lies at an event (`oscDrawLoopEvents`);
+- before a render through mode 1, the object's words as a note gives them about the table (`oscDrawModeOneWords`):
+  the beat's words (`oscDrawBeatWords`, the heads' lines moved), the range about the events and the position in it,
+  the current and the last event, the pitch and rates 0.5…2, the gain's three. Byte 2 opens returns and turns three
+  times in four. Then one of four steers (`steerWalk`, a row each):
+  - bouncing as an Alternate loop leaves it, the walk forward: in the forward loop (byte 3's 0x08 alone, the step
+    back, at a mark with byte 2 open) or the backward one (0x04). The event it goes to is put at the loop's last point
+    (the backward loop's start, the forward's end), the position whole samples before it, where a crossing meets the
+    point while bouncing. The beat's tail clears 0x08 when the walk goes back or with 0x04.
+  - a sample's step (byte 3's 0x01, the pitch and rate 1, the fraction 0) from whole samples before the event ahead,
+    so that a frame lands on the crossing;
+  - at a loop point ahead, near or far: a sample's step onto it, or the position on it, in both loops. Only a start on
+    the point shows a crossing found there as the walk stands on it (`walk-past`): from a landing, its second
+    crossing repeats its first.
+  - or none.
+- xt_vc2osc's render event gives the voice mode 1's render word one render in four (`oscSteerRenders`, given the
+  shared draws from v327);
+- `oscInstallRom` maps a page at 0x80100000 for the cached jump's stray write.
+
+Not drawn:
+- an odd stride or first, whose entries' positions would be MOV.Ls off their alignment (an address error on the XT,
+  which the interpreter reads anyway), and a stride or first past 0x7f, whose sign extension rom.4 takes;
+- positions outside the case's wave, where rom.4 reads unmapped memory;
+- a cached jump from a player other than mode 1, which has no row yet.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. The mode 1 part plays 10240, 102400 and
+  102400 blocks; the voice part renders 233, 2355 and 2466 through mode 1. xt_vc2tone reaches it too: 9 renders at 40
+  cases, by coverage, as its steer file (at the kit's 300 lines) has no room for a count.
+- at 400 cases, `Vc2OscModeOne.cpp`, `Vc2OscWalk.cpp` and `Vc2OscWalkEvents.cpp` are wholly reached, every line and
+  branch, but a turn's `keepsSign`, which only index 16's row would set.
+- `mutate_vc2.py --osc`: 161 new plants on the render, the walk, its events' ways, the pool words and the row, all
+  caught; at 20 cases all but `ev-back-mark-last`. Not planted, as nothing can show them: `keepsSign`, and the
+  position One Way, a hold and a return write before mode 1's jump writes it again. The whole `--osc` (1,589) and
+  `--tone` (754) lists caught. No rom.2 port changed, so no `mutate_tone.py` plants run, by the rule from v327.
+
+**Next.** Mode 1's set-up `0x893cc760` (SOLO's start `0x893cc1a0`, `0x893ccf50`, then the beat's start) and its seek
+`0x893cc830` (the event lookup `0x893cc100`, the jump `0x893ca160`, the beat's reset), which SOLO's walk shares.
+
+### The VC-2's LITE heads (2026-11-21, v326) {#vc2-osc-lite-heads}
+
+Step 4.3's fifty-fourth version, the second piece of item 11's fourth part's second half. LITE's heads' renders,
+`0x893c6e80` (mono) and `0x893c6e8c` (stereo), are the voice's own (`Vc2OscHeads.cpp`), two more rows of its own
+renders.
+
+**rom.4's heads against rom.2's.** They are rom.2's `0x8950a7f0` and `0x8950a7fc`, which `XtLitePlayer` ports,
+instruction for instruction but for two things:
+- their words lie four bytes up from +0x94: the one base offset the code holds is 0xec where rom.2's is 0xe8;
+- their backward reads take each sample as it is. rom.2 negates it and adds (FNEG, FADD: the head's sample read
+  −s + (s′ − s) × the fraction, s′ the one before it); rom.4 subtracts (FSUB: s + (s′ − s) × the fraction). That holds
+  for all six backward reads, two in the mono kernel and four in the stereo. It is the plan's "the right way up".
+
+**The beat's block first.** Each render starts with rom.4's `0x893c8990`, which is rom.2's `0x8950c280` (under a
+wrapper that keeps MACH, MACL and PR) but for two things:
+- its steer gives up only four steps past the target. A SHLL2 on the step in a branch's delay slot (`0x893c8c30`)
+  makes the compare against four steps, where rom.2's is against one. `XtBeat` gains `pastShift`: rom.2's 0, rom.4's 2.
+- the word a hold's end sets 1, the object's +0xa0 (rom.2's +0x9c), lies four bytes up with the rest.
+
+It reads the loop's positions through the record the object's +0x6c names: LITE's note-on copies the block's +0xe0
+record's pointer there. They are its four loop events' positions, 0xb4 bytes apart from +0x4: the forward loop's start
+and end, then the backward's end and start, ×16.
+
+Its tail, which `XtBeat::block` leaves to its callers, gives the walk step's word (+0x34) by the object's byte 3:
+- with 0x40 the walk is held, the word 0, until it goes the way 0x20 says; then 0x70 is cleared and +0xa0 set to 1;
+- else the walk's word, or one sample's (±2^25 by the walk's way) with 0x01, turned with 0x08 going forward (going
+  back 0x08 is cleared) and with 0x04 going back (going forward 0x08 is cleared, sic), and turned with 0x02.
+
+`XtMbPlayer::blockImpl` ports that tail but for 0x01 and 0x02, and `XtLitePlayer` none of it. On rom.4 a LITE voice's
+byte 3 keeps its 0x01 through the beat's start, so the VC-2's port keeps the whole tail. Whether rom.2's LITE player
+can meet a byte 3 another player left set is not looked at here.
+
+**The port.** `Vc2OscVoice::beatBlock` (`Vc2OscBeat.cpp`) runs XtBeat's block on the voice's words with rom.4's
+shift, the positions read through `Vc2OscParts::boundFloat`, then the tail. `vc2OscHeads` then runs an `XtLitePlayer`
+on the object's words:
+- `XtLitePlayer::words()` lists each word its block reads or writes as an `XtWord`: its place in rom.2's object, its
+  member and its bytes. v325's two copies are now one pair, `vc2OscWordsFrom` and `vc2OscWordsTo`, for the beat and
+  the heads alike.
+- its block takes the step's word it is given (`walkBlock`), its samples are rom.4's halfwords read by the address the
+  SH-4 forms (`XtLiteSamples`), and its backward reads are rom.4's (`setUpright`).
+- its output stage moved, its lines as they were, into a routine of its own (`out`), to keep `frame` within the kit's
+  size. For rom.2's player nothing changes: xt_tone and PluginTest's LITE waves are as they were.
+
+**The checks.** xt_vc2osc no longer hooks the two renders: rom.4's own run in the voice, in xt_vc2tone too. Before a
+render through the heads, the object's words are drawn as a note gives them (`oscDrawHeadsWords`):
+- a range and both loops inside a wave of 8192 frames, each loop 64 frames or more, the walk's position about them
+  and the heads within a period of it, a period of 50…400 frames, a pitch and formant of 0.5…2;
+- the gain and its target 0…0.5 (two heads at full scale give full scale), the beat's factor and its integral 0…2, the
+  beat's position about the loop events', Tempo Sync and Time Trip off three times in four;
+- byte 3 any byte half the time: a hold, a turn, a sample's step. Left as other events had left it, no hold was let go
+  with 0x10 set, which the hold's end clears.
+
+xt_vc2osc's render event gives the voice the heads' render word one time in four, as only LITE's install writes it.
+Its analog draws now give a SQUARE near the root a pitch in one of its edge's steps, each step as likely, and the
+code's copy (+0x248), which the update reads, SQUARE too (`steerSquareSteps`, from the renders' generator; the bounds
+read from rom.4's memory). The update's first step is a semitone of the two octaves drawn: v325's run happened to reach
+it at 40 cases and v326's didn't.
+The records' loop events (`oscDrawLoopEvents`) are drawn from the renders' generator in both checks. Not drawn:
+- a loop of no length: rom.4's wrap never ends;
+- positions far from the loops, where its wrap's sum would stand still;
+- a NaN in the beat's integral: xtf's FTRC of a NaN isn't the SH-4's. The first run at seed 7 met one through the
+  steer into the walk's position.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc renders 240, 2477 and 2504
+  blocks through the heads, xt_vc2tone 21, 251 and 232.
+- `Vc2OscHeads.cpp` and `Vc2OscBeat.cpp` wholly reached, every line and branch, and both of the beat's wraps. In
+  `XtLitePlayer.cpp`, every line the VC-2 runs is reached at 400 cases but the guards against a loop of no length
+  (rom.4 has none, and the draws give none). Its lines for rom.2 alone (the note-on, seek, block update, the negated
+  backward read, the beat's own step) are xt_tone's.
+- `mutate_vc2.py --osc`: 51 new plants on the heads, the beat block, the words' tables and XtLitePlayer's new lines,
+  all caught. `beat-held-keeps` went missed until byte 3 was drawn. `heads-words-last` first dropped a row nothing
+  reads back, so it now drops the rows from the eighteenth. A plant in `XtBeat.h` can't be made by a VC-2 port; its
+  shift is `beat-rom4-past`'s in Vc2OscBeat.cpp, and `reach()` is under `mutate_tone.py`'s `beat-past`. The whole
+  `--osc` (1,428) and `--tone` (754) lists caught.
+- `mutate_tone.py` (XtLitePlayer.cpp and XtMultiBandPlayer.cpp changed): `beat-past`, `beat-past-sign` and `xfg-step`
+  rewritten on the lines they plant, all caught; of the whole 1,191, all caught but `check-pad-cc` (the gap since
+  v189), and the four `plays-` ERRORs v268 found, whose text is in XtSynthOut.cpp from v204.
+
+**Next.** Kind 1's mode 1 (`0x893c9f60`, its set-up `0x893cc760` and its seek `0x893cc830`), with VariPhrase's band
+players, whose routines it calls. With it LITE is whole.
+
+### The VC-2's players' beat and seeks (2026-11-21, v325) {#vc2-osc-beat-seeks}
+
+Step 4.3's fifty-third version, the first piece of item 11's fourth part's second half. The players' beat, and the two
+seeks with no band player in them, are the voice's own (`Vc2OscBeat.cpp`).
+
+**The beat.** rom.4's `0x893cbf40(object)` is rom.2's `0x8950f860` instruction for instruction, and `0x893cbfe0` is
+rom.2's `0x8950f900`: the beat's start and reset, which `XtBeat` ports (XtMultiBandPlayer.cpp). Their words in the
+object (+0x15c) sit where rom.2's do:
+- the clocks and Time Trip steps not yet taken (+0x40, +0x41: the voice's +0x19c and +0x19d, v324's count and
+  matched count);
+- the wave's Original Tempo and the note's (+0x48, the wave header's +0x1c; +0x4c, the block's +0x60 × 10000);
+- a clock's step and the budget, the sync's, trip's, walk's and beat's positions (+0x50…+0x64);
+- the factor and its integral (+0x8c, +0x90).
+
+The voice copies them into an `XtBeat` (`Vc2OscBeatWord`: each word's place in the voice and in XtBeat), runs its
+routine and writes them back.
+- The start, which LITE's note-on calls after the type's words and before its seek: the factor is the note's tempo
+  over the wave's, a clock's step is 564479918080 over the wave's, the counts and positions are 0, and the beat's
+  position is the player's (+0x38, the voice's +0x194) × 32. It also clears bits 1…6 of the object's byte 3, which
+  XtBeat doesn't hold, so the voice clears them after it.
+- The reset, where both seeks end: the factor is 0 under Time Trip (the object's byte 0's 0x04), else the start's;
+  its integral is the factor, the budget twice the step, and the three positions 0.
+
+rom.4's two pool words there, 2^32 and 564479918080, are rom.2's, which XtBeat holds.
+
+**The seeks.** `0x893c6360(object, at)` is rom.2's `0x89509840` (`XtLinearPlayer::seek`), and `0x893c6de0` is rom.2's
+`0x8950a780` (`XtLitePlayer::seek`). Each runs on rom.4's object, four bytes up, then jumps to the reset.
+- Vari off's: the position (+0x24c) is the sample (`at` >> 4), its fraction (+0x248) 0. LITE's type 0 seeks through
+  it, and VariPhrase's Vari off too, at its note-on (types 1, 6, 7 and 8) and a re-seek (1, 6 and 8).
+- The heads': the walk's position (+0x270) is the sample as a float and both heads (+0x254, +0x258) the sample.
+  Their fractions and the first window's phase and clock are 0. The second window's are the period (+0x2ac) × the
+  seek's own pool word, 0.5 (`0x893c6e60`).
+
+The voice's seeks are now one table by address, as its renders are (`kOwnSeeks`, `Vc2OscVoice::seekBy`). The note-ons
+and the re-seek name their seek by address as before. Any other seek still goes out through `Vc2OscParts`: mode 1's
+`0x893cc830` and the band players' `0x893cc630`, `0x893cd090` and `0x893cd440`. Those call the band players' own
+routines (`0x893cc100`, `0x893ca160`) and will come with them.
+
+**The checks.** xt_vc2osc no longer hooks the three routines: rom.4's own run in the voice, in xt_vc2tone too. The draws
+are unchanged. The words the beat reads were already noise or a note's, and both of the reset's ways come: at 40
+cases, 105 of 221 resets are under Time Trip.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. At 40 cases xt_vc2osc runs the start 383
+  times and the voice's own seeks 221 times: the calls out fell from 399 object calls and 330 seeks to 16 and 109.
+- `Vc2OscBeat.cpp`, `Vc2OscLite.cpp`, `Vc2OscPlayers.cpp` and XtBeat's start and reset wholly reached, every line
+  and branch.
+- `mutate_vc2.py --osc`: 45 new plants (the beat's words, start and reset, the own seeks' table and shift, XtBeat's
+  two routines, both seeks' laws, the half period's pool word, the re-seek's way), and 9 rewritten on the calls that
+  replaced the hooked ones, all caught. One of them, `ev-seek-pos`, now plants the event the seek looks up. The
+  position a VariPhrase note-on gives its Vari off seek is written over by Vari off's start right after it
+  (`vc2OscVariOffStart`), in rom.4 too, so shifting it changes nothing; that showed once the seek was the voice's own.
+  The whole `--osc` list (1,377) and `--tone` list (754) caught.
+
+**Next.** LITE's heads' renders, `0x893c6e80` and `0x893c6e8c`, on `XtLitePlayer`. Kind 1's mode 1 (`0x893c9f60`, its
+set-up `0x893cc760` and its seek `0x893cc830`) comes with VariPhrase's band players, whose routines it calls.
+
+### The VC-2's LITE update and settings (2026-11-21, v324) {#vc2-osc-lite-update}
+
+Step 4.3's fifty-second version, the first half of item 11's fourth part: LITE's update and settings, kind 1's, are
+the voice's own (`Vc2OscVoice::updateLite`, `settingsLite`, in `Vc2OscLite.cpp` beside v240's note-on). They are its
+row's ways, `Vc2OscUpdate::lite` and `Vc2OscSettings::lite`. Until v324 they went out by address through `Vc2OscParts`.
+
+**The update, `0x893c8280(voice)`.** By the wave's type (+0x104); past 2 it does nothing. It writes into the object:
+- the tuned ratio (`0x893afb80`) into +0x1cc;
+- for type 0, the walk's and formant's targets (`0x893afc30`, `0x893afca0`) into +0x1d8 and +0x1d0; for types 1 and
+  2, the walk and the formant themselves (`0x893afdf0`, `0x893afeb0`);
+- the gain (`0x893aff30`) into +0x1dc;
+- for type 2 only, the heads' filter rate (+0x25c): the root's Hz × the pitch × its own pool word (`0x893c84a0`,
+  the note-on's value).
+
+Type 0's four are the note-on's first four targets, so the update takes those rows (`kTargets`).
+
+**The settings, `0x893c8390(voice, the settings' +0xb0)`.** The settings' words from there are the block's from +0xb0.
+- With +0x40 set, the object's 0x04 held and +0x3c clear: a seek pending (+0xa8c) and the gain's target (+0x1dc) 0.
+- With 0x04 clear and +0x3c set: the matched count's byte (+0x19d) 1.
+- With 0x02 clear and +0x38 set: the count's byte (+0x19c) 0.
+- The object's bits 0x04, 0x02 and 0x01 from +0x3c, +0x38 and +0x34, as the note-on takes them from the block
+  (`kBits`). None of these stores touches the flags byte, so rom.4's three re-reads of it read the same.
+- Then, by the settings' own type word, not the voice's, through the loop record. rom.4 reads it through the head the
+  note-on leaves at +0x1a0: the voice's own +0x108's address, so +0x28 there is the voice's +0x130. It reads it
+  whatever the type.
+  - Type 0: Vari off's range (+0x26c, +0x254) and one side. With the walk below 0, the backward loop and its mode;
+    else the forward's. The mode is the loop record's by the object's 0x01, where the note-on takes the block's
+    +0x148 for the backward one.
+  - Type 2: the heads' range and loops as floats with their modes, its own 2^32 (`0x893c8650`) for the unsigned
+    ones.
+  - Type 1 and past 2: nothing.
+
+The shared parts are factored out of the note-ons, not copied:
+- `headsLoops`, from v240's `twoHeads`;
+- `vc2OscVariOffLoops`, v238's `vc2OscVariOffOf` without the rate factors;
+- `vc2OscSetVariOffSide`, the range and one side, which `vc2OscSetVariOff` now calls for both.
+
+**The checks.** xt_vc2osc no longer hooks the two routines: rom.4's own run in the voice. Before a settings on a LITE
+voice (`oscSteerLiteSettings`, from the renders' generator):
+- the head's address is the voice's own +0x108's, as its note-on leaves it. rom.4 reads through it, so noise there
+  read rom.4's memory;
+- half the time the settings' type 0…2;
+- each of its four switches 0 or 1 half the time. As noise they were never 0, which left the seek's path unreached.
+
+xt_vc2tone does the same before an OSC settings. It also draws one note-on input in four with both OSCs VariPhrase
+(`toneOscBlockOfKind` on kind 2 and a type its install has a render for, from the renders' generator). With LITE's
+update its own, only VariPhrase's update (`0x893c88b0`, `0x893c8670`) still calls out, and a voice's update writes
+only its own words. So the tone's order of its two OSC updates shows only in the calls of a tone whose OSCs are both
+VariPhrase. Without the draw, v322's plant `update-osc-order` went unseen at 40 cases. The run's other counts move
+with the draw: what a note-on leaves decides later draws.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400):
+  - xt_vc2osc: 72, 592 and 599 LITE updates and 52, 591 and 601 settings on a type with a way;
+  - xt_vc2tone: 4, 18 and 22 settings; 342, 3214 and 3351 inputs of two VariPhrase OSCs.
+- `Vc2OscLite.cpp` and `Vc2OscPlayers.cpp` wholly reached, every line and branch.
+- `mutate_vc2.py --osc`: 41 new plants (the update's types, targets and filter rate, the settings' bits, side effects
+  and both types' ways, the shared sides and loops, the two pool words, the rows' ways) and 9 of v240's and the
+  kinds' rows rewritten on the new names; all 50 caught. The whole `--osc` list (1,332) and `--tone` list (754) caught,
+  `update-osc-order` among them again with the two-VariPhrase draw.
+
+**Next.** The second half of item 11's fourth part: LITE's object routine `0x893cbf40`, its heads' renders
+`0x893c6e80` and `0x893c6e8c` on `XtLitePlayer`, kind 1's mode 1 (`0x893c9f60`, its set-up `0x893cc760`) and its
+seeks.
+
+### The VC-2's Vari off renders on the voice (2026-11-21, v323) {#vc2-osc-vari-off-joined}
+
+Step 4.3's fifty-first version, item 11's third part: Vari off's two renders, `0x893c63c0` (mono) and `0x893c66e0`
+(stereo), join the OSC voice. Until v323 they went out by address through `Vc2OscParts`. They were ported in v261
+("The VC-2's Vari off") as `vc2OscVariOffMono` and `vc2OscVariOffStereo` and checked alone against rom.4's own.
+LITE's and VariPhrase's installs (v238) write them at +0xa44 for the waves' types and the block's Vari off bit.
+
+**The voice's own renders, one table by address.** rom.4's render (`0x893ae9f0`) calls whatever +0xa44 names, as
+`(out, the object, third)`. The voice keeps the renders it has as rows of the address and its way (`kOwnRenders`,
+`Vc2OscVoice::renderOwn`), and sends any other out by its address, as before:
+- v322's EXT IN renders, `renderExtIn` given the frame's words, kind 4's 0 and 1 and kind 7's 4 and 4;
+- Vari off's two, on the wave its object's +0xf4 points into.
+
+That wave comes through a new `Vc2OscParts::waveSamples()`, a `Vc2OscSamples` of the wave memory (v261's struct,
+moved into the voice's header). The tone host's link passes it to the deriving class, which in the part will give the
+VC-2's own wave memory. Neither render reads the third argument, the object's +0x15c.
+
+**The checks.** xt_vc2osc no longer hooks the two renders: rom.4's own run in the voice.
+- Each case draws a wave of 16,384 halfwords into rom.4's memory and the port's parts (`oscDrawWave`). It comes from
+  the renders' generator of their own (v322's, named `OscShared::renders` from v323), so the run's other draws stay.
+- Before a render through Vari off, the object's words are drawn as v261's part draws them, on that wave
+  (`oscSteerRenders`). That keeps the reads inside the wave, which past it are rom.4's memory, and the wrap's length
+  above 0, where rom.4's loop would never end. v261's draws of the wave and the words moved out of
+  `Vc2VariOffCheck.cpp` into the shared draws (`oscDrawHalfwords`, `oscDrawVariOffWords`), with the object words'
+  offsets (`OscVariOff`). v261's part draws as it did, its line unchanged.
+- Only LITE's and VariPhrase's installs write Vari off's addresses, which left 3 blocks in 40 cases. So one render in
+  four now makes the voice's render word one of the two, from the renders' generator.
+
+xt_vc2tone's voices run the same, the steer before each tone's render (`toneSteerRenders`, v322's `toneSteerExtIn`).
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400):
+  - xt_vc2osc: 275, 2,575 and 2,627 blocks through Vari off's renders;
+  - xt_vc2tone: 59, 492 and 533 tone renders with an OSC through them.
+- Every line of the table, the link and Vari off's port reached. In the port the one branch not taken is v261's: the
+  wrap's guard, which rom.4 has no way to survive.
+- `mutate_vc2.py --osc`: 7 new plants (Vari off's rows' addresses and ways, their wave, the table's render) and 11
+  of v322's rewritten on the table and `renderExtIn`'s words, 0 missed. The whole list, 1,291, and `--tone`, 754 with
+  the link's new plant, all caught.
+
+**Next.** Item 11's fourth part: LITE's own routines, its update `0x893c8280` and settings `0x893c8390`, its object
+routine `0x893cbf40`, its heads' renders on `XtLitePlayer`, kind 1's mode 1 and its seeks.
+
+### The VC-2's EXT IN player (2026-11-20, v322) {#vc2-osc-ext-in}
+
+Step 4.3's fiftieth version, item 11's second part: the EXT IN player's three routines join the OSC voice
+(`Vc2OscNoteOn.cpp`, beside kinds 4–7's note-ons, on the object's words those set). Until v322 they went out by
+address through `Vc2OscParts`.
+
+**The update, `0x893c6260(voice)`:**
+- the ratio (`0x893afb40`) into the object's pitch (+0x1cc);
+- the gain (`0x893aff30`) into its target (+0x1dc), with the level left to go to it.
+
+Kinds 4 and 7 run it after ramp 0's tick, as their row's update (`Vc2OscUpdate::extIn`). Kind 6 runs it before its
+ramps, then its own `0x893b0150`. The row's address for that, `updateFirst`, becomes a flag (`extInFirst`), as no
+other kind has one.
+
+**The renders, `0x893c62e0` (kind 4's install's) and `0x893c61e0` (kind 7's), each `(out, the object)`:**
+- 32 frames of 32 bytes from `[0x8993eadc]`, the pointer the part mixer reads its input by (its mic is the frame's
+  word 1, the input stage's word 5);
+- kind 4's render plays words 0 and 1, kind 7's word 4 on both sides, each as an integer times the level (+0x1e0);
+- after each sample the level goes 1/32 of the way to the target by FMAC: (target − level) × 1/32, rounded, then
+  added. Kind 4's keeps it in a register and stores it at the end, kind 7's at every sample: the same words.
+
+That is rom.2's player's law, `0x895097d0`, which reads its own pointer's first two words. So both renders run on
+v203's `XtExtInPlayer`, seeded from the object's level and target and the level written back. Neither reads the
+object's pitch.
+
+The voice's render finds them by the address its install wrote at +0xa44 (`Vc2OscVoice::renderExtIn`), as rom.4
+calls through it. Any other address still goes out to its parts. The analog's render word (+0xa48) only ever holds
+the analog's renders, so it keeps going out. The frames come through a new `Vc2OscParts::inputFrames()`. The tone
+host's link passes it to the deriving class, which in the part will give the mixer's own input.
+
+**The checks.** xt_vc2osc no longer hooks the three routines: rom.4's own run in the voice, compared whole after every
+event, the render's output after each render.
+- The frames are drawn before every event into rom.4's memory, with `[0x8993eadc]` aimed at them, and given to the
+  port's parts (`oscDrawAnswers`).
+- They come from a generator of their own, seeded from the run's (`OscShared::extIn`), so the run's other draws stay
+  as v321 drew them. xt_vc2osc's osc and kinds lines are unchanged.
+- Before a render through the player (`oscPlaysExtIn`), a level or target past ±1 is drawn again within 0…1, as a
+  note gives them (`oscSteerExtIn`). There are two reasons:
+  - The render takes the level from the target by `xtf::sub`, whose NaN's sign is FSUB's negated.
+  - In xt_vc2tone the player's output is OSC 2's into the tone's delay mix (v269), which moves its delay by it. Past
+    full scale the delay reads past the mix's lines: with levels up to ±1000, seed 7 crashed in the mix's
+    `delayedSample`.
+
+xt_vc2tone's tones' voices run the same, through the host's link.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400):
+  - xt_vc2osc: 464, 4,449 and 4,548 blocks through the player's renders;
+  - xt_vc2tone: 478, 4,442 and 4,024 tone renders with an OSC through them.
+- Every line and branch of the three routines and the link reached in both checks.
+- `mutate_vc2.py --osc`: 29 new plants and 7 rewritten on the new code, 0 missed. The new ones are the update's
+  targets, the renders' words, addresses and frame shape, the level's start, target and write-back, the rows' ways and
+  the voice's way to them, and three on `XtExtInPlayer` itself through xt_vc2osc (`vc2xtextin`). The rewritten ones
+  are five row plants, the first update's order and the render's answer. The whole list, 1,284, and `--tone`, 753 with
+  the link's new plant, all caught.
+
+**Next.** Item 11's third part: Vari off's renders (`0x893c63c0`, `0x893c66e0`, v261's ports) joined, with the wave's
+samples through the voice's parts.
+
+### The VC-2's kinds 5 and 6 updates on the voice (2026-11-20, v321) {#vc2-osc-kind-updates}
+
+Step 4.3's forty-ninth version, item 11's first part (VC2_MODE_PLAN.md, step 4.3): the OSC kinds' routines the voice
+still reaches by rom.4's address come into the port before Vc2Synth holds the 24 tone hosts (the user's choice,
+2026-11-20). The first two are kinds 5's and 6's updates, which `0x893ae1c0` calls after the kind's ramps:
+- `0x893afff0`, the VOCODER OSC's (kind 5), was ported in v222 as `vc2Kind5Update` on a `Vc2Kind5Voice` of drawn
+  words. Its law is in "The VOCODER OSC's converter and kind 5's update";
+- `0x893b0150`, the mic's pitch shifter's (kind 6), had no port.
+
+Both now run in the voice as the port's own (`Vc2OscVoice::updateCarrier` and `updateKind6`, `Vc2OscNoteOn.cpp`).
+Each is a row's way, `Vc2OscUpdate::carrier` and `kind6` (`Vc2OscVoiceKinds.cpp`), as the analog's update became one
+in v248.
+
+**Kind 5's.** The voice fills `Vc2Kind5Voice` from its own words where `0x893afff0` reads them:
+- the cents +0x5c, bound envelope 0's output (+0x4c) times the depth +0x70, and the vibrato's pitch output times +0xfc;
+- the pitch ramp's value (+0x90c's `0x893b1160`), the tail's offset (+0xa70);
+- the ratio's scale +0x60 and the tail's rate ratio (+0xa6c);
+- the gain: the vibrato's level times +0x100, then +0x88, +0xb0 and the pitch ramp's factor (+0x960);
+- the growl's envelope 1 and LFO 5, and the balance's envelope 2 and LFO 6, each bound object's output (an LFO's
+  +0x38).
+
+`vc2Kind5Update` writes P (+0x104) back and gives the carrier its update with the input stage's peak (`0x899d9a5c`).
+The voice asks its parts for that peak, `Vc2OscParts::inputPeak`. The tone host's link passes the question to the
+deriving class (`Vc2ToneOscLink::inputPeak`), as it does the mic ring and the unvoiced decision: in the part it is
+the input stage's, which Vc2Synth will hold.
+
+**Kind 6's, `0x893b0150(voice)`.** The row's first routine, `0x893c6260`, runs before the ramps (the EXT IN player's
+update, still by its address: item 11's next part). Then, after ramps 0 and 1:
+- P+0 = the ratio, 2^(the cents' sum / 1200) × +0x60 × the rate's ratio. Its bounds are its own pool's
+  (`0x893b0254…0x893b0268`: ±6000 cents, 1/1200, ±32), as the targets' `ratioOn` takes a pool. Those are the same
+  values as the kinds' note-on's pool (`0x893af35c…`) and the ratios' (`0x893afdc8…`);
+- P+4 = the formant (`0x893afeb0`), P+8 = the gain (`0x893aff30`), P+0xc = kind 6's level (+0x6c);
+- kind 6's set `0x893ec790` on P (`Vc2Kind6::set`).
+
+The object's pitch (+0x1cc) keeps what the note-on wrote.
+
+**The checks.** xt_vc2osc no longer hooks `0x893afff0` and `0x893b0150`: rom.4's own run in the voice against the
+port's, with the voice compared whole after every event, P and the carrier among it. What they read is drawn as a note
+gives it:
+- the input stage's peak before every event, 0 one time in four, else a level, into rom.4's word and the port's
+  answer;
+- on a kind-5 or kind-6 voice, P's growl and balance terms (+0x134 within 0…1, +0x148 within 0…2) and their
+  envelope's and LFO's depths (±1), and the carrier's Dynamics Threshold and Sensitivity (+0x128, +0x12c), beside
+  v266's levels.
+
+Two of those words lie over the block's record pointers, +0x128 the header's and +0x134 the +0xe0 record's, which a
+player's note-on reads. When the kinds' note-on makes a kind-5 voice a player, LITE's note-on read through a level as
+an address and faulted (case 0 at 40 cases, rom.4's side), so that event draws the records again
+(`oscDrawRecordWords`).
+
+The pitch ramp's factor is 1 once its phase has run to 65536, a few ticks after a case's start. So the first run
+missed a gain without it. Half the time an update on a kind-5 voice now draws the factor's phase within 0…32768 with a
+depth, and a count of 0…3, so the factor is short of its end when the update reads it. In the part that factor is
+always 1: only the restart `0x893b11a0`, which nothing calls, gives it a depth.
+
+The new draws moved both runs, and three older plants lost the rare cases they were caught by, so three draws keep
+them:
+- xt_vc2osc's `sub-plain-phase` (v244), the sub oscillator's end at HQ and NOISE holding a negative phase to 0, needs
+  a kind-3 note with the sub on, one of those three codes and a negative phase. With the sub on, one time in three the
+  code is now HQ-SQUARE, HQ-SAW or NOISE.
+- xt_vc2tone's `methods-position-bound` (v273), the position getter given a number past the OSCs', needs the voice
+  the number would wrongly name to have a position. In xt_vc2tone the players' renders are hooked and write none, so a
+  LITE's or VariPhrase voice kept its note-on's, mostly 0. Before a getter, half the time, such a voice's positions
+  (+0x194, +0x24c, +0x270) are now drawn on both sides, as v319 drew its +0x168.
+- xt_vc2tone's `host-new-block-cosm-sound` (v318), a COSM's new block not given to its sound, shows only in a render
+  before the next update converts again: about twice in 40 cases (11 times in 200), and this run none. Half the time
+  a COSM's new block now goes on into a render of the same tone (`toneRenderOf`, the render event on a given tone):
+  six times in 40 cases.
+
+xt_vc2tone's OSC voices run the same, rom.4's in its tone against the host's. Its hooks' answers (the clock, the
+peak, a render's answer, a seek's flags, the event lookup's positions) come from the same routine as xt_vc2osc's,
+`oscDrawAnswers` (`Vc2OscPartDraws.cpp`); the two checks' copies of it are now one.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at seeds 2024 (40 cases), 7 and 31337 (400). Their count lines moved with
+  the new draws; xt_vc2osc's ramp, Vari off and vibrato parts are unchanged.
+- Every line and branch of the two updates and the voice's new switch reached, but kind 5's least ratio, −32. It needs
+  a negative factor, and a note's are positive (2^x, +0x60, the rate's ratio). xt_vc2carrier's second part reaches it
+  on drawn words (its second ratio now and then below 0).
+- `mutate_vc2.py --osc`: 51 new plants (kind 5's wiring and its offsets, kind 6's, its pool's addresses, the rows and
+  the voice's switch) and 8 rewritten on the new code (five row plants, the update's two, k5-pitch). The first run
+  missed three. Two were taken out as equivalent: kind 6's update on the kinds' note-on's pool or the ratios' bounds,
+  whose words are its own pool's. The third was kind 5's gain without the ramp's factor, which the factor's draw now
+  reaches. The whole list, 1,255, and `--tone`, 752 with the link's new plant, all caught.
+
+**Next.** Item 11's second part: the EXT IN player (`0x893c6260`, `0x893c62e0`, `0x893c61e0`), kinds 4 and 7 and kind
+6's first routine.
+
+### The VC-2's shared routines for the plugin (2026-11-20, v320) {#vc2-tone-math}
+
+Step 4.3's forty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-fifth part). The VC-2's ports take four
+routines through `Vc2ToneShared`: the velocity curve `0x893a7fb0`, exp2 `0x893a8340`, logf `0x895065f4` and powf
+`0x89506e54`. The OSC voices, their ramps, the COSMs' converters and the carrier all reach them. Until v320 only the
+checks gave them, rom.4's own in the interpreter (`RomShared`). `Vc2ToneMath` gives them to the plugin, where
+Vc2Synth's tone hosts need them next:
+- the velocity curve and exp2 are rom.2's ports of the same code, XtOsc's `xtVelCurveValue` (`0x894ebd60`) and
+  `xtOscExp2` (`0x894ec090`), on their tables from the rom.2 the plugin loads beside rom.4;
+- logf and powf are rom.4's own, `Vc2LibMath` (v257).
+
+**What rom.4's two do, against rom.2's ports.** Read at `0x893a7fb0`, and run against them both:
+- **The velocity curve is rom.2's code.** A sens of 0 answers 0x8000, and so does a curve from 7 on. A sens from 200
+  on takes 0x10000, from −200 down −0x10000, and else the sens table; then the curve's 128 bytes by the velocity.
+  It differs from rom.2's port in three places, all outside what the part gives:
+  - it tests the curve against 7 alone (`cmp/ge`), so a curve below 0 reads a pointer from before its table of
+    eight, where rom.2's port answers 0x8000;
+  - it takes the sens by `exts.w`, its low 16 bits;
+  - a velocity past 127 reads past the curve's 128 bytes, where rom.2's port holds it to 127.
+- **exp2 is the same within ±7 octaves.** Past them rom.4 reads on beyond its seven words ("The VC-2's LITE
+  note-on"), where rom.2's port holds the octave at 6. The part's pitch keeps within ±6000 cents.
+
+**The check.** xt_vc2libm's second part (`Vc2ToneMathCheck.cpp`) holds the class to rom.4's own, every answer bit for
+bit:
+- the velocity curve on every velocity 0…127, sens −260…260 and curve 0…9, 666,880 calls;
+- exp2 on its edges within ±7 octaves (each whole octave and either side, the fraction's first and last steps) and
+  every 2048th float pattern within them, from an offset the seed draws, both signs: 1,063,030 calls;
+- logf and powf through the class on 20,000 of the first part's draws each.
+
+It loads XtOsc's tables from the rom.2 beside rom.4 by `vc2Rom2Of` (`Vc2CheckRom2.h`). That helper is the derivation
+xt_vc2cosm and xt_vc2tone each held inline, so both now call it.
+
+Results:
+- 0 different at seeds 2024, 7 and 31337, at 20,000 draws; the first part's lines are unchanged.
+- Every routine of `Vc2ToneMath.cpp` reached.
+- 6 new planted errors, 0 missed (a call of the wrong routine or its arguments moved), and the whole `--libm` (112),
+  `--cosm` (1439) and `--tone` (751) lists.
+
+**Next.** Vc2Synth holds the 24 tone hosts, on `Vc2ToneMath`.
+
+### The OSC voices in the tone's parts' host (2026-11-20, v319) {#vc2-tone-host-oscs}
+
+Step 4.3's forty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-fourth part). `Vc2ToneHost` holds each
+tone's two OSC voices (`Vc2OscVoice`, v230…v267, at +0x20 and +0xba4): with them it holds every part a tone has.
+`Vc2ToneCommon` gains the routines the voices share (`Vc2ToneShared`: rom.4's velocity curve, exp2, logf and powf),
+which the wiring gives. The host's OSC part is `Vc2ToneHostOsc.cpp`.
+
+**Every call the tone makes on an OSC voice is the voice's own:**
+- the constructor `0x893ae070`, the install `0x893ae0f0`, the update `0x893ae1c0`, the note-on `0x893ae370`;
+- the ramp's start `0x893ae610`, the two counts `0x893ae6c0` and `0x893ae720`, the settings `0x893ae780`, the legato
+  `0x893ae9b0`;
+- the render `0x893ae9f0`, the take `0x893aee20` (given that tone's voice of the same OSC), the getters `0x893aed40`
+  and `0x893aed60`;
+- the key-off `0x893b2b60`, one store, the vibrato's +0x34 to 0, which the host makes.
+
+And the words the tone reads are the voice's: the kind (+0x54), the flag (+0xa40), the wave's type (+0x104) and its
+setter, the ratio COSM 1's update takes (+0x1cc), the set-up's +0x1cc, +0xa80 and byte +0x58, and the cost (+0xa88).
+The binding writes the tone's own envelopes' and LFOs' rom.4 addresses at +0xa4c…+0xa68, then its flags.
+
+**A voice's parts are its link, `Vc2ToneOscLink`.** The host answers two things:
+- the voice's address, the tone's +0x20 or +0xba4 (VariPhrase's install keeps it in the object);
+- the words of the tone's own envelopes and LFOs (`Vc2ToneModulators::boundFloat`).
+
+Every other call goes to the deriving class's `oscOutside`, which Vc2Synth will give:
+- a kind's routines by rom.4's address: the players' renders, set-ups, seeks and event lookup; kinds 1's, 2's, 4's,
+  5's, 6's and 7's updates and settings; the analog's renders;
+- the OS's millisecond word, which a carrier's init reads;
+- the wave's records: its header, its loop record, and VariPhrase's +0xe0 record's word;
+- the mic ring and the unvoiced decision, which kind 6 reads.
+
+**Found.**
+- **The tone drops the install's answer**, so `Vc2ToneParts::installOsc` is void from v319. v228's check answered it
+  as drawn and saw no difference.
+- **The vibrato's scale needs its static initializer.** Its note-on reads the scale's slopes from words that
+  `0x893b2d60` sets. xt_vc2osc runs it; xt_vc2tone didn't, and rom.4's scale came out 1.
+- **An install writes no render for a type or code it has no player for.** That is LITE's types past 2,
+  VariPhrase's 0, 2, 4, 7 and past 8, and the analog's codes past 10 with its sub oscillator off. The voice keeps
+  the word its last use left (0 in a fresh one), and rom.4 would render through it. The converters give none of them.
+- **The analog's install reads the code's copy at +0x248**, the note-on's, not +0x104; a take copies it with the
+  object.
+- **Only a note-on writes a voice's kind and flag.** So the install pass alone keeps COSM 1's mode by itself, and
+  v318's rule for it went.
+- **Kinds 5 and 6 leave +0x1cc**, their pitch being in P. A COSM that takes OSC 1's pitch (the Side Band Filters, the
+  Growl) needs another kind under it.
+
+**The check.** xt_vc2tone runs rom.4's own voices, nothing of theirs hooked. Each voice is compared whole, its 0xb84
+bytes, after every event. What the voices call beyond the tone is xt_vc2osc's: its hooks' table and its fake parts
+(`OscPortParts`), each call on its voice (tone × 2 + its OSC) in a log of its own. xt_vc2osc's draws of what a voice is
+given are shared, moved into `Vc2OscDraws.cpp` and `Vc2OscPartDraws.cpp` with xt_vc2osc's lines unchanged:
+- a note-on's block and the settings' block;
+- the analog's words and object;
+- kinds 5's and 6's words;
+- the vibrato's block and the hold of its fade;
+- the ramps' words and the mic ring.
+
+Its records (`Vc2OscRecords.cpp`), hooks (`Vc2OscFakes.cpp`, given the voices' numbering) and fake parts
+(`Vc2OscPortParts.cpp`) are shared as they stand. The OSC blocks are drawn before the modulators', as the LFOs' tempo
+is OSC 1's block's +0x60. The shared routines are rom.4's own (`RomShared`), with the interpreter's registers kept
+around each (`ToneMath`): the port calls them inside an event whose answer rom.4 has left in r0.
+
+**Rules keep the check to what the part does.** Each came from a difference that was the check's, not the port's.
+- **A block binds the tone's own parts.** Its bound parts' numbers, its kind's (the note-on's switch on the kind), are
+  envelopes and LFOs of the tone. A number past them sends the tone's binding flags past its arrays.
+- **A wave's type or code is one its install has a render for.** On the others rom.4 renders through 0.
+- **The records are a real wave's** (`oscRealWave`: the converter's rates, cents and an octave's tune). xt_vc2osc's
+  far tunes take rom.4's exp2 past its tables, into RAM a tone's note-on has written by the time the port's call reads
+  it.
+- **An analog's code given after its words turns the sub oscillator off on an LA code.** That happens at a legato's
+  match, at the fix-up, and when a code past 10 is drawn again. 2^Fat's sum is ∞ there, and ∞ × 0 is a NaN whose sign
+  `xtf::sub` negates.
+- **A voice made analog for the fix-up's legato is made as its note would leave it**: bound to the tone's own parts,
+  given the code's copy, and installed on both sides.
+- **The analog's object words are drawn before a kind-3 note-on** (v244's), the vibratos' fades held for an update's
+  count (v267's), and a block of the mic fed before a render with a voice of kind 6 (v266's).
+- **A VariPhrase voice's +0x168 is drawn before a getter.** Its players' routines write it, hooked here, so it would be
+  0 on every voice and the getter couldn't tell OSC 1's from OSC 2's (the plant `host-osc-word168` was missed so).
+- **Two draws keep older plants' reach** that the fakes' words gave. The fix-up's case puts its type 10 on an OSC 2
+  of another kind half the time (0, 4 or 7, whose installs read no type but kinds 4's and 7's flag at type 1), where
+  the note-on must leave it (`fixup-no-kind`). The mix's setter finds the sync's flag set half the time, as a blend's
+  note-on leaves it (`mix-settle-ring-sync`).
+- **Under a COSM 1 that takes OSC 1's pitch, OSC 1 is a steady EXT IN.** For codes 7, 8 and 9 it is kind 4 at a ratio
+  of 1 and a root of 440 Hz, stereo or mono half the time. The Side Band Filters' delay must fit their line, as do
+  the Growl's lines; xt_vc2cosm's draws keep the set-up there. The same EXT IN, its wave's type giving COSM 1's
+  sound's mode, is OSC 1 at a note-on that starts no COSMs.
+
+Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400). At 40 cases the OSC voices' note-ons by kind 0…7 are 310,
+  171, 198, 397, 792, 193, 193, 216 (341 OSC 1s steady for a COSM 1 of its pitch), with 85 settings, 90 blocks of
+  the mic and, beyond the tone, 1223 kinds' routines, 458 renders, 206 seeks, 230 object set-ups and 78 event
+  lookups. 225 whole renders through COSM 1, 56 of them a stereo Side Band Filter.
+- Every line, branch and region of `Vc2ToneHost.cpp` and `Vc2ToneHostOsc.cpp` reached at 40 cases. `Vc2Tone.cpp`'s
+  update reaches a TVA that is over at 400 cases of seed 7, not at 40.
+- xt_vc2osc's lines are unchanged.
+- 45 new planted errors, 0 missed, and the whole `--tone` (751) and `--osc` (1204) lists. Taken out of the tone's list
+  as equivalent now: v228's `build-osc-order` and `matched-order`, as each voice's constructor and matched count
+  write that voice alone. v316's to v318's build plants planted a call of `buildPart`, which went; they plant the part
+  left unbuilt.
+
+**Next.** Vc2Synth holds the 24 hosts, and what a voice calls beyond the tone comes from the part.
+
+### The COSMs in the tone's parts' host (2026-11-20, v318) {#vc2-tone-host-cosms}
+
+Step 4.3's forty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-third part). `Vc2ToneHost` holds each
+tone's two COSMs: their objects (`Vc2CosmObjectWords`, at +0x1728 and +0x188c), a sound each (`Vc2CosmDsp`, v263's) and
+the note-on frame (`Vc2CosmNoteOn`, v250's). The host is their bound: a float of the tone's envelopes or LFOs by
+address, `Vc2ToneModulators::wordAt`. `Vc2ToneCommon` gains the pools (0x89999290) and the three words after the
+renders' buffer c, which a stereo Side Band Filter's follower reads. At 0x89998e20 those are the part mixer's frames.
+
+**Every call the tone makes on a COSM is its port's:**
+- the constructor `0x893aa030` and the destructor `0x893aa060`; the tone takes down the LFOs and both COSMs alone;
+- the set-up `0x893aa590` and the binding `0x893aa7b0`, the bound parts' addresses;
+- the note-on `0x893aa0e0`, on COSM 1's pool or COSM 2's;
+- the install `0x893aafe0`;
+- the update, COSM 1's vtable's +0x0c (`0x893aa7d0`), with OSC 1's +0x1cc;
+- the new block `0x893aa5d0`;
+- the render, the routine at +0x148, on buffer c;
+- the cost, COSM 1's +0x14c.
+
+**Two things rom.4 decides that the join had to read.**
+- **The set-up's struct.** The tone's note-on builds it on its stack (`0x893b3898…0x893b38c0`): the OSC's +0x1cc and
+  +0xa80 at +0 and +4, and its byte +0x58 at +0xc. +8 the set-up writes as the flag. The three bytes after the byte
+  are whatever the stack held, and the object keeps them at +0xd…+0xf. Nothing reads them: the Growl's view leaves
+  +0x004…+0x00f unread, and no port reads the word.
+- **When a sound takes its note.** The tone's note-on starts its COSMs (for structures 0…2) and only then installs
+  them. Rom.4 keeps a sound's state in the object and its slot, set up at the note-on; the port keeps it in XtCosm's
+  objects, whose note-on wants the install's mono or stereo (v263). So the host keeps a COSM's block from its
+  note-on, and the sound takes its note at the install that follows.
+  - So a sound keeps its note's mode. Rom.4 reaches its install pass from the note-on alone: no word, `bsr` or `bra`
+    names `0x893b4060`, because the note-on holds the pass inline. And the part's structures (0…2) always start the
+    COSMs, so every install in the part comes with a note.
+  - An install with no note of its own would switch a sounding COSM's routine. That needs the install pass run alone
+    or a structure past 2, and the check keeps the mode at both (below). A setter for the sound's mode at every install
+    was tried and taken out: past that, nothing could reach it.
+
+**The check.** xt_vc2tone runs rom.4's own COSMs, nothing of theirs hooked. Its blocks are drawn as each type's
+converter writes them: xt_vc2cosm's draws, shared (`Vc2CosmNoteOnDraws`). Codes come from those the port has a type
+for, every code a converter writes; no converter writes 10, 11 or 17, which the port has no type for. The words the
+type doesn't write keep the bound envelopes' and LFOs' numbers the note-on reads. The OSC words a COSM takes are drawn
+as an OSC gives them: the pitch ratio 0.25…4 and the root 55…1760 Hz.
+
+What the check compares:
+- each object's frame words, but the state its sound keeps, which the port keeps in XtCosm's objects and
+  xt_vc2cosm's seventh part holds to rom.4's;
+- the pools' words;
+- the sound, through buffer c after a whole render.
+
+**Five rules keep the check to what the part can do.** Each came from a difference that was the check's, not the
+port's. The part builds a tone for a note, gives it that note, and takes it down at its end; the check builds, re-notes
+and unmakes tones in any order.
+- **A COSM is bound once.** The check binds a COSM never bound (an update holds its bound levels, and rom.4 would read
+  near address 0). One that is bound keeps its note-on's bindings, as the part binds at the note-on alone.
+- **A tone's slots are freed before a note-on that starts its COSMs again**, on both sides, as the part's destructor
+  would have. A second note-on takes a slot without freeing the first. Run as it would in the check, the pools would
+  run dry, where rom.4 plays on stale stack words (v264).
+- **Before a destructor, a COSM holding no slot by the check's count names none.** A tone's memory starts zeroed, so a
+  COSM never given a note names slot 0 of pool 0, and the destructor frees what the object names. That freed slot 0
+  under another tone's Compressor. The next note-on cleared it, and rom.4's delay line went to 0 where the port's ring
+  played on. This was most of what still differed at seeds 7 and 31337.
+- **A whole render runs only on a tone given a note that started its COSMs.** A COSM from a tone's last use renders
+  on a slot it has given up.
+- **An install with no note of its own keeps a sounding COSM's mode.** Two installs come with no note: the install
+  pass alone, and a note-on whose structure starts no COSMs (past 2, which the part's notes never have). Before
+  either, OSC 1's flag is drawn to agree with the note's. Rom.4's mono routines keep the right channel's state moving
+  where the port's mono sound leaves it, so a switch to stereo mid-note parts them. The first Side Band Filter's
+  D+0x54 showed it, found by holding the sound's state to rom.4's D words before each render (xt_vc2cosm's own
+  compare). The part never makes that switch.
+
+So that what reaches a COSM's sound is seen:
+- every render of a tone with a COSM note is whole;
+- COSM 1's block is a Side Band Filter one time in three, the type whose stereo follower reads the three words past
+  buffer c;
+- those words are drawn up to twice the mix's full scale, as xt_vc2cosm draws them at its frames'. The plant that
+  passes the buffer in their place was missed until then.
+
+Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400). At 40 cases: 730 slots taken, 346 freed before a note-on,
+  355 stale slots named none, 124 modes kept, 269 whole renders through COSM 1, 97 of them a stereo Side Band Filter.
+- Every line, branch and region of `Vc2ToneHost.cpp` reached. With the COSMs the destructor's fall-through went
+  (`destroyPart`): nothing is left for it.
+- 22 new planted errors, 0 missed, and the whole `--tone` and `--cosm` lists. Taken out of the tone's list as the
+  real COSMs left them equivalent or unreachable:
+  - v228's `destroy-cosm-order`: each COSM frees its own pool's slot alone.
+  - v228's `install-cosm2-flag`: COSM 1's install answers 1 for stereo, else whether its code is 10, which no
+    converter writes.
+  - v229's `cosmbind-type17`: no converter writes code 17.
+  - v316's `host-destroy-lfos`: the LFOs' destructor writes only the vtable word, as v268 found, with no log left.
+
+**Next.** The OSC voices join the host, their kinds' routines still by address where rom.2's renders aren't adapted.
+Then Vc2Synth holds 24.
+
+### The TVA in the tone's parts' host (2026-11-20, v317) {#vc2-tone-host-tva}
+
+Step 4.3's forty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-second part). `Vc2ToneHost` holds each
+tone's TVA, `Vc2Tva` (v233), at the tone's +0x19f0, and every call the tone makes on it is the TVA's own:
+- its constructor, note-on, new block and update;
+- the two end tests (`0x893b2560`, the stopped word `0x893b2610`) and silent, which the tone's held asks (`0x893b25c0`);
+- the render, into the output;
+- the two truncations, and the fade the truncation's waits read;
+- the level the tone's level test reads, its +0x40 (`0x893b4c00`).
+
+**What the TVA reads beyond itself, joined:**
+- **Its envelope and two LFOs** are the tone's own. The tone's note-on binds them by rom.4's addresses at +0xa4,
+  +0xa8 and +0xac with its serial at +0xc0, and leaves the bindings' flags. The TVA reads them through
+  `Vc2ToneModulators::tvaEnvelope` and `lfoOut` (v268's), which take those addresses.
+- **The fade's step** is rom.4's word 0x8993eb08, the one C's TVA child writes (v285). It sits in `Vc2ToneCommon` as
+  `fadeStep`, every tone's.
+- **The OS's event** (`0x89301830`), which a told truncation's fade end sets, goes to the deriving class
+  (`osEvent`). In the part it wakes the truncation's task.
+
+**The tone's input is 0x738 bytes**, not 0x700. The TVA's block starts at +0x6e8 and its note-on copies 0x50 bytes,
+to +0x738: the note W's last 0x38 bytes before its tone word, which v275 named `rest` and "not touched". The note's
+routines don't touch them. The TVA's note-on reads them, so `Vc2ToneInput` now holds them; W's layout and size are
+as they were.
+
+**The check.** xt_vc2tone runs rom.4's own TVA, its ten hooks gone. The OS's event is hooked to log its event and
+flags, and the port's `osEvent` logs the same. The drawn answers for the end tests and held are gone: they come from
+the TVA now. Changes to the draws and compares:
+- **Each event** draws the tone's TVA words on both sides by xt_vc2tva's laws. Those draws are now
+  `Vc2TvaDraws.h/.cpp`, shared by the two checks; xt_vc2tva's lines are unchanged. The bindings go to an envelope
+  and two LFOs of the tone's own, the stopped word one time in four, and the fade's step both sides' word.
+- **A note-on's and the setter's TVA block** draw the words the TVA reads as floats, keeping the numbers the note-on
+  binds by.
+- **A render** draws the output on both sides first and compares it after, with the TVA's 0xc8 bytes after every
+  event.
+
+Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400).
+- At 40 cases: 163 tones ended by the TVA's own answers and 292 waits on a real fade; 60 renders end a told fade and
+  set the OS's event.
+- Every line, branch and region of `Vc2ToneHost.cpp`, `Vc2Tone.cpp` and `Vc2ToneMethods.cpp` reached.
+- 23 new planted errors, 0 missed. The whole lists: `--tone` 690, `--tva` 109, `--notes` 55 and `--sets` 374
+  planted, 0 missed.
+
+**Two planted errors became equivalent** once the TVA was real, and are taken out of the list:
+- `update-tests-order`, the update asking the stopped word before the end test: both only read, and no log orders
+  them now.
+- `methods-truncate-floor`, the truncation's wait looping on a fade above 0.5: the told truncation sets the fade to 1
+  (`0x893b25a0`), and the waits end it at 0, so the loop sees no other value.
+
+**Next.** The COSMs join the host (`Vc2CosmObject`, its note-on frame, the adapters, the update and the DSP,
+v249…v264, on the pools v250), then the OSC voices; then Vc2Synth holds 24.
+
+### The VC-2 tone's parts' host (2026-11-20, v316) {#vc2-tone-host}
+
+Step 4.3's forty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's twenty-first part). Vc2Synth needs a tone's
+parts as port objects behind the tone's interface, `Vc2ToneParts`. Until now the only code that joined the ported
+parts to that interface was xt_vc2tone's port side, a check. `Vc2ToneHost` (Vc2ToneHost.h, Vc2ToneHost.cpp) is that
+code moved into the plugin, not copied.
+
+**What it joins.** Each tone's 14 envelopes and 8 LFOs (`Vc2ToneModulators`) and its OSC mix (`Vc2ToneMix`), held by
+the host at the tone's +0x1b38, +0x2158 and +0x1ab8. And what every tone shares, `Vc2ToneCommon`, each rom.4's at
+its own address:
+- the pool (0x8999f524);
+- the part's two lists of tones (0x89999678…);
+- the mixes' delay lines (0x8a0af984, 0x8a0bb384);
+- the free LFOs (0x8a0c6d84);
+- the LFOs' constructors' generator (0x89999668).
+
+Every call the tone makes on those parts goes through it: build and destroy, the ticks, the clock, the note-ons, the
+follow and the free objects, the lists, the settings and release (v315), and the flags a binding leaves on the bound
+envelopes and LFOs (`bindFlags`).
+
+**What it leaves to a deriving class.**
+- The parts not joined yet: the OSC voices, the COSMs and the TVA (`buildPart` and `destroyPart` for their
+  construction).
+- Another tone's host, which a key-unsynced LFO follows (`hostOf`).
+- The tail's two routines (the note's) and the OS's wait.
+
+xt_vc2tone's `TonePortParts` is now that class: its fakes and its counts of follows and takes, over the host.
+
+**The check.** xt_vc2tone's lines are v315's, every one, at seed 2024. 0 different at seeds 7 and 31337 (400). Every
+line, branch and region of `Vc2ToneHost.cpp` is reached. The five one-line queries (an LFO's follow word, its note
+value's switch, the envelopes' and LFOs' on words) are in the .cpp, not the header, so plants reach them. 35 planted
+errors (`vc2tonehost`), 0 missed, and the whole `--tone` list. Not planted: the free object's value the tone reads,
+which `startFree`, its one caller, drops; the port's LFO reads the free object's phase itself.
+
+**Next.** The TVA joins the host. rom.4's own TVA runs in xt_vc2tone. The TVA's envelope and LFOs are read through
+the tone's real modulators (`Vc2ToneModulators::tvaEnvelope`, `lfoOut`, v268's). The fade's step is rom.4's word at
+0x8993eb08, C's TVA step (v285). Then the COSMs, then the OSC voices. With all three joined the host is whole, and
+Vc2Synth holds 24.
+
+### The VC-2's envelopes' and LFOs' settings and release (2026-11-20, v315) {#vc2-modulators-settings-release}
+
+Step 4.3's forty-third version (VC2_MODE_PLAN.md, step 4.3, item 10's twentieth part). The tone's parts need a host
+before Vc2Synth can hold them, and the host needs every routine the tone calls on its envelopes and LFOs. Four had no
+port: the settings and the release of each (VC2_MODE_PLAN.md's table, "What each interface still needs").
+`Vc2ToneEnvelope::settings` and `release`, `Vc2ToneLfo::settings` and `release` are those four.
+
+**They are rom.2's.** Each of the four is rom.2's routine word for word: rom.4's envelope code sits 0x143f70 below
+rom.2's and its LFO code 0x143f50 below, as v268 found for the rest:
+
+| rom.4 | rom.2 | What | Its law |
+|---|---|---|---|
+| `0x893ac110` | `0x894f0080` | an envelope's settings | `XtEnvelope::update` |
+| `0x893ac470` | `0x894f03e0` | an envelope's release | `XtEnvelope::noteOff` |
+| `0x893acff0` | `0x894f0f40` | an LFO's settings | `XtLfo::update` |
+| `0x893ac8c0` | `0x894f0810` | an LFO's release | `XtLfo::fadeStart`, by its own test |
+
+As v268's adapters do, each loads rom.4's words into XtEnvelope or XtLfo, runs the law and stores the words back.
+What rom.4 reads and writes decided three details:
+- **The envelope's +0x50**, the level a release starts from, is written by the release alone and read by the release
+  stage's output. `load` and `store` now carry it, which changes nothing that ran before: no other routine writes
+  it.
+- **The LFO's settings copy six of the block's eight words**: the wave, rate, delay, fade, offset and fade mode
+  (`0x893acff8…0x893ad01c`), not the key sync or the note value's switch. Then the fade's three times again through
+  the vtable (+0x54 and +0x48 on the fade, +0x3c on the delay; `0x893ac650`, `0x893ac620`, `0x893ac610`, in the
+  direction the note-on chose), and a note value's step, 65535 over the rate. That is XtLfo's update on the words as
+  they then stand.
+- **The LFO's release tests the mode the note-on took** (+0x2c), not the block's (+0x68), which the settings
+  rewrite. It tests that mode as unsigned, mode − 2 below 2, so only modes 2 and 3 start the fade, through the
+  vtable's +0x0c (`0x893ac580`). XtLfo's `noteOff` reads its own copy as `fadeMode >= 2`, which would differ past 3.
+  So the release is written out on the words, with XtLfo's fade start alone.
+
+**Never reached on the VC-2.** The settings' other two branches: an envelope at stage 6 (only a negative tick count
+reaches it, which the tone's caller never gives, as v268 found) and a negative scale (the converter writes 1). An LFO
+mode past 3 never reaches the release (the converter writes 0…3).
+
+**The check.** xt_vc2tone runs rom.4's own four routines; their hooks are gone. The setter event now gives the LFO
+and envelope setters their own blocks, drawn as the converters write them; they were all given the mix's when the
+four were hooked. The tone's sustain is seldom reached by its own ticks in a case, so half the time the envelope
+setter finds a started envelope in sustain (stage 3, phase 0), drawn on both sides. At 40 cases: 43 envelope
+settings in sustain, 569 LFO fades started by a release, 521 released envelopes ticked. Results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400);
+- the new code's lines and branches all reached;
+- 26 new planted errors, 0 missed, and the whole `--tone` list, 634 planted, 0 missed.
+
+Every count line of xt_vc2tone moves, as in v268…v273, because the setter event draws more.
+
+**Two of v273's planted errors became equivalent** once the releases were real, and are taken out of the list:
+- `methods-keyoff-lfo0`, a key-off passing over LFO 0: no note-on starts LFO 0 (its loop runs 1…7), and its
+  constructor clears its +0x28. So its release finds it inactive and returns at once. rom.4's key-off releases it for
+  nothing.
+- `methods-keyoff-order`, the envelopes released before the LFOs: neither release touches a word of the other's. The
+  log that ordered them while both were hooked is gone.
+
+### The VC-2 part as one object: Vc2Synth's start (2026-11-20, v314) {#vc2-synth-start}
+
+Step 4.3's forty-second version (VC2_MODE_PLAN.md, step 4.3, item 10's nineteenth part), the first of Vc2Synth:
+`Vc2Synth` (Vc2Synth.h, Vc2Synth.cpp) holds every port's object of the part, each as rom.4 lays it out at its own
+address, and starts them as rom.4 does.
+
+**rom.4's start.** C startup copies .data and clears .bss. Then a table of static initializers at 0x898c59c0 runs in
+order: 12-byte rows `{0, routine, 0}`, walked by 0x895063f8 to the first null. The part's rows run from 0x898c5cc0 to
+the one before 0x893f5070, which is a task object's that isn't the tone generator's. The OS MIDI's two rows, its port
+objects' 0x893179d0 and its states' 0x89317db0, come earlier in the table. No row reads a word another writes, so only
+rom.4's order needs keeping. Most rows only write their file's three floats (44100/440, 880/44100, 0.009375), which
+no code reads.
+
+**What Vc2Synth's start does.** The ports' own defaults already give most of rom.4's start, and their own
+initializers the rest:
+- the voices' heads (row 4), the glides (row 7), Time Trip's records (row 11), the update queue (row 14), the reload
+  objects (row 26), the static M (row 37, its channel state by v313's set-up), the COSM pools (row 45), the free LFOs
+  (row 54), Auto Note (row 83) and the mic ring's globals (row 85);
+- the OS MIDI's states and port objects first, as their rows come earlier;
+- the vocoder (row 54's builder) and the tracker (rows 87, 88) by their constructors.
+
+The start sets what no port's defaults give:
+- .data's words: the voices' counts as last read (−1, −1, −1, 0), C's TVA step, the update task's elapsed count (1)
+  and both Receive flags (1);
+- .bss's nodes' channel, 0 until the part's init gives them none (−1 is the port's default);
+- the rows no port runs: the pitch source (−1, 0, 0.0, row 12), the notes' unread float (row 17), robot human depth
+  (1.0, row 42; the port's settings tables start it at 0) and the LFOs' chaos generator (0.7, row 47).
+
+Two things put right on the way:
+- **C's `Vc2LfoWords` and `Vc2MixWords`** shared their names with the tone's LFO's and mix's (v268, v269). The plugin
+  compiled both pairs into different files, two definitions under one name, which C++'s one-definition rule
+  forbids. Vc2Synth, which includes both, was the first to see it. C's are now `Vc2SetLfoWords` and
+  `Vc2SetMixWords`.
+- **The 12 bytes at 0x89997290** have three holders: the static M's levels, the Matrix set-up's and the part
+  mixer's. The start leaves them 0 in all three.
+
+**Not held yet** (the agent's catalog of the rows, research notes):
+- the tones' own parts: their OSC voices, COSMs, TVA, mix and modulators;
+- C's OSC-block and COSM-input children, and Random Pitch's seed (row 32);
+- the notes' task object and its MIDI queue (row 1), the tone generator's object with its Out DC cut flag (row 16),
+  the semitone detector's words (row 89);
+- the unread floats.
+
+**The check.** `xt_vc2synth` (Vc2SynthCheck.cpp) runs rom.4's own initializers in the interpreter on a fresh image
+(the OS MIDI's two, then the part's 94). Then it builds and starts `Vc2Synth` and compares every member with rom.4's
+memory at its address, byte for byte: 133 regions (the whole objects, the settings tables a field at a time, each pool
+tone's head and tail), then the vocoder by v219's shared compares with its engine and hook words. It links every VC-2
+source `Vc2Sources.cmake` lists but rom.4's parameter tables (which lean on rom.2's patch store), with XtLfo,
+XtEnvelope, XtCosm and XtOsc.
+
+The results:
+- 0 different.
+- `mutate_vc2.py --synth`: 30 plants (each start value changed, each step taken out, the static M's set-up broken
+  two ways), none missed. Not planted: the static M's node given to the update queue, which only the queue's routines
+  on that node read, and the start reaches none.
+- `mutate_vc2.py --sets` after the two renames: 374 plants, none missed.
+- **v312's memory cap, put right.** One of those plants, `sets-first-child`, crashes its mutant, which counts as
+  caught. It first read ERROR: `capped` waits on the mutant itself, and the shell says how a background job ended
+  ("Bus error: 10") when it notices. mutlist reads " error" in a run's output as a plant that never ran, where
+  timeout(1) had said nothing. `capped` now watches with the shell's own stderr to /dev/null (`capWatch`); the
+  mutant's own stderr is given before. `mutate_cap_test.sh` adds a run that crashes, which must read as died with no
+  word of the shell's in its output; the plant now reads caught. v313's `port-row`, which had crashed the same way,
+  was changed then to a plant that doesn't.
+
+### rom.4's MIDI channel states (2026-11-20, v313) {#vc2-os-midi-channel-states}
+
+Step 4.3's forty-first version (VC2_MODE_PLAN.md, step 4.3, item 10's eighteenth part), and a change to Vc2Synth's
+plan. That plan handed the host's parsed messages straight to v308's dispatcher. But neither the queue's drain
+`0x893110b0` nor the dispatcher writes a MIDI channel state, and the part only reads them: its bend, pressure and
+controller handlers (v303, v307) pass a state's address to the listeners, whose voices read the values there, and the
+Matrix sources and C's TVA read the controllers. Every write is the OS library's own MIDI task's (entry `0x89314ce0`,
+queue `0x8995ccac`, handler `0x89314e90`). Each message reaches both tasks through a hub (`0x89314d30`), which first
+waits for the OS's queue to empty, so every earlier message's state is written before the next is handed on. The OS
+task's priority, handed to the kernel from the task table, is the more urgent of the two, so it most likely handles a
+message before the part's dispatcher does. That order is inferred: the kernel is outside rom.4. So Vc2Synth runs the
+OS handler on each message, then the dispatcher. The OS handler is now the port's: `Vc2OsMidi` (Vc2OsMidi.cpp, its
+handler and control change in Vc2OsMidiHandler.cpp).
+
+**A channel state**, 0xec bytes (`Vc2ChannelState`; the part reads it at its +2, C):
+- +0 the channel number;
+- C+0 the bend, 14 bits, centre 0x2000;
+- C+2 the channel pressure, C+3 the most of the poly pressures, C+4 + key the poly pressures;
+- C+0x84 + cc the controllers 0…98. CC 96, 97 and 98's bytes are also the bend up, the bend down and the last
+  pressure, so a CC 98 overwrites that pressure, as on the XT;
+- C+0xe7 the template's last byte, which no routine writes.
+
+Its routines:
+- the set-up `0x89317a10`: the channel, then the full reset `0x89317a50`, which copies the 0xe8-byte template at
+  `0x8950d5f0` to C, gives CC 7, 10, 93 and 91 their defaults and resets the controllers;
+- Reset All Controllers `0x89317a90`: 20 controllers' defaults (11 to 127, the rest 0), the bend centred, the
+  pressures cleared;
+- a controller's default `0x89317b30` and its store `0x89317c20` (each below 99);
+- the bend `0x89317c60`: its side's byte the distance from centre over 64, both cleared only at exact centre, so a
+  bend crossing centre leaves the other side's byte stale;
+- the poly pressure `0x89317cc0` and the channel pressure `0x89317cf0`.
+
+**The states and port objects.** rom.4 has 32 states, at `0x8995edf8`: v276's table rows 0 and 1, with sources 1…3
+sharing row 0 and source 4 having row 1. HARDWARE_FIRMWARE.md's "64 channel states" (v292) is put right in place. The
+48 port objects from `0x8995eaf4` (`Vc2MidiPort`, 16 bytes) are found by the source's row (`0x8950d528`) in the table
+`0x8950d530`. Each holds:
+- its state's address;
+- its RPN's and NRPN's numbers (bit 15 not selected, 0x7f7f none);
+- Data Entry;
+- its listeners: the OS's part objects, through nodes.
+
+Their static initializers are `0x89317d00`, which sets each channel up in rows 0 and 1, and `0x89317910`, which puts
+rows 0…2 on the states of sources 1…3 with no numbers and no listeners.
+
+**The handler**, by the status's class (a channel message's status masked to its class, 0x80…0xef):
+- **poly pressure, channel pressure and the bend** stored in the message's channel's state;
+- **control change** `0x893172e0`, by number:
+  - CC 0 and 32 dropped while Receive Bank Select is off;
+  - Data Entry's two halves (CC 6, 38), each told to the listeners with the RPN's number (their +0x24 slot) and the
+    NRPN's (+0x30);
+  - the numbers' halves (CC 98…101), the other kind marked unselected;
+  - CC 121 at 0 resets the controllers and the numbers;
+  - every message but a dropped one is then stored below 99 and told to the listeners (+0x18);
+- **program change** `0x893172a0`: told to the listeners (+0x0c) while Receive Program Change is on;
+- **0x70**: Reset All Controllers on its source's 16 channels (`0x89317780`);
+- **0x40, by its word's kind**:
+  - kind 0: `0x89317fe0`, the full reset of every channel on byte 1's bit 7 (`0x893178a0`, `0x893176d0` through
+    sources 1 and 3), `0x89318420`, `0x89318210`;
+  - kind 4: `0x89318040`, the two Receive flags read from system B's IDs 0x45 and 0x46 (`0x893178d0`), `0x89318450`,
+    `0x893154a0`, `0x8931a420`;
+  - kind 5: `0x8931a460`;
+- **0x01**: SysEx's routine `0x89310640`, while its flag `0x8992e3d1` is set;
+- notes, 0x41 and the system and real-time statuses: nothing.
+
+The OS's part objects, the listeners, are not ported, and nor are the OS's other routines above. They go through
+`Vc2OsMidiParts`. They are what turns a Bank Select and Program Change into a patch change, CC 5 into Portamento Time,
+CC 65 into Portamento Switch, CC 126 and 127 into Mono and Poly, and RPN 0…2 into the bend range and tunes, each as a
+parameter edit that reaches the part later as its own 0x40 message. Those are parameter edits, the plugin's side's to
+decide with the parameters as a host sees them (VC2_MODE_PLAN.md, step 5). Its tables are `Vc2OsMidiTables`, read by
+`loadVc2` through `vc2LoadOsMidi`.
+
+**The check.** `xt_vc2midi` (Vc2OsMidiCheck.cpp, its draws and events in Vc2OsMidiEvents.cpp) runs rom.4's own
+handler and routines on its own states, port objects and flags:
+- **The listeners** are objects in scratch memory with one vtable. Each slot's adjustment is drawn, and its routine is
+  at a hooked address that logs the object it is given and its words.
+- **The OS's nine routines and the parameters' getter** are hooked to log. The getter answers the two Receive flags as
+  drawn, alike on both sides.
+- **Each case** starts both static initializers on both sides, compared, then runs 400 events: the handler on a
+  message of every class (controllers aimed at the ones with a way, bends now and then at centre), the control and
+  program changes alone, each state routine, the resets, the flags' read and the initializers.
+- **Before each event** come now and then a state's bytes, a port's state, numbers, Data Entry and listeners, the
+  flags, SysEx's flag and the answers.
+- **After each event** the ports, the states, the flags and the calls are compared.
+- **Not drawn:** data bytes past 127 (a key there writes past the pressures) and sources past 4 (rom.4 reads past its
+  row table).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of Vc2OsMidiHandler.cpp is reached, and of Vc2OsMidi.cpp but the initializers' tests for a
+  missing state or port object, as rom.4's tables have none in the rows they read.
+- `mutate_vc2.py --midi`: 95 plants, none missed. Not planted, as they change nothing:
+  - the poly pressure's most started at 0;
+  - the real-time return from 0xf0 and the channel mask from 0x90;
+  - Reset All Controllers' second write of the last pressure;
+  - kind 0's reset moved past the OS's next routine;
+  - the template's address a word on.
+- `mutate_panel.py rom4-no-osmidi`, and the three loader plants whose text moved, caught.
+
+### The VC-2 part's update queue with the static M's node (2026-11-20, v312) {#vc2-queue-static-node}
+
+Step 4.3's fortieth version (VC2_MODE_PLAN.md, step 4.3, item 10's seventeenth part), the first of Vc2Synth's ground:
+v279's update queue takes one node besides the voices' and the head, the static M's (v295's, at `0x89997278`), which
+the static M's part init enqueues. rom.4's queue routines take any node by its address and read its first 0x14 bytes,
+which a voice, the head and the static M lay out alike (the links, the queued word, the queue's byte, the class). The
+port's queue kept a node's words in one of two places, the head's or a voice's; from v312 it is given the static M's
+node by its address (`Vc2UpdateQueue::setNode`), and every routine reaches a node's words through one view of them,
+`slotsOf` (`Vc2QueueSlots`: the links, the queued word, the queue's byte), the head's, the node given's or a voice's.
+v310's walk reads them the same way. `Vc2QueueNode` has its own header, `Vc2QueueNode.h`.
+
+**What the walk runs on it.** A node's class's update is called as rom.4's old ABI lays a virtual out: the word at the
+class's +0x0c added to the node's address, and the routine at its +0x14 called on that. The static M's node's class
+(`0x898cd460`, v295's) gives −0x170 and `0x893a2ee0`: the update task's walk runs M's init (v247's) on the static M
+itself, its answer the node's queued word. The voices' class gives 0 and the voice's update (v279's).
+
+**The check.** `xt_vc2voices`' seventh part (in `Vc2UpdateTaskCheck.cpp`, on the seed after the sixth part's): the sixth
+part's sides with the static M's node given to the port's queue and written into rom.4's memory beside the queue's
+words before each event and compared after it. The queue's draws place it among the voices (shuffled with them, on the
+queue or linked to itself, its links aimed elsewhere now and then), and one time in four a queue routine's node is it.
+Each event is either the update task's pass, with the static M's class's update hooked as the voices' are, or one of the
+fourth part's eleven queue events. The fourth part's class events are not drawn: the sixth part's hooks on the classes'
++0x0c would stand in for rom.4's own update there. The queue's draws and compare moved into their own file,
+`Vc2VoiceQueueCheck.cpp`; with no node given, they draw as before.
+
+**A bound on the port's side.** rom.4's routines run in the interpreter, whose step limit ends any that runs on; the
+port's run natively, and nothing ended them. A planted error that breaks how a node's words are found can send the
+port's walk round the voices' list heads forever, each turn logging its wait, signal and update into the check's log:
+v312's first two plant runs grew that log until the machine ran out of memory (the four mutants that ran on held 152,
+101, 92 and 63 GB). So `xt_vc2voices` bounds each event (`Vc2PartVoicesCheck.h`): every port-side call goes through
+`voicesLog`, which throws past 65536 calls in one event, the update task's part's draws throw past as many tries at a
+sound queue or a walk past every voice, and each part's case runs its draw and event through `voicesBounded`, which
+says that as the event's difference. No real event comes near it, and the clean runs' lines are as before. The port's
+walk itself has no bound, as rom.4's has none. And a bound on every plant run besides (the user's decision, here in
+v312): `mutate.sh` runs a mutant through `capped` (`research/tools/mutate_cap.sh`), which polls its resident size every
+0.1 s and kills it past `MUT_MEM_MB`, 2048 by default, a run that died, so its plant reads as caught. The clean checks
+peak under 300 MB (`xt_tone` 278 at 2000 cases, `xt_files` 215, the VC-2 checks under 50), and six jobs at the cap
+leave the 24 GB machine room. `mutate_cap_test.sh` proves it: an allocator past a 512 MB cap is killed at it and reads
+as died, while a run under the cap, one with its own exit status and one past `MUT_TIMEOUT` read as before. The four
+plants that took the machine then ran alone, each caught in seconds.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first six parts' lines as they were. At seed 2024 the
+  node is on the queue after 2547 of the 16000 events.
+- Every line and branch of `Vc2VoiceQueue.cpp` and `Vc2UpdateTask.cpp` is reached.
+- `mutate_vc2.py --voices`: 328 plants, none missed. v312's 12 new: the voices' and the node given's words in
+  `slotsOf`, its test and registration, the enqueue's view and the walk's. Six of v279's and v310's reworded where v312
+  changed their text. Not planted: the head's queued word and queue byte, as no routine is given the head as its node.
+
+### The VC-2 part's voices' update and schedule (2026-11-20, v311) {#vc2-part-tones-update-schedule}
+
+Step 4.3's thirty-ninth version (VC2_MODE_PLAN.md, step 4.3, item 10's sixteenth part): the two routines in the part
+mixer's file that the tasks call on the part's tones, `0x893b16a0` (the update task's, v310) and `0x893b1710` (the
+notes' task's schedule, v309), now the port's own as `Vc2PartMixer::updateTones` and `scheduleTones` on v227's mixer
+words:
+- **The voices' update** `0x893b16a0`: the blocks mixed since its last run (`0x8993eae4` less `0x8993ead8`, which takes
+  the blocks), as a float, × a block's seconds (32/44100, `0x893b17ec`) ÷ the update's tick (0.01 s, `0x893b17f4`); n
+  that truncated when above 1, else 1. Each tone on the sounding list (`[0x899996d0]`) is given its +0x0c (v228's
+  update) with n, and then the vocoder's glue (`0x893f07a0` on `0x89999758`, v220's) the carried word (`0x8993eac4`).
+- **The voices' schedule** `0x893b1710`: the blocks since its last run (`0x8993eae0`) × a block's seconds, a block's
+  seconds when that is 0, to the free LFOs' clock (`0x893ad870` on `0x8a0c6d84`, v271's), then each tone's +0x30 (its
+  LFOs' clock) with them and +0x3c (its OSC voices' count) with 1.
+
+The tones go through `Vc2MixerTone`, given as the list stands, as the block's voices are (v227); the free LFOs' clock
+and the glue go through `Vc2MixerTaskParts`. The two constants are read by `Vc2PartMixerTables`.
+
+**The check.** `xt_vc2mixer`'s second part (`Vc2MixerTasksCheck.cpp`), on the seed after the run's: rom.4's own two
+routines on its own mixer words. Up to three tones are linked in the part's list as the first part links its voices,
+their vtable's three methods each at a hooked address logging the tone and its argument; the free LFOs' clock and the
+glue log their float. Each event is either routine. Before it come the tones' count, the blocks mixed and each routine's
+last blocks (a few before, about the update's tick, the same, any, after), and the carried word 0, 1 or any. After each,
+the mixer's words and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first part's line as it was.
+- Every line and branch of `Vc2PartMixer.cpp` is reached.
+- `mutate_vc2.py --mixer`: 98 plants, none missed; v311's 14 new (not planted: the least count's test at 1 by one, a
+  whole number of ticks below 2 giving 1 either way); `mutate_panel.py rom4-no-mixer` caught.
+
+### The VC-2 part's update task (2026-11-20, v310) {#vc2-part-update-task}
+
+Step 4.3's thirty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's fifteenth part): the update task `0x893952b0`
+(its object `0x8994ff64`) loops from `0x89395310`: it waits for events (`0x893017f0`, mask 3) and makes one pass, now the
+port's own as `vc2UpdateTaskPass` (`Vc2UpdateTask.cpp`). In rom.4's order:
+- **0x2**, the timer's (`0x893952a0` counts its ticks at `0x8993d080` and raises it). With ticks elapsed since the last
+  pass (the time struct `0x8993d084`'s count, a half, not 0), each node on the update queue (v279's, `0x89989cc4`), from
+  the head by its +4 link, is made the queue's current node and given its vtable's (+0x10) +0x0c virtual (a voice's
+  update, v279's) with the time struct's address, under the queue's lock (its +0x20, the OS's wait `0x893018b0` and
+  signal `0x893018c0`). Its +8 takes the answer's low half; with that 0 and the node still linked (its +0 not itself),
+  the current node becomes its +0 link and it is unlinked (`0x89394f20`). The walk goes on from the current node's +4
+  link to the head, which it leaves current. Then the ticks since the last pass are measured into the time struct:
+  their difference as a half, a negative one taken past the wrap, into its count, and added to its last.
+- **0x1**: the pitch source `0x89394a60` on `0x89989748` (v226's), then the voices' update `0x893b16a0`.
+
+The interrupts' masking around the walk changes no memory. The calls out go through `Vc2UpdateTaskParts` (with
+v279's `Vc2QueueParts`), and v279's queue links are now public for the walk.
+
+**The check.** `xt_vc2voices`' sixth part (`Vc2UpdateTaskCheck.cpp`), on the seed after the listeners' part's: rom.4's
+own loop body entered at its top and left when it comes back there (v309's way), on the voice class part's sides,
+hooks and draws (v279's install, start and draws shared from v310). Beyond those, the wait answers the events drawn;
+both voice classes' +0x0c log the node and the time struct's address and answer from the voices' draws
+(`assignHookSlot`'s answer, v310); the pitch source and the voices' update log. Before each pass come the events, the
+time struct and the ticks (a few past the last, past a half's wrap, or any). The queue's links are drawn again until
+each node and the head are linked both ways, and one pass in eight has a node on the walk whose +0 link is itself.
+After each, the voices' and keys' spans, the queue's words, the time struct, the ticks and the calls. Not drawn: a
+node on the queue but a voice (v279's queue takes no other), or a list linked otherwise, on which rom.4's walk need not
+end. The first draws let a node's +0 link point past the head, and both sides looped there.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first five parts' lines as they were.
+- Every line and branch of `Vc2UpdateTask.cpp` and `Vc2VoiceQueue.cpp` is reached.
+- `mutate_vc2.py --voices`: 316 plants, none missed; v310's 21 new.
+
+### The VC-2 part's notes' task (2026-11-19, v309) {#vc2-part-notes-task}
+
+Step 4.3's thirty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's fourteenth part): the notes' task
+`0x8938fc00` (its object `0x8998190c`), after its start-up (v304's `0x89392ab0`) and its set-up, loops from
+`0x8938fc66`: it waits for events (`0x893017f0`, mask 0x3fe) and makes one pass over what the wait gave, now the port's
+own as `vc2NotesTaskPass` (`Vc2NotesTask.cpp`). In rom.4's order of tests:
+- **0x002**: the MIDI queue `0x89981918` drained (`0x893110b0`, each message to v308's dispatcher).
+- **0x004**: v272's ended scan (`0x89390ee0`).
+- **0x008**: while the word at `0x89981904` is set, v308's reset (`0x89390340`) of sources 1, 2 and 3.
+- **0x010**: the schedule `0x893b1710` once per count, the count (`0x89981b60`, the schedule object `0x89981b40`'s
+  +0x20) taken and cleared under the interrupts' mask.
+- **0x080**: All Notes Off (controller 123) on source 3, Auto Note's count of other keys cleared, its key let go
+  (`0x893ebcf0`) if one is held, and its key −1 (the pitch source `0x89989748`, v226's).
+- **0x040**: Auto Note's note-off, source 4, the key at `0x8993d038`, velocity 64.
+- **0x020**: Auto Note's note-on, the key at `0x8993d034`, velocity 100, but not with `0x89981904` set or another key
+  down; either ends the pass there.
+- **0x100**: the polyphonic aftertouch on source 3, data 0 and 0.
+- **0x200**: with `0x89981904` clear, a held C4 on source 3 (key 60, velocity 127).
+
+Each message goes on the channel of source 4's part 0 node (`0x89988bd0`'s +0xd). The calls out go through
+`Vc2NotesTaskParts`, the handlers by v308's `Vc2MidiHandler`.
+
+**The check.** `xt_vc2settings`' twenty-second part (`Vc2NotesTaskCheck.cpp`), on the seed twenty-one after the run's:
+rom.4's own loop body, entered at the loop's top with the registers its prologue leaves (r8…r12) and the queue's
+address on its stack, and left when it comes back there (XtFxCheckHand's way of leaving a task at its wait); the wait
+hooked to answer the events drawn, and the queue's drain, the ended scan, the reset, the schedule, Auto Note's release
+and the four handlers hooked to log. Each pass is on events drawn (each of the nine bits half the time; now and then
+none or any word). Before it come the note-on gate 0, 1 or any, the pitch source, the schedule's count (0…3, −1, any
+below 6), Auto Note's two keys, and the node's channel (−1, 0…15 or any). After each, the tables, the pitch source, the
+schedule's count and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first twenty-one parts' lines as they were.
+- Every line and branch of `Vc2NotesTask.cpp` is reached.
+- `mutate_vc2.py --settings`: 864 plants, none missed; v309's 27 new.
+
+### The VC-2 part's MIDI dispatcher (2026-11-19, v308) {#vc2-part-midi-dispatcher}
+
+Step 4.3's thirty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's thirteenth part): `0x8938fed0`, a virtual of
+the notes' task object (in its vtables at `0x898cd168` and `0x898cd180`), given each message its mailbox holds, now the
+port's own (`Vc2MidiDispatch.cpp`). A message is four bytes (the status, two data bytes, the source: 1…3 the inputs, 4
+Auto Note) and a word; the task object is unread. By the status's class (`0x8938fe50`: a status of 0x80…0xef less its
+channel, any other the status itself), in rom.4's order of tests:
+- **0x80…0xe0**, the channel messages, to their handlers given the source, the channel and the data (v307's note-off,
+  note-on and the three that tell the listeners, v301's controller, the program change; the program change and the
+  pressure given the first data byte alone). A note-on of velocity 0 is the note-off at 64; any other, none while the
+  word at `0x89981904` is set.
+- **0x40** and **0x41**, the parameters' messages: their word's first byte its kind; of kind 3, Out DC cut for TG (ID
+  0x532, on the system's third block, `0x89320f60`) read into `0x893955e0` first (the DC-cut flag of the tone
+  generator's object, `0x8998a480 + 0x24`, set under the interrupts' mask; 0x40's by `0x89390230`, 0x41's inline); then
+  v297's `parameters` (`0x89392890`) or `partParameters` (`0x89392830`) on the part (`0x899888ac`), given the word.
+- **0x70**, the reset `0x89390340`: with a note held (`0x899891d0`, v294's) each of the source's 16 channels given
+  controller 121 alone; else 120, 123 and 121 on each, then all notes off (`0x89391e30`).
+- Any other class, nothing.
+
+The handlers, the parameters' two routines, the DC cut and all notes off go out through `Vc2MidiParts`, the channel
+handlers one virtual by `Vc2MidiHandler`; the ways a table by class (`kWays`).
+
+**The check.** `xt_vc2settings`' twenty-first part (`Vc2MidiDispatchCheck.cpp`), on the seed twenty after the run's:
+rom.4's own dispatcher with its class, the 0x40's builder and the reset; its callees hooked to log their arguments and
+routine, the system's read of 0x532 by the read objects' hooks as the first part's. Each event a message: a status of
+any channel class half the time, else 0x40, 0x41, 0x70 or any byte; the data bytes below 128 three times in four (a
+note-on's velocity 0 one time in four); a source 1…4 three times in four; the word's kind 0…4 or any; before each, the
+note-on gate 0, 1 or any and the held note's word 0, 1 or any. After each, the tables, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first twenty parts' lines as they were.
+- Every line and branch of `Vc2MidiDispatch.cpp` is reached.
+- `mutate_vc2.py --settings`: 837 plants, none missed; v308's 26 new (not planted: the class's bounds by one, 0x80
+  being its own class and 0xf0 none either way).
+
+### The VC-2 part's channel messages (2026-11-19, v307) {#vc2-part-channel-messages}
+
+Step 4.3's thirty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's twelfth part): what the MIDI dispatcher
+`0x8938fed0` calls for a source's channel message, given the source (1…4), the channel and the message's two bytes, now
+the port's own (`Vc2PartChannel.cpp`). Below, K is the source's and channel's key table, its list the nodes on the
+source's channel (`0x899890d0`, v293's), and a node's call its part object's vtable (the object's +4) entry, the held
+class's (`0x898cd3b8`) v278's node routines, the plain class's (`0x898cd184`) others:
+- **The note-on** `0x89392da0(source, channel, key, velocity)` (the dispatcher sends a velocity of 0 as a note-off). Auto
+  Note's notes come as source 4, which plays on source 3's key table and list, through the pitch source `0x89989748`
+  (v226's `Vc2PitchSource`): with another key down (its +4 above 0) nothing; else its key (+0) the note's. Any other
+  source: with Auto Note's key held (+0 not below 0) and its On Switch (`0x8993fe50`, v226's) at 1, Auto Note's note
+  released first (the note-off of source 4, that key, velocity 64); then the other keys' count +1. Then K's note-on
+  (`0x89391e90`, v276's), each node's +0x0c (the note's start, `0x89396a80`) given K, the node's word, the key and the
+  velocity on the stack, and K's +0x130 0xff.
+- **The note-off** `0x89392e70`: source 4 on source 3's again; K's note-off (`0x89391ef0`), each node's +0x18 (the note's
+  end, `0x89396c90`) given K and the node's word, v278's release over K's voices (`0x89390c00`), and the key's note-on
+  and note-off counts both cleared when they are as many. Then Auto Note's key −1 for source 4, else the other keys'
+  count less 1, no lower than 0.
+- **The polyphonic aftertouch** `0x893930a0`, **channel pressure** `0x893930c0` and **pitch bend** `0x893930e0`, one code:
+  the channel's state (v303's: its source's row's word + 2) to the listeners (`0x89390ea0`, v305's); their data unread.
+  **The program change** `0x89393090` is a bare return, not ported.
+
+The part objects' two virtuals, the release and the listeners go out through `Vc2ChannelParts`. v303's key table,
+channel state and node walk are now `Vc2PartChannel`'s, shared (`vc2ChannelTableOf`, `vc2ChannelStateOf`,
+`vc2EachNode`).
+
+**The check.** `xt_vc2settings`' twentieth part (`Vc2PartChannelCheck.cpp`), on the seed nineteen after the run's:
+rom.4's own handlers on its own keys, nodes, lists and part objects, the pitch source and the On Switch; the part
+objects' four routines, the release and the listeners hooked to log (`kSettingsNotifyCallee`, v303's hook shared), the
+key tables' note-on and note-off rom.4's own. Each case gives the nodes' lists as xt_vc2keys' second part draws them,
+each node's part object one of the 16 and each part object's class either, and the keys noise with each table's curve
+one of the eight. Events are a note-on or note-off of a source 1…4, a channel, a key and a velocity (0 one time in
+eight), or one of the three; before each, the pitch source's key −1 or a key, its count 0, 1, 2 or any below 64, and
+the On Switch 0, 1, 2 or any. After each, the tables, the keys' span, the pitch source, the calls. Not drawn: a key or
+velocity past 127 (rom.4 reads past a table's counts and curve), a source but 1…4.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first nineteen parts' lines as they were.
+- Every line and branch of `Vc2PartChannel.cpp` and `Vc2PartNumbers.cpp` is reached.
+- `mutate_vc2.py --settings`: 811 plants, none missed; v307's 26 new (and v303's five on the shared code moved
+  with it; not planted: the count's rise before Auto Note's release, which leaves the count alone, and the floor's
+  test at 0 by one, at 0 the same).
+
+### The VC-2 part's Time Trip (2026-11-19, v306) {#vc2-part-time-trip}
+
+Step 4.3's thirty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's eleventh part): the trip objects v301's
+part's controller drives, now the port's own (`Vc2TimeTrip.cpp`). The part table `0x8993d040` points at 16 records of
+0x34 bytes from `0x89989408` (to `0x89989748`), `Vc2TripRecord`: the trip object's 0x20 bytes (`Vc2TripObject`), the
+pad's X and Y (+0x20, +0x21), two bytes made 0, the level the Matrix reads (+0x24, 127 at rest), the rate's index
+(+0x28, 2), 4 over it (+0x2c, the pool's 4.0 at `0x893948ec`) and the part (+0x30). v301's `Vc2TripFront` is now the
+trip object and the pad.
+- **The records' static initializer** `0x89394570`: for each part k the constructor with (k, 0xffff), then the record's
+  bytes, the index 2 and the rate with it, and 4 / 2.
+- **The constructor** `0x893b0400(object, part, mask)` (a new 32 bytes when given none; the initializer always gives
+  one): +0 the part and +4 the mask a tone is matched by, the way and carry 0, the rate of index 4, +0x14 and +0x15 64,
+  the last radius and angle −1, X and Y 64, the radius and angle −1. +8, the trip under way, is left as it was.
+- **The rate** `0x893b05b0(object, index)`: below 9 the steps a turn (`0x8954601a`, 0 at index 0) and the offset
+  (`0x8954602c`) by index; at 0 the trip stopped. **The set** `0x893b0610(object, on, x, y)`: 0 stops it (under way 0,
+  way 0, X and Y 64, the radius, angle and last ones −1, +0x14 and +0x15 0); else, with the steps above 0, under way and
+  X and Y stored.
+- **The move** `0x893b0460(object, x, y)`, answering the radius: X and Y stored and the position `0x893b0690` taken; under
+  way, the steps `0x893b0790`, broadcast `0x893b1780` with the count, then 127 nearer 0, while it has the count's sign;
+  the radius and angle kept as the last.
+- **The position**: a quarter of the pad by X and Y about 64, the polar table `0x89543f18` (65 × 65 pairs, a radius
+  and an angle 0…32) by the two distances from the centre, the radius stored and the angle (64, 96, 32 or 128 less the
+  table's, the last quarter's 0 kept 0) × 4, so 0…512 a turn.
+- **The steps**, on three scratch words (`0x899996a4`, `Vc2TripScratch`): from the last angle to the new one (none or
+  the same, 0 steps), the turn wrapped to ±256. Not turning yet, the way is the turn's (at angle 0, by the half the last
+  is in); turning, a turn past 64 drops the carry, one against the way with the carry not with it is held as the carry,
+  else the carry comes off the angle from. With a way, the angle from (a turn back's plus the offset and 1) is quantized
+  to the steps (× steps, ÷ 512 and back by shifts, ÷ steps by the library's division), its distance to the new folded
+  to half a turn, and the count is that × steps ÷ 512, negative turning back.
+- **The broadcast**: each tone on the sounding list (`[0x899996d0]`, v273's) by its +0 link, its vtable's +0x48 (v228's
+  `0x893b4ca0`, the OSC voices' counts when its +0x1c under the mask is the part) given the count, part and mask,
+  through `Vc2TripParts`.
+
+Not ported, as nothing in rom.4 calls them: the X-only and Y-only moves `0x893b04d0` and `0x893b0540` and the steps'
+sender `0x893b0740`; nor `0x893b09f0`'s two floats (`0x899996b0`, `0x899996b4`), which nothing reads.
+
+**The check.** `xt_vc2settings`' nineteenth part (`Vc2TimeTripCheck.cpp`), on the seed eighteen after the run's: rom.4's
+own routines on its own records and scratch words, the fifteenth part's hooks on the set and the move taken off, the
+tone's +0x48 hooked to log. Each event a routine on a record drawn (the static initializer one time in 32), the record's
+words drawn half the time about the edges (angles a few steps or half a turn from the last, 0, 256, none, any; the carry
+about the most held; the way 0, 1, −1 or any; the rate's words the table's or any; X and Y the centre one time in four),
+one move in four aimed at a count of one or two broadcasts exactly (`aimMove`, on a copy placed by `vc2TripPlace`, the
+move's first part), and up to three tones on the sounding list. After each, the tables, the records, the scratch words,
+the calls and the answer. Not drawn: X or Y past 127 where the position is reached (rom.4 reads past its table), steps
+below 1 where the steps are reached (its division by them), a rate's index below 0.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first eighteen parts' lines as they were.
+- Every line and branch of `Vc2TimeTrip.cpp` and `Vc2PartControllers.cpp` is reached.
+- `mutate_vc2.py --settings`: 785 plants, none missed; v306's 73 new (69 in the trip, four in its tables' reads; the
+  steps' distance taken the other way is not planted, the fold after it giving a turn and its negative the same), and
+  v301's three on the trip's flag moved to its new name.
+
+### The VC-2 part's listeners' run (2026-11-19, v305) {#vc2-part-listeners}
+
+Step 4.3's thirty-third version (VC2_MODE_PLAN.md, step 4.3, item 10's tenth part): `0x89390ea0(state)`, which the
+number classes' base handler (v303) gives the channel's state, now the port's own as `Vc2Assigner::notify`
+(`Vc2AssignRelease.cpp`): each voice on the sounding list (`[0x899826e0]`), its next link read after the call, whose key
+table (its +0x34) holds `state` as its first word (the table's channel state, v276's `Vc2KeyTable::channel`), its
+vtable's +0x48 virtual called with its +0x3c (its part); the answer unread. The entry's offset is 0 in both voice
+classes: the note's voice's (`0x898cd3dc`) is v279's change test `0x893972d0`, the plain voice's (`0x898cd1a8`)
+`0x89391720`, which answers 0. The virtual goes out through `Vc2AssignParts::changed`. The release path's walk over a
+key table's voices is now one routine over a test, `eachWhere`, which the listeners' run shares.
+
+**The check.** `xt_vc2voices`' fifth part (`Vc2AssignListenersCheck.cpp`), on the seed after the voice class's: the
+release part's sides, start and draws, and beyond them the +0x48 virtual of both classes hooked to log the voice and its
++0x3c (`assignHookSlot`, the retune's and key-off's hooks made one routine with it). Before each event every voice the
+draws left on no key table put on one of the three, and each table's channel state one of two words or any; the state
+given a table's half the time, else either word or any. After each, the voices' span, the keys' span and the calls. Not
+drawn: a sounding voice on no key table (rom.4 reads the word at any address, the port a table's).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first four parts' lines as they were.
+- Every line and branch of `Vc2AssignRelease.cpp` is reached.
+- `mutate_vc2.py --voices`: 295 plants, none missed; v305's eight new (and the walk's table test moved to its new
+  text).
+
+### The VC-2 part's start-up (2026-11-19, v304) {#vc2-part-start-up}
+
+Step 4.3's thirty-second version (VC2_MODE_PLAN.md, step 4.3, item 10's ninth part): `0x89392ab0`, the first thing
+the notes' task runs (`0x8938fc2e`), now the port's own as `vc2PartStartUp` (`Vc2PartStartUp.cpp`), checked by
+`xt_vc2settings`' eighteenth part. In rom.4's order:
+- Time Trip Assign X and Y's bytes (`0x89989404`, v296's) and the two bytes after them (`0x89989406`) −1.
+- The routing object (`0x899893f8`, the routing reset's and the receive channel's `this`): its +1 127, its +4
+  `acosf(0)` × 2 (π) and its +8 that ÷ 2 (π/2), its +0 0. acosf at 0 is its π/2 (`0x898c5710`) less asin 0, which is
+  0, so the constant itself; × 2 and ÷ 2 are exact. `Vc2PartSettingsTables::halfPi` reads it.
+- The settings object (`0x899826fc`): its constructor `0x89391610` sets its +0x14 to its own +1 (the Patch Remain byte,
+  v296's `0x899826fd`).
+- The part's init `0x89393370` (v302's `vc2PartInit`), then v272's voices' and lists' inits (`0x89391ba0`,
+  `0x89391270`).
+- `0x8939b200`: part 0's reload object (v300's, `0x89996120`) idle, its part, state and posted word 0; eight calls that
+  return at once (`0x893a7f40`, `0x893a1ae0`, `0x893a0330`, `0x8939a8b0`, `0x8939b7d0`, `0x89399c10`, `0x893a6f10`,
+  `0x893a6200`), left out; and the static M's part init `0x893a2fe0` (v295's) as its tail.
+
+The words no port held before are `Vc2PartStartWords` (the routing object's two bytes and two floats, the bytes after
+the assigns, the settings object's +0x14); the rest are the ports' own objects, reached through `Vc2PartStartWorld`.
+
+**The check.** `xt_vc2settings`' eighteenth part, on the seed seventeen after the run's: rom.4's own start-up with
+everything under it its own (the init, the voices' inits, acosf, 0x8939b200) but the static M's two calls out, which
+the ninth part hooked. Each case gives every table noise, then 16 start-ups, each on noise first in all it reaches,
+the same on both sides: the nodes, their lists, class bytes and part objects, the keys, the number objects and their
+table, the voices with their heads, globals and age word, the reload objects, the static M and the start-up's own
+words (`startRegions`, one table both writes them into rom.4's memory and compares them after). After each, the
+tables, those words, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first seventeen parts' lines as they were.
+- Every line and branch of `Vc2PartStartUp.cpp` is reached.
+- `mutate_vc2.py --settings`: 712 plants, none missed; v304's 19 new (18 in the start-up, π/2's read).
+
+### The VC-2 part's controller handlers (2026-11-19, v303) {#vc2-part-number-handlers}
+
+Step 4.3's thirty-first version (VC2_MODE_PLAN.md, step 4.3, item 10's eighth part): the number classes' handlers
+(v302's table), each called as `handler(object, source, channel, value)`, the source counting from 1, now the port's
+own on `Vc2PartNumbers` (a class row's way), checked by `xt_vc2settings`' seventeenth part. Below, K is the key table
+of the source and channel (`0x89982720 + 0x1340 (source − 1) + 0x134 channel`, v276's):
+- **The base** `0x893938d0` (and the three that branch to it): with no channel (−1) nothing; else the channel's state
+  (its source's row at `0x8950d6d8 + source`, its word at `0x8950d6e0 + 64 row + 4 channel`, + 2) to `0x89390ea0`,
+  which runs the listeners of that state.
+- **Hold (64)** `0x89393980`: the base; a press (64 and up) only with the channel's Hold-press byte set
+  (`0x899893e0`), a release always: K's Hold (`0x89391f60`), v278's `holdOff` (`0x89390cd0`) on K, the vocoder's pedal
+  (`0x893b1c10` → `0x893f0770`, v220's `Vc2Vocoder::hold`) with the value.
+- **Sostenuto (66)** `0x89393a10`: the base; K's Sostenuto (`0x89391f70`), v278's `sostenutoOff` (`0x89390d10`).
+- **CC 84** `0x89393a70`: the base; the value as K's +0x130 byte, which v276 named `wasReset` (0xff after a reset):
+  CC 84's key (Portamento Control).
+- **Reset All Controllers (121)** `0x89393ac0`: K's Hold and Sostenuto 0, its +0x130 0xff, `holdOff`, `sostenutoOff`,
+  the channel's state to the listeners (no test of the channel), the vocoder's pedal 0.
+- **All Sound Off (120)** `0x89393ba0`: with the held note's word (`0x899891d0`) 0 and the value 0: K cleared
+  (`0x89391fe0`), the glides' held flags of the channel's nodes cleared (`0x89393000`), v278's `truncateTable`
+  (`0x89390d50`).
+- **Mono (126)** `0x89393c10`: with the value 16 or less, the same with v278's `releaseBut` (`0x89390da0`).
+- **Poly (127)** `0x89393c80`: with the value 0, the same.
+- **All Notes Off and the Omnis (123…125)** `0x89393ce0`: below 0 (the Category's and the receive channel's −1), the
+  same with v278's `releaseAll` (`0x89390e20`); at 0 with no note held, with `releaseBut`; else nothing.
+
+**The glides' held flags** `0x89393000(source, channel)`: each node on the source's channel's list, for its two glides
+(by the node's source byte and object index: `0x89987420 + 0x480 source + 0x48 index + 0x24 n`), the four held bytes
+(+0x23, +0x1d, +0x1b, +0x21) 0.
+
+The listeners, the vocoder's pedal and v278's five key-table routines go out through `Vc2NumberParts` (the release
+path is `Vc2Assigner`'s, which the wiring gives). A correction to v299: the bytes at `0x899893e0` let a Hold press be
+heard, not a release (`cmp/ge #64` then `bf` to the Hold for a value below 64); `Vc2PartRows::holdLifts` is now
+`holdPresses`.
+
+**The check.** `xt_vc2settings`' seventeenth part, on the seed sixteen after the run's: rom.4's own controller on its
+own number objects, the sixteenth part's hooks on the handlers taken off, the listeners, the vocoder's pedal and the
+five key-table routines hooked to log, the part's controller's trip routines as the fifteenth part's. Each case gives
+every table noise, the nodes noise with their lists drawn (each one's object index 0…15, its word a byte with a part
+0…15), the keys and the trip objects noise (`settingsListsCaseOf`, the fifteenth part's case made one template with
+it). Each event takes a source 1…4, a channel 0…15 (or, one time in 16 from source 2, none, on a number of the base's),
+a number of a class's own half the time, else 0…127, and a value at the handlers' edges (0, 1, 16, 17, 63, 64, 127, −1,
+−128) or any; before it the held note's word 0 half the time and the channel's Hold-press byte 0, 1 or any. After each,
+the tables, the keys' span, the trip objects and the calls. Not drawn: no channel on the other classes (Hold,
+Sostenuto, CC 84, Reset All Controllers and the notes off read before their bytes or tables with it).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first sixteen parts' lines as they were.
+- Every line and branch of `Vc2PartNumbers.cpp` is reached.
+- `mutate_vc2.py --settings`: 693 plants, none missed; v303's 40 new (and v302's five on the class rows, the
+  dispatch and the init's channel moved to the code's new text).
+
+### The VC-2 part's controller numbers and init (2026-11-19, v302) {#vc2-part-numbers-init}
+
+Step 4.3's thirtieth version (VC2_MODE_PLAN.md, step 4.3, item 10's seventh part): the objects the controller (v301)
+calls by number, and the part's init that makes them, on a new `Vc2PartNumbers` (`Vc2PartNumbers.h/.cpp`), checked by
+`xt_vc2settings`' sixteenth part.
+
+**A correction to v301.** `0x89392f90` leaves the controller's value in r7 when it calls the number's virtual, and
+the handlers read it (Hold's tests it against 64): the virtual is given the source, the channel and the value. v301's
+`Vc2ControllerParts::numberChanged` left the value out and its check didn't log r7; both now carry it, and the
+fifteenth part's line is as it was (it compares the value now).
+
+**The number objects.** 128 of 8 bytes from `0x89988cd0`, one a controller number: the number (+0) and its class's
+vtable (+4); their table `0x899891e0` holds each one's address (the lists `0x899890d0` follow it). Each class's handler
+is its vtable's +0x14 (+0xc, the adjustment, is 0 in all):
+
+| Numbers | Maker | Vtable | Handler |
+|---|---|---|---|
+| 1, and any not below | `0x89393910` (the base) | `0x898cd220` | `0x893938d0` |
+| 7, 10, 11, 91, 93 | `0x89393930` | `0x898cd250` | `0x89393920` (the base's) |
+| 5, 65, 68, 71…74 | `0x89393960` | `0x898cd268` | `0x89393950` (the base's) |
+| 64 | `0x893939e0` | `0x898cd238` | `0x89393980` |
+| 66 | `0x89393a60` | `0x898cd280` | `0x89393a10` |
+| 84 | `0x89393ab0` | `0x898cd298` | `0x89393a70` |
+| 121 | `0x89393b40` | `0x898cd2b0` | `0x89393ac0` |
+| 120 | `0x89393c00` | `0x898cd2c8` | `0x89393ba0` |
+| 126 | `0x89393c70` | `0x898cd2e0` | `0x89393c10` |
+| 127 | `0x89393cd0` | `0x898cd2f8` | `0x89393c80` |
+| 123, 124, 125 | `0x89393d80` | `0x898cd310` | `0x89393ce0` |
+| 6, 38 | `0x89393da0` (its third argument, 1 for 6, unread) | `0x898cd328` | `0x89393d90` (the base's) |
+
+Each maker writes the number and the base's vtable, then its own; Hold's maker also sets each channel's Hold-press
+byte (`0x899893e0`, v299's) to 1. The base handler gives the channel's state (the sources' rows at `0x8950d6d8` and
+`0x8950d6e0`, v292's; nothing for channel −1) to `0x89390ea0`, which runs the virtual of each listener on the list at
+`[0x899826e0]` whose +0x34 names that state; the others work the key tables' pedals and the notes before or instead
+(v303's).
+
+**The part's init** `0x89393370`: for each source, part 0's node on part object 0 (rom.4's table `0x89535458`'s first
+word; its plain class's vtable written, the base's first), its glides reset by the object's index (`0x893904d0`, v293's,
+before the index is set to 0), its object index 0, its source, no channel, the held note's word 0, the word at
+`0x8950d7a0` (`0x89960b7c`); then the keys' and the glides' static initializers (`0x89392190`, `0x89392410`, v276's),
+every list cleared, and the 128 number objects made in order with their table. The glides' reset in the loop leaves no
+trace: the glides' static initializer writes every glide again.
+
+The controller's virtual dispatches by the object's vtable to its class's handler, through `Vc2NumberParts` until the
+handlers are ported; the word at `0x8950d7a0` is read by `Vc2PartSettingsTables` (`nodeWord`).
+
+**The check.** `xt_vc2settings`' sixteenth part, on the seed fifteen after the run's: rom.4's own init and its own
+number objects through the controller, the twelve handlers hooked to log their source, channel, value and address,
+then their object (`SettingsCallee::more`); the earlier parts' hooks on the controller and the 120 class's maker taken
+off; the sources' rows of channel states written back as the image holds them (earlier parts draw the first). Each
+case gives every table, the nodes, the lists, the part objects (an index 0…15) and the keys noise. Events: the init
+(one in four, and in place of a controller while a list is not empty), or the controller (a source 1…4, a channel
+0…15, a number 0…127, a value), one in four after an object's class drawn as another object's and its number byte
+noise, now and then a table word pointing at another object. After each, the tables, the nodes, the number objects,
+their table, the lists, the part objects, the keys' span and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first fifteen parts' lines as they were.
+- Every line and branch of `Vc2PartNumbers.cpp` is reached.
+- `mutate_vc2.py --settings`: 653 plants, none missed; v302's 30 new (29 in the numbers, one in the word's read) and
+  `ctl-number-value` for v301's value. `mutate_panel.py rom4-no-partsettings` caught.
+
+### The VC-2 part's controllers (2026-11-19, v301) {#vc2-part-controllers}
+
+Step 4.3's twenty-ninth version (VC2_MODE_PLAN.md, step 4.3, item 10's sixth part): the controller the Category
+(v294), the receive channel (v298), the notes' task's event 0x80 and the MIDI dispatcher send, and the part's
+controller it runs, on a new `Vc2PartControllers` (`Vc2PartControllers.h/.cpp`), checked by `xt_vc2settings`'
+fifteenth part.
+
+**The controller** `0x89392f90(source, channel, number, value)`, its source counting from 1 (so v294's and v298's
+`controller(3, …)` are source 3's, the receive channel's the source whose node changed): first the number's object
+(`[0x899891e0 + 4 × number]`, 128 of them, made by the part's init `0x89393370`, item 10's next) is given the source,
+the channel and (in r7, left as it came; found in v302) the value through its virtual (the object's vtable at +4, the
+function at the vtable's +0x14, `this` moved by its +0xc);
+then each node on the list of the source (less 1) and channel (`0x899890d0`, v293's; a channel of −1 reads the list
+before, the last channel's of the source before) gives the first byte of its word (+8) as a part to the part's
+controller with the number and value.
+
+**The part's controller** `0x89394440(part, number, value)`, three tests each made, so a number may match more than one:
+- **Time Trip Assign X** (v296's byte `0x89989404`): the part's trip object (the part table `0x8993d040`, v245's), the
+  value as a signed byte: with the trip not under way (its +8 0) or the value above 0, the pad's X (+0x20) is the value;
+  else the trip object's `0x893b0610(trip, 0, X, Y)` and the part's byte (+0x24) at rest, 127.
+- **Time Trip Assign Y** (`0x89989405`): the trip not under way, a value above 0 is the pad's Y (+0x21) and, with X above
+  0, `0x893b0610(trip, 1, X, Y)`; under way, a value above 0 is Y and the part's byte is `0x893b0460(trip, X, Y)`'s
+  answer, else `0x893b0610(trip, 0, X, Y)` and 127.
+- **Reset All Controllers** (121): `0x893b0610(trip, 0, 0, 0)` and 127.
+
+The trip object's fields are read as they stand at each test. `0x893b0610` and `0x893b0460` are the VC-2's Time Trip
+object's (with `0x893b0690`, `0x893b0790` and `0x893b1780` under them), a port of their own to come. `0x893943c0` (a
+part's trip at rest alone) is not ported: nothing calls it.
+
+The number's objects, a word's first byte, the part table and the trip object's two routines go out through
+`Vc2ControllerParts`; the trip object's front is `Vc2TripFront`.
+
+**The check.** `xt_vc2settings`' fifteenth part, on the seed fourteen after the run's. rom.4's 128 number objects are
+made at addresses of the check's own, one vtable whose +0x14 is a hooked address logging the number; the part table
+points at 16 trip objects' fronts in scratch memory; each node's word points at a byte of its own with a part 0…15.
+Each case gives every table noise, the nodes noise with their lists drawn as `xt_vc2keys`' second part draws them, and
+the trip objects noise. Before each event Time Trip Assign X and Y are drawn (0…127, 121 or −1, now and then the same),
+now and then a part's trip object's flag (0, 1 or any), X and Y, and the trip's move's answer. The trip object's two
+routines are hooked to log; the earlier parts' hook on the controller is taken off. Events: the controller (a source
+1…4, a channel 0…15 or, from source 2, −1; a number Time Trip Assign X or Y or 121 half the time, else 0…127) and the
+part's controller alone (any number). After each, the tables, the trip objects and the calls. Not drawn: a
+controller's number past 0…127 (rom.4 reads past its table).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first fourteen parts' lines as they were.
+- Every line and branch of `Vc2PartControllers.cpp` is reached.
+- `mutate_vc2.py --settings`: 623 plants, none missed; v301's 30 new. `mutate_vc2.py --keys` (`Vc2PartNodes.h`'s
+  `node`): 105, none missed.
+
+### The VC-2 part's reload objects (2026-11-19, v300) {#vc2-part-reload-objects}
+
+Step 4.3's twenty-eighth version (VC2_MODE_PLAN.md, step 4.3, item 10's fifth part): what the parameters' messages
+call the reload task's request and run (v297) and the part node's notes call the parameters' message (v278), on a new
+`Vc2PartReloads` (`Vc2PartReloads.h/.cpp`), checked by `xt_vc2settings`' fourteenth part.
+
+**The objects.** 16 of 24 bytes from `0x89996120`, one a part, each an OS timer node: its links (+0, +4, to itself
+off the queue), the queue's word (+8), its vtable (+0xc, `0x898cd430`, whose +0x14 is the fire), the part it reads
+(+0x10), its state (+0x11: 0 idle, 1 asked, 2 reading) and its posted word (+0x14: on the OS's queue `0x8994fc24`). After
+them three floats at `0x899962a0`: 44100/440, 0.019955 and 0.009375 (no direct reader found).
+
+**The routines.** In each, the queue's add is `0x893004a0(0x8994fc24, object)` and its remove `0x89300640(…)`, both
+OS calls:
+- The static initializer `0x8939b350`: the three floats from its pool, then the array builder `0x8950773a` making each
+  object in place by `0x8939b260`. That one, given an object (it allocates 24 bytes when given 0, which nothing does),
+  runs the OS base `0x893002a0` (the links to itself, the base's vtable `0x898c6ba8`) and then writes its own vtable.
+- The cancel `0x8939ae50`: the five held flags `0x8993d0c0…c4` set to 1, the remove, the flags 0. The flags make a
+  reader on another task give up while the object leaves the queue.
+- The run `0x8939af10` (v297's kinds 5, 6, 10…13): reading → the cancel; idle; then the part's read (v292's
+  `0x8939b170`), its answer.
+- The request `0x8939af40` (v297's part message): if posted, reading → the cancel's held remove, then idle; then by
+  its state (a braf table), 1 nothing, 2 the held remove and then as 0, 0 or past 2 asked, and posted (the word set
+  first) unless it is.
+- The fire `0x8939b020`, the vtable's +0x14, which the queue runs: not idle → reading, the part's read, idle; then not
+  posted; it answers 0.
+- The message `0x8939b050` (v278's `readParameters`, by its braf table): idle nothing; asked (or past 2) idle and the
+  part's read now (`0x8939b0a0`); reading, the remove alone (no flags). Its answer goes unread (idle's is 0x48, the
+  table's word).
+- Not ported, as nothing in rom.4 calls them: `0x8939ae90` (the remove alone), `0x8939aea0` (a request without the
+  posted word's test) and the init `0x8939af00` (part, state 0, not posted); part 0's object is set up by
+  `0x8939b200`, the start of the part's init, item 10's.
+
+The held flags are given to `Vc2PartReloads` as `Vc2HeldFlags`, the bytes `Vc2PartParams::held` reads; the add, the
+remove and the part's read go out through `Vc2ReloadParts`; the floats are read by `Vc2PartSettingsTables`.
+
+**The check.** `xt_vc2settings`' fourteenth part, on the seed thirteen after the run's: rom.4's own routines on its
+own objects, the queue's add and remove hooked to log (the remove with the held flags as they stand in rom.4's memory,
+the port's as they stand in its own), the part's read hooked to log and answer as drawn; the eleventh part's hooks on
+the request and the run taken off. Each case gives every table, the objects and the floats noise; each object's part
+is 0…15, its state 0, 1 or 2 mostly (now and then any byte), its posted word 0, 1 or any, and before each event the
+object's words are drawn so half the time. Events: the static initializer one time in 32, else the constructor, the
+cancel, the run, the request, the fire or the message on a drawn object. After each, the tables, the objects, the
+floats, the held flags byte by byte and the calls, and the run's and the fire's answers.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first thirteen parts' lines as they were.
+- Every line and branch of `Vc2PartReloads.cpp` is reached.
+- `mutate_vc2.py --settings`: 593 plants, none missed; v300's 36 new (two in the floats' reads). `mutate_panel.py
+  rom4-no-partsettings` caught.
+
+### The VC-2 part's routing reset (2026-11-19, v299) {#vc2-part-routing-reset}
+
+Step 4.3's twenty-seventh version (VC2_MODE_PLAN.md, step 4.3, item 10's fourth part): the routine kind 0's
+parameters' message (v297) runs with its second byte's flag 0x80, on `Vc2PartSettings` (`routing`, in
+`Vc2PartSettingsReceive.cpp` beside the receive channel it calls), checked by `xt_vc2settings`' thirteenth part.
+
+**The routing's reset** `0x89393e30(…, flag)` (its first argument handed on to the receive channel, unread there):
+- ChordMemory Switch (ID 55) on the system's fourth read object (`0x893206f0`, v298's), against its last read, the
+  word `0x8993d03c`; a change is stored there and all notes off is sent (`0x89391e30`, the notes' task's event 0x80).
+- With the flag 0 it answers 1 there.
+- With it set, for each source (0…3), part (0…15) and each of the part's two glides: the node of the source and part
+  moved to no channel (`0x89393100(node, −1, −1)`: given no source, a node ends on no channel, so the second move finds
+  nothing to do), the glide aimed at the spare table `0x89988620` and reset (`0x893923c0`, v276's P reset, which leaves
+  its table word alone).
+- Then for each channel (0…15) its byte at `0x899893e0` set to 1 and the four sources' key tables of that channel reset
+  (`0x89392040`, v276's). The byte lets the Hold pedal's press (a value of 64 and up) be heard on that channel: with it
+  0, `0x89393980` takes no Hold-on there, a release always heard; the constructor `0x893939e0` sets all 16 to 1 as well.
+  (v299 had it the release; v303's reading of `0x89393980` puts it right.)
+- Then part 0's receive channel (`0x89393fd0(…, 0)`, v298's), which answers 1, so it goes on (with 0 it would answer 0).
+- Then `0x89392820(0x899888ac, 0)`, a bare answer of 0, chooses the held class (`0x893932c0`, v293's) for part 0's node of
+  source 1 over the plain (`0x89393310`).
+- It answers 1 on every way, so kind 0's message always runs the held note's switch after it.
+
+The two words are `Vc2PartRows::chordMemory` and `holdPresses` (`holdLifts` until v303). The messages reach the reset through
+`Vc2SettingsParts::routing` (v297's), which the wiring gives `Vc2PartSettings::routing`.
+
+**The check.** `xt_vc2settings`' thirteenth part, on the seed twelve after the run's. Each case gives every table
+(v299's words too), G, the keys, the part objects and the class bytes noise, and the nodes' sources, channels and lists
+drawn as the twelfth part's. Before each event, ChordMemory Switch's last read is set to the store's answer half the
+time (no change heard), and the held note's word is 0 half the time, else 1 or any. The store gives ChordMemory Switch
+0 or 1 half the time, the receive channel's IDs as the twelfth part's (`kReceiveNarrow`, now in
+`Vc2PartSettingsStates.h`), and the Matrix Controls' Sens as the seventh's (kind 0's way runs the Matrix's settings).
+The controller, all notes off, the held note's event, every voice's truncation and a node's voices' stop are hooked to
+log (all now shared callees); the eleventh part's hook on `0x89393e30` is taken off. Events: the reset alone (its flag
+0 half the time, else 0x80 or any word), and kind 0's message (the flag set half the time) running rom.4's own reset
+against the port's (`SettingsPortOuts::routed`). After each, the tables, the nodes, the lists, the keys' span, the part
+objects, the class bytes, the calls and the reset's answer. The tenth to twelfth parts' noise stops before v299's
+words (`kV298Rows`; `settingsWorldCaseOf` given how far).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first twelve parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsReceive.cpp` is reached.
+- `mutate_vc2.py --settings`: 557 plants, none missed; v299's 23 new (and v298's `receive-glides-one` on the glides'
+  helper its text now names).
+
+### The VC-2 part's receive channel (2026-11-19, v298) {#vc2-part-receive-channel}
+
+Step 4.3's twenty-sixth version (VC2_MODE_PLAN.md, step 4.3, item 10's third part): the routine the system's
+parameters' message (kind 4, v297) runs for part 0, on `Vc2PartSettings` (`Vc2PartSettingsReceive.cpp`), checked by
+`xt_vc2settings`' twelfth part.
+
+**A part's receive channel** `0x89393fd0(…, part)` (its first argument unread):
+- Part n's Receive Switch and Channel, IDs 71 + 2n and 72 + 2n on system B's read object (`0x89320760`, the store
+  object's second word); with the switch 0 the channel is −1 and isn't read.
+- The store's record: IDs 0, 1, 2 and 52 (Part 1's Bank Select MSB, LSB and Program Number, and Sampling Template) on
+  the system's fourth read object (`0x893206f0`, the store object's first word; `Vc2ParamBlock::kSystemD`), read by
+  `0x89320700(…, 0)` into four bytes, then parsed by `0x89318a20` (MSB 87, the user bank: LSB 0 a number of 1…64, else
+  `(LSB − 1) × 128 + 64 + PC + 1`, held to the bank's count, `0x893273c0(1)`'s halfword at `0x899613ec`) and asked by
+  `0x89318a90`, which answers 2 when the parsed record's first byte is set, and then the part's node of source 1 is
+  given the plain class (`0x89393310`). But `0x89318a20` writes that byte 0 on every way, so `0x89318a90` answers 0
+  and the install is never reached: only the four reads are kept.
+- Part 0's node of source 3's channel is taken before anything moves.
+- For each source s (0…3): the part's node of s moved (v293's `0x89393100`) onto the channel, or −1 when it is 16 or
+  more (a negative channel is moved onto as it is); then the part's two glides of s (`0x89987420 + 0x480 s + 0x48 part`,
+  v276's P) aimed at a key table: for sources 1 to 3 the table of s and the channel when it is 0…15, else the spare table
+  `0x89988620`; for source 4 its channel 0's table whatever the channel (the code for s = 3 is unrolled with the
+  channel 0).
+- For part 0 alone, if source 3's node's channel changed: with the old channel not −1, three controllers from source
+  3 on the old channel (`0x89392f90`, whose source counts from 1, v301: 121 Reset All Controllers with 0, 123 All Notes
+  Off with −1, 120 All Sound Off with 0); then with the new channel not −1, the held note's word (`0x899891d0`, v294's) picks: 0, all notes
+  off (`0x89391e30`, the notes' task's event 0x80); else the held note's event `0x89391e50` (event 0x200 to the notes'
+  task, `0x8994fec8`, whose way sounds key 60 at 127 by `0x89392da0` on source 4's channel when `0x89981904` is 0).
+- It answers 1 on every way.
+
+**Part 0's** `0x89393fb0`: the routine above for part 0, its answer as a truth value: 1 always, so the system's
+message always reads Patch Remain after it.
+
+The held note's event goes out through `Vc2SettingsParts::heldNoteOn`. The messages still reach the receive channel
+through `Vc2SettingsParts::receive` (v297's), which the wiring gives the port's `Vc2PartSettings::receive`.
+
+**The check.** `xt_vc2settings`' twelfth part, on the seed eleven after the run's. Each case gives every table, G,
+v276's keys, the part objects and the class bytes noise, the nodes noise with their sources, channels (−1…15) and
+lists drawn as `xt_vc2keys`' second part draws them (`vc2DrawNodeLists`, now in `Vc2PartNodesDraws.h`), and G's
+channel word's sources drawn; before each event the held note's word 0 half the time, else 1 or any. The store gives
+each part's Receive Switch 0 or 1 half the time and its Receive Channel −1…17 always: both sides of 0…15, while a
+channel below −2 would read past rom.4's lists and −2's every-list moves are `xt_vc2keys`' (they can make a list
+loop). `0x893206f0` is hooked as the other read objects' set-ups, leaving a handle; the controller, all notes off,
+the held note's event and a node's voices' stop are hooked to log; the eleventh part's hook on `0x89393fb0` is taken
+off (`settingsHookCallees`' `own`). Events: a part's receive channel (part 0 half the time), part 0's, and the system's
+message (kind 4, its second byte 0 half the time) running rom.4's own receive channel against the port's
+(`SettingsPortOuts::receiving`). After each, the tables, the nodes, the lists, the keys' span, the part objects, the
+class bytes and the calls, and the receive routines' answer.
+
+The check's shared parts moved for it: the world routine and its case (`settingsWorldOn`, `settingsWorldCaseOf`,
+`Vc2PartSettingsWorld.h`, the eleventh part's, which now writes and compares the lists too, unchanged where nothing
+moves), the controller's, all notes off's and a node's stop's callees (`Vc2PartSettingsCheck.h`), and a part's line
+by its counts alone from its row (`SettingsSaid`, the tenth's and eleventh's lines as they were).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first eleven parts' lines, and `xt_vc2keys`', as
+  they were.
+- Every line and branch of `Vc2PartSettingsReceive.cpp` is reached.
+- `mutate_vc2.py --settings`: 534 plants, none missed; v298's 36 new. `mutate_vc2.py --keys`: 105, none missed.
+
+### The VC-2 part's parameters' messages (2026-11-19, v297) {#vc2-part-parameter-messages}
+
+Step 4.3's twenty-fifth version (VC2_MODE_PLAN.md, step 4.3, item 10's second part): the two routines the notes'
+task runs on a parameters' message from its mailbox (`0x8939005c` and `0x893900ea`), on `Vc2PartSettings`
+(`Vc2PartSettingsMessages.cpp`), with what they reach in `Vc2PartWorld`, checked by `xt_vc2settings`' eleventh part.
+
+**By kind** `0x89392890(…, message)`: the message's first byte picks a way through a braf table of 14 (past 13
+nothing), which the port keeps as a table of ways:
+- **0**: the Matrix's settings for part 0 (`0x8939b0c0` → `0x893a51c0(G, 0)`, its answer unread), the routing's
+  reset `0x89393e30(…, flag)` with the second byte's bit 0x80 as its flag, and if that answers non-zero the held note's
+  switch `0x89391500(…, flag)`: with the held note's word clear and the flag set, every sounding voice truncated
+  (`0x89391120`);
+- **3**: the calibration's dispatcher, the voices' counts (v296);
+- **4**: the system's dispatcher, part 0's receive channel `0x89393fb0`, and if that answers non-zero Patch Remain;
+- **5**: the assignments' dispatcher, part 0's reload run (`0x89392b10` → `0x8939af10` on its object at
+  `0x89996120`), Time Trip's assigns;
+- **6 and 10…13**: with the second byte (a part) 0, its reload run and its node's voices stopped (kind 6's first call,
+  `0x89394360`, answers 1 and does nothing else, so the five are alike);
+- **1, 2, 7…9**: nothing.
+
+Kinds 3 to 5 end with part 0's node of source 1's voices stopped (`0x89392720` → `0x89393360`, v293's).
+
+**The part's** `0x89392830(…, message)`: only kind 0, and only part 0 (the second byte unsigned ≥ 1 is refused): the
+reload task's request (`0x8939af40` on the part's object), the node of source 1's held class (`0x89394370(…, part, 0)`:
+0 the held class `0x893932c0`, else the plain `0x89393310`; v293's), the Category and budget (v294's), and part 0's step
+counts cleared (`0x89392750`: 64 bytes, part 0's alone being kept, v289's).
+
+The reload task's request and run, the receive channel, the routing's reset and the truncation of every voice go out
+through `Vc2SettingsParts`; the receive channel (`0x89393fd0`) and the routing's reset are long routines on the
+parameter store's own read objects (`0x893206f0`, `0x89320700`) and the nodes, keys and glides, for the next versions.
+
+**The check.** `xt_vc2settings`' eleventh part, on the seed ten after the run's. Each case gives every table, the
+nodes (each one's object index 0…15), G, v276's keys, the part objects (an index 0…15) and the class bytes noise and
+draws G's channel word's sources. Every routine reached is rom.4's own but the five calls out and `0x89390f70` (a node's
+voices' stop), hooked to log; the receive channel and the routing answer as each event draws. A message's two bytes sit
+in Vc2Fw's RAM, its kind 0…15 and its second byte 0 half the time; the part's message is kind 0 half the time. Events:
+a message by kind, the part's, the held note's switch alone (its word 0 half the time, its flag 0, 1 or any) and a
+node's class alone (any part, flag 0 half the time). After each, the tables, the keys' span, the nodes, the part
+objects, the class bytes and the calls; no answer is compared. The store gives the Matrix Controls' Sens −128…127 and
+Receive Channel 0…15 always, as the seventh part's (`kMatrixNarrow`, now shared in `Vc2PartSettingsStates.h`).
+
+Before it the check header was split by what its parts do (the 300-line limit): the event templates into
+`Vc2PartSettingsEvents.h`, G's channel word's sources and the Matrix-safe narrow IDs into `Vc2PartSettingsStates.h`; a
+callee hooked may answer (`SettingsCallee::answer`).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first ten parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsMessages.cpp` is reached.
+- `mutate_vc2.py --settings`: 498 plants, none missed; v297's 33 new.
+
+### The VC-2 part's system readers and budget (2026-11-19, v296) {#vc2-part-system-readers}
+
+Step 4.3's twenty-fourth version (VC2_MODE_PLAN.md, step 4.3, item 10's first part): the readers the parameters'
+messages (`0x89392890`, by the message's kind) run besides item 9's dispatchers, on `Vc2PartSettings`
+(`Vc2PartSettingsSystem.cpp`, and the budget in `Vc2PartSettingsCategory.cpp`), checked by `xt_vc2settings`' tenth
+part. None tests a held flag; each but the budget answers 1.
+
+- **Time Trip's assigns** `0x893943f0` (kind 5's; also called near `0x893927e0`): Time Trip Assign X and Y (IDs 0x93, 0x94,
+  the system's read object) into the bytes at `0x89989404` and `0x89989405`, 0 and 32 (OFF and CC32) as −1, the
+  first stored before the second is read. `0x89394440`, next to it, is the controllers' use of them: item 10's.
+- **Patch Remain** `0x89391520(0x899826fc)` (kind 4's): ID 0x41 on the system's second read object into the given
+  object's +1, `0x899826fd`.
+- **The voices' counts** `0x89391550` (kind 3's): on the system's third read object, Number of Voices (0x52d) held to
+  24, Offset of Voice Number (0x52e) held to 23, CPU Power Max for TG (0x530) and CPU Power Offset for Voice (0x531);
+  with count + offset past 24 the count is 24 − offset. Each is held against its last read, four halfwords at
+  `0x8993d02c` (a signed halfword against the word): a new count or offset is stored and given to the reserve
+  (`0x893911b0(count, offset)`, v272's); a new power stored and the budget run; a new power offset stored and given
+  to its setter (`0x89391260`, v272's `setOffset`).
+- **The budget** `0x893937b0`: Patch Category on part 0's block, CPU Power Max, the Category's law and the held note's
+  word, the budget's setter; the argument it is given is not read. It is the Category routine's second half, the
+  same code: `category` (v294) now calls `budget` after its first read, its line unchanged.
+
+The reserve, the power offset's setter and the budget's setter go out through `Vc2SettingsParts`; v272 has all three.
+
+**The check.** `xt_vc2settings`' tenth part, on the seed nine after the run's, every table and these words noise; the
+reserve and the power offset's setter hooked to log, the budget's setter by v294's hook. The store draws Time Trip
+Assign X and Y 0…39 half the time, Number of Voices and Offset 0…11 (inside the holds, so a last read can be set to
+equal what the reader will make of it), Patch Category 0…13; before the voices' counts each last read is set half the
+time to the store's answer. The bytes are compared one by one with the tables' trailers (a word compare of a one- or
+two-byte region read nothing: the first run crashed there).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first nine parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsSystem.cpp` and `Vc2PartSettingsCategory.cpp` is reached.
+- `mutate_vc2.py --settings`: 465 plants, none missed; v296's 25 new. The sum's test at 24 by one, missed in a first
+  run, is equivalent (at a sum of 24, 24 − offset is the count itself) and is listed as not planted.
+
+### The VC-2 part's static M (2026-11-19, v295) {#vc2-part-static-m}
+
+Step 4.3's twenty-third version (VC2_MODE_PLAN.md, step 4.3, item 9's tenth part): the part's own Matrix object, the
+static M at `0x89997108`, as `Vc2StaticMatrix`, and its two initializers, checked by `xt_vc2settings`' ninth part.
+
+**The object**, 0x290 bytes word for word, as far as read:
+- +0x000 M's words (v243's `Vc2MatrixWords`) and +0x168 its links (the channel state's word, the part; v247's);
+- +0x170 its update queue node, a list head's first 0x14 bytes (links, flag, queue byte, and its class's vtable at
+  +0x180, `0x898cd460`, whose +0xc holds −0x170: the node is a base class 0x170 into the object);
+- +0x184 the object's vtable `0x898cd448`, whose +0x14 is M's init `0x893a2ee0` (v247): what the queue runs when it
+  takes the node;
+- +0x188 the part's levels (v247's `0x89997290`), +0x194 a float;
+- +0x198 its own channel state, 0xec bytes like the 64 of the channel states' table, set up by `0x89317a10`;
+- +0x284 the word G's channel word takes with Receive Switch off (v292's `0x8999738c`), +0x288 and +0x28c two
+  floats. G follows at `0x89997398`.
+
+**The static initializer** `0x893a3020` (from the init table `0x898c5e74`): the three floats from its pool
+(`0x893a3098`, `0x893a30a0`, `0x893a30a4`: about 100.23 into +0x288, 0.01996 into +0x28c, 0.009375 into +0x194; read
+by `Vc2PartSettingsTables`); the node made by `0x89394f30` (v272's: its links to itself, the node class's vtable
+`0x898cd340`); the two vtables, +0x184 then +0x180 over the node's; then `0x89317a10(+0x198, 0)`, the channel
+state's set-up, which goes out through `Vc2StaticMatrixParts`.
+
+**The part's init** `0x893a2fe0` (from the part's init's last call, `0x8939b200`): the part halfword +0x16c 0, the
+head's velocity 0 and its two keys 60, the channel word from +0x284, then the node onto the update queue
+(`0x89394fa0(0x89989cc4, +0x170)`, v279's enqueue, which goes out too: the ported queue knows voices and heads by
+address, not this node).
+
+**The check.** `xt_vc2settings`' ninth part, on the seed eight after the run's. Each event gives the static M noise on
+both sides, then runs one initializer; `0x89317a10` and `0x89394fa0` are hooked to log, `0x89394f30` runs as rom.4's
+own; after each, the tables as every part has them, the static M word for word and the calls.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first eight parts' lines as they were.
+- Every line of `Vc2StaticMatrix.cpp` is reached (it has no branch), and the three floats' reads.
+- `mutate_vc2.py --settings`: 440 plants, none missed; v295's 21 new. `mutate_panel.py rom4-no-tables
+  rom4-no-setenvelopes rom4-no-partsettings`: 3, none missed (they reach the loader's failure tests, which the check
+  can't).
+
+### The VC-2 part's settings by ID: the Category and budget (2026-11-19, v294) {#vc2-part-settings-category}
+
+Step 4.3's twenty-second version (VC2_MODE_PLAN.md, step 4.3, item 9's ninth part): `0x89392c60(node)`, which the
+part's handler `0x89392830` calls with the node of source 1 and the part, after the reload task's request and before
+the step counts' clear. It is on `Vc2PartSettings` (`Vc2PartSettingsCategory.cpp`), checked by `xt_vc2settings`'
+eighth part; its calls out go through `Vc2SettingsParts`.
+
+**The routine** tests no held flag. In rom.4's order:
+- Patch Category (ID 0x12c) on part 0's block; the word `0x899891d0` set to 1 if it is 10 or more, then Patch
+  Category again through a second read object, and CPU Power Max for TG (0x530) on the system's third read object;
+- a switch on the second Category: 0…5 and 7…9 take 400 off the power and clear the word; 6 clears it alone; 10 and
+  11 take 400 off and set it to 1; past 11 (unsigned) it is cleared. As a law: every Category 0…11 but 6 costs 400
+  µs, 10 and 11 hold a note (the plan's event 0x200: the notes' task plays C4 from source 3 while the word is set);
+- the power to the budget's setter (`0x89391240`, v272's `setBudget`);
+- `0x89392f90(3, channel, 123, −1)`: All Notes Off from source 3, on the channel of part 0's node of source 4
+  (`0x899888d0` + 0x30d, a signed byte);
+- `0x89390fd0` with the given node's +8: the sounding voices whose +0x3c is that word get +0x2d cleared and +0x30's
+  bit 0 set, are truncated (v277's `0x89391a50`) and queued (v279's `0x893951b0`);
+- Auto Note's switch (`0x89396f90`, v291's);
+- then the word read again, and with it 0, all notes off: event 0x80 to the notes' task (`0x89391e30`).
+
+**The check.** `xt_vc2settings`' eighth part, on the seed seven after the run's. Each case is noise in every table,
+the word and the nodes, then 400 events of the routine on a drawn part's node. The four callees are hooked to log
+among the reads, and Auto Note's setters keep v290's hooks; the port's calls out log the same. Patch Category is drawn
+0…13 half the time. Auto Note's switch runs inside this routine 20 bytes deeper than v291's check calls it alone, so
+its leftover word is given the same handle at that depth (on the XT that word is the saved r14 of `0x89390fd0`, which
+here is the getter's address). The word is compared as memory in every part, and the earlier parts' noise stops before
+it.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first seven parts' lines as they were. At seed
+  2024, 1,236 events held a note and 14,764 sent all notes off.
+- Every line and branch of `Vc2PartSettingsCategory.cpp` is reached.
+- `mutate_vc2.py --settings`: 419 plants, none missed; v294's 27 new.
+
+### The VC-2 part's nodes (2026-11-19, v293) {#vc2-part-nodes}
+
+Step 4.3's twenty-first version (VC2_MODE_PLAN.md, step 4.3, item 9's eighth part): the nodes' routines, on
+`Vc2PartNodes` (`Vc2PartNodes.cpp`), with `0x893904d0` on `Vc2Keys`, checked by `xt_vc2keys`' second part.
+
+**What they are.** A node (`0x899888d0`, 16 bytes, one a source 1…4 and part, v291's layout) is what puts a part on a
+channel: a source's MIDI message walks the list of its channel (`0x899890d0` + 64 × (source − 1) + 4 × channel, a
+node's +0 the next) and hands it to each node's part object (+4). The part objects are v278's "part nodes": 16 of 16
+bytes at `0x8998246c`, which rom.4's table `0x89535458` points at by the node's +0xe, each one's first byte its
+index and +4 its class's vtable. The byte at `0x899888bd` + index says which class.
+
+**The channel's move** `0x89393100(node, source, channel)` (the source less 1):
+- nothing if the node's channel and source (+0xd, +0xc, signed bytes) are already those;
+- off its old list by its own source: channel −2, every list of the source; −1, none; else its own. rom.4 picks by a
+  two-entry table on channel + 2, which the port keeps as a table (`runOf`). On a list it's unlinked where found, the
+  head or a link; a list it isn't on is left as it is;
+- if the source given isn't its own, its channel becomes −1 and that's all;
+- else its channel is the new one, and it goes onto the new list: −2, at the head of every list of the source, its
+  link the last list's old head (so the lists share a chain from then on); −1, none; else in address order (before
+  the first node above it, unsigned). Where a shared chain leads back to the node itself, rom.4 writes the link before
+  the node's own, and the port does the same.
+
+So an every-list move leaves 16 lists sharing one chain. Moves on them can make a list that never ends: the check met
+it 5 times in 16,000 events at seed 2024, on both sides alike, and draws the lists again there, before the next walk
+would loop. On the XT that would hang the note task; the callers seen give only −1 and 0…15, so it may never happen.
+
+**The class installs** `0x893932c0(node)` (held) and `0x89393310(node)` (plain), one routine over the class:
+- the old object's destructor (`0x893904c0`) is called when +4 isn't 0, and is a bare return;
+- the part object of the node's index is given its class: the base vtable `0x898cd1fc`, then the held class's
+  `0x898cd3b8` or the plain one's `0x898cd184`; its address into the node's +4 (rom.4's table has no 0 among the 16);
+- `0x893904d0(object)`: the part's glides reset, two of each source, at 0x24 × (32 × source + 2 × the object's first
+  byte) and the one after (v276's `0x893923c0`, `Vc2Keys::resetObjectGlides`);
+- the class byte: 1 held, 0 plain.
+
+**The voices' stop** `0x89393360(node)` jumps to `0x89390f70` with the node's +8 (the sounding voices of that word,
+asked by their class and stopped, then all notes off), which goes out through `Vc2NodeParts`.
+
+The init `0x89393370` sets part 0's four nodes (source c, channel −1, index 0, +8 from `0x8950d7a0`, its object made
+the plain class) with the controllers' handlers; it is the front's, item 10.
+
+**The channel states' table** that v292's `Vc2ChannelStates` reads is v276's `Vc2KeysTables` (`sources`, the byte at
+`0x8950d6d9`, and `states`, `0x8950d6e0`): the wiring can answer it from there.
+
+**The check.** `xt_vc2keys`' second part, on the seed after the run's, so the first part's lines are as they were. Each
+case draws the nodes (noise; a source mostly its own row's, a channel −1…15, an index 0…15), makes the lists from them
+in address order with one node in eight left off its own, and draws the part objects (noise, an index 0…15). Then 400
+events on a drawn node: a move (its own source mostly; a channel −1…15, its own now and then, −2 one time in 32), an
+install of either class, a stop, or `0x893904d0` alone on a part object. `0x89390f70` is hooked to log its word; the
+port's `Vc2NodeParts` logs the same. After each, the keys' span, the nodes, lists, class bytes, part objects and the
+calls. Not drawn: a source past 0…3, a channel below −2 or past 15, an index past 15, where rom.4 reads past its lists
+or table.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first part's lines as they were.
+- Every line and branch of `Vc2PartNodes.cpp`, and of `Vc2Keys.cpp`, is reached.
+- `mutate_vc2.py --keys`: 105 plants, none missed; v293's 27 new, among them the link written in rom.4's order (the
+  shared chain that leads back to the node). `--voices` (its third part runs `Vc2Keys.cpp`): 287, none missed.
+  `--settings` (its check's node writes now the
+  nodes' alone): 392, none missed.
+
+### The VC-2 part's settings by ID: the dispatchers and G's channel word (2026-11-19, v292) {#vc2-part-settings-dispatch}
+
+Step 4.3's twentieth version (VC2_MODE_PLAN.md, step 4.3, item 9's seventh part): the four routines that run the
+readers, and G's channel word `0x893a5050`, on `Vc2PartSettings` (`Vc2PartSettingsDispatch.cpp`), checked by
+`xt_vc2settings`' seventh part. The Matrix's set-up (v247's `Vc2MatrixSetup`) is given to them.
+
+**The dispatchers.** Each calls its readers in turn and tests each answer:
+- **the part's** `0x8939b170(part)`, which the reload task `0x8939af10` calls with its object's part: the mode row
+  (`0x89396f70`), the part's bytes, the common, the OSC table, the mix, the envelopes, the LFOs, the COSM inputs, the
+  TVAs, the Matrix's settings (`0x893a51c0` on G), then the vocoder reader. The first that answers 0 stops the rest,
+  and the dispatcher answers the last answer it got.
+- **the system's** `0x8939b0d0()`: the OSC table's trailer (`0x893a1000`), the LFOs' system byte, the TVA's route,
+  then G's channel word.
+- **the assignments'** `0x8939b110()`: the Matrix's system assignments (`0x893a50b0`), then the TVA's controls flag.
+- **the calibration's** `0x8939b140()`: the OSC table's calibration (`0x893a1060`), then the TVA's trailer.
+
+Every reader the last three call answers 1, so their tests never stop them; the port calls them in order.
+
+**G's channel word** (`0x893a5050(G)`, system B's read object `0x89320760`): with Part 1 Receive Switch (ID 71) at 0,
+G+0x840 is the word at `0x8999738c` (by `0x893a3010`); otherwise it is the word in the channel states' table
+`0x8950d6e0` at 64 × the byte at `0x8950d6d9` + 4 × Part 1 Receive Channel (ID 72), plus 2. It answers 1. In the image
+that byte is 0 and the table holds 64 channel states' addresses (16 a source; sources 2 and 3 alike), and
+`0x8999738c` is 0. The port takes both words through `Vc2ChannelStates`. (Put right in v313, "rom.4's MIDI channel
+states": the table's 64 words are four rows of 16, and only rows 0 and 1 are channel states, sources 1…3 sharing row 0
+and source 4 having row 1; rows 2 and 3 point at the OS's 16 part objects.)
+
+**v247's record, put right.** rom.4's `0x893a46f0` and `0x893a51c0` test flag 0 after their reads as well as before,
+and answer 0 if it was set in between. v247's port answered true there, and took the flag as a bool given at the start;
+xt_vc2cosm's fourth part never sets the flag during a read, so it couldn't show it. `Vc2MatrixParams` now has `held()`,
+which `record` tests before and after, as the other readers do; xt_vc2cosm's line is as it was.
+
+**The check.** It is `xt_vc2settings`' seventh part, on the seed six after the run's. Each case is noise in every
+table, the nodes and G (`0x89997398`, compared as memory in every part), the source byte drawn 0…3 and `0x8999738c`
+drawn, the table left as rom.4 holds it; the port's `Vc2ChannelStates` reads the same words. Then 400 events: the
+part's dispatcher on part 0 (as rom.4's handler `0x89392830` gives), the other three, G's channel word alone, or the
+Matrix's settings alone (`0x893a51c0` on a drawn part, the flip within its reads). The last is there because in the
+part's dispatcher the Matrix's answer can't show: the vocoder reader after it tests flag 0 before any read, so a
+record that wrongly answered true would stop there all the same (a first run of the plants missed it). Every
+reader is rom.4's own, the Matrix's set-up too, against v247's on `SettingsMatrixParams`, the same reads; the earlier
+parts' hooks on the mode row's messages and the vocoder's callees stay. The store's special IDs are now one table of
+`SettingsNarrow` rows (an ID, its count of values, how often, where from), which this part extends:
+- Receive Switch 0…1 half the time, Receive Channel 0…15 always (past the table rom.4 reads what lies around it);
+- the eight Matrix Controls' Sens 1 and 2 −128…127 always, as v247's check draws them: rom.4's depth routine
+  (`0x893a36a0`) reads its tables by them, and faulted on the store's wider words in a first run.
+
+The part's dispatcher draws its flip over its whole run of reads (about 7,000), or half the time over its first 64:
+a flag 0 set during the bytes' or the common's 20 reads is the only way the common is the one to give up.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first six parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsDispatch.cpp` is reached, every reader in the chain giving up now and
+  then; and `Vc2MatrixSetup.cpp`'s flag tests (its other routines are xt_vc2cosm's).
+- `mutate_vc2.py --settings`: 392 plants, none missed; v292's 35 new, two of them on `Vc2MatrixSetup.cpp`'s flag
+  tests (port `vc2settingsmatrix`). `--cosm`: 1,439, none missed, its two plants on the record's flag and the
+  settings' order given the new signature's text. `--sets`: 374, none missed.
+
+### The VC-2 part's settings by ID: the mode row and Auto Note's switch (2026-11-19, v291) {#vc2-part-settings-modes}
+
+Step 4.3's nineteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's sixth part): the dispatcher's first reader,
+`0x89396f70(0x89995390, part)`, and Auto Note's switch `0x89396f90`, which the Category routine `0x89392c60` calls last.
+Both are on `Vc2PartSettings` (`Vc2PartSettingsModes.cpp`) and checked by `xt_vc2settings`' sixth part. Their calls out
+go through `Vc2SettingsParts`.
+
+**The mode row** (`0x89396e20(table, part)`; `0x89396f70` wraps it and answers the same, as 0 or 1). It fills the
+parts' settings, 32 bytes a part from `0x89995390` (v278's "the parts' settings": the assigner reads +0 as the key's
+offset). Flag 0 is tested first (`0x89396dc0`, which then sets up the part's block, `0x893207b0`), and the reads are:
+- +0 = 12 × Octave Shift (0x12f), a byte; +1 = 1 when Mono/Poly (0x130) is 0, MONO; +2 = Legato Switch (0x131);
+  the halfword +4 = Patch Tempo (0x13a);
+- +6…+0x14: the zones' upper keys by `0x89320870`, Zone 1 Range Upper (0x141) to Zone 15's, each the most of it and
+  those before it (from 0, signed); +0x15 = 127 for zone 16;
+- +0x17 = Split Point (0x1a1); then Modulator Key Mode (0x1a2) and Vocoder Sw (0x193), in that order.
+
+When the Mode differs from +0x18 (read as a signed byte), or Vocoder Sw is 0 and +0x16 is not, each of the part's
+nodes for sources 1, 2 and 3 (`0x899888d0` + 0x100 × (source − 1) + 16 × part, `Vc2PartNodes`) whose channel byte
+(+0xd) is 0 or more is sent All Sound Off: `0x89393c00(&msg, 120)` makes the message, and `0x89393ba0(&msg, source,
+channel, 0)` hands it on. That routine doesn't read the message: with its last word 0 and the word `0x899891d0` clear it
+clears the key table of that source and channel (v276's `0x89391fe0`), calls `0x89393000(source, channel)` and
+truncates the table's voices (v278's `0x89390d50`); item 10 wires it. rom.4 also tests each node's address for 0, which
+none is. Then +0x18 = the Mode and +0x16 = Vocoder Sw. It answers flag 0 clear, tested again at the end.
+
+**The nodes** (`Vc2PartNodes.h`): 64 of 16 bytes from `0x899888d0`, one a source (1…4) and part. As far as read: +0
+the next node on its channel's list (the lists at `0x899890d0`), +4 an object, +8 a word given to `0x89390f70` and
+`0x89390fd0`, +0xc the source less 1, +0xd the channel (−1 none), +0xe an index into the objects' table `0x89535458`.
+Their init (`0x89393370`, part 0's four alone) and routines (`0x89393100`, `0x893932c0`, `0x89393310`) are item 9's
+nodes version.
+
+**Auto Note's switch** (`0x89396f90`, given the mode rows' address, which it doesn't read). It reads part 0 alone:
+- flag 1, then kind 0's first OSC's Type (0x2e5) through `0x89396df0` (`0x89320a50`); flag 1 again, then kind 1's;
+  either test giving up ends it with nothing called;
+- when either Type is EXTIN (2): Auto Note On Switch (0x19c) and Legato Switch (0x131, read and dropped) from part 0's
+  block, set up only if flag 0 is clear. With flag 0 held rom.4 reads both through the read object's word as the
+  stack left it: the port reads them through `Vc2ParamBlock::kLeftover`;
+- Auto Note's switch (`0x893ebc20`) gets the On Switch, or 0, and its legato setter (`0x893ebc60`) 0.
+
+v290's vocoder reader does the same with its own reads; this is the copy the Category routine calls.
+
+**The check.** It is `xt_vc2settings`' sixth part, on the seed five after the run's, so the first five parts' draws
+and lines are as they were. Each case is noise in every table and in the 64 nodes, then 400 events: the wrapper or
+the row on a drawn part, or Auto Note's switch. The message's two routines are hooked to log the number, and the
+source, channel and last word, among the reads; Auto Note's two setters keep v290's hooks; the port's All Sound Off
+logs the same through `SettingsPortOuts`. In this part the store draws Modulator Key Mode 0…2 and Vocoder Sw 0…1 half
+the time, and half the time each event sets +0x18 and +0x16 to what the store will answer, so the Mode is held and
+Vocoder Sw goes off often enough. Before each Auto Note's switch the stack word its second read object leaves is given
+a handle of its own (`kLeftoverHandle`), which the getter's hook logs as the leftover's block. The mode rows and the
+nodes are compared as memory in every part; v290's part's noise now stops before the mode rows.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first five parts' lines as they were. At seed
+  2024: 5,372 wrappers, 5,364 rows and 5,264 Auto Note switches, 8,885 All Sound Offs and 116 reads through the
+  leftover object.
+- Every line and branch of `Vc2PartSettingsModes.cpp` is reached.
+- `mutate_vc2.py --settings`: 357 plants, none missed; v291's 60 new. `Vc2PartNodes.h`'s `of` is planted at its
+  call, by the source and part it is given.
+
+### The VC-2 part's settings by ID: the vocoder reader (2026-11-19, v290) {#vc2-part-settings-vocoder}
+
+Step 4.3's eighteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's fifth part): `0x893a72f0(0x89997fdc, part)`, the
+reader that sets up the vocoder, the part mixer's levels and Auto Note. It is on `Vc2PartSettings`
+(`Vc2PartSettingsVocoder.cpp`) and checked by `xt_vc2settings`' fifth part. What it hands on goes through
+`Vc2SettingsParts`, which the wiring gives the objects already ported.
+
+**The reader**, in rom.4's order (flag 0 tested before and after; the part's block first):
+- **Formant Shift** (0x19f): its value as a float, 1 for 0, gives the ratio 2^(x × 1/63 − 64/63). That is one FMAC
+  (the product, then the sum) and rom.4's powf (`vc2LibPow`). Both sides' ratios take it.
+- **The settings struct** (`Vc2VocoderSettings`, on rom.4's stack):
+  - Vocoder Sound Level, Vocoder Depth and Unvoice Level, each × 1/127;
+  - Unvoice Detect + 24, and Unvoice Spread as 0 or 1;
+  - Env Attack, Env Release and Formant Template as they are; Hold Dump Time × 1/127.
+
+  The pivots (+0x10, +0x14) are never written: rom.4 hands the stack's leftovers, and the settings path sets both
+  before anything reads them.
+- **Unvoice Level** goes into kind 6's global `0x899d9968` too. Direct Sound Level × 1/127 goes to the part mixer's
+  setter `0x893b1eb0`.
+- **Kind 0's sends** (flag 1): its first block's Reverb and MFX Sends (0x2e2, 0x2e0) × 1/127 go to `0x893b1ec0` and
+  `0x893b1ed0`, and its first OSC's Type is read. Then the mixer's targets (`0x893b1ee0`) are called, whatever the
+  flag. Flag 1 is tested again, and kind 1's first OSC's Type is read.
+- **Auto Note**, when either kind's first OSC is EXTIN (Type 2):
+  - it reads Auto Note On Switch, Legato Switch (read and dropped) and robot human depth; the last × 1/127 goes into
+    `0x89997fdc`;
+  - Auto Note's switch (`0x893ebc20`) takes the On Switch, and its legato setter (`0x893ebc60`) is called with 0;
+  - with the On Switch above 0 and Formant Template below 16, each side's offset is a record's float on the same
+    scale as Formant Shift: x × 1/63 − 64/63. The records are 140 bytes each at `0x89540904`, the float at +8;
+    template T takes record T on the left and T + 16 on the right (`Vc2PartSettingsTables`).
+
+  Otherwise `0x89997fdc` is 0, Auto Note's switch gets 0 and the legato setter is called; the offsets are 0.
+- **The vocoder's mode** (`0x893b1c00` → `0x893f0600`) is (Vocoder Type + 1) × Vocoder Sw. Its settings
+  (`0x893b1be0` → `0x893f06a0`) take the struct, and the mixer keeps Stereo Process Sw == 1 (its word `eac8`).
+
+It answers flag 0 clear. The pool's three floats (−64/63, 1/63, 1/127) are read from rom.4 by
+`Vc2PartSettingsTables`, with the records' 32 floats.
+
+**The check.** It is `xt_vc2settings`' fifth part, on the seed four after the run's, so the earlier parts' draws and
+lines are as they were. rom.4's powf runs as its own. The eight callees are hooked to log their values among the reads:
+the setters' floats as bits, the targets, Auto Note's two, the mode, the settings struct word for word without the
+pivots, and the stereo flag. The port's calls out log the same through `SettingsPortOuts`. `0x89997fdc` and
+`0x899d9968` are compared as memory in every part. Each case is noise in every table, then 400 events of the reader
+on a drawn part. The store gives the OSCs' Types 0…3 half the time, so about one event in five has an EXTIN OSC, and
+Formant Template 0…17 half the time, either side of the templates' 16.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first four parts' lines as they were. At seed
+  2024, 3,479 events had an EXTIN OSC and 542 a template's offsets.
+- Every line and branch of `Vc2PartSettingsVocoder.cpp` is reached.
+- `mutate_vc2.py --settings`: 297 plants, none missed; v290's 42 new. The templates' bound by one is not planted:
+  template 15's two records hold 64, an offset of 0. A first run missed a bound at 15, which is why; it also showed
+  that Formant Template below 16 was drawn too seldom, so the store now draws it within 0…17 half the time.
+
+### The VC-2 part's settings by ID: the OSC block's reader (2026-11-19, v289) {#vc2-part-settings-osc-block}
+
+Step 4.3's seventeenth version (VC2_MODE_PLAN.md, step 4.3, item 9's fourth part): `0x893a04e0`, the reader v288's
+part reader calls for each kind's two OSC blocks, on `Vc2PartSettings` (`Vc2PartSettingsOscBlock.cpp`) and checked by
+`xt_vc2settings`' fourth part.
+
+**The reader** (`0x893a04e0(table, part, kind, osc)`, flag 1 tested before and after). It reads the kind's first
+block (`0x89320a50`) into the block at +0x1020 × the part + 32 + 0x100 × the kind + 0x80 × the OSC. OSC 2's IDs are
+OSC 1's + 52 for most. The Vibrato's step is 4, the carrier's 14. Detune and the Sub Oscillator's step 3, and the
+Harm Formant's 5, are taken once for any OSC past 1. In rom.4's order:
+- Switch, Type, Wave Gain, Pitch (0x2e4…0x2e7) into +0, +1, +2, +4; Pitch Keyfollow × 100 into the halfword +6; its
+  LFO and Envelope Depths and Coarse Tune into +8, +9, +0xe; Fine Tune × 10 into +0x10;
+- Random Pitch Depth (0x2ed) into the halfword +0x12 by a switch of 30: cents × 10, 0…9 by tens, 10…19 by hundreds
+  from 100, 20…29 by thousands from 2000, and anything past 29 (as unsigned) 12000;
+- Level, its Keyfollow × 10, its LFO Depth into +0x14, +0x16, +0x18; the Vibrato's Type, Rate, Depth (0x37c…) into
+  +0x1c…+0x1e;
+- the analog's Waveform, Impact, Pulse Width (0x2f1…) into +0x20…+0x22, its Keyfollow × 10 into +0x24, its LFO and
+  Envelope Depths into +0x26, +0x27; Fat, its Keyfollow × 10, LFO and Envelope Depths into +0x2c, +0x2e, +0x30, +0x31;
+- Detune and the Sub Oscillator's Octave and Level (0x34d…) into +0x36…+0x38;
+- the carrier's fourteen (0x354…: Saw Wave LPF cutoff, Level, Noise LPF and HPF cutoffs and Level, the Dynamics'
+  Threshold and Sensitivity, Growl Level, its Keyfollow × 10, LFO and Envelope Depths, the Saw-Noise Mix Balance and
+  its two depths) into +0x64…+0x68, +0x74, +0x75, +0x6a, +0x6c, +0x6e, +0x6f, +0x76, +0x7a, +0x7b;
+- the Wave Number (0x2fe) into the halfword +0x3c. When it changes, the OSC's step count goes to 0: a halfword at
+  `0x89989c84` + 64 × the part + 4 × the kind + 2 × the OSC, which the OSC block's converter reads (`0x8939fe66`);
+- Start Offset (0x306) into the word +0x40; Time, its Keyfollow × 10, its LFO and Envelope Depths into +0x44, +0x46,
+  +0x48, +0x49; Formant and its three likewise into +0x4e, +0x50, +0x52, +0x53; Tempo Sync, Robot Voice, Playback
+  Mode, Loop, Vari and Energy into +0x58…+0x5c and +0x5e; Time Offset (0x30b, read here, after Energy) into +0x5d;
+  Time Trip and its Beat Keep into +0x5f, +0x60;
+- for kind 0, when +1 (the Type) is 2, EXTIN (the Types are ANALOG, PCM, EXTIN, VOCODER): the Harm Formant, its
+  Keyfollow × 10 and its Style (0x371, 0x372, 0x375) into +0x4e, +0x50 and +0x5e, over the Formant's and Energy's.
+
+**Part 0 alone.** The step counts hold part 0's 64 bytes; the update queue (v279) follows at `0x89989cc4`. For a part
+past 0, rom.4 would clear a halfword over the queue and what follows it. Its handler `0x89392830` takes no part but 0
+before the readers run, and `0x89392750` clears part 0's counts. The port keeps part 0's (`Vc2PartRows::steps`) and
+writes nothing for another part.
+
+**The port.** The reads are rows of an ID, its step by OSC, a place and a store (byte, halfword, × 10, × 100, word,
+Random Pitch Depth's law), in rom.4's order. The part's reader is now `oscRows` given a block reader: `oscs` gives
+`oscBlock`, and the check's third part a fake, so its v288 line stands. `Vc2PartParams::oscBlock` is gone.
+
+**The check.** It is `xt_vc2settings`' fourth part, on the seed three after the run's. The hook on `0x893a04e0` comes
+off, so rom.4's own reader runs. Each case is noise in every table and the step counts, then 400 events: the block
+reader (part 0; kind 0 one time in four; OSC 0 or 1) and the part's reader on part 0. Before each, a block's Wave
+Number is set half the time to what the store will answer, so that it stays. The store gives the Types 0…3 half the
+time, so kind 0's Type 2 is met. The step counts are compared in every part. The further parts are now rows
+(`SettingsPartRow`) run by one routine.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first three parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsOscBlock.cpp` is reached but the guard on a part past 0, never drawn.
+- `mutate_vc2.py --settings`: 255 plants, none missed; v289's 48 new. Not planted: the read's part (part 0 alone is
+  given) and a once-past-OSC-1 step taken by the OSC (the same for OSCs 0 and 1).
+- The check caught one slip of mine on its first run: values 20…29 of Random Pitch Depth count from 2000, so 25 gives
+  7000.
+
+### The VC-2 part's settings by ID: the OSC table (2026-11-19, v288) {#vc2-part-settings-osc}
+
+Step 4.3's sixteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's third part): the OSC table's readers, on
+`Vc2PartSettings` (`Vc2PartSettingsOsc.cpp`) and checked by `xt_vc2settings`' third part. The part's reader calls the
+OSC block's own reader, `0x893a04e0`, for each block. That reader is over 900 instructions and is v289's; here it is
+behind `Vc2PartParams::oscBlock`.
+
+**The table** (`0x89e371e0`, `Vc2PartRows::oscs`): 0x1020 bytes a part (a 32-byte header, then 0x100 a kind, 0x80 an
+OSC), then the systems' bytes from +0x10200.
+- **The trailer** (`0x893a1000`, the second system block): the halfword +0x10200 from ID 62, the bytes +0x10202 and
+  +0x10203 from IDs 63 and 122. It answers 1.
+- **The calibration** (`0x893a1060`, the third system block), at u = +0x10204:
+  - u+0 is cleared;
+  - u+1…u+5 each come from ID 0x534 + its place, read in the order +1, +3, +2, +4, +5;
+  - the halfwords u+6 and u+8 come from IDs 0x53a and 0x53b;
+  - ID 0x53c switches four groups of eleven bytes, four apart, at u+0xa, u+0xc, u+0xb and u+0xd. They are read in
+    that order from ID 0x53d on, consecutively. Off, the groups take 60, 0, 0 and 127, and nothing is read.
+
+  It answers 1.
+- **A part's row** (`0x893a1410`, flag 0 tested before and after the header). The header comes from the part's block:
+  - +0 = 12 × ID 0x12f; +1 = ID 0x12d; the halfword +2 = 10 × ID 0x12e;
+  - +4 = 1 when ID 0x130 is 0, else 0; +5 = ID 0x133;
+  - ID 0x151 switches twelve halfwords from +6, each 10 × an ID from rom.4's table `0x8954012c` (0x153…0x169, every
+    other one; read by `Vc2PartSettingsTables`). Off, they are 0 and nothing is read;
+  - +0x1e = ID 0x193.
+- **Each block.** Then, for each kind and each of its two OSCs, the block at +32 + 0x100 × the kind + 0x80 × the OSC:
+  - first `0x893a04e0(table, part, kind, osc)`, whose 0 stops the reader;
+  - then (flag 2, tested before and after) six envelopes' velocity curves and depths from the kind's second block,
+    by v286's laws. Envelopes 1, 2, 3, 2, 3, 4 (OSC 2's 5, 6, 7, 6, 7, 8) go into +0xa/+0xc, +0x28/+0x2a,
+    +0x32/+0x34, +0x4a/+0x4c, +0x54/+0x56 and +0x19/+0x1a.
+
+  A pair is the COSM inputs' read (v287): the curve's ID is 0x389 + 13 × the envelope, the depth's the next. The
+  port reads both through one routine, `velocityPair`.
+
+The system's dispatchers call the first two (`0x8939b0d0` the trailer, `0x8939b140` the calibration), item 9's later
+part. The readers' byte and halfword stores, the product and the loop over the kinds moved to `Vc2PartSettingsWords`.
+
+**The check.** It is `xt_vc2settings`' third part, on the seed two after the run's, so the first two parts' draws and
+lines are as they were. It hooks `0x893a04e0` to log its part, kind and OSC among the reads and to answer from the
+store: mostly 1, 0 one time in 64 (a stop), and now and then any other word. The flip may follow it as it follows a
+read. Each case is noise in every table, then 400 events: the trailer, the calibration and a part's reader. The OSC
+table (0x1023c bytes) is compared word for word after every event, in all three parts. The event templates, the case
+and the tables' addresses moved to `Vc2PartSettingsCheck.h`, and the part is in `Vc2PartSettingsOscCheck.cpp`.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first two parts' lines as they were.
+- Every line and branch of `Vc2PartSettingsOsc.cpp` and `Vc2PartSettingsWords.cpp` is reached.
+- `mutate_vc2.py --settings`: 207 plants, none missed; v288's 68 new. The plants on the held flags' numbers, which
+  moved into a header with the split, are now planted where each flag is tested.
+
+### The VC-2 part's settings by ID: the part's bytes and the COSM inputs (2026-11-19, v287) {#vc2-part-settings-cosm}
+
+Step 4.3's fifteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's second part): two more of the part's readers, on
+`Vc2PartSettings` and checked by `xt_vc2settings`' second part.
+
+**The part's bytes by kind** (`0x89998a14`, 16 a part, the byte the sets read by kind): `0x893a8250` reads each kind's
+by `0x893a81d0`, ID 0x2d3 from the kind's first block (flag 1).
+
+**The COSM inputs** (`0x89e2003c`, 0x540 a part, 84 a kind, 42 a COSM input), by `0x89399ed0`: for each kind, each of
+its two COSM inputs, two rows:
+- `0x89399c90` (flag 4): a COSM's own read object, `0x89320c10(obj, part, kind, cosm)`, read by the typed getter
+  `0x89324370` (its third argument a halfword at `0x8950d98a`). +0 takes ID 0x462 and +1 0x463, the COSM's type. The
+  type picks a run of IDs from rom.4's table `0x8953fb40` (a first and a last ID by type: 17 types, 1…14 IDs each),
+  read into halfwords from +10. Past type 16 the table runs into other data, some of whose runs would write far past
+  the row; the parameter's range never gives such a type, and the port reads nothing there.
+- `0x89399d60` (flag 2): from the kind's second block, two envelopes' velocity curve and depth by v286's laws, into
+  +2 and +4, +6 and +8. COSM input 0 takes envelopes 9 and 10's (IDs 0x389 + 13 × the envelope, and the next); input
+  1 takes 11 and 12's. A COSM index past 1 answers 0.
+- The runs are read by `Vc2PartSettingsTables` (loadVc2), which refuses an image where a run is out of order or
+  longer than a row's 16 halfwords.
+
+**The check.** It is `xt_vc2settings`' second part, on the seed after the first's, so the first part's draws and line
+are as they were. It adds the COSM set-up and the typed getter to the hooks; the read's log carries the COSM input.
+The store answers the type's ID within the table's 17. Each case is noise in every table, then 400 events: the
+bytes' reader and row, the COSM inputs' reader and its two rows (the second given a COSM index up to 2).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the first part's line as it was.
+- Every line and branch of `Vc2PartSettings.cpp` is reached but the type's guard past 16, never drawn.
+- `mutate_vc2.py --settings`: 139 plants, none missed; v287's 34 new. The first run missed one, a flag set right
+  after a COSM row's reads: the check's flips set only flags 0…3, so the second part's now set any of the five (the
+  first part's stay at four, keeping its draws).
+
+### The VC-2 part's settings by ID (2026-11-19, v286) {#vc2-part-settings}
+
+Step 4.3's fourteenth version (VC2_MODE_PLAN.md, step 4.3, item 9's first part): the readers that fill the tables C's
+children read (v281…v285). `Vc2PartSettings` is bit for bit against rom.4's own in `xt_vc2settings`.
+
+**How a reader reads.** It sets up a read object on a block of parameters and reads by ID through the getter
+`0x89324350`. The blocks: the part's (`0x893207b0`, its store `0x8950d8e0[part]`'s), the system's three
+(`0x89320790`, `0x89320760`, `0x89320f60`), and a note kind's three in the part's store (`0x89320a50` at +0xfe +
+128 × the kind, `0x89320ad0`, `0x89320b70`). A reader gives up (answers 0) when its task's held flag is set before
+its reads or after them: the bytes `0x8993d0c0`…`c4`, set together around a reload (`0x8939ae50`). The port takes
+both through `Vc2PartParams` (`value(block, part, kind, id)`, `held(flag)`).
+
+**The tables** (`Vc2PartRows`, as rom.4 lays them):
+- **the commons** (`0x89997090`, 6 bytes a part), by `0x893a1be0` → `0x893a1b40`: IDs 0x132, 0x134, 0x135 and the
+  halfword 0x136, from the part's block; flag 0.
+- **the envelopes** (`0x89e2765c`, 2080 a part, 130 a kind, 10 an envelope), by `0x8939ada0`: every kind's 13 rows
+  by `0x8939ab90`. Envelope 12's on byte is ID 0x2d9 from the kind's first block (flag 1), the others' 1. Then from
+  the second block (flag 2), at 0x390 + 13 × the envelope: +1, +2, +3, +4 from +0, +2, +3, +5; +5…+7 from +8…+0xa,
+  each × 100 / 63 by rom.4's division; the halfword +8 from +0xb × 10.
+- **the LFOs** (`0x89e2f85c`, 800 a part, 50 a kind, 10 an LFO), by `0x8939b9a0`: every kind's five rows (the row
+  `0x8939b860` inlined), from the third block (flag 3) at 0x439 + 8 × the LFO: +0, the halfword +2, then +4…+8. The
+  system's byte after them (+0x3200) is ID 67 from the second system block (`0x8939b970`).
+- **the mix** (`0x89e32a60`, 352 a part, 22 a kind), by `0x8939bff0`: each kind's +0…+4 from IDs 0x2d4…0x2d8 of the
+  kind's first block (flag 1, `0x8939bf30`). The rest of the row is not written.
+- **the TVAs** (`0x89e4987c`, 384 a part, 24 a kind), by `0x893a71f0`, each kind two rows:
+  - `0x893a6f80` (flag 1, then 0): the first block's IDs 0x2d9…0x2e3 into +4…+0x15, the two key follows × 10 as
+    halfwords; then +0x16 from the part's block, ID 0x195. ID 0x2d9 is the 13th envelope's on byte too.
+  - `0x893a70c0` (flag 2): the second block's 0x432 by the curve's law `0x893a8120` (1…7 less 1, else 7) into +0, and
+    0x433 by the depth's law `0x893a8070` into the halfword +2. That law takes ±32 to ±100 by 32nds and past it on by
+    31sts, each side's byte as a byte.
+  - Its systems: `0x893a7160` the trailer's gain (+0x1800, ID 0x533) and rate (+0x1802, 0x52c) from the third
+    system block; `0x893a71a0` the route flag (+0x1804, ID 66) from the second; `0x893a71d0` the part's controllers'
+    flag (`0x89997fcc`, ID 0xbb) from the first.
+- The tables are static arrays; their static initializers' tests of the pointer for 0 are dead.
+
+**The dispatchers** (the later parts): `0x8939b170`, a part's, runs eleven readers in turn, these and the mode row
+`0x89396f70`, the part's bytes by kind `0x893a8250`, the OSC rows `0x893a1410`, the COSM inputs `0x89399ed0`, G's
+record `0x893a51c0` (v247) and `0x893a72f0`'s floats; `0x8939b0d0`, `0x8939b110` and `0x8939b140` run the system's.
+
+**The check.** `xt_vc2settings` runs rom.4's own readers on its own tables. The seven set-ups are hooked to leave a
+handle (the block, part and kind) in the read object, and the getter to answer from a store both sides draw alike,
+by a hash of the event's seed and the read, logging each read. The held flags are drawn, and now and then one is set
+after a drawn read on both sides, so every give-up is reached. Each case is noise in the tables, then 400 events: each
+reader, its rows, the systems' and the two laws alone; after each the tables word for word, the bytes past their
+words, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases), 2.1 million reads at 40 cases.
+- Every line and branch of `Vc2PartSettings.cpp` is reached.
+- `mutate_vc2.py --settings`: 105 plants, none missed. The first run missed five: four were equivalent (the depth
+  law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
+  read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
+
+### The VC-2 part's sets' TVA (2026-11-19, v285) {#vc2-set-tva}
+
+Step 4.3's thirteenth version (VC2_MODE_PLAN.md, step 4.3, item 8's fifth child, its last): C's TVA, one a voice.
+`Vc2SetTvas` is bit for bit against rom.4's own in `xt_vc2sets`' sixth part.
+
+**Its words.** There are 24 TVAs of 40 bytes from `0x89997c04`, one a voice (`0x893a67d0(40, number)`).
+- +0 holds the note's kind; +1 the voice's key and +2 its +0x43.
+- +6…+0x1d hold the part's twelve words, from `0x89e4987c` + 384 × the part + 24 × the kind: the velocity's curve and
+  depth, whether it takes its sums, the level and its key follow, a depth, the pan and its key follow, a second
+  depth, the outputs' level, two sends, the outputs' route, and the sends' common level.
+- +0x20 holds the velocity curve's level squared, +0x24 the note's M.
+
+**The constructor and conversion.** `0x893a67f0(tva, call, block, M; the kind on the stack)` writes the kind and M,
+the voice's two bytes and the part's words, as the mix's. The conversion `0x893a68c0` writes the voice's bytes again.
+Then both take the shared velocity curve (`0x893a7fb0`) on the velocity, the depth (+8) and the curve (+6), as a
+halfword over 32768, squared, into +0x20, and call the writer. **The update `0x893a6940`** writes the part's words
+again; **the copy `0x893a69a0`** is the writer's code again, its literal pools apart; **the end `0x893a68b0`** is a
+bare return.
+
+**The block.** Each TVA converts the TVA block of the note's input, W + 0x6e8, by the writer `0x893a6260`. It takes
+seven of the group reader `0x893a2bf0`'s sums. +0 takes 13, and +4, +0x10, +0x14 take 0.
+- **When it takes its sums** (+0xa not 0):
+  - the level: the byte plus its sum, held to 0…127, plus the key follow, (key − 60) × the follow × 127 / 6000 by
+    rom.4's magic division, as a halfword, held again; then the level table by it over 32768. With the part's flag
+    (`0x89997fcc`) the product of it with CC 7's and CC 11's, read from M + 0x178; times the curve's level.
+  - two depths (+0x10, +0x16, signed): the byte plus its sum held to ±63, then sign · (d / 63)², at +8 and +0x1c;
+    +0x18 takes 0.0.
+  - the pan: the byte plus its sum as a halfword, plus its key follow, as a halfword held to 0…127; then CC 10 (M +
+    0x17a) moves it toward 127 by n / 63 above 64 and toward 0 by n / 64 below; the crossfade's pair by 127 less it
+    and by it.
+- **Otherwise** +0xc takes 1.0 (a product of CC 7 and 11 computed first with the flag is stored over), the depths
+  0.0, and the pan the crossfade's middle pair, 63 and 64.
+- Then the outputs' level by its sum, held, from the level table. +0x48 and +0x4c take the pan's pair, and +0x40 and
+  +0x44 1.0 and 0.0 for a note of kind 0, else 0.0 and 1.0.
+- **The route** (+0x1b, a table of three): 0 puts the outputs' level at +0x28 and +0x2c, 1 (and past 2) at +0x20 and
+  +0x24, 2 there unless the part table's flag (`0x89e4b080`) is set; the other pair 0.0.
+- The sends: +0x30 the level by its byte and sum × 16; +0x34 CC 93's level times the other's.
+- **The part's gain** 2^(g / 6) by rom.4's powf, g the signed byte at `0x89e4b07c`, multiplies +0x20…+0x2c, +0x30
+  (as the common level by the table, times the gain, times +0x30), +0x34; +0x38 takes the common level × the gain × 4,
+  +0x3c the gain × the outputs' level.
+- **A global**: `0x8993eb08` takes 1 / (r / 100 × 44.1), r the signed halfword at `0x89e4b07e`. The port keeps it
+  as the pool's word, `step`.
+- The scales are pool words, read by `Vc2SetEnvelopeTables` with the mix's: the curve's, the on and off paths'
+  (both 32768), 63, 16, 6, 4, 100 and 44.1.
+
+**What the port shares.** rom.4's magic division is one routine now, `vc2ByMagic`, the common's by 127², the
+envelopes' by 6400 and the TVA's by 6000 and 63. The kind-only children's head (M, the kind, the voice's bytes, the
+part's words) is the pool's `madeByKind`, the mix's and the TVA's; the part's words by the kind a template on their
+count; the level table's gain `vc2LevelRun`.
+
+**The check.** It is xt_vc2sets' sixth part, on the seed after the mix's. It hooks the reader as the envelopes'
+part does. The velocity curve is rom.4's own on both sides (the port's through `RomShared`, its registers kept, as
+rom.4's answer is read from r0 after the port has run); powf is rom.4's on its side and the port's on the other.
+
+The draws, beyond the sets' part's:
+- the parts' TVA words and the TVAs' own;
+- the curve 0…8 or any; its depth either side of ±200 (the routine's edges) or any; the bytes at their edges; the
+  depths either side of ±63; the follows 0, ±100, ±1200, the ends or any; the route 0…3 or any;
+- the part's flag; the trailer's gain at 0, ±6, ±12 or the ends, its rate (never 0), its route flag;
+- four Ms in the interpreter's RAM that the TVAs point at, their controllers 0…127.
+
+Not drawn: a controller past 127 (MIDI's), where CC 10 sends the pan past the tables either side; a rate of 0.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the earlier parts' lines as they were.
+- Every line and branch of `Vc2SetTva.cpp` is reached.
+- `mutate_vc2.py --sets`: 374 plants, none missed; the TVA's 82 and its tables' 9 new, and the head's division and
+  kind-only head. Four were equivalent and left out: the off pair 63 and 64 (both 32768 in the crossfade's table,
+  planted at 62 and 65 instead), the pan sum's halfword (one with the follow's, mod 2^16), and the curve's answer as a
+  halfword (it answers 0…0x8000).
+
+The first run differed in all its cases: the port's curve ran rom.4's routine in the interpreter and left its answer
+in r0, where the check then read rom.4's constructor's. The next differed on CC 10 past 127, which the draws then left
+out.
+
+### The VC-2 part's sets' mix (2026-11-19, v284) {#vc2-set-mix}
+
+Step 4.3's twelfth version (VC2_MODE_PLAN.md, step 4.3, item 8's fourth child): C's mix, one a voice. `Vc2SetMixes`
+is bit for bit against rom.4's own in `xt_vc2sets`' fifth part.
+
+**Its words.** There are 24 mixes of 32 bytes from `0x89996c34`, one a voice (`0x8939bd90(32, number)`: 32 × the
+number; it reads no index).
+- +0 holds the note's kind; +1 the voice's key (+0x41) and +2 its +0x43.
+- +6…+0x1b hold the part's eleven words for it, from `0x89e32a60` + 352 × the part + 22 × the kind. As bytes the
+  writer reads five: whether it mixes (+6), the type (+7), a level (+8) and the crossfade's two (+9, +0xa).
+- +0x1c holds the note's M.
+
+**The block.** Each mix converts the mix block of the note's input, W + 0x644. The writer is `0x8939bcc0`:
+- **Off** (+6 is 0): +0 takes 0 and the four gains +4…+0x10 take 0.7 (the pool word `0x8939bcf8`).
+- **On, by the type less 1, unsigned** (a table of four, `0x8939bd08`):
+  - type 1: +0 takes 1, +8 the level table (`0x89541f34`) by the level byte over 32768 (`0x8939bd00`), and +0xc
+    and +4 1.0;
+  - type 2: the same with 2, its divisor the pool word `0x8939bf04`;
+  - type 3: +0 takes 0, and the crossfade's table (`0x89542034`) gives two pairs over 32768: +4 by 127 less the
+    first byte, +8 by the first byte, +0xc and +0x10 the same by the second;
+  - type 4: +0 takes 4 and +4 1.0;
+  - any other: +0 takes 0 and the four gains 0.7 (`0x8939bf08`).
+- **The three tables are one run.** 127 less a byte past 127 reads the level table below the crossfade's, and a
+  byte past 127 reads on into the note values' ticks (`0x89542134`). So the port reads 384 halfwords from
+  `0x89541f34`, the envelopes' level table widened.
+- Types 1 and 3 are reached by branches to `0x8939bbe0` and `0x8939bc40`. Three copies beside them, `0x8939bbc0`
+  (off), `0x8939bc10` (type 2) and `0x8939bcb0` (type 4), have no callers.
+
+**The routines.**
+- **The constructor `0x8939bdb0(mix, call, block, M; the kind on the stack)`** writes the kind and M, the voice's
+  two bytes and the part's words, then the block.
+- **The conversion `0x8939be40`** writes the voice's two bytes again, then the block. **The update `0x8939be60`**
+  writes the part's words again. **The copy `0x8939bec0`** is the writer alone. **The end `0x8939be30`** is a bare
+  return.
+- These are the envelopes' and LFOs' routines but for where the voice's bytes go (+1, not +2) and the words by the
+  kind alone. So the mix is on `Vc2SetChildPool` too, given those two (`Vc2MixWordsOf`), with its own placement.
+- The four pool words join `Vc2SetEnvelopeTables` (loadVc2), which refuses an image where any isn't positive.
+
+**The check.** It is xt_vc2sets' fifth part, on the seed after the LFOs'. Nothing is hooked: the routines call
+nothing, and the sets' part's hooks on them are taken off.
+
+The draws, beyond the sets' part's:
+- the parts' mix words for 16 parts and 4 kinds, and the mixes' own words;
+- on 1, 0 or any; the type 0…5 or any;
+- the three bytes at 0, 1, 126…128, 254, 255 or any, so each table's run either side is read.
+
+Each case is noise in the mixes, then 400 events: the placement, the constructor, the end, the conversion, the
+update, the copy and the writer alone.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the earlier parts' lines as they were.
+- Every line and branch of `Vc2SetMix.cpp` is reached.
+- `mutate_vc2.py --sets`: 284 plants, none missed; the mix's 27, its tables' 5 and the head's mix reader new. Not
+  planted: the off gains for the other type's and the two scales for each other, each pair the same value in rom.4
+  (their addresses are planted), and what Vc2SetMix.h holds, a header.
+
+The children's checks share more now. One draw template (`setsChildDraw`) serves the LFOs and the mix. The part's
+words' draw and the port's reads are templates on the word count. Each part's counts carry their line's format
+(`kSaid`), said by `setsSayCounts`, and the runner takes the events array itself; the earlier lines print as before.
+The three float-to-word helpers are one, `floatWord` in Vc2SetChildHead.h.
+
+### The VC-2 part's sets' LFOs (2026-11-19, v283) {#vc2-set-lfos}
+
+Step 4.3's eleventh version (VC2_MODE_PLAN.md, step 4.3, item 8's third child): C's five LFOs a voice. `Vc2SetLfos`
+is bit for bit against rom.4's own in `xt_vc2sets`' fourth part.
+
+**Its words.** There are 120 LFOs of 20 bytes from `0x899962b0`, 5 a voice (`0x8939b690(20, number, index)`: 100 ×
+the number + 20 × the index).
+- +0…+3 are laid out as an envelope's: the note's kind, the index, the voice's key (+0x41) and its +0x43.
+- +6…+0xf hold the part's five words for it, from `0x89e2f85c` + 800 × the part + 50 × the kind + 10 × the index.
+  As bytes they are: the waveform, a byte unread, the rate (signed, +8), a switch, a depth, a switch, a depth and
+  the key sync.
+- +0x10 holds the note's M.
+
+**The block.** Each LFO converts an LFO block of the note's input, W+0x44 + 0x20 × the index (the input's blocks
+2…6). The writer is `0x8939b590`, its writes in this order:
+- +0x14 and +4, the rate. **From 128 on it is a note value:** +0x14 takes 1, and +4 the value's ticks as a float
+  (the envelopes' table `0x89542134`). **Below 128** +0x14 takes 0, and +4 the rate table `0x8953fdb0` (128 floats)
+  by `0x8939b450`: the rate plus the LFO's Matrix sum, a 32-bit sum of the two signed halves held to 0…127. LFO 0
+  reads the group reader `0x893a26b0` +0, 1 `0x893a28b0` +0, 2 the first COSM's `0x893a2960` +0x10, 3 the second's
+  `0x893a2aa0` +0x10, and 4 `0x893a2bf0` +6; an index past 4 has no sum.
+- +0, the waveform's code by its byte (`0x8939b3b0`): 1 → 0, 2 → 2, 3 → 3, 4 → 6, 5 → 4, 6 → 5, 7 → 7, else 1.
+- +0x18, the switch at +0xa: 0…4 as it is, else 2 (`0x8939b510`).
+- +8, the depth at +0xb: (x / 127)² × 10000 in single precision, divided, squared, then scaled (the pool words
+  `0x8939b624` and `0x8939b628`).
+- +0x1c, the switch at +0xc: 1…3 as it is, else 0 (inline).
+- +0xc, the depth at +0xd, the same way.
+- +0x10, 1 when the key sync's byte isn't 0.
+
+**The routines.**
+- **The constructor `0x8939b6c0(lfo, call, block, M; the kind and index on the stack)`** writes the kind, index and
+  M, the voice's two bytes and the part's words, then the block.
+- **The conversion `0x8939b750`** writes the voice's two bytes again, then the block. **The update `0x8939b770`**
+  writes the part's words again. **The copy `0x8939b7c0`** is the writer alone. **The end `0x8939b740`** is a bare
+  return.
+- These are the envelopes' routines but for the block and the envelope's tempo and release velocity. The port says so:
+  `Vc2SetChildHead` holds the head bytes, the voice's two, the part's words by a reader, and the pool's conversion,
+  update and copy on a child's writer, the envelopes now on it as well.
+- The rate table and the two pool words join `Vc2SetEnvelopeTables` (loadVc2), which refuses an image whose rate of
+  127 is 0 or whose depth words aren't positive.
+
+**The check.** It is xt_vc2sets' fourth part, on the seed after the envelopes'. It hooks the five readers the rates
+take, which log the M they're given and answer one run of drawn sums. The sets' part's hooks on the LFO's routines are
+taken off.
+
+The draws, beyond the sets' part's:
+- the parts' LFO words for 16 parts, 4 kinds and 5 indices; the LFOs' own words, the index past 4 now and then;
+- a waveform's byte 0…8 or any; a rate of 0, 1, 126…129, 255, any of 0…255 or below 0; the switches one past their
+  range or any; the depths at the square's edges or any; the key sync 0, 1, 2 or any;
+- the sums as the envelopes': 0, small, ±127, ±300 or any.
+
+Not drawn: a rate past 255, a note value past the table's 128 entries, where rom.4 reads whatever follows the table.
+
+Each case is noise in the LFOs, then 400 events: the placement, the constructor, the end, the conversion, the update,
+the copy and the writer alone.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases); the earlier parts' lines as they were.
+- Every line and branch of `Vc2SetLfo.cpp` and `Vc2SetChildHead.cpp` is reached.
+- `mutate_vc2.py --sets`: 251 plants, none missed. The LFOs' 35, the shared head's 10 and three more in the tables are
+  new; the envelopes' plants on code that moved into the head were planted there again.
+
+The children's check steps are now in their own header, `Vc2SetsChildCheck.h`, as Vc2SetsCheck.h had reached the
+300-line limit. The placement and constructor events are templates there too, with the part's words' and the sums'
+draws and the readers' hooks, and each part's counts are `SetChildCounts` with its pool's name.
+
+### The VC-2 part's sets' envelopes (2026-11-19, v282) {#vc2-set-envelopes}
+
+Step 4.3's tenth version (VC2_MODE_PLAN.md, step 4.3, item 8's second child): C's 13 envelopes a voice.
+`Vc2SetEnvelopes` is bit for bit against rom.4's own in `xt_vc2sets`' third part.
+
+**Its words.** There are 312 envelopes of 0x1c bytes from `0x89e2543c`, 13 a voice (`0x8939a620`: 0x16c × the
+number + 0x1c × the index).
+- +0 holds the note's kind and +1 the index; +2 the voice's key (+0x41) and +3 its +0x43.
+- +6…+0xf hold the part's five words for it, from `0x89e2765c` + 2080 × the part + 130 × the kind + 10 × the index.
+  As bytes they are: whether it runs, the attack, decay, sustain and release, the three times' velocity depths, and a
+  key follow (signed, +0xe).
+- +0x10 holds the key's time factor (16.16), +0x14 the tempo, +0x16 the release's velocity (64 until a release
+  gives it), +0x18 the note's M.
+
+**The block.** Each envelope converts an envelope block of the note's input, W+0x15c + 0x38 × the index (the input's
+blocks 2…14). The writer is `0x8939a3d0`; the copy `0x8939a800` is it alone.
+- +0 takes 2 for envelope 3 and those past 6, else 0. +4 takes 1.0, +8 0, and +0xc and +0x10 take 0x124f80.
+- The key's factor comes first: 65536 × 2^((key − 60) × −follow / 1200) by rom.4's powf (v257), converted unsigned
+  (past 2^31 less 2^32).
+- An envelope that doesn't run gets 0.0 times and 1.0 at +0x28…+0x30. One that runs gets:
+  - +0x14, the attack;
+  - +0x1c, the decay;
+  - +0x20, the release;
+  - +0x30, the sustain: the level table `0x89541f34` by its byte, over 32768;
+  - 0.0 at +0x18, +0x24 and +0x34, and 1.0 at +0x28 and +0x2c.
+- **A time from 128 on is a note value:** its ticks (`0x89542134`) over 24 × the tempo, × 600000.
+- **Otherwise it takes a Matrix sum, held to 0…127.** The sum is the envelope's attack, decay or release sum
+  (`0x89399ff0`, `0x8939a130`, `0x8939a270`, one routine by the stage). Envelopes 0…3 read the group reader
+  `0x893a2550`, 4…7 `0x893a2750`, 8 and 9 the first COSM's `0x893a2960`, 10 and 11 the second's `0x893a2aa0`, and 12
+  `0x893a2bf0`. Each envelope's three sums are 2 bytes apart and the next envelope's 6 on, the COSM groups' from +4;
+  an index past 12 has none.
+- **Then the time curve `0x8939aa40`** reads the table `0x8953fc90` by the value; 0 stays 0.
+  - With a depth d, it subtracts (d × 40) × (velocity − 64) / 256; d × 40 is rom.4's division of d × 256000 by
+    6400, by the magic `0x51eb851f`. Nothing at or below 0 is left, and it is held to 12000.
+  - Then the key's factor: at 1 as it is; below 1 the product's high half; past it held to 12000. At least 1.
+  - The attack takes the factor as 1, and the release takes the release's velocity.
+- **The decay of a type-0 envelope** is the table's value a quarter (`0x8939ab10`), with no depth or factor.
+
+**The routines.**
+- **The constructor `0x8939a690(env, call, block, M; the kind and index on the stack)`.** It writes the kind, index
+  and M, the voice's two bytes, 64 at +0x16, the part's words and the tempo, then the block.
+  - The tempo comes from the clock object at `0x8995cb40`. When its +0x40 is 0 it is 30000 × +0x10 / +0x14; otherwise
+    150000 / +0x48. Both are the library's signed division `0x89505db8`.
+  - Below 200 it becomes 20, and above 2500 250: two thresholds and two values that read as in different units, but
+    rom.4's.
+- **The conversion `0x8939a790`** writes the voice's two bytes again, then the block.
+- **The update `0x8939a7b0`** writes the part's words again.
+- **The release `0x8939a810(env, velocity, block)`** writes the velocity at +0x16, then the block's release time
+  again: 0.0 when it doesn't run, its note value's scale the pool word `0x8939a8f4`, 600000 as the writer's.
+- **The end `0x8939a780`** is a bare return.
+- The four tables and the five pool words are read from rom.4 by `Vc2SetEnvelopeTables` (loadVc2).
+
+**The check.** It is xt_vc2sets' third part, on the seed after the common's. It hooks the Matrix group's five
+readers, which log the M they're given and answer one run of drawn sums. powf, the helpers and the curves run on
+rom.4's own side, and the sets' part's hooks on the envelope's routines are taken off.
+
+The draws, beyond the sets' part's:
+- the parts' envelope words for 16 parts, 4 kinds and 13 indices: times at their ends, a note value now and then, the
+  depths at their edges, the key follows 0, ±100, ±1200, 32767, −32768 or any;
+- the clock: internal or not, its words over a wide span;
+- the sums: 0, small, ±127, ±300 or any;
+- the envelopes' own words, the index past 12 one time in four.
+
+Not drawn: a clock divisor of 0; an envelope's tempo of 0, where the note value's 0 / 0 would be a NaN whose payload
+is the host's. Not planted: the release's note value scale swapped for the writer's, both 600000.
+
+Each case is noise in the envelopes, then 400 events: the placement, the constructor, the end, the conversion, the
+update, the copy, the release and the writer alone.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2SetEnvelope.cpp` is reached.
+- `mutate_vc2.py --sets`: 210 plants, the envelopes' 87 and their tables' 8 among them, none missed;
+  `mutate_panel.py rom4-no-setenvelopes` caught once the ROM test asks for these tables.
+- The first plant run missed ten. The tempo's seven showed the clock's draw met the holds' thresholds almost never,
+  so half the draws now aim a tempo at them. Two constants changed by one were near-equivalent at these sizes and are
+  planted otherwise. One, the curve's hold, can't be reached from the table.
+
+The children's parts share their sides, case loop, runner and events: `SetChildSides`, `setsChildCase`,
+`setsChildPart` and the event templates in Vc2SetsCheck.h. The common's part was rewritten on them, its line as it
+was. The part's words now go into the common's object as rom.4 writes them, halfwords copied in place.
+
+### The VC-2 part's sets' common (2026-11-19, v281) {#vc2-set-common}
+
+Step 4.3's ninth version (VC2_MODE_PLAN.md, step 4.3, item 8's first child): C's common, which only a kind-0 note
+has. `Vc2SetCommons` is bit for bit against rom.4's own in `xt_vc2sets`' second part.
+
+**Its words.** There are 24 commons of 12 bytes from `0x89996f68`, one by a voice's number. The allocator
+`0x893a1940` is given 10 but steps by 12.
+- +0 holds the voice's key (its +0x41) and +1 its +0x43.
+- +4…+9 hold the part's three words from `0x89997090` + 6 × the part. The routines read bytes +4 and +5 (two
+  switches), byte +6 (a level) and the halfword +8 (a signed depth).
+
+**The block** is the common's in the note's input, W+0xc: what each OSC voice's `0x893ae610` is given (v230). Two
+routines write it, `0x893a1870` and the copy `0x893a1a10`, the same code twice.
+- +0 takes whether +4 is set, +4 and +8 take 0, and +0x10 takes whether +5 is set.
+- +0xc takes a float, the level by velocity:
+  - The level x gives A = x² × 10000 / 127². x = 1 gives 1, where the division would give 0.
+  - The depth d gives B = d × v² × A / (127² × 16). v is the velocity, or 127 less it when d is negative, as a byte;
+    d's negation is held to 16 bits.
+  - Each division is rom.4's signed multiply by `0x82061029`, keeping the high word plus the dividend, shifted by 13
+    or 17 and rounded toward 0. The products are 32-bit, A is held to 16 bits, and A − B is too. Below 0 gives 0;
+    then it becomes the float.
+
+**The routines.**
+- The constructor `0x893a1960(common, call, block)` writes the voice's two bytes and the part's words, then the block.
+  It answers the common.
+- The conversion `0x893a19c0(common, call, block)` writes the voice's two bytes again, then the block.
+- The update `0x893a19e0(common, call)` writes the part's words again.
+- The end `0x893a19b0` is a bare return.
+
+**The check.** It is xt_vc2sets' second part, on the seed after the sets' part, so the first part's lines stay as they
+were. Nothing is hooked: the sets' part's hooks on these routines are taken off, and the routines call nothing.
+
+The draws, beyond the sets' part's:
+- the parts' words: the switches 0 or 1, or now and then any; the level 0, 1, 2, 64, 126, 127, 128, 255 or any; the
+  depth 0, ±1, ±63, ±127, 32767, −32768, −32767 or any;
+- the commons' own words the same way, the velocity below 128 half the time.
+
+Each case is noise in the commons, then 400 events: the placement, the constructor, the end, the conversion, the
+update, the copy and its twin. After each, the commons, W and the answer are compared.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2SetCommon.cpp` is reached.
+- `mutate_vc2.py --sets`: the common's 34 plants with the 84 before them, none missed.
+
+`vc2CheckMain` now takes a check's further parts. `vc2CheckPart` (Vc2CheckMain.h) runs a part's cases on the seed
+after, and xt_vc2voices' runner `voicesPart` uses it too.
+
+### The VC-2 part's conversion sets and the notes' Matrix (2026-11-19, v280) {#vc2-part-sets}
+
+Step 4.3's eighth version (VC2_MODE_PLAN.md, step 4.3, item 7): a voice's conversion set C, which v279's virtuals call,
+and the note's Matrix object M. `Vc2Sets` and `Vc2NoteMatrices` are bit for bit against rom.4's own routines in
+`xt_vc2sets`.
+
+**C.** There are 24 sets of 0x6c bytes from `0x89997fe8`, one by a voice's number (`0x893a76a0` multiplies by 108
+whatever its r4 says).
+- +0 holds the note's kind (W+0x742).
+- +1 holds the part's byte by kind, read at `0x89998a14` + 16 × the part + the kind.
+- +4…+0x67 hold the children, 0 for none: +4 the common, +8 and +0xc the two OSC blocks', +0x10 the mix, +0x14…+0x44
+  13 envelopes, +0x48…+0x58 5 LFOs, +0x5c and +0x60 the two COSM inputs, +0x64 the TVA.
+- +0x68 holds the note's M.
+
+**The children.** Each kind has an allocator, a constructor, an end, a conversion, an update and a copy; the envelopes
+a release too, the OSC blocks a refresh. Each child converts a block of the note's input (W):
+
+| Kind | Count | Allocator (bytes) | Constructor | Block in W |
+|---|---|---|---|---|
+| common | 1 | `0x893a1940` (10) | `0x893a1960` | +0xc |
+| OSC | 2 | `0x8939fdd0` (0x108) | `0x8939fe00` | +0x434, +0x53c |
+| mix | 1 | `0x8939bd90` (32) | `0x8939bdb0` | +0x644 |
+| envelope | 13 | `0x8939a620` (28) | `0x8939a690` | +0x15c + 0x38 × n: the input's envelope blocks 2…14 |
+| LFO | 5 | `0x8939b690` (20) | `0x8939b6c0` | +0x44 + 0x20 × n: its LFO blocks 2…6 |
+| COSM input | 2 | `0x89399ae0` (60) | `0x89399b10` | +0x658, +0x6a0 |
+| TVA | 1 | `0x893a67d0` (40) | `0x893a67f0` | +0x6e8 |
+
+- An allocator is given its bytes and the voice's number. The OSCs', envelopes', LFOs' and COSM inputs' are given the
+  index as well.
+- A constructor is given the object, C's call struct, its block, M, and on the stack the kind. The ones with an index
+  take it on the stack after the kind. The common's takes neither M nor the stack.
+- The ends: `0x893a19b0`, `0x893a0000`, `0x8939be30`, `0x8939a780`, `0x8939b740`, `0x89399b80`, `0x893a68b0`, each given
+  the object and 3.
+- The conversions: `0x893a19c0`, `0x893a0040`, `0x8939be40`, `0x8939a790`, `0x8939b750`, `0x89399b90`, `0x893a68c0`.
+- The updates: `0x893a19e0`, `0x893a0250`, `0x8939be60`, `0x8939a7b0`, `0x8939b770`, `0x89399bb0`, `0x893a6940`.
+- The copies: `0x893a1a10`, `0x893a0310`, `0x8939bec0`, `0x8939a800`, `0x8939b7c0`, `0x89399c00`, `0x893a69a0`.
+- The envelopes' release is `0x8939a810`, the OSCs' refresh `0x893a0150`.
+
+**C's routines.** Each passes over the children in the table's order.
+- **The make `0x893a76d0(C, call, W)`.**
+  - C+0 takes the note's kind and C+1 the part's byte, which W+0 takes too.
+  - M is the voice's number's (`0x89e4741c` + 0x184 × it, `0x893a5d80`); it is constructed and kept at +0x68.
+  - Then each child is allocated and, when there is one, constructed and kept. The common is made for kind 0 alone;
+    otherwise C+4 and W+0xc take 0.
+- **The end `0x893a7a20(C, 3)`.** It does nothing for no C. Otherwise M's end, then each child's end, each only when
+  there is one.
+- **The conversion `0x893a7b20(C, call, W)`.** W+0 takes C+1 again, then each child's conversion on its block.
+- **The update `0x893a7cc0(C, call)`.** C+1 is read again, then M's update and each child's update.
+- **The copy `0x893a7df0(C, W)`.** W+0 takes C+1, then M's copy and each child's copy into its block.
+- In the conversion, the update and the copy, only the common is tested for none; the others are called whatever C
+  holds.
+- **The release `0x893a7c50(C, velocity, W)`.** It runs each envelope's release, given the velocity as a byte and its
+  block, when there is one. v279's key-off gives it W in r6, which v279's port left out: it does now.
+- **The refresh `0x893a7f10(C, call)`.** It answers 1 when the first OSC block's refresh answers anything but 0, else
+  whether the second's does.
+
+**The note's M.** There are 24 objects of 0x184 bytes from `0x89e4741c`. Up to +0x168 they are the Matrix's words
+(v243, v247).
+- +0x168 is the channel's state K's first word names, and +0x16c the part.
+- +0x170 and +0x172 hold the part's record's head, its Bend Ranges, or 0 when the kind isn't 0.
+- +0x174 holds the channel's bend by them: from the centre 8192, the product of the distance and the range × 8 / 65536,
+  negative below.
+- +0x178…+0x17c hold the channel's CC 7, 11, 10, 93 and 91 (its +0x84 + the number). +0x180…+0x183 are cleared.
+
+**M's routines.**
+- **The constructor `0x893a5db0(M, call, kind)`.**
+  - It writes +0x168, then the head: for kind 0 the voice's +0x43, its key and its +0x42; for any other kind 0, the
+    key and +0x42.
+  - The part's own M (`0x89997108`) takes the head when its part is the note's (v247's `0x893a2eb0`).
+  - Then the pass the update is too.
+- **The update `0x893a6010(M, call, kind)`.** It keeps +0x168. It copies the record's sources, uses, slots and
+  routines. +0x84…+0x165 take rom.4's 0xe2 bytes from `0x895402f6`, the run v247's M init takes, by the block move
+  `0x895061bc`; the two now share `vc2MatrixFromRecord`.
+  - Kind 0 clears the second eight slots' destinations, any other kind the first eight.
+  - Then the Bend Ranges, the bend, the controllers and the cleared bytes.
+- **M's end `0x893a5fe0` and copy `0x893a61f0`** are bare returns.
+
+**The check.** `xt_vc2sets` (40 cases in fcheck) runs rom.4's own on its own C, M, W, Matrix settings G and the part's
+M in .bss. Every routine of the children is hooked to log its arguments: a call struct is read through its pointer,
+and the stacked words read. Which arguments each routine reads is the check's own table: when it was the port's, a
+planted error in it changed both sides alike. An allocator answers an object or none; a refresh answers 0, 1 or any
+word. Each side's answers come from a generator of its own, the two seeded alike before each event. M's routines, the
+head and the block move run on both.
+
+The draws, before each event:
+- the voices' 16 bytes a call points at (their key tables, parts and numbers below 24);
+- the key tables' channel words, the channels' bends (the centre, its ends, near the centre, any) and the bytes past
+  them;
+- the parts' numbers (below 16, a few half the time, where the part's M's matches) and the part's bytes by kind;
+- C's words (the kinds 0 half the time, the children an object or none, M one of the pool);
+- M's words and channel;
+- W's kind, +0 and +0xc;
+- G's records, and the part's M with its part a few half the time.
+
+Each case is noise, then 400 events: the two placements, the make, the end (of none one time in eight), the
+conversion, the release, the update, the copy, the refresh, and M's constructor and update with any kind. After each,
+C, M, W, the part's M, the calls and the answer are compared.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line of `Vc2Sets.cpp` and `Vc2NoteMatrix.cpp` is reached, and every branch but the make's test of M's address,
+  rom.4's own, which can't fail.
+- `mutate_vc2.py --sets`: 84 plants, none missed.
+
+### The VC-2 part's voices' virtuals and update queue (2026-11-19, v279) {#vc2-voice-class}
+
+Step 4.3's seventh version (VC2_MODE_PLAN.md, step 4.3, item 6): the note voice's class (vtable `0x898cd3dc`, which
+v277's class builder `0x893969e0` puts on a voice taken) and the update queue at `0x89989cc4`. `Vc2VoiceClass` and
+`Vc2UpdateQueue` are bit for bit against rom.4's own routines in `xt_vc2voices`' fourth part.
+
+**The class's words.** Beyond the base's 0x50 bytes (v272): +0x50…+0x55 bytes, +0x58 a word set when C's refresh
+found a change, and +0x5c the voice's conversion set C, 0 for none. C itself is step 4.3's next item; here its routines
+are called and logged.
+
+**The words a portamento key sets** (P, v276, and its key table K, P's +0):
+- **The prepare's `0x89391ae0(V, P, part, key; a word on the stack)`.**
+  - +0x34 takes K, +0x38 P, +0x3c the part, +0x41 the key, +0x42 P's key and +0x43 the word.
+  - The voices' age counter (`0x8998270c`) goes up by one. +0x20 takes its low 28 bits with 0x70000000, and +0x24
+    takes 0x5fffffff.
+  - +0x2f takes K's note-on velocity (K+8), and +0x2e K's note-on count for P's key (K+0x1c + the key, as a byte).
+  - +0x48 takes 7: the key and both pedals held.
+- **The retune's `0x89391b40(V, P, part, key)`.** It writes the same, but leaves +0x34…+0x3c. +0x43 takes K's
+  note-on velocity, and +0x48 has 7 or-ed in. The part, in r6, isn't read.
+
+**The six virtuals.** C's routines are given a struct of three words: V+0x34, V+0x53 and a word.
+- **+0x0c, the update `0x893970b0(V)`.** It needs a set and a note.
+  - Under the OS's lock (`0x893018e0` and `0x893018f0` on `0x8994fec8`): C's refresh `0x893a7f10` (a nonzero answer
+    sets +0x58), then C's update `0x893a7cc0`, both with the word 0.
+  - Then C's copy into the note `0x893a7df0(C, W)` and the note's update pass (v275, `0x893967a0`).
+- **+0x18, the retune `0x893971f0(V, P, part, key)`.** It waits on the voice's queue (`0x893951b0`), sets the retune's
+  words and +0x55 to 1. With a set and a note: C's conversion `0x893a7b20(C, struct, W)`, the struct's word read from
+  `0x8953fb2c` (0 in rom.4), then the note's settings pass (`0x89396650`).
+- **+0x24, the destroy `0x893973a0(V)`.** It takes the voice off its queue (`0x89395120`). It ends its note
+  (`0x89396590(W, 3)`) and its set (`0x893a7a20(C, 3)`), each cleared after, and clears +0x30.
+- **+0x30, the key-off `0x89397280(V)`.** It waits on its queue. With a set and a note: C's release
+  `0x893a7c50(C, +0x2f)`, then the note's release (`0x893968b0`).
+- **+0x3c, the prepare `0x89397130(V, P, part, key; the legato's struct, a word and the kind on the stack)`.**
+  - It sets the prepare's words and +0x2d to 1.
+  - +0x55, +0x53 and +0x54 take +0x50, +0x51 and +0x52; +0x30 and +0x58 are cleared.
+  - Its note is the note W of its own number (`0x8998a51c` + 0x744 × +0x40), constructed with the part's first byte
+    and the kind (`0x89396520`).
+  - Its set is placed by `0x893a76a0(108, number)`. When there is one, it is made (`0x893a76d0(C, struct, W)`, the
+    struct's word the legato's struct's address). +0x5c takes it, or 0.
+- **+0x48, the change test `0x893972d0(V)`.** It answers 0 when +0x30's bit 0 is set. Otherwise the voice is put on the
+  queue (`0x89394fa0`). With a set, C's refresh (word 0) runs: when it answers nonzero or +0x58 is set, +0x58 is cleared
+  and the test answers 1; else 0.
+
+**The update queue.** There is one queue, 36 bytes at `0x89989cc4`. A voice's +0x0c byte names its queue
+(`0x89989cc4` + 36 × the byte), and every caller gives queue 0.
+- **Its words.** The head node is at +4: its links at +4 and +8, its class `0x898cd358` at +0x14. The node being run
+  is at +0x18. +0x1c is an OS object posted when that node moves on. +0x20 is one waited on and signalled around it.
+- **The nodes.** They are the voices' first words: +0 the next node, +4 the previous, +8 a flag. A node out of the
+  queue is linked to itself.
+- **The constructor `0x89394f60(Q)`** links the head to itself, writes its class and clears +0x18. The static
+  initializer `0x89395280` runs it on the queue.
+- **The link `0x89394f10(node, after)` and unlink `0x89394f20(node)`** are the list's plain two; the unlink links the
+  node to itself.
+- **The enqueue `0x89394fa0(Q, node)`.**
+  - When the node is being run, it waits for it (the OS's wait then signal on +0x20) and unlinks it.
+  - Otherwise a node already on a queue (its next not itself) is left.
+  - Then the node goes at the front, after the head; its flag takes 1 and its queue byte 0.
+- **The node being run moves to its next** in four routines when it is the node given:
+  - the move on `0x89395040(Q, node)`, which posts +0x1c and unlinks the node;
+  - the pass on `0x893950b0(Q, node)`, which posts +0x1c alone;
+  - the take off `0x89395120(Q, node)`, which waits and unlinks the node;
+  - the move `0x89395210(node, queue)`, which needs no queue given, with the interrupts masked. It unlinks the node,
+    links it at the front of the queue named and writes the byte.
+- **The waits.** `0x893951b0(Q, node)` waits when the node is being run, and `0x893951d0(Q)` always.
+
+**The check.** `xt_vc2voices` gains a fourth part, on the seed after the release path's, so the other three parts'
+lines stay as they were. It runs rom.4's virtuals and queue routines, which the earlier parts hook, as its own again.
+It hooks and logs, with their arguments:
+- the note's five routines;
+- C's eight, a struct read through its pointer, with the placement and the refresh answering as drawn (a set for each
+  note's number, or none);
+- the OS's lock, unlock, wait, signal and post.
+
+The port's queue routines run on the port's queue. A call on another queue's address is logged as one rom.4 never
+makes. The queue's 36 bytes are written into rom.4's memory before each event and compared after it, beside the
+voices' and keys' spans.
+
+The draws, beyond the release path's:
+- every voice on queue 0;
+- the queue's links one list, a few voices on it in a drawn order and the rest linked to themselves, and one time in
+  four a voice's link aimed elsewhere (where the enqueue's test of the next link alone shows);
+- the queue's node being run (none, the head, one on the queue or any voice), its class and OS words;
+- a node's queue byte, half the time, before the queue's own routines (which don't read it);
+- the voices' sets, +0x58 and bytes +0x50…+0x55, and their held bits (+0x48) any byte one time in four, where the
+  prepare's write and the retune's or differ;
+- the age counter now and then, its top bits set;
+- the four messages' keys below 128;
+- the retune's word, 0 or any.
+
+Not drawn: a glide's key past 127, as the port reads K's note-on counts by the key. Not planted: a queue's stride, as
+there is one queue and a virtual reads queue 0; the unlink's two writes in the other order, which never meet.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2VoiceClass.cpp` and `Vc2VoiceQueue.cpp` is reached.
+- `mutate_vc2.py --voices`: the class's 57 plants and the queue's 38 with the 191 before them, none missed.
+
+The parts' runners are now one template, `voicesPart` (Vc2AssignCheck.h), on their sides, hooks, starts, draws, events
+and counts.
+
+### The VC-2 part's assigner, its second part (2026-11-19, v278) {#vc2-part-assigner-release}
+
+Step 4.3's sixth version (VC2_MODE_PLAN.md, step 4.3, item 5's second half): the release path and the part node's note
+start and off, on v272's voices and v276's keys. They are bit for bit against rom.4's own routines in `xt_vc2voices`'
+third part.
+
+**A voice's held bits.** A voice's +0x48 holds three bits: 1 for the key, 2 for Hold, 4 for Sostenuto.
+- **A key's release `0x89391760(V, K)`** does nothing unless bit 1 is set. Then:
+  - Hold (K+0x11c) below 64 clears bit 2.
+  - Sostenuto (K+0x11d) below 64, or the voice's key (+0x42) not latched in K+0x120, clears bit 4.
+  - With neither pedal's bit left, the age word's bit 28 is cleared.
+  - Bit 1 is cleared, +0x2f takes K's note-off velocity (K+0xa), and the age word's bit 29 is cleared.
+  - With no bit left, the voice's +0x30 virtual runs (a note's key-off).
+- **The pedals' lifts `0x89391820` (Hold) and `0x89391880` (Sostenuto).** With the pedal's bit set and the key's
+  clear, the bit is cleared, then bit 28 and the key-off as above.
+
+**Over a key table's sounding voices** (those whose +0x34 is the table):
+- **The note-off `0x89390c00(K)`.** It skips a voice whose +0x2e (its key's note-on count when it started) is above
+  K's note-off count for the key. It remembers a voice of kind 1 (the last one). It releases every other voice on the
+  note-off key. Then, if it found a kind-1 voice, no key is held any more and part 0's settings byte +0x18 is 0, it
+  releases that one too.
+- **`0x89390cd0(K)` and `0x89390d10(K)`**: with Hold or Sostenuto below 64, its lift on each voice.
+- **`0x89390d50(K)`**: each voice truncated (v277's) and waited on.
+- **`0x89390da0(K)`**: each voice released but those of kind 1 while part 0's +0x18 is set.
+- **`0x89390e20(K)`**: each voice released.
+
+**The part node's note start `0x89396a80(node, K, message, value; word on the stack)`** (the node class's vtable slot at
+`0x898cd3cc`).
+- It reads the message's first byte as the part and runs the part's parameters' message (`0x8939b050` on
+  `0x89996120` + 24 × part).
+- The key is the part's settings byte +0 (signed; the settings are 32 bytes a part from `0x89995390`) plus the value,
+  held to 0…127.
+- Its two portamento keys are the pair at `0x89987420` + 0x480 × K's source + 0x48 × the node's first byte (its
+  channel). The first takes the note-on (v276, at the OS clock).
+- **When the part's +0x16 is set,** the second key plays a carrier note first: kind 1, key 60, the word 100. With +0x18
+  set, it is built unless one is already sounding. Otherwise the first key's flags decide: with a held mono or poly key,
+  the note below follows (a held mono key goes to the legato path); with neither, the part's kind-1 voices are truncated
+  and the carrier note built.
+- **Then the part's note.** Poly (+1 clear) builds it. Mono with a held mono key and legato (+2) retunes the part's
+  sounding voices (v277's `0x89390b20`) instead. Mono otherwise truncates the part's kind-0 voices, then builds it.
+
+**The part node's note-off `0x89396c90(node, K, message)`.** It runs the first key's note-off (v276).
+- With no key left, it runs the second key's note-off too, unless the part's +0x18 is set.
+- With a key left and the part mono, it runs the parameters' message and retunes the part's voices to that key, moved
+  as at the note start.
+
+**The check.** `xt_vc2voices` gains a third part, on the seed after the assigner's, so the other two parts' lines stay as
+they were. It hooks, beyond the voices' and the assigner's hooks:
+- the +0x30 virtual of both voice classes;
+- the parameters' message;
+- the OS clock, which answers the ms an event draws.
+
+The keys are the port's (v276), written into rom.4's memory before each event and compared after it beside the voices'
+span. `xt_vc2voices` now loads v276's tables as well. Without them its bits table read as zeros: the latched test then
+failed, and the highest-key query would never end.
+
+The draws, beyond the assigner's:
+- the voices' held bits, keys and note-on counts, and some voices put on the three key tables, with a message for their
+  part;
+- the tables' sources, pedals, latched and held keys (all clear one time in three, key 0 alone one in six, where the
+  queries' low bound and the note-off's found key 0 show), note-off keys and counts;
+- every glide aimed at one of the three tables, its flags 0 or 1 and its clock below 2^30;
+- the note-off's glide sounding the table's note-off key half the time;
+- four messages (their first byte a part 0…3) and four nodes (a channel 0…15);
+- the parts' five settings bytes.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2AssignRelease.cpp` and `Vc2AssignNotes.cpp` is reached.
+- `mutate_vc2.py --voices`: the second half's 56 plants with the 135 before them, none missed.
+
+### The VC-2 part's assigner, its first part (2026-11-19, v277) {#vc2-part-assigner}
+
+Step 4.3's fifth version (VC2_MODE_PLAN.md, step 4.3, item 5's first half): the routines that start the voices prepared
+for a note, on the voices and lists of v272. `Vc2Assigner` is bit for bit against rom.4's own in `xt_vc2voices`' second
+part.
+
+**What a note is started from.** The assigner's routines are given a message, a part, a byte, a word they pass on, and
+a kind.
+- **The message** is a portamento key P (v276); P+0 is its key table, which a voice keeps at its +0x34.
+- **A voice of the same note** is a sounding voice with that key table and part, and a note of that kind (W+0x742,
+  compared as an unsigned byte with the whole register). For a legato partner it must also have its +0x30 bit 0 clear
+  and its state 0.
+
+**The start `0x89390860(message, part, byte, word; kind on the stack)`.** For each voice on the prepared list, in order:
+1. **A legato partner** among the sounding voices of the same note: the last one found, or the first whose age word
+   has bit 29 set. `0x89390720` is this search out of line, writing the bit to its fourth argument; nothing calls it.
+2. **The voice's +0x3c virtual** (a note's `0x89397130`, which makes its note, tone and conversion set). It is given
+   the message, the part and the byte. On the stack it gets a struct of three bytes, then the word and the kind. The
+   struct's bytes: a partner found, its bit 29, and the byte (the partner's note's +0x740 when there is one).
+3. **The note's note-on `0x893965e0`**, given the partner's note (or 0) and the struct's byte, sign-extended.
+4. **The cost.** The new tone's (`0x893b4020` plus the offset at `0x899826dc`) is added to the sounding list's sum,
+   where only the first voice of kind 1 counts. While the budget at `0x899826d8` is not greater than the total, the
+   oldest sounding voice of kind 0 is stopped (`0x893918e0`) and its cost taken off; with none left, the loop ends.
+5. **The note's start `0x89396630`.**
+
+Then the prepared list is moved onto the sounding list's front, in order. The sum reads the sounding list before that
+move, so a voice prepared earlier in the same pass does not count against a later one's budget. These are the inline
+copies of v272's out-of-line routines (the cost, the sum, the oldest, the stop), now with a caller.
+
+**The other routines.**
+- **The class builder `0x893969e0(unread, message, part, byte; word and kind on the stack)`.** It takes a voice
+  (v272's take) and, when there is one, builds a note's voice in place:
+  - the update queue's node (`0x89394f30`, v272's node constructor);
+  - the vtable `0x898cd1a8`, then `0x898cd3dc` over it;
+  - +0x50 set to 0 and +0x52 to 0xff;
+  - +0x44 set to the destroy on leave.
+
+  Then, if anything is prepared (`0x89390850`), it runs the start.
+- **The matching test `0x893913a0`**: a voice of the same note, as a legato partner must be.
+- **Mono's retunes `0x89390b20`** (notes not of kind 1) **and `0x89390b90`** (kind 1, a copy nothing calls). Each calls
+  the +0x18 virtual of every sounding voice with the key table, part and state 0, whatever its update bit.
+- **The truncation of a part's voices `0x893907d0`.** For each sounding voice with the key table, the part and the
+  kind, it runs the voice's truncation, then the update queue's wait (`0x893951b0` on the queue `0x89989cc4` + 36 × the
+  voice's +0x0c).
+- **A voice's truncation `0x89391a50`.** It runs the note's truncation once (`0x89396910`) when the voice has a note,
+  then `0x89391aa0`: both orders' bit 30 cleared, and the state set to 1 when the age points at the voice's own
+  orders. `0x89391a90` sets the state.
+
+**`Sh4::call` sets r4 to r7 alone.** A check that calls a routine with arguments on the stack writes them at `kVc2Sp`
+itself, as `xt_vc2cosm`'s binding did.
+
+**The check.** `xt_vc2voices` gains a second part, run after the voices' cases on the seed's next, so their lines stay
+as they were. It hooks, beyond the voices' destroys, end test and cost:
+- the +0x3c and +0x18 virtuals of both voice classes;
+- the note's note-on, start and truncation once;
+- the queue's wait.
+
+Each hook logs its arguments into the voices' log, now with room for them; a +0x3c's stack struct is logged packed,
+with the two stack words after it. A +0x3c writes the voice's note as drawn. The draws:
+- four messages, each aimed at one of three key tables;
+- each voice's key table one of those three or another, its part 0 to 2, its update bit, its queue and its queue's
+  links;
+- the notes' +0x740 bytes;
+- a target note, which up to four sounding voices are made to be (some with their age word's bit 29 set) and which a
+  call takes half the time. Without it, two voices of one note were too rare: the first marked partner was never told
+  from the last.
+
+Each case starts from noise and rom.4's three inits, then 400 events: the start and the class builder (twice as often),
+the partner, the test, the two retunes, the truncation of a part's voices, a voice's truncation, the orders' clear and
+the state's setter.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- At 40 cases: 3,557 voices prepared, 1,287 with a partner, and 4,854 destroys.
+- Every line and branch of `Vc2Assigner.cpp` is reached.
+- `mutate_vc2.py --voices`: the assigner's 43 plants and v272's 92, none missed.
+
+### The VC-2 part's keys (2026-11-19, v276) {#vc2-part-keys}
+
+Step 4.3's fourth version (VC2_MODE_PLAN.md, step 4.3, item 4). `Vc2Keys` holds the part's key tables and the
+portamento's keys word for word, the span `0x89982720…0x899888ac`. Its routines are bit for bit against rom.4's own in
+`xt_vc2keys`.
+
+**The key tables K**, 0x134 bytes each. There are 64, one by source (0…3) and channel at `0x89982720` + 0x1340 × source +
+0x134 × channel, and two of the part's own: `0x89988620`, which code beyond the keys sets up, and `0x89988754`. A
+table's words:
+
+| Offset | What |
+|---|---|
+| +0x000 | the channel's state, by address: rom.4's table `0x8950d6e0` (16 words a row) by the source's row at `0x8950d6d9` (sources 0…2 row 0, source 3 row 1), + 2 |
+| +0x004, +0x005 | the source and channel it was set up for |
+| +0x006 | the velocity curve, one of eight at `0x89535518`, 128 bytes each |
+| +0x007, +0x008 | the last note-on's key, and its velocity through the curve |
+| +0x009, +0x00a | the last note-off's key, and its velocity as given |
+| +0x00c…+0x01b | the keys held, a bitmap: key k at bit k & 15 of halfword k >> 4 |
+| +0x01c…+0x09b | each key's note-ons, held at 255 |
+| +0x09c…+0x11b | each key's note-offs, held at 255 |
+| +0x11c, +0x11d | the Hold and Sostenuto pedals' values |
+| +0x120…+0x12f | the keys held when Sostenuto went down |
+| +0x130 | 0xff after a reset |
+| +0x131 | 1 after a note-on, 0 after a note-off |
+
+A key stays held until its note-offs are as many as its note-ons. A note-off with no note-on counted leaves the counts
+alone.
+
+The tables' routines:
+- the init `0x893920c0(K, source, channel)`;
+- the reset `0x89392040`, which marks +0x130 and clears Sostenuto, the latched keys, the held keys and the counts;
+- the static initializer `0x89392190`, which inits the 64 tables channel by channel and resets `0x89988754` inline (the
+  table at `0x89988620` it leaves alone);
+- the note-on `0x89391e90` and note-off `0x89391ef0`;
+- the Hold `0x89391f60`, which stores the value;
+- the Sostenuto `0x89391f70`: when the value's bit 6 differs from the last, it latches the held keys from 64 up (signed)
+  and clears the latched keys below, then stores the value;
+- the clear `0x89391fe0` (the held keys and counts only);
+- the velocity factor `0x89392280`: the curve's velocity squared over 127² (the pool word `0x89392400`), rounded to zero.
+  Nothing calls it.
+
+**The held keys' queries** take any bitmap.
+- `0x89392670(bits, lo, hi)`: the highest key held from hi down to lo, or −1. In hi's own halfword it ignores lo: a key
+  there below lo is still found. Every caller gives 0 and 127.
+- `0x893925e0`: the same over 0…127. `0x89392630` sets lo…hi. `0x893925a0` sets every key. `0x893925b0` tests for any.
+  These four have no caller.
+
+**The portamento's keys P**, 0x24 bytes each: 128 at `0x89987420` (source s, channel c, n of 2 at 0x480 × s + 0x48 × c +
+0x24 × n) and `0x89988888`, the own table's. Their layout is rom.2's `XtKeyState`'s, and so are their laws: the note-on
+`0x893922d0` (the key is the table's +7, the clock the OS's `0x893018d0`) and the note-off `0x89392360` (the table's +9
+against the sounding key, the highest held by `0x89392670`). Beyond rom.2's there are three words:
+- +0 is the table;
+- +8 is pointed at +4 by the constructor `0x893922b0`, which calls operator new when given none;
+- +0x1e is the time since the note-on before, held at 0xffff.
+
+The note-off passes its caller's r5 and r6 to the query, and every caller (`0x89396cc0`, `0x89396cfe`) gives 0 and 127,
+so the port's note-off takes none. Its other routines:
+- the reset `0x893923c0` (the keys 60, the held flags 0, the window 32);
+- the static initializer `0x89392410`. It aims every P of source s at the table of source s and channel 0, whatever its
+  own channel, and the own P at `0x89988754`; its branch for a negative source, with `0x89988620`, is never taken;
+- the array's `0x89392560` (`0x8950773a` with the constructor on the 128, then the own P's +8).
+
+`0x89392750`, which clears 16 pairs of halfwords on a base it is given, has no caller and is not ported.
+
+**The check.** `xt_vc2keys` runs rom.4's own routines on the span, with only the OS clock hooked, to answer the ms an
+event draws.
+
+Each case starts from noise. Every table's curve is one of the eight. Every glide is aimed at a table, with its held
+flags 0 or 1 and its clock below 2^30. Then come 400 events:
+- a table's init, reset, note-on, note-off, Hold, Sostenuto, clear and velocity factor;
+- the five queries, on a table's held or latched keys;
+- a glide's constructor, reset, note-on and note-off;
+- one event in 50, an initializer.
+
+Before each event, a table's counts and held bit for a key are drawn, and the event takes that table and key half the
+time. A table's held keys, Sostenuto and curve, or a glide's words, are drawn now and then. After each event, the span is
+compared word for word, then the answer.
+
+Not drawn:
+- keys and note-on velocities past 127, and ranges below 0 or past 127 (rom.4 reads and writes beyond the table there);
+- held flags other than 0 and 1 (no routine writes another);
+- clocks 2^30 apart (`XtKeyState`'s difference is an int's).
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2Keys.cpp` is reached.
+- `mutate_vc2.py --keys`: 78 planted, 0 missed.
+
+### The VC-2 part's notes (2026-11-19, v275) {#vc2-part-notes}
+
+Step 4.3's third version (VC2_MODE_PLAN.md, step 4.3, item 3). A note W is what a voice plays: the tone's input and the
+tone it was given. `Vc2Notes` holds rom.4's 24 notes and the hook word beside them, word for word. Its routines are
+bit for bit against rom.4's own in `xt_vc2notes`.
+
+**The notes.** The 24 notes are at `0x8998a51c`, 0x744 bytes apart. `0x893964f0(size, n)` gives note n's address for
+any n (a `mul.l`, so it wraps) and ignores its size argument; the voice's `+0x3c` virtual (`0x89397130`) calls it with
+the voice's number. A note's words:
+
+| Offset | What |
+|---|---|
+| +0x000…+0x6ff | the tone's input (`Vc2ToneInput`), which the conversion writes and the tone's note-on reads |
+| +0x700…+0x737 | not touched by the note's routines |
+| +0x738 | its tone, by address |
+| +0x73c | the note a legato takes from, 0 none |
+| +0x740 | the note-on's third argument (a byte the assigner gives) |
+| +0x741 | the part node's first byte |
+| +0x742 | the voice's kind (v272's take reads it: kind 0 can be stolen) |
+| +0x743 | 1 once truncated at once |
+
+Beside them, `0x8998a514` is the hook word. Its static initializer `0x89396960` sets it to `0x893964c0`, an empty
+routine, and the notes' task sets it to `0x893901a0` at its start (`0x8938fc28`). The word at `0x8998a518` is a float
+that the file's other static initializer (`0x89396970`) writes, with two more at `0x8999537c` and `0x89995380`. No code
+loads `0x8998a518`'s address to read it, so it is kept as a word and nothing more.
+
+**The routines.**
+- **The constructor `0x89396520(W, part, kind)`.** It stores the two bytes, then takes a tone from the pool:
+  `0x893b2db0(0, kind << 16 | part)`, on the full registers (the caller zero-extends the part's byte; the kind is a
+  stack argument). It gives the tone the note's two routines in its tail: `0x893964d0` at +0x1b14, which jumps to the
+  hook word's routine with the tone, and `0x893964e0` at +0x1b18, which undoes the tone, `0x893b2fc0(tone, 3)`. Then it
+  clears the partner and the truncated byte.
+- **The note-on `0x893965e0(W, partner, byte)`.** It stores both, writes the input's +4 (the partner's tone's serial, its
+  +8, or −1 with no partner), then tail-calls the tone's note-on `0x893b3390(tone, W)`.
+- **The end `0x89396590(W)`.** Nothing for W 0. Otherwise it asks the tone's vtable's +0x60 (`0x893b4040`,
+  `Vc2Tone::held`). If that is not 0, the tone is undone at once (`0x893b2fc0(tone, 3)`); else it is truncated and waits
+  (`0x893b3bc0`). The voices' two destroys call it (`0x893916d0`, `0x893973a0`).
+- **The start `0x89396630`.** It tail-calls the part's lists' start `0x893b1cd0` (v273) and doesn't read W.
+  `0x89396640` is the same code, with no caller.
+- **The block pass `0x89396650` and `0x893967a0`.** These are one code twice: the voice's settings virtual calls the
+  first (`0x8939725e`), its update virtual the second (`0x89397114`). Each makes 27 calls of the tone's block setters, in
+  this order:
+  1. the OSC voices' settings (`0x893b3350`, the input's +0x0c);
+  2. OSC 1 and 2 (`0x893b3110`);
+  3. the mix (`0x893b32d0`);
+  4. COSM 1 and 2 (`0x893b3240`);
+  5. envelopes 1 to 13 (`0x893b31f0`, at +0x124 + 0x38 × n);
+  6. LFOs 1 to 7 (`0x893b31a0`, at +0x24 + 0x20 × n);
+  7. the TVA (`0x893b3310`).
+
+  Envelope 0 and LFO 0 are not the note's.
+- **The release `0x893968b0`.** The 13 envelopes' blocks again, then the tone's key-off `0x893b3ad0`. The voice's
+  key-off virtual (`0x893972ba`) and the base voice's (`0x893916f8`) call it.
+- **The truncation once `0x89396910`.** If +0x743 is 0, it sets it to 1 and tail-calls `0x893b3c20`. `0x89391a50`
+  calls it, a voice routine for item 5.
+- **The position `0x89396950(W, osc)`.** `0x893b3fd0(tone, osc)`. Nothing calls it. `0x89396940` is an empty routine.
+
+**The check.** `xt_vc2notes` runs rom.4's own routines on its own notes and hook word. It hooks every tone method they
+reach, the seven block setters and the hook word's two routines (`0x893964c0`, `0x893901a0`). Each hook logs the argument
+registers its routine reads and answers from a generator per side, both seeded alike before each event. The end test is
+hooked where the tone's real vtable leads. The tones are the pool's 24, with their vtable, serials and the two routines a
+constructor gives them in rom.4's memory; the port's side reads the same words and keeps the routines it gives.
+
+Each case starts from noise, with every note given a pool tone. Then come 400 events: every routine above, both block
+passes, the start and its copy, the placement of any n, and the two routines a tone is given. Before each event a note's
+tail, bytes and input words, the hook word and the serials are drawn now and then. After each, the hook word and the 24
+notes are compared word for word, then the tones' two routines, the calls and the answer.
+
+The results:
+- 0 different at seed 2024 (40 cases), 7 and 31337 (400 cases).
+- Every line and branch of `Vc2Notes.cpp` is reached, but for the `constexpr` table builder, which runs at compile time.
+- `mutate_vc2.py --notes`: 55 planted, 0 missed.
+
 ### A .p02 onto the VC-2's parameters (2026-11-21, v452) {#vc2-patch-load}
 
 Step 4.5's third item (research/VC2_MODE_PLAN.md), with which its first half is done. `VSynthEmuProcessor::loadVc2Patch`
@@ -2041,7 +5251,7 @@ Every list is walked to its end, as nothing keeps a tail. The note-on's search f
 
 **The mix's settings update `0x893add60(mix, block)`,** by the type its note-on took (the mix's +0): type 0 the four targets from the block; type 1 its first over 2^31 (its own word, `0x893adea8`) and the next two; types 2 and 3 three targets; all four of those clear the sync switch. Type 4 sets the sync switch and takes the hold from the block. Any other type changes nothing. The block's own type is not read.
 
-**Left hooked, with no port yet:** the envelopes' and LFOs' settings and release (`0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have, and the vibrato's key-off `0x893b2b60`.
+**Left hooked, with no port yet:** the envelopes' and LFOs' settings and release (`0x893ac110`, `0x893acff0`, `0x893ac470`, `0x893ac8c0`), which the real modulators (v268) don't have (ported in v315, "The VC-2's envelopes' and LFOs' settings and release"), and the vibrato's key-off `0x893b2b60`.
 
 **The check.** `xt_vc2tone` no longer hooks `0x893ad9a0`, `0x893ada10` or `0x893ada30`. rom.4's own lists run on their words, compared after every event. A tone leaves its list by rom.4's own routine before anything builds it again (a note-on, a constructor) and after its destructor, as the part keeps a tone on one list at most. The scribble keeps a tone's links, its own address and its vtable. Events of their own run the setters on drawn numbers and the mix's block, key-off, both truncations with one to three waits, the cost, the getters, the start and the lists' routines alone. The new routines' callees are hooked, and the OSCs' costs, the TVA's fade and COSM 1's cost are drawn. 0 different at seed 2024 (40 cases) and at seeds 7 and 31337 (400 cases each). Every line and region of the new port code runs. `mutate_vc2.py --tone`: 610 planted, 65 new, 0 missed. The first run missed v228's two plants on the constructor's clearing of the links: with every tone off its list before it is built, the links were already 0, so the check now gives a tone on no list stale links half the time. v228's plant on the destructor's order of the unlist and its parts' teardown is gone, as no log orders real list work against the parts' calls.
 
@@ -2312,7 +5522,7 @@ Step 4.2's OSC voice. The VOCODER OSC's carrier (`Vc2Carrier`, v221) and the mic
 
 **What they read from outside the voice** comes through `Vc2OscParts`: the OS's millisecond word (`0x893018d0`, where a carrier's phase starts), the mic ring (`0x8a0f31cc`) and the input stage's unvoiced decision for the block (`0x899d99dc`, by `0x893ed500`). rom.4 has one ring, which every voice reads.
 
-**Not connected yet.** Kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by their addresses through `Vc2OscParts`. The first reaches the carrier's update, which reads the input stage's peak (`0x899d9a5c`); the second ends in kind 6's setter `0x893ec790`. So in xt_vc2osc a carrier's growl stays 0 and its targets stay as the note-on left them. xt_vc2carrier and xt_vc2kind6 still check those paths on their own.
+**Not connected yet.** Kind 5's update `0x893afff0` and kind 6's `0x893b0150` still go by their addresses through `Vc2OscParts`. The first reaches the carrier's update, which reads the input stage's peak (`0x899d9a5c`); the second ends in kind 6's setter `0x893ec790`. So in xt_vc2osc a carrier's growl stays 0 and its targets stay as the note-on left them. xt_vc2carrier and xt_vc2kind6 still check those paths on their own. **Connected (v321, "The VC-2's kinds 5 and 6 updates on the voice"):** both are the voice's own, and the input stage's peak comes through `Vc2OscParts`.
 
 **Check.** xt_vc2osc no longer hooks the five routines. rom.4's own run on the voices in its RAM, and after every event the carrier's and kind 6's words and the ring's start word are compared with the port's, as the render's output already was. The carriers' rate setter `0x893ec6a0` and kind 6's globals' setter `0x893ecef0` run once at the start. Each case resets the ring, writes all 128 blocks of it, then starts both voices' carrier and pitch shifter; a kind 6 render writes one more block first, with a drawn period and unvoiced decision.
 

@@ -16,6 +16,8 @@ constexpr uint32_t kFewestClocks = 3, kClockChoices = 190, kClocksDrawnPast = 30
 constexpr float kLongestMs = 12000.0f, kTickMs = 10.0f, kFullFadeMs = 10000.0f, kMostHz = 100.0f, kLeastHz = 0.01f;
 constexpr float kSlowestBpm = 20.0f, kBpmSpan = 280.0f, kPhaseSpan = 65535.0f;
 constexpr float kLeastClockTime = 0.01f, kClockTimeSpan = 0.115f, kLeastScale = 0.25f;
+constexpr int32_t kSustain = 3, kReleasing = 4;       // [FW] an envelope's stages
+constexpr uint32_t kFirstOffMode = 2, kOffModes = 2;  // [FW] 0x893ac8ce: the LFO fade modes a release starts
 
 uint32_t bits(float x) { return std::bit_cast<uint32_t>(x); }
 
@@ -114,6 +116,31 @@ void toneDrawModulatorBlocks(Vc2ToneInput& in, std::mt19937& rng) {
     }
     for (uint32_t l = 0; l < Vc2Tone::kLfos; ++l) drawLfoBlock(&in.at(In::kLfos + In::kLfoStride * l), rng);
     in.at(In::kLfoValue) = bits(kSlowestBpm + kBpmSpan * vc2Unit(rng));
+}
+
+void toneSteerSustain(ToneSides& s, int i, uint32_t envelope, std::mt19937& rng) {
+    Vc2ToneEnvelope& e = s.parts[(size_t)i].mods.envelopes[envelope];
+    const uint32_t at = toneEnvelopeAt(s.pool.addressOf(i), (int)envelope);
+    if (e.started() && rng() % 2 == 0) {   // as its ticks leave it: the decay ended, the phase at 0
+        bothAt(s, at + offsetof(Vc2EnvelopeWords, stage), e.w.stage, kSustain);
+        bothAt(s, at + offsetof(Vc2EnvelopeWords, phase), e.w.phase, 0);
+    }
+    s.n.sustains += e.w.stage == kSustain;
+}
+
+void toneCountReleases(ToneSides& s, int i) {
+    if (s.pool.tones[(size_t)i].head.state != Vc2Tone::kSounding) return;
+    for (const Vc2ToneLfo& l : s.parts[(size_t)i].mods.lfos) {
+        s.n.releaseFades += l.w.active != 0 && l.w.mode - kFirstOffMode < kOffModes;
+    }
+}
+
+void toneCountReleaseTicks(ToneSides& s, int i) {
+    if (s.pool.tones[(size_t)i].head.state != Vc2Tone::kSounding) return;
+    const auto& envelopes = s.parts[(size_t)i].mods.envelopes;
+    s.n.releaseTicks += std::count_if(envelopes.begin() + 1, envelopes.end(), [](const Vc2ToneEnvelope& e) {
+        return e.w.on != 0 && e.w.stage == kReleasing;   // envelope 0 is never ticked
+    });
 }
 
 // What the tone reads of them: an envelope ticks only with an output routine, which only its note-on gives it, but for
