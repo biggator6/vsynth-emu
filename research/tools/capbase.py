@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 """capbase.py: a capture run's takes found in a recording, for the cutters (fxcut.py, vc2cut.py).  The test wave's layout
 (its mark, the two one-sided clicks, sweep, 1 kHz steps and noise, fxcapture.probe()'s first 16.8 s), a take from the take
-list, and `Locate`: where the run is in the recording and where each take's first click landed.  Split from fxcut.py as it
-stood; a cutter's analysis is `Locate` with capmeasure's, cappath's and capreport's parts."""
+list, and `Locate`: where the run is in the recording and where each take's first click landed (capclick.py's part).
+Split from fxcut.py as it stood; a cutter's analysis is `Locate` with capmeasure's, cappath's and capreport's parts.
+The wave's layout is caplayout.py's, given on from here as the cutters import it."""
 import csv, os
 import numpy as np
 
-import fxcapture
-from caprec import Bad
-
-WAVE_FS = fxcapture.FS
-CUT_LEAD = 0.25                       # seconds kept before a take's note-on
-MARK, CLICK_L, CLICK_R = 0.5, 2.0, 4.0
-SWEEP, STEPS, NOISE = (6.0, 11.0), (12.5, 13.8), (14.8, 15.8)
-STEP_DB = [-72 + 6 * i for i in range(13)]
-LOW_STEPS = (-48, -42)                # the 1 kHz steps a take's gain is read on: clear of clipping in `hotter` (+24 dB) even at a path of +9.4 dB
-SAME_DB = 0.05                        # below this, two levels are the same level: a setting did nothing
+from caprec import Bad, Recording
+from capclick import Clicks
+from caplayout import WAVE_FS, CUT_LEAD, MARK, CLICK_L, CLICK_R, SWEEP, STEPS, NOISE, STEP_DB, LOW_STEPS, SAME_DB
 
 
 class Take:
@@ -66,7 +60,18 @@ def load_takes(path, run, start, only=None):
 
 
 
-class Locate:
+class Locate(Clicks):
+    probe_file = None                 # a cutter's test wave, in its take list's folder; make_probe() makes it again
+    clean_sides = 2                   # how many of the wave's one-sided clicks a clean take shows (a mono path, one)
+
+    @classmethod
+    def load_probe(cls, folder):
+        p = os.path.join(folder, cls.probe_file)
+        if os.path.exists(p):
+            r = Recording(p)
+            return r.read(0, r.frames)
+        return cls.make_probe()
+
     def __init__(self, rec, takes, probe, run):
         self.rec, self.takes, self.pr, self.run = rec, takes, probe, run
         self.fs = rec.fs
@@ -114,13 +119,7 @@ class Locate:
         if first is None:
             raise Bad('no take with a note')
         t0 = self.takes[0].note_on - PRE
-        w = np.zeros(int((self.takes[-1].next - t0) * 100) + 2)
-        w[:int((first.note_on - t0) * 100)] = -1.0
-        for t in self.takes:
-            if t.note:
-                i = int((t.note_on - t0) * 100)
-                k = min(len(m), int((t.note_off - t.note_on) * 100), len(w) - i)
-                w[i:i + k] = m[:k]
+        w = self.mask(t0, m)
         N = 1
         while N < len(r) + len(w):
             N *= 2
@@ -132,20 +131,50 @@ class Locate:
             k = int(kmax) - N if kmax >= len(r) else int(kmax)
             if -len(w) < k < len(r) and all(abs(k - c) >= 50 for c in cands):
                 cands.append(k)
-                if len(cands) == 5:
+                if len(cands) == 30:
                     break
+        k = self.choose(cands, t0)
+        self.heard = (r, m, t0, k)
+        self.match = self.heard_share()
+
+    def mask(self, t0, m, skip=()):
+        """What should sound, 10 ms a frame from t0: the wave's pattern m at each take with a note (but those in
+        skip), silence before the first."""
+        first = next(t for t in self.takes if t.note)
+        w = np.zeros(int((self.takes[-1].next - t0) * 100) + 2)
+        w[:int((first.note_on - t0) * 100)] = -1.0
+        for t in self.takes:
+            if t.note and t.name not in skip:
+                i = int((t.note_on - t0) * 100)
+                k = min(len(m), int((t.note_off - t.note_on) * 100), len(w) - i)
+                w[i:i + k] = m[:k]
+        return w
+
+    def heard_share(self, skip=()):
+        """Of what should sound at the run's place (the takes in skip aside), the share that does."""
+        r, m, t0, k = self.heard
+        w = self.mask(t0, m, skip)
+        i0, i1 = max(0, -k), min(len(w), len(r) - k)
+        if i1 > i0:
+            ww, rr = w[i0:i1], r[i0 + k:i1 + k]
+            return float(np.mean(rr[ww > 0] > 0)) if (ww > 0).any() else 0.0     # of what should sound: effects fill the gaps, so those can't count
+        return 0.0
+
+    def choose(self, cands, t0):
+        """The run's place among the correlation's best lags (frames of 10 ms), by the clicks each puts in place; it
+        sets self.offset, and returns the lag."""
         # The best score is nearly always right, but takes full of tails blur the pattern: then the clicks decide among the next best.
-        best, best_clean = None, -1
+        best, best_clean, best_score = None, -1, -1.0
         notes = sum(1 for t in self.takes if t.note)
-        for n, k in enumerate(cands):
+        for n, k in enumerate(cands[:5]):
             self.offset = k * 0.01 - t0
             clean = self.count_clean()
-            if clean > best_clean:
-                best, best_clean = k, clean
+            score = clean + 0.5 * self.holds_run()        # takes alike in length fit shifted too: a tie keeps the run in
+            if score > best_score:
+                best, best_clean, best_score = k, clean, score
             if n == 0 and clean >= max(3, 0.3 * notes):
                 break
-        k = best
-        self.offset = k * 0.01 - t0
+        k = self.held(best, best_clean, cands[5:], t0)
         if best_clean <= 0:                     # nothing fits: maybe the clicks can say where the run is, whichever take they're from
             found = self.find_triple()
             if found and abs(self.at(CLICK_L - MARK) / float(found[1] - found[0]) - 1.0) <= 3e-4:
@@ -155,40 +184,25 @@ class Locate:
                     if clean > best_clean:
                         best_clean, k = clean, int(round((self.offset + t0) * 100.0))
             self.offset = k * 0.01 - t0
-        i0, i1 = max(0, -k), min(len(w), len(r) - k)
-        if i1 > i0:
-            ww, rr = w[i0:i1], r[i0 + k:i1 + k]
-            self.match = float(np.mean(rr[ww > 0] > 0)) if (ww > 0).any() else 0.0     # of what should sound: effects fill the gaps, so those can't count
+        return k
 
-    # ---------------------------------------- each take's click
-    def count_clean(self):
-        n = 0
-        for t in self.takes:
-            t.mark, t.clean = None, False
-            if t.note and 0 <= self.at(t.note_on + self.offset) < self.rec.frames:
-                self.find_mark(t, self.at(t.note_on + MARK + self.offset))
-                n += t.clean
-        return n
+    def held(self, k, clean, more, t0):
+        """Lag k, unless the run doesn't fit in the recording there and a later lag in `more` fits it with as many
+        clean clicks: takes alike in length leave the best lags a whole take or more apart, all equally good."""
+        self.offset = k * 0.01 - t0
+        if self.holds_run():
+            return k
+        for other in more:
+            self.offset = other * 0.01 - t0
+            if self.holds_run() and self.count_clean() >= clean:
+                return other
+        self.offset = k * 0.01 - t0
+        return k
 
-    def stands_out(self, i, peak):
-        """A click near i: as large as the wave says against the first, and clear of what's around it, which a reverb's tail isn't."""
-        near = float(np.abs(self.rec.read(i - 16, i + 17)).max())
-        around = max(float(np.abs(self.rec.read(i - 400, i - 100)).max()), float(np.abs(self.rec.read(i + 100, i + 400)).max()))
-        return near >= 0.2 * peak and near >= 3.0 * around
-
-    def find_mark(self, t, centre):
-        half = self.at(0.4)
-        a0 = centre - half
-        x = self.rec.read(a0, centre + half)
-        a = np.abs(x).max(axis=1)
-        top = float(a.max()) if len(a) else 0.0
-        if top <= 0.0:
-            return
-        i = int(np.argmax(a >= min(top, max(0.25 * top, 8.0 * float(np.median(a))))))      # the first arrival, as a delay's echo can be the larger, and clear of the noise
-        j = i + int(np.argmax(a[i:i + 64]))
-        t.mark = a0 + j
-        t.mark_peak = float(a[j])
-        t.clean = t.mark_peak > 0.0 and self.stands_out(t.mark + self.at(CLICK_L - MARK), t.mark_peak) and self.stands_out(t.mark + self.at(CLICK_R - MARK), t.mark_peak)
+    def holds_run(self):
+        """Whether the recording holds every take at the run's place now."""
+        first, last = self.takes[0], self.takes[-1]
+        return self.at(first.note_on + self.offset) >= 0 and self.at(last.next + self.offset) <= self.rec.frames
 
     def align(self):
         """Finds every take's mark, then fits the run's timing through the clean ones, for the takes with none."""
@@ -221,25 +235,17 @@ class Locate:
             if t.note and t.mark is not None and not t.clean and t.mark < expect - self.at(0.1):
                 t.mark = None                                # it found something else, far ahead of the note
 
-    def find_triple(self):
-        """The wave's three clicks anywhere in the recording's first minutes, at any speed: one on both sides, one on one side, one on the other.  No other part of
-        the wave, and nothing likely in a room, does that.  Returns their samples, or None."""
-        n = min(self.rec.frames, self.at(240.0))
-        x = np.abs(self.rec.read(0, n))
-        a = x.max(axis=1)
-        top = float(a.max()) if n else 0.0
-        if top <= 0.0:
-            return None
-        thr = max(0.05 * top, 8.0 * float(np.median(a)))
-        gap, i, events = self.at(0.1), 0, []
-        loud = np.flatnonzero(a >= thr)
-        while i < len(loud):
-            j = int(loud[i])
-            pk = x[j:j + 33].max(axis=0)
-            kind = 'L' if pk[1] < 0.1 * pk[0] else ('R' if pk[0] < 0.1 * pk[1] else 'B')
-            events.append((j + int(np.argmax(a[j:j + 33])), kind))
-            i = int(np.searchsorted(loud, j + gap))
-        for (b, kb), (c, kc), (d, kd) in zip(events, events[1:], events[2:]):
-            if kb == 'B' and kc + kd in ('LR', 'RL') and abs((d - c) / float(c - b) - (CLICK_R - CLICK_L) / (CLICK_L - MARK)) < 0.03:
-                return b, c, d
-        return None
+
+def analysis_of(cls, rec, run, takes_csv, start=None, probe=None, only=None):
+    """A cutter's analysis of a recording, run through: the run's takes from the list (from `start`, or `only` one),
+    the test wave (the class's own in the list's folder, unless given), where the run and its takes are, their levels,
+    the checks."""
+    takes = load_takes(takes_csv, run, start, only)
+    if probe is None:
+        probe = cls.load_probe(os.path.dirname(takes_csv))
+    a = cls(rec, takes, probe, run)
+    a.locate()
+    a.align()
+    a.measure()
+    a.run_checks()
+    return a

@@ -19,28 +19,19 @@ with other --dev or --ch settings cuts the same.  fxcut_test.py checks this on s
 The parts every cutter shares (vc2cut.py's too): caprec.py, the WAV reader; capbase.py, the takes and where they
 are; capmeasure.py, the levels; cappath.py, the path's checks; capreport.py, the report and the files.  This file
 is the effects' own checks."""
-import argparse, os, re, sys
+import os, re, sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fxcapture
 from caprec import Bad, Recording
 # CUT_LEAD and MARK for fxcut_test.py
-from capbase import CUT_LEAD, MARK, STEP_DB, LOW_STEPS, SAME_DB, Locate, load_takes
+from capbase import CUT_LEAD, MARK, STEP_DB, LOW_STEPS, SAME_DB, Locate, analysis_of
 from capmeasure import Measure
 from cappath import PathChecks
-from capreport import Report
+from capreport import Report, cli
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..')
-
-
-def load_probe(folder):
-    p = os.path.join(folder, 'fxprobe.wav')
-    if os.path.exists(p):
-        r = Recording(p)
-        return r.read(0, r.frames)
-    frames, _ = fxcapture.probe()
-    return np.frombuffer(frames, dtype='<i2').reshape(-1, 2) / 32768.0
 
 
 DRY_TAKES = {'main', 'main_again', 'multi_off', 'multi_thru', 'multi_off_m64', 'multi_thru_m64', 'master_100', 'gain_plus6', 'gain_minus6', 'hot', 'hotter'}
@@ -55,6 +46,12 @@ class Analysis(Report, PathChecks, Measure, Locate):
                  'every window here rests on that.')
     fine_fix = 'Check Original Fine Tune.'
     no_clicks = 'Is this the right recording, with the wave `fxprobe` playing, and the level up?'
+    probe_file = 'fxprobe.wav'
+
+    @staticmethod
+    def make_probe():
+        frames, _ = fxcapture.probe()
+        return np.frombuffer(frames, dtype='<i2').reshape(-1, 2) / 32768.0
 
     def check_run1(self):
         by = self.by
@@ -169,26 +166,11 @@ class Analysis(Report, PathChecks, Measure, Locate):
         else:
             self.add('OK', '%s: %s.' % (what, txt))
 
-    def check_run2(self):
-        same = []
-        prev = None
-        for t in self.takes:
-            if not t.present or t.cut_short or t.sweep[0] is None:
-                prev = None
-                continue
-            if prev is not None and all(abs(a - b) < 0.02 for a, b in zip(t.sweep + t.noise, prev.sweep + prev.noise)):
-                same.append('%s = %s' % (t.name, prev.name))
-            prev = t
-        if same:
-            self.add('LOOK', 'Takes with the levels of the one before, so maybe a type that didn\'t change: %s.' % ', '.join(same[:8]))
-        else:
-            self.add('OK', 'Every take differs from the one before.')
-
     def check_run(self):
         if self.run == 'fx_run_1':
             self.check_run1()
         else:
-            self.check_run2()
+            self.check_differs()
 
     def next_step(self):
         return 'run 2' if self.run == 'fx_run_1' else 'the comparison'
@@ -203,41 +185,15 @@ def analyse(path, run=None, takes_csv=None, start=None, probe=None, only=None):
             raise Bad('Which run is this? Say --run fx_run_1 or --run fx_run_2.')
         run = m.group(0) if m else ('fx_run_2' if re.match(r'(mfx|rev|cho)\d\d$', only) else 'fx_run_1')
     folder = os.path.join(REPO, 'analysis/test_files/fx')
-    takes = load_takes(takes_csv or os.path.join(folder, 'fx_takes.csv'), run, start, only)
-    if probe is None:
-        probe = load_probe(os.path.dirname(takes_csv) if takes_csv else folder)
-    a = Analysis(rec, takes, probe, run)
-    a.locate()
-    a.align()
-    a.measure()
-    a.run_checks()
-    return a
+    return analysis_of(Analysis, rec, run, takes_csv or os.path.join(folder, 'fx_takes.csv'), start, probe, only)
+
+
+load_probe = Analysis.load_probe                         # the wave in a take list's folder, for fxcut_test.py
 
 
 def main():
-    ap = argparse.ArgumentParser(description='Checks a recording of an effects run and cuts it into takes.')
-    ap.add_argument('recording')
-    ap.add_argument('--run', choices=['fx_run_1', 'fx_run_2'], help='which run; by default, from the file name')
-    ap.add_argument('--from', dest='start', type=float, help="a recording made with fxplay --from: the next_s it started at")
-    ap.add_argument('--take', help='a recording of this take alone')
-    ap.add_argument('--takes', help='the take list; by default analysis/test_files/fx/fx_takes.csv')
-    ap.add_argument('--out', help='where to write; by default a folder beside the recording, named after it')
-    ap.add_argument('--no-cut', action='store_true', help='report only')
-    a = ap.parse_args()
-    if not os.path.exists(a.recording):
-        print('FAIL  no file at %s' % a.recording)
-        sys.exit(2)
-    try:
-        an = analyse(a.recording, a.run, a.takes, a.start, None, a.take)
-    except Bad as e:
-        print('FAIL  %s' % e)
-        sys.exit(2)
-    for line in an.report():
-        print(line)
-    folder = a.out or os.path.splitext(os.path.abspath(a.recording))[0]
-    an.write(folder, not a.no_cut)
-    print('\nWrote %s' % folder)
-    sys.exit(1 if any(c[0] == 'FAIL' for c in an.checks) else 0)
+    cli(analyse, 'Checks a recording of an effects run and cuts it into takes.', ['fx_run_1', 'fx_run_2'],
+        'analysis/test_files/fx/fx_takes.csv')
 
 
 if __name__ == '__main__':

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """capreport.py: a cutter's report and files: the table of takes, the checks, the verdict, levels.csv, report.txt and a WAV
-per take in the recording's own bytes.  `Report` is a part of a cutter's analysis.  Split from fxcut.py as it stood."""
-import csv, os, struct
+per take in the recording's own bytes.  `Report` is a part of a cutter's analysis; `cli` is a cutter's command line.
+Split from fxcut.py as it stood."""
+import argparse, csv, os, struct, sys
 import numpy as np
 
+from caprec import Bad
 from capbase import CUT_LEAD, STEP_DB
 
 
@@ -88,3 +90,30 @@ class Report:
                 f.write(b'fmt ' + struct.pack('<I', len(fmt)) + fmt + (b'\0' if len(fmt) & 1 else b''))
                 f.write(b'data' + struct.pack('<I', len(body)) + body)
 
+
+def cli(analyse, description, runs, takes_default):
+    """A cutter's command line: analyse(recording, run, takes, from, probe, take) -> its analysis; exit 2 for a file
+    it can't read, 1 for any FAIL, else 0."""
+    ap = argparse.ArgumentParser(description=description)
+    ap.add_argument('recording')
+    ap.add_argument('--run', choices=runs, help='which run; by default, from the file name')
+    ap.add_argument('--from', dest='start', type=float, help="a recording made with fxplay --from: the next_s it started at")
+    ap.add_argument('--take', help='a recording of this take alone')
+    ap.add_argument('--takes', help='the take list; by default %s' % takes_default)
+    ap.add_argument('--out', help='where to write; by default a folder beside the recording, named after it')
+    ap.add_argument('--no-cut', action='store_true', help='report only')
+    a = ap.parse_args()
+    if not os.path.exists(a.recording):
+        print('FAIL  no file at %s' % a.recording)
+        sys.exit(2)
+    try:
+        an = analyse(a.recording, a.run, a.takes, a.start, None, a.take)
+    except Bad as e:
+        print('FAIL  %s' % e)
+        sys.exit(2)
+    for line in an.report():
+        print(line)
+    folder = a.out or os.path.splitext(os.path.abspath(a.recording))[0]
+    an.write(folder, not a.no_cut)
+    print('\nWrote %s' % folder)
+    sys.exit(1 if any(c[0] == 'FAIL' for c in an.checks) else 0)

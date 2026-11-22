@@ -10,6 +10,28 @@ from capbase import WAVE_FS, MARK, CLICK_L, CLICK_R, SWEEP, NOISE, STEP_DB, LOW_
 
 
 class PathChecks:
+    may_be_silent = frozenset()                         # takes a run allows to be silent: the answer, not a fault
+    match_floor = 0.6                                   # less of what should sound than this, and it's another recording
+
+    def check_differs(self, only=None):
+        """Each take against the one before it (of those named in `only`, if given): one at the same levels is a type
+        that maybe didn't change."""
+        same = []
+        prev = None
+        for t in self.takes:
+            if only is not None and t.name not in only:
+                continue
+            if not t.present or t.cut_short or t.sweep[0] is None:
+                prev = None
+                continue
+            if prev is not None and all(abs(a - b) < 0.02 for a, b in zip(t.sweep + t.noise, prev.sweep + prev.noise)):
+                same.append('%s = %s' % (t.name, prev.name))
+            prev = t
+        if same:
+            self.add('LOOK', 'Takes with the levels of the one before, so maybe a type that didn\'t change: %s.' % ', '.join(same[:8]))
+        else:
+            self.add('OK', 'Every take differs from the one before.')
+
     # ---------------------------------------- the checks
     def check_format(self):
         r = self.rec
@@ -30,15 +52,21 @@ class PathChecks:
             names = [t.name for t in missing + short]
             self.add('FAIL', 'The recording doesn\'t hold the whole run: %d of %d takes are missing or cut off (%s). It starts %.1f s %s the run\'s start.' % (
                 len(names), len(self.takes), ', '.join(names[:6]) + (', …' if len(names) > 6 else ''), abs(self.offset), 'before' if self.offset >= 0 else 'after'))
-        if self.match < 0.6:
-            self.add('FAIL', 'The recording doesn\'t look like this run: only %.0f%% of what should sound does. Check that it\'s the right file.' % (self.match * 100))
         silent = []
         floor = self.env_floor
         for t in expected:
             if t.present and not t.cut_short and max(t.peak) < max(floor + 20.0, -90.0):
                 silent.append(t.name)
-        if silent:
-            self.add('FAIL', 'No sound in %d take%s: %s. A note that never arrived, or a setting that silences it.' % (len(silent), '' if len(silent) == 1 else 's', ', '.join(silent[:8]) + (', …' if len(silent) > 8 else '')))
+        answers = [n for n in silent if n in self.may_be_silent]       # a take whose silence answers a question isn't a fault
+        if answers:
+            self.match = self.heard_share(answers)
+        if self.match < self.match_floor:
+            self.add('FAIL', 'The recording doesn\'t look like this run: only %.0f%% of what should sound does. Check that it\'s the right file.' % (self.match * 100))
+        loud = [n for n in silent if n not in self.may_be_silent]
+        if loud:
+            listed = ', '.join(loud[:8]) + (', …' if len(loud) > 8 else '')
+            self.add('FAIL', 'No sound in %d take%s: %s. A note that never arrived, or a setting that silences it.'
+                     % (len(loud), '' if len(loud) == 1 else 's', listed))
         self.silent = set(silent)
 
     def check_silence(self):
@@ -152,7 +180,9 @@ class PathChecks:
                 self.add('LOOK', 'The channels leak: a click on one side shows on the other at %.1f and %.1f dB.' % (db(R1 / L1), db(L2 / R2)))
 
     def check_trim(self):
-        ref = self.by.get('main') or self.reference_take()
+        ref = self.by.get('main')
+        if ref is None or ref.name in self.silent:          # a silent take says nothing of the trim
+            ref = self.reference_take()
         if ref is None or ref.sweep[0] is None:
             return
         base = ref.base
