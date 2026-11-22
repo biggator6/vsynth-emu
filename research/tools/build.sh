@@ -195,6 +195,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
    $( [ -f Vc2OscModeOne.cpp ] && echo Vc2OscModeOne.cpp Vc2OscWalk.cpp Vc2OscWalkEvents.cpp Vc2OscWalkDraws.cpp ) \
    $( [ -f Vc2OscWalkStart.cpp ] && echo Vc2OscWalkStart.cpp Vc2OscModeOneStart.cpp ) \
+   $( [ -f Vc2OscVari.cpp ] && echo Vc2OscVari.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
       Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
@@ -213,6 +214,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
    $( [ -f Vc2OscModeOne.cpp ] && echo Vc2OscModeOne.cpp Vc2OscWalk.cpp Vc2OscWalkEvents.cpp Vc2OscWalkDraws.cpp ) \
    $( [ -f Vc2OscWalkStart.cpp ] && echo Vc2OscWalkStart.cpp Vc2OscModeOneStart.cpp ) \
+   $( [ -f Vc2OscVari.cpp ] && echo Vc2OscVari.cpp ) \
    $( [ -f Vc2OscAnalog.cpp ] && echo Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp ) \
    $( [ -f Vc2OscAnalogSub.cpp ] && echo Vc2OscAnalogSub.cpp ) \
    $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp ) \

@@ -1019,6 +1019,14 @@ version against rom.4's routines with what it calls hooked:
          point × 16, the re-seek's beat position over 32), its low half held to the last; the re-seek's stands. And
          from the words a start leaves, the find never reaches its stop at the last event. With it LITE is whole.
          Next: VariPhrase's update, settings, lookup and seeks.
+       - VariPhrase's update, start and settings (v330): `0x893c88b0` (five words 0.7 of the way to their targets),
+         `0x893c8670`, the players' start in its note-on (the gain's and level's targets, the player's set-up by the
+         wave's type, the band seek to the block's seek point) and `0x893b0280` (the flags, the object's bits and
+         their side effects), the voice's own in `Vc2OscVari.cpp`; the last of a kind's routines by address, so
+         `kindCall` and `kindSettings` are gone; the players' set-ups out by address on the object again
+         (`objectCall`) until the players come (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase update, start and
+         settings"). Found: the start gives a band seek the right units, a number in events and the point × 16 in
+         samples. Next: the event lookup for VariPhrase's note-on and the band seeks.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

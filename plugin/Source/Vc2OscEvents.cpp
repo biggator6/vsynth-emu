@@ -17,6 +17,7 @@ constexpr int kKindWord = 0, kWaveWord = 0xb0 / 4, kHeaderWord = 0xd4 / 4, kLoop
 constexpr int kKinds = 8;
 constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
 constexpr uint32_t kCarrierKind = 5, kKind6Kind = 6;   // [FW] v266's kinds, counted
+constexpr uint32_t kVariPhrase = 2;                    // [FW] v330: whose update steps its words to their targets
 using Answer = OscAnswer;
 
 std::string onConstruct(OscSides& s, std::mt19937&, int v) {
@@ -74,7 +75,8 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     else oscSteerAnalog(s, rng, v);
     n = steerFactor(s.voices[(size_t)v], rng, n);
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
-    const Vc2OscVoice& seeking = s.voices[(size_t)v];   // v329: a seek pending re-seeks once the level has fallen
+    Vc2OscVoice& seeking = s.voices[(size_t)v];   // v329: a seek pending re-seeks once the level has fallen
+    if (seeking.kind() == kVariPhrase) s.n.variDrawn += oscSteerVariWords(seeking, s.shared.renders);   // v330
     oscSteerSeek(s, v, oscIsModeOne(seeking) && seeking.tail.seekPending != 0);
     ++s.n.updates;
     constexpr uint32_t kLite = 1, kLiteTypes = 3;   // [FW] v324: LITE's kind and the wave types its update has ways for
@@ -112,6 +114,7 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
         oscAnalogObject(s.voices[(size_t)v], rng);
         oscWriteVoice(s, v);
     }
+    if (block[kKindWord] == kVariPhrase) s.n.variDrawn += oscSteerVariWords(s.voices[(size_t)v], s.shared.renders);
     oscSteerSeek(s, v, oscBlockIsModeOne(block.data()));   // v329: LITE's note-on seeks on the object as it finds it
     const uint32_t legato = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 2;
     s.fw.cpu.write(kOscBlockAt, block.data(), sizeof block);

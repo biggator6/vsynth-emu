@@ -79,12 +79,11 @@ struct Vc2OscSamples {
     }
 };
 
-// What the voice calls on its parts and reads from them; a kind's routine by its rom.4 address
+// What the voice calls on its parts and reads from them; a player's routine by its rom.4 address (a kind's routine on
+// the voice and its settings went with v330, VariPhrase's update and settings the last)
 class Vc2OscParts {
 public:
     virtual ~Vc2OscParts() = default;
-    virtual void kindCall(uint32_t routine) = 0;              // routine(voice): an install, an update, a note-on
-    virtual void kindSettings(uint32_t routine, const uint32_t* from) = 0;   // routine(voice, the settings' +0xb0)
     virtual uint32_t renderBy(uint32_t routine, float* out, uint32_t third) = 0;   // routine(out, the object, third)
     virtual void seek(uint32_t routine, int32_t at) = 0;      // a player's, routine(the object, at)
     // v266: what the voice's carrier and kind 6 read from outside it: the OS's millisecond word (0x893018d0), where a
@@ -101,10 +100,11 @@ public:
     virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
     // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0);
-    // 0x893cc0d0(the object, event, &position, &…), an event's position ×16 (a player's routine on the object went
-    // with v328, mode 1's set-up its last)
+    // 0x893cc0d0(the object, event, &position, &…), an event's position ×16; a player's routine on the object, by its
+    // address (v238; gone with v328, mode 1's set-up its last, and back from v330 for VariPhrase's players' set-ups)
     virtual uint32_t address() = 0;
     virtual int32_t eventPosition(uint32_t event) = 0;
+    virtual void objectCall(uint32_t routine) = 0;
     virtual Vc2OscWaveHeader waveHeader(uint32_t at) = 0;
     virtual Vc2OscLoopRecord loopRecord(uint32_t at) = 0;
 };
@@ -134,6 +134,11 @@ public:
     // v324 (Vc2OscLite.cpp): LITE's update 0x893c8280 and settings 0x893c8390 (given the settings' +0xb0)
     void updateLite(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void settingsLite(const uint32_t* from, Vc2OscParts& parts);
+    // v330 (Vc2OscVari.cpp): VariPhrase's update 0x893c88b0, its players' start 0x893c8670 (its note-on's) and its
+    // settings 0x893b0280 (given the settings' +0xb0)
+    void updateVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void startVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void settingsVari(const uint32_t* from);
     void noteOnAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)
     // v248 (Vc2OscAnalogUpdate.cpp): the analog's install 0x893c2ad0, update 0x893c2ce0 and settings 0x893c3460
     // (given the settings' +0xb0)

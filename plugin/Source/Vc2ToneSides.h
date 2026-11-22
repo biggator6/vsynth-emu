@@ -40,6 +40,7 @@ struct ToneCounts {
     long modeOneSetUps = 0, modeOneTaken = 0;   // v328: mode 1's set-ups at an install, those through a take's head
     long settingsTaken = 0;                     // v328: and the LITE settings through a take's head
     long modeOneSeeks = 0, bandReseeks = 0;     // v329: the OSCs steered for mode 1's seek, VariPhrase's re-seeks
+    long variDrawn = 0;                         // v330: VariPhrase's update's words drawn finite
     std::array<long, kOscKinds> oscCalls {};
 };
 
@@ -152,9 +153,10 @@ void toneSteerModeOne(ToneSides& s, int i, int osc);
 // object, their mode 1 words drawn on both sides (oscSteerModeOneSeek) and counted: before a note-on those whose block
 // is LITE's of type 1 (LITE's note-on seeks before any take), else (an update) the mode 1 voices with a seek pending.
 // And before an update one VariPhrase voice in four given a seek pending, its level 0, so that it re-seeks: its band
-// players' seeks are the only ones still going out by address (through the link's seek), and nothing else here sets
-// one (VariPhrase's settings are still hooked)
-void toneSteerSeeks(ToneSides& s, int i, bool noteOn);
+// players' seeks are the only ones still going out by address (through the link's seek), and nothing else here set one
+// until v330 (VariPhrase's settings were hooked).  From v330 (toneSteerSeeks until then) before a note-on of a
+// VariPhrase block and an update of a VariPhrase voice, its update's words drawn finite (oscSteerVariWords)
+void toneSteerOscs(ToneSides& s, int i, bool noteOn);
 // v328: the voice whose records tone i's OSC's LITE settings read: the one its head names when that is another pool
 // tone's LITE voice holding a loop record's address, as a take leaves it (counted), else its own, as v324's steer made it
 uint32_t toneSettingsVoice(ToneSides& s, int i, int osc);

@@ -22,6 +22,16 @@ constexpr int kPositionShift = 4;
 constexpr float kTwo31 = 2147483648.0f;   // [FW] 0x893aedc4…0x893aedd0: mov #79, shll8, shll16, as a float
 
 float settingsWord(const uint32_t* s, uint32_t at) { return std::bit_cast<float>(s[at / 4]); }
+
+// The kind's settings by its row's way, in Vc2OscSettings' order (given the settings' +0xb0): none, or the port's (the
+// analog's v248, LITE's v324, VariPhrase's v330, the last that went by an address)
+using SettingsWay = void (*)(Vc2OscVoice& v, const uint32_t* from, Vc2OscParts& p);
+void settingsNone(Vc2OscVoice&, const uint32_t*, Vc2OscParts&) {}
+void settingsOfAnalog(Vc2OscVoice& v, const uint32_t* from, Vc2OscParts&) { v.settingsAnalog(from); }
+void settingsOfLite(Vc2OscVoice& v, const uint32_t* from, Vc2OscParts& p) { v.settingsLite(from, p); }
+void settingsOfVari(Vc2OscVoice& v, const uint32_t* from, Vc2OscParts&) { v.settingsVari(from); }
+constexpr std::array<SettingsWay, 4> kSettingsWays { settingsNone, settingsOfAnalog, settingsOfLite, settingsOfVari };
+static_assert((size_t)Vc2OscSettings::vari + 1 == kSettingsWays.size(), "a way for each of Vc2OscSettings");
 } // namespace
 
 void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneShared& shared) {
@@ -38,9 +48,7 @@ void Vc2OscVoice::settings(const uint32_t* s, Vc2OscParts& parts, const Vc2ToneS
     std::memcpy(&rates, s + kVibratoFrom / 4, sizeof rates);
     vibrato.settings(rates);
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
-    if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248
-    else if (row.settingsWay == Vc2OscSettings::lite) settingsLite(s + kKindFrom / 4, parts);   // v324
-    else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);
+    kSettingsWays[(size_t)row.settingsWay](*this, s + kKindFrom / 4, parts);
     if (!row.carrier) return;
     std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);
     Vc2CarrierParams given;

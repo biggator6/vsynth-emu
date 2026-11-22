@@ -181,4 +181,15 @@ void oscDrawVoicedVoice(Vc2OscVoice& o, std::mt19937& rng) {
 void oscDrawVoicedWords(std::span<uint32_t> words, std::mt19937& rng, uint32_t below) {
     drawNoteWords([&](uint32_t at, float x) { words[(at - below) / 4] = std::bit_cast<uint32_t>(x); }, rng);
 }
+
+long oscSteerVariWords(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr std::array<uint32_t, 6> kStepped { 0x1cc, 0x1d0, 0x1d4, 0x1d8, 0x1dc, 0x6c };   // [FW]
+    long drawn = 0;
+    for (uint32_t at : kStepped) {
+        if (std::isfinite(o.f32(at))) continue;
+        o.setF32(at, oscDrawFloat(rng, OscRange::moderate));
+        ++drawn;
+    }
+    return drawn;
+}
 #endif

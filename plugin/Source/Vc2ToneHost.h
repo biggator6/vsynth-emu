@@ -46,8 +46,6 @@ class Vc2ToneHost;
 class Vc2ToneOscLink final : public Vc2OscParts {
 public:
     Vc2ToneOscLink(Vc2ToneHost& host, int osc) : host_(host), osc_(osc) {}
-    void kindCall(uint32_t routine) override;
-    void kindSettings(uint32_t routine, const uint32_t* from) override;
     uint32_t renderBy(uint32_t routine, float* out, uint32_t third) override;
     void seek(uint32_t routine, int32_t at) override;
     int32_t osClock() override;
@@ -59,6 +57,7 @@ public:
     float boundFloat(uint32_t part, uint32_t offset) override;   // the tone's envelope's or LFO's; another's outside
     uint32_t address() override;                                 // the voice's, at the tone's +0x20 or +0xba4
     int32_t eventPosition(uint32_t event) override;
+    void objectCall(uint32_t routine) override;   // v330: VariPhrase's players' set-ups, outside
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
 

@@ -159,12 +159,12 @@ void toneSteerModeOne(ToneSides& s, int i, int osc) {
     s.fw.cpu.write(at, &v, sizeof v);
 }
 
-void toneSteerSeeks(ToneSides& s, int i, bool noteOn) {
+void toneSteerOscs(ToneSides& s, int i, bool noteOn) {
     constexpr uint32_t kVariPhrase = 2, kLevelAt = 0x1e0;   // [FW] the kind; the object's level, the re-seek's wait
     for (int osc = 0; osc < 2; ++osc) {
         Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
-        const bool seeks = noteOn ? oscBlockIsModeOne(&s.shared.input.at(In::kOscs[(size_t)osc]))
-                                  : oscIsModeOne(v) && v.tail.seekPending != 0;
+        const uint32_t* block = &s.shared.input.at(In::kOscs[(size_t)osc]);
+        const bool seeks = noteOn ? oscBlockIsModeOne(block) : oscIsModeOne(v) && v.tail.seekPending != 0;
         const bool band = !noteOn && v.kind() == kVariPhrase && s.shared.osc.renders() % 4 == 0;
         if (band) {
             v.tail.seekPending = 1;
@@ -172,7 +172,10 @@ void toneSteerSeeks(ToneSides& s, int i, bool noteOn) {
             ++s.n.bandReseeks;
         }
         s.n.modeOneSeeks += oscSteerModeOneSeek(v, s.shared.osc, seeks);
-        if (seeks || band) s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
+        const bool vari = (noteOn ? block[0] : v.kind()) == kVariPhrase;   // v330: its update steps its words
+        const long drawn = vari ? oscSteerVariWords(v, s.shared.osc.renders) : 0;
+        s.n.variDrawn += drawn;
+        if (seeks || band || drawn != 0) s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
     }
 }
 
@@ -225,7 +228,7 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     // v328: a LITE wave of type 1 (the legato's kinds too) the records its set-up reads, from the renders' generator
     for (uint32_t block : In::kOscs) oscModeOneBlock(&s.shared.input.at(block), s.shared.osc.renders);
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
-    toneSteerSeeks(s, i, true);   // v329
+    toneSteerOscs(s, i, true);   // v329, v330
     drawListedWords(s, i, rng);
 }
 #endif

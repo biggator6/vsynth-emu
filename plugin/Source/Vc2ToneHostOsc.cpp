@@ -59,9 +59,6 @@ int32_t Vc2ToneHost::oscWord168(int osc) { return voice(osc).word168(); }
 uint32_t Vc2ToneHost::oscPosition(int osc) { return voice(osc).position(); }
 
 Vc2OscParts& Vc2ToneOscLink::outside() const { return host_.oscOutside(osc_); }
-void Vc2ToneOscLink::kindCall(uint32_t routine) { outside().kindCall(routine); }
-
-void Vc2ToneOscLink::kindSettings(uint32_t routine, const uint32_t* from) { outside().kindSettings(routine, from); }
 
 uint32_t Vc2ToneOscLink::renderBy(uint32_t routine, float* out, uint32_t third) {
     return outside().renderBy(routine, out, third);
@@ -93,5 +90,6 @@ float Vc2ToneOscLink::boundFloat(uint32_t part, uint32_t offset) {
 
 uint32_t Vc2ToneOscLink::address() { return host_.self() + kOscsAt[(size_t)osc_]; }
 int32_t Vc2ToneOscLink::eventPosition(uint32_t event) { return outside().eventPosition(event); }
+void Vc2ToneOscLink::objectCall(uint32_t routine) { outside().objectCall(routine); }
 Vc2OscWaveHeader Vc2ToneOscLink::waveHeader(uint32_t at) { return outside().waveHeader(at); }
 Vc2OscLoopRecord Vc2ToneOscLink::loopRecord(uint32_t at) { return outside().loopRecord(at); }

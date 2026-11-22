@@ -91,10 +91,13 @@ void toneDrawCosmBlocks(Vc2ToneInput& in, std::mt19937& rng) {
 }
 
 // The setter's block for COSM `cosm`: the object's code three times in four, so its type's new block runs
+// v330: a number past 1 reaches no COSM, its block COSM 1's, which is drawn as for COSM 1 itself: a setter that reached a
+// COSM it shouldn't would then run that type's new block (methods-cosm-bound's catch had been one event's luck)
 void toneDrawCosmNewBlock(ToneSides& s, int i, uint32_t cosm, std::mt19937& rng) {
     toneDrawCosmBlocks(s.shared.input, rng);
-    if (cosm > 1 || rng() % 4 == 0) return;
-    drawTypeOf(s.shared.input, In::kCosms[cosm], s.parts[(size_t)i].cosms[cosm].code, rng);
+    const uint32_t to = cosm > 1 ? 0 : cosm;
+    if (rng() % 4 == 0) return;
+    drawTypeOf(s.shared.input, In::kCosms[to], s.parts[(size_t)i].cosms[to].code, rng);
 }
 
 // A note-on drawn that starts the COSMs again: each slot the tone's last one took in use no longer on both sides, as the

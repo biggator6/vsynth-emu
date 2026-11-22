@@ -786,8 +786,7 @@ host-key-off-osc|vibrato.w.active = 0;|vibrato.w.falling = 0;|vc2tonehostosc
 host-osc-cost|{ return voice(osc).tail.installed; }|{ return voice(osc).tail.factor; }|vc2tonehostosc
 host-osc-word168|{ return voice(osc).word168(); }|{ return voice(1 - osc).word168(); }|vc2tonehostosc
 host-osc-position|{ return voice(osc).position(); }|{ return (uint32_t)voice(osc).word168(); }|vc2tonehostosc
-link-kind-call|{ outside().kindCall(routine); }|{ outside().kindCall(routine + 4); }|vc2tonehostosc
-link-kind-settings|outside().kindSettings(routine, from);|outside().kindSettings(routine, from + 1);|vc2tonehostosc
+link-object-call|{ outside().objectCall(routine); }|{ outside().objectCall(routine + 4); }|vc2tonehostosc
 link-render-by|return outside().renderBy(routine, out, third);|return outside().renderBy(routine, out, 0);|vc2tonehostosc
 link-seek|outside().seek(routine, at);|outside().seek(routine, at + 16);|vc2tonehostosc
 link-os-clock|{ return outside().osClock(); }|{ return outside().osClock() + 1; }|vc2tonehostosc
@@ -817,3 +816,5 @@ link-voice-own|return host_.hostOf(pool.indexOf(at)).oscs[osc].f32(in);|return h
 link-voice-osc|- kOscsAt[osc];|- kOscsAt[0];|vc2tonehostosc
 link-voice-end|<= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) {|<= 0xb0 - sizeof(float)) {|vc2tonehostosc
 link-voice-pool|pool.holds(at) && osc < kOscsAt.size()|false && osc < kOscsAt.size()|vc2tonehostosc
+# v330: link-object-call is back where link-kind-call stood (VariPhrase's players' set-ups go out on the object again);
+# link-kind-call and link-kind-settings went with the kind's routine and settings by address, VariPhrase's the last

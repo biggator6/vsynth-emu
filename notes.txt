@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's VariPhrase update, start and settings v330 (2026-11-22, on claude/vc2-part-4-3 after v329;
+  HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase update, start and settings"): step 4.3's fifty-eighth version, the first
+  piece of item 11's fifth part. Kind 2's update 0x893c88b0 (five words 0.7 of the way to their targets by FSUB and
+  FMAC), its players' start 0x893c8670 (the gain's and level's targets, the player's set-up by the wave's type, the band
+  seek to the block's seek point, a number in events and the point x 16 in samples) and its settings 0x893b0280 (the
+  new flags, the object's bits and their side effects, Vari off's bit kept) are the voice's own (Vc2OscVari.cpp), the
+  row's ways. They were the last of a kind's routines by address: kindCall, kindSettings and the rows' update and
+  settings words are gone, the kinds' settings a table of ways; the players' set-ups go out on the object again
+  (objectCall) until the players come. The checks no longer hook them and hook the set-ups instead; before an update or
+  note-on of VariPhrase, its words drawn finite again (a NaN's sign through FSUB is the host's, which the unoptimized
+  coverage build met); xt_vc2tone's COSM setter past 1 draws its block as COSM 1's. 0 different at seeds 2024, 7 and
+  31337. Not in the sound yet.
+
 The VC-2's mode 1 seek v329 (2026-11-22, on claude/vc2-part-4-3 after vc2-mode's 650bf26; HARDWARE_FIRMWARE.md, "The
   VC-2's mode 1 seek"): step 4.3's fifty-seventh version, the last piece of item 11's fourth part; LITE whole. Mode 1's
   seek 0x893cc830 is the voice's own (Vc2OscWalkStart.cpp, vc2OscSeekModeOne), with the find 0x893cc100: in samples the

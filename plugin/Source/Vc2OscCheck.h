@@ -21,8 +21,6 @@ inline constexpr int kOscRecords = 2;                    // of each kind
 inline constexpr uint32_t kOscRendersAt = 0x8C05c000;    // hooked render routines the tail's +0xa44, +0xa48 point at
 inline constexpr int kOscRenders = 2;
 inline constexpr uint32_t kOscRampAt = 0x8C05d000;       // the six words a ramp's start or legato update reads (v236)
-// [FW] the pitch ramp's value and factor in a voice (+0x90c + 0x3c, + 0x54), which a kind's call logs as it finds them
-inline constexpr uint32_t kOscRampValueAt = 0x948, kOscRampFactorAt = 0x960;
 inline constexpr uint32_t kOscPairsAt = 0x8C05e000;      // the records the block's +0xe0 points at (v238)
 inline constexpr uint32_t kOscPairWord = 0x2d0;          // [FW] the word VariPhrase's note-on reads of one
 inline constexpr uint32_t kOscBlockWords = Vc2OscVoice::kBlockBytes / 4, kOscOther = 0xff;
@@ -35,7 +33,8 @@ inline constexpr uint32_t kOscWaveAt = 0x8C0B0000;       // the wave Vari off's 
 inline constexpr uint32_t kOscWaveHalfwords = 16384;
 inline constexpr uint32_t kOscEventsAt = 0x8C0C8000;     // the events' table mode 1 walks (v327; v328 32 KB up)
 
-enum OscKind : int32_t { kKindCall, kKindSettings, kRenderBy, kSeek, kEventPosition, kOscKinds };
+// v330: a kind's routine and its settings by address went, the last VariPhrase's; a player's set-up came back
+enum OscKind : int32_t { kRenderBy, kSeek, kEventPosition, kObjectCall, kOscKinds };
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
 // routine's address, a settings word's offset in the settings' block or a word's in the voice, the output as 1, a
@@ -128,11 +127,6 @@ struct OscShared {
 class OscPortParts final : public Vc2OscParts {
 public:
     OscPortParts(int voice, OscShared& shared, Vc2OscVoice& self) : voice_(voice), s_(shared), self_(self) {}
-    void kindCall(uint32_t routine) override {   // with the pitch ramp's value and factor, as rom.4's hook logs them
-        const Vc2RampWords& pitch = self_.ramps[Vc2OscVoice::kPitchRamp].w;
-        log(kKindCall, routine, std::bit_cast<uint32_t>(pitch.value), std::bit_cast<uint32_t>(pitch.factor));
-    }
-    void kindSettings(uint32_t routine, const uint32_t* from) override { log(kKindSettings, routine, offsetOf(from)); }
     uint32_t renderBy(uint32_t routine, float* out, uint32_t third) override;
     void seek(uint32_t routine, int32_t at) override;
     int32_t osClock() override { return s_.draws.clock; }
@@ -146,12 +140,12 @@ public:
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
     uint32_t address() override { return oscVoiceAt(voice_); }
     int32_t eventPosition(uint32_t event) override;
+    void objectCall(uint32_t routine) override { log(kObjectCall, routine); }   // v330: VariPhrase's players' set-ups
 
 private:
     void log(OscKind kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
         s_.calls.push_back({ kind, voice_, a, b, c });
     }
-    uint32_t offsetOf(const uint32_t* p) const { return (uint32_t)(p - s_.settings.data()) * 4; }
     uint32_t outOf(const float* p) const { return p == s_.out.data() ? 1 : kOscOther; }
     int voice_;
     OscShared& s_;

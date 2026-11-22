@@ -31,7 +31,7 @@ constexpr uint32_t kLegato = 0x908, kGate = 0xb8;
 constexpr uint32_t kHeaderAt = 0x128, kLoopAt = 0x130, kPairAt = 0x134;   // [FW] the block's +0xd4, +0xdc, +0xe0
 // The calls counted over the run, by kind
 constexpr std::array<std::pair<OscKind, long OscCounts::*>, 3> kTallied { {
-    { kSeek, &OscCounts::seeks }, { kKindCall, &OscCounts::kindCalls }, { kEventPosition, &OscCounts::lookups } } };
+    { kSeek, &OscCounts::seeks }, { kEventPosition, &OscCounts::lookups }, { kObjectCall, &OscCounts::objectCalls } } };
 
 uint32_t drawKind(std::mt19937& rng) {   // 0…7, now and then past 7
     constexpr std::array<uint32_t, 4> kPast { 8, 9, 100, 0xffffffff };
@@ -210,8 +210,8 @@ int main(int argc, char** argv) {
     std::printf("kinds 5 and 6: %ld carriers started, %ld carrier blocks, %ld carrier settings, %ld kind 6 starts, %ld "
                 "kind 6 blocks; %ld of the blocks sounding, %ld not finite\n", n.carrierStarts, n.carrierBlocks,
                 n.carrierSettings, n.kind6Starts, n.kind6Blocks, n.voicedSounding, n.voicedNotFinite);
-    std::printf("calls: %ld seeks, %ld kinds' routines, %ld event lookups; %ld ramps gliding after an event\n",
-                n.seeks, n.kindCalls, n.lookups, n.gliding);
+    std::printf("calls: %ld seeks, %ld event lookups, %ld players' set-ups; %ld ramps gliding after an event; %ld "
+                "VariPhrase words drawn finite\n", n.seeks, n.lookups, n.objectCalls, n.gliding, n.variDrawn);   // v330
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
                 "heads', %ld through mode 1's\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks,
                 n.modeOneBlocks);   // v322, v323, v326, v327

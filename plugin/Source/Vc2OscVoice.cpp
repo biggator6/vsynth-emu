@@ -109,15 +109,15 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
         if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
-    switch (row.updates) {   // the port's (v248, v321, v322), or the kind's by its address
+    switch (row.updates) {   // the port's (v248, v321, v322, v324, v330), or none
         case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;
         case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;
         case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;
         case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;
-        case Vc2OscUpdate::lite: updateLite(parts, shared); return;   // v324
-        case Vc2OscUpdate::routine: break;
+        case Vc2OscUpdate::lite: updateLite(parts, shared); return;
+        case Vc2OscUpdate::vari: updateVari(parts, shared); return;
+        case Vc2OscUpdate::none: return;
     }
-    if (row.update != 0) parts.kindCall(row.update);
 }
 
 void Vc2OscVoice::reseek(Vc2OscParts& parts) {

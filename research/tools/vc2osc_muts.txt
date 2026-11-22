@@ -76,7 +76,7 @@ update-wait-ge|f32(kLevel) > vc2OscTables().waitLevel|f32(kLevel) >= vc2OscTable
 update-wait-no-return|vc2OscTables().waitLevel) return;|vc2OscTables().waitLevel) {}|vc2osc
 update-no-reseek|        reseek(parts);\n||vc2osc
 update-first-after|    if (row.extInFirst) updateExtIn(parts, shared);   // v322: 0x893c6260\n    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }|    for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {\n        if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);\n    }\n    if (row.extInFirst) updateExtIn(parts, shared);|vc2osc
-update-no-update|    if (row.update != 0) parts.kindCall(row.update);\n||vc2osc
+update-no-update|        case Vc2OscUpdate::vari: updateVari(parts, shared); return;|        case Vc2OscUpdate::vari: return;|vc2osc
 reseek-no-hold|setU8(kFlags, (uint8_t)(was \| kHeld));|setU8(kFlags, was);|vc2osc
 reseek-at-unsigned|(int32_t)u32(kSeekAt) >> kSeekShift|(int32_t)(u32(kSeekAt) >> kSeekShift)|vc2osc
 reseek-bit-inverted|const uint32_t routine = bit ? seek.set : seek.clear;|const uint32_t routine = bit ? seek.clear : seek.set;|vc2osc
@@ -152,7 +152,7 @@ settings-byte-unread|if (bytes[kSettingsByte] != u8(kByte)) {|if (true) {|vc2osc
 settings-vibrato-from|kVibratoFrom = 0x80|kVibratoFrom = 0x84|vc2oscget
 settings-no-vibrato|    vibrato.settings(rates);\n||vc2oscget
 settings-kind-from|kKindFrom = 0xb0|kKindFrom = 0xb4|vc2oscget
-settings-no-kind|    else if (row.settings != 0) parts.kindSettings(row.settings, s + kKindFrom / 4);\n||vc2oscget
+settings-no-kind|settingsOfLite, settingsOfVari };|settingsOfLite, settingsNone };|vc2oscget
 settings-carrier-bytes|kCarrierBytes = 88|kCarrierBytes = 84|vc2oscget
 settings-no-carrier-copy|    std::memcpy(own.data() + (kWave - kOwn), s + kKindFrom / 4, kCarrierBytes);\n||vc2oscget
 settings-no-carrier|    carrier.settings(&given);   // 0x893ec450, on the settings' words themselves\n||vc2oscget
@@ -198,20 +198,20 @@ k0-flag|{ .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },|
 k1-install|{ .installs = Install::lite,|{ .installs = Install::vari,|vc2osckinds
 k1-waits|.installs = Install::lite, .waits = true,|.installs = Install::lite,|vc2osckinds
 k1-ticks|.ticks = kR0 \| kR2, .updates = Vc2OscUpdate::lite|.ticks = kR0, .updates = Vc2OscUpdate::lite|vc2osckinds
-k1-update|.updates = Vc2OscUpdate::lite|.updates = Vc2OscUpdate::routine|vc2osckinds
+k1-update|.updates = Vc2OscUpdate::lite|.updates = Vc2OscUpdate::none|vc2osckinds
 k1-records|      .records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::lite|      .ramp = true, .settingsWay = Vc2OscSettings::lite|vc2osckinds
 k1-ramp|.records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::lite|.records = Records::fromBlock, .settingsWay = Vc2OscSettings::lite|vc2osckinds
-k1-settings|.settingsWay = Vc2OscSettings::lite|.settingsWay = Vc2OscSettings::routine|vc2osckinds
+k1-settings|.settingsWay = Vc2OscSettings::lite|.settingsWay = Vc2OscSettings::none|vc2osckinds
 k1-pitch|.settingsWay = Vc2OscSettings::lite, .pitch = Pitch::tuned|.settingsWay = Vc2OscSettings::lite, .pitch = Pitch::bounded|vc2osckinds
 k2-install|{ .installs = Install::vari,|{ .installs = Install::lite,|vc2osckinds
 k2-waits|.installs = Install::vari, .waits = true,|.installs = Install::vari,|vc2osckinds
 k2-ticks|.ticks = kR0 \| kR1 \| kR2|.ticks = kR0 \| kR2|vc2osckinds
-k2-update|.update = 0x893c88b0|.update = 0x893c8280|vc2osckinds
-k2-records|      .records = Records::fromBlock, .settings = 0x893b0280|      .settings = 0x893b0280|vc2osckinds
-k2-ramp|.records = Records::fromBlock, .settings = 0x893b0280,|.records = Records::fromBlock, .ramp = true, .settings = 0x893b0280,|vc2osckinds
-k2-pitch|.settings = 0x893b0280, .pitch = Pitch::tuned|.settings = 0x893b0280, .pitch = Pitch::bounded|vc2osckinds
+k2-update|kR0 \| kR1 \| kR2, .updates = Vc2OscUpdate::vari|kR0 \| kR1 \| kR2, .updates = Vc2OscUpdate::lite|vc2osckinds
+k2-records|      .records = Records::fromBlock, .settingsWay = Vc2OscSettings::vari|      .settingsWay = Vc2OscSettings::vari|vc2osckinds
+k2-ramp|.records = Records::fromBlock, .settingsWay = Vc2OscSettings::vari,|.records = Records::fromBlock, .ramp = true, .settingsWay = Vc2OscSettings::vari,|vc2osckinds
+k2-pitch|.settingsWay = Vc2OscSettings::vari, .pitch = Pitch::tuned|.settingsWay = Vc2OscSettings::vari, .pitch = Pitch::bounded|vc2osckinds
 k3-install|.installs = Install::analog, .ticks = kR0|.installs = Install::frame, .ticks = kR0|vc2osckinds
-k3-update|.updates = Vc2OscUpdate::analog, .ramp = true,|.updates = Vc2OscUpdate::routine, .ramp = true,|vc2osckinds
+k3-update|.updates = Vc2OscUpdate::analog, .ramp = true,|.updates = Vc2OscUpdate::none, .ramp = true,|vc2osckinds
 k3-ramp|.updates = Vc2OscUpdate::analog, .ramp = true,|.updates = Vc2OscUpdate::analog,|vc2osckinds
 k3-settings|.settingsWay = Vc2OscSettings::analog, .renders|.renders|vc2osckinds
 k3-renders|.renders = Render::byAnalog|.renders = Render::byRender|vc2osckinds
@@ -219,10 +219,10 @@ k3-pitch|.renders = Render::byAnalog, .pitch = Pitch::bounded|.renders = Render:
 k4-render|.render = 0x893c62e0|.render = 0x893c61e0|vc2osckinds
 k4-installed|.render = 0x893c62e0, .installed = 4|.render = 0x893c62e0, .installed = 5|vc2osckinds
 k4-ticks|.render = 0x893c62e0, .installed = 4, .ticks = kR0,|.render = 0x893c62e0, .installed = 4,|vc2osckinds
-k4-update|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::routine|vc2osckinds
+k4-update|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn|.render = 0x893c62e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::none|vc2osckinds
 k4-flag|.updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|.updates = Vc2OscUpdate::extIn,\n      .noteOn = NoteOn::extIn },\n    { .installed = 5|vc2osckinds
 k5-installed|{ .installed = 5|{ .installed = 6|vc2osckinds
-k5-update|.updates = Vc2OscUpdate::carrier|.updates = Vc2OscUpdate::routine|vc2osckinds
+k5-update|.updates = Vc2OscUpdate::carrier|.updates = Vc2OscUpdate::none|vc2osckinds
 k5-ramp|.updates = Vc2OscUpdate::carrier, .ramp = true,|.updates = Vc2OscUpdate::carrier,|vc2osckinds
 k5-carrier|.ramp = true, .carrier = true,|.ramp = true,|vc2osckinds
 k5-renders|.renders = Render::carrier|.renders = Render::kind6|vc2osckinds
@@ -230,13 +230,13 @@ k5-pitch|.renders = Render::carrier, .pitch = Pitch::bounded|.renders = Render::
 k6-installed|{ .installed = 6|{ .installed = 5|vc2osckinds
 k6-first|.extInFirst = true, ||vc2osckinds
 k6-ticks|.ticks = kR0 \| kR1, .updates = Vc2OscUpdate::kind6|.ticks = kR0, .updates = Vc2OscUpdate::kind6|vc2osckinds
-k6-update|.updates = Vc2OscUpdate::kind6|.updates = Vc2OscUpdate::routine|vc2osckinds
+k6-update|.updates = Vc2OscUpdate::kind6|.updates = Vc2OscUpdate::none|vc2osckinds
 k6-ramp|.updates = Vc2OscUpdate::kind6, .ramp = true,|.updates = Vc2OscUpdate::kind6,|vc2osckinds
 k6-renders|.renders = Render::kind6|.renders = Render::carrier|vc2osckinds
 k6-pitch|.renders = Render::kind6, .pitch = Pitch::bounded|.renders = Render::kind6, .pitch = Pitch::tuned|vc2osckinds
 k7-render|.render = 0x893c61e0|.render = 0x893c62e0|vc2osckinds
 k7-installed|.render = 0x893c61e0, .installed = 4|.render = 0x893c61e0, .installed = 6|vc2osckinds
-k7-update|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::routine|vc2osckinds
+k7-update|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::extIn|.render = 0x893c61e0, .installed = 4, .ticks = kR0, .updates = Vc2OscUpdate::none|vc2osckinds
 k7-flag|.updates = Vc2OscUpdate::extIn, .flagByWave = true,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|.updates = Vc2OscUpdate::extIn,\n      .noteOn = NoteOn::extIn },\n    { .clearsFlag|vc2osckinds
 beyond-flag|{ .clearsFlag = true, .records = Records::atZero }|{ .records = Records::atZero }|vc2osckinds
 beyond-renders|{ .clearsFlag = true, .records = Records::atZero }|{ .clearsFlag = true, .records = Records::atZero, .renders = Render::zero }|vc2osckinds
@@ -280,7 +280,7 @@ tables-formant|{ 0x893affe0, &t.formantLeast }|{ 0x893affd4, &t.formantLeast }|v
 k0-noteon|{ .clearsFlag = true, .renders = Render::zero, .noteOn = NoteOn::one },|{ .clearsFlag = true, .renders = Render::zero },|vc2osckinds
 k1-noteon|.noteOn = NoteOn::lite },|.noteOn = NoteOn::none },|vc2osckinds
 k1-noteon-vari|.noteOn = NoteOn::lite },|.noteOn = NoteOn::vari },|vc2osckinds
-k2-noteon|.pitch = Pitch::tuned, .noteOn = NoteOn::vari }|.pitch = Pitch::tuned, .noteOn = NoteOn::none }|vc2osckinds
+k2-noteon|.pitch = Pitch::tuned,\n      .noteOn = NoteOn::vari }|.pitch = Pitch::tuned,\n      .noteOn = NoteOn::none }|vc2osckinds
 k3-noteon|.noteOn = NoteOn::analog },|.noteOn = NoteOn::none },|vc2osckinds
 k4-noteon|      .noteOn = NoteOn::extIn },\n    { .installed = 5|      .noteOn = NoteOn::carrier },\n    { .installed = 5|vc2osckinds
 k5-noteon|.noteOn = NoteOn::carrier }|.noteOn = NoteOn::extIn }|vc2osckinds
@@ -565,10 +565,9 @@ formant-target|setF32(kFormant, Vc2OscTargets(*this, parts, shared).formant());|
 walk-target|setF32(kWalk, Vc2OscTargets(*this, parts, shared).walk());|setF32(kWalk, Vc2OscTargets(*this, parts, shared).walkTarget());|vc2oscplayers
 level-copy|setU32(kLevel, u32(kLevelFrom));|setU32(kLevel, u32(kLevelFrom + 4));|vc2oscplayers
 zero-kept|    setF32(kZero, 0.0f);\n||vc2oscplayers
-update-call|    parts.kindCall(kUpdate);\n||vc2oscplayers
-after-update|    parts.kindCall(kAfterUpdate);\n||vc2oscplayers
-calls-order|    parts.kindCall(kUpdate);\n    parts.kindCall(kAfterUpdate);|    parts.kindCall(kAfterUpdate);\n    parts.kindCall(kUpdate);|vc2oscplayers
-after-update-routine|kAfterUpdate = 0x893c8670,|kAfterUpdate = 0x893c88b0,|vc2oscplayers
+update-call|    updateVari(parts, shared);   // v330: 0x893c88b0 and 0x893c8670, the voice's own (Vc2OscVari.cpp)\n||vc2oscplayers
+after-update|    startVari(parts, shared);\n||vc2oscplayers
+calls-order|    updateVari(parts, shared);   // v330: 0x893c88b0 and 0x893c8670, the voice's own (Vc2OscVari.cpp)\n    startVari(parts, shared);|    startVari(parts, shared);\n    updateVari(parts, shared);|vc2oscplayers
 type-minus|const uint32_t type = u32(kWave) - 1;|const uint32_t type = u32(kWave);|vc2oscplayers
 varioff-ignored| \|\| (u8(kFlagsByte) & kVariOff) == 0) return;|) return;|vc2oscplayers
 by-samples-swap|if (inSamples) bySamples(*this, parts, shared);|if (!inSamples) bySamples(*this, parts, shared);|vc2oscplayers
@@ -1018,7 +1017,6 @@ upd-settings-copied|0x20, 0x30, 0x38, 0x3c, 0x40 }|0x20, 0x34, 0x38, 0x3c, 0x40 
 upd-settings-at|setU32(kCode + at, from[at / 4]);|setU32(kCode + at, from[at / 4 + 1]);|vc2oscanalogupdate
 upd-way-update|case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;|case Vc2OscUpdate::analog: break;|vc2osc
 upd-way-install|        case Vc2OscInstall::analog: installAnalog(); return;   // v248\n||vc2osc
-upd-way-settings|if (row.settingsWay == Vc2OscSettings::analog) settingsAnalog(s + kKindFrom / 4);   // v248\n    else if (row.settings|if (row.settings|vc2oscget
 upd-pool-fat-move|0x893c2e74, 0x893c2e78, 0x893c2e7c,|0x893c2e74, 0x893c2e74, 0x893c2e7c,|vc2osctables
 upd-pool-floor|0x893c2e7c, 0x893c2e80, 0x893c2e84|0x893c2e7c, 0x893c2e7c, 0x893c2e84|vc2osctables
 upd-pool-pw|0x893c2e84, 0x893c2e88, 0x893c3068|0x893c2e88, 0x893c2e88, 0x893c3068|vc2osctables
@@ -1393,7 +1391,7 @@ side-fwd-mode|v.setU32(kFwdMode, w.fwdMode);|v.setU32(kFwdMode, w.bwdMode);|vc2o
 side-both|    vc2OscSetVariOffSide(v, w, true);\n||vc2oscplayers
 lite-update-filter-pool-at|{ 0x893c84a0, &t.liteUpdateFilter }|{ 0x893c84a4, &t.liteUpdateFilter }|vc2osctables
 lite-settings-two32-pool-at|{ 0x893c8650, &t.liteSettingsTwo32 }|{ 0x893c8654, &t.liteSettingsTwo32 }|vc2osctables
-get-lite-way|settingsLite(s + kKindFrom / 4, parts);|settingsLite(s + kKindFrom / 4 + 1, parts);|vc2oscget
+get-lite-way|{ v.settingsLite(from, p); }|{ v.settingsLite(from + 1, p); }|vc2oscget
 voice-update-lite|case Vc2OscUpdate::lite: updateLite(parts, shared); return;|case Vc2OscUpdate::lite: return;|vc2osc
 # v325: the players' beat on the voice and its own seeks (vc2oscbeat), XtBeat's start and reset it runs (vc2xtbeat),
 # the two seeks' laws (vc2oscplayers, vc2osclite), the heads' seek's pool word (vc2osctables) and the re-seek's way
@@ -1758,3 +1756,59 @@ seek-own-mode-one-at|{ 0x893cc830, vc2OscSeekModeOne }|{ 0x893cc834, vc2OscSeekM
 seek-own-vari-shift|vc2OscSeekVariOff(v, at >> kSampleShift);|vc2OscSeekVariOff(v, at);|vc2oscbeat
 seek-own-heads-shift|vc2OscSeekHeads(v, at >> kSampleShift);|vc2OscSeekHeads(v, at);|vc2oscbeat
 walk-seek-at|v.seekBy(kModeOneSeek, at, p);|v.seekBy(kModeOneSeek, at + 16, p);|vc2oscwalk
+# v330: VariPhrase's update, its players' start and its settings (vc2oscvari), the step's pool word (vc2osctables), the
+# kind's settings' table (vc2oscget, settings-no-kind), the row's ways (vc2osckinds).  Not planted, as nothing could show
+# them: in samples, the seek point compared by its low half alone, and by events by the whole word (the check's points
+# differ, or are equal, whole); the steps' order (no target reads a word the update steps; vr-order went missed)
+vr-pitch-target|{ 0x1cc, &Vc2OscTargets::tunedRatio, 0 }|{ 0x1cc, &Vc2OscTargets::formant, 0 }|vc2oscvari
+vr-pitch-at|{ 0x1cc, &Vc2OscTargets::tunedRatio, 0 }|{ 0x1c8, &Vc2OscTargets::tunedRatio, 0 }|vc2oscvari
+vr-formant-target|{ 0x1d0, &Vc2OscTargets::formant, 0 }|{ 0x1d0, &Vc2OscTargets::formantTarget, 0 }|vc2oscvari
+vr-level-from|{ 0x1d4, nullptr, 0x6c }|{ 0x1d4, nullptr, 0x68 }|vc2oscvari
+vr-level-target|{ 0x1d4, nullptr, 0x6c }|{ 0x1d4, &Vc2OscTargets::level, 0x6c }|vc2oscvari
+vr-walk-target|{ 0x1d8, &Vc2OscTargets::walk, 0 }|{ 0x1d8, &Vc2OscTargets::walkTarget, 0 }|vc2oscvari
+vr-gain-target|{ 0x1dc, &Vc2OscTargets::gain, 0 }|{ 0x1dc, &Vc2OscTargets::level, 0 }|vc2oscvari
+vr-step-way|xtf::add(xtf::mul(xtf::sub(to, was), step), was)|xtf::add(xtf::mul(xtf::sub(was, to), step), was)|vc2oscvari
+vr-step-sum|xtf::add(xtf::mul(xtf::sub(to, was), step), was)|xtf::add(xtf::mul(xtf::sub(to, was), step), to)|vc2oscvari
+vr-step-whole|setF32(at, xtf::add(xtf::mul(xtf::sub(to, was), step), was));|setF32(at, xtf::add(xtf::sub(to, was), was));|vc2oscvari
+vr-step-word|{ 0x893c8960, &t.variStep }|{ 0x893c8964, &t.variStep }|vc2osctables
+st-no-targets|    Vc2OscTargets(*this, parts, shared).writeInto(*this, kStartTargets);\n||vc2oscvari
+st-gain|{ 0x1dc, &Vc2OscTargets::gain },|{ 0x1d8, &Vc2OscTargets::gain },|vc2oscvari
+st-level|{ 0x1e0, &Vc2OscTargets::level } }|{ 0x1e0, &Vc2OscTargets::gain } }|vc2oscvari
+st-type|const uint32_t type = u32(kWave) - 1;|const uint32_t type = u32(kWave);|vc2oscvari
+st-solo-setup|{ 0x893cc2e0, 0x893cc630 }|{ 0x893cc2e4, 0x893cc630 }|vc2oscvari
+st-solo-seek|{ 0x893cc2e0, 0x893cc630 }|{ 0x893cc2e0, 0x893cd440 }|vc2oscvari
+st-backing-setup|{ 0x893cd1d0, 0x893cd440 }|{ 0x893cc8f0, 0x893cd440 }|vc2oscvari
+st-backing-seek|{ 0x893cd1d0, 0x893cd440 }|{ 0x893cd1d0, 0x893cc630 }|vc2oscvari
+st-ensemble-setup|{ 0x893cc8f0, 0x893cd440 }|{ 0x893cd1d0, 0x893cd440 }|vc2oscvari
+st-ensemble-seek|{ 0x893cc8f0, 0x893cd440 }|{ 0x893cc8f0, 0 }|vc2oscvari
+st-six-setup|{ 0x893cc310, 0x893cc630 }|{ 0x893cc2e0, 0x893cc630 }|vc2oscvari
+st-six-seek|{ 0x893cc310, 0x893cc630 }|{ 0x893cc310, 0 }|vc2oscvari
+st-eight-setup|{ 0x893ccff0, 0x893cd090 }|{ 0, 0x893cd090 }|vc2oscvari
+st-eight-seek|{ 0x893ccff0, 0x893cd090 }|{ 0x893ccff0, 0x893cd440 }|vc2oscvari
+st-two-none|{ 0x893cc2e0, 0x893cc630 }, { 0, 0 },|{ 0x893cc2e0, 0x893cc630 }, { 0x893cc2e0, 0x893cc630 },|vc2oscvari
+st-no-setup|    if (player.setUp != 0) parts.objectCall(player.setUp);\n||vc2oscvari
+st-samples-bit|kInSamples = 0x80;|kInSamples = 0x40;|vc2oscvari
+st-samples-way|const bool inSamples = (u8(kFlags) & kInSamples) != 0;|const bool inSamples = (u8(kFlags) & kInSamples) == 0;|vc2oscvari
+st-not-moved|if (!moved \|\| player.seek == 0) return;|if (player.seek == 0) return;|vc2oscvari
+st-from|kFrom = 0x13c, kSeekTo = 0x144;|kFrom = 0x140, kSeekTo = 0x144;|vc2oscvari
+st-seek-to|kFrom = 0x13c, kSeekTo = 0x144;|kFrom = 0x13c, kSeekTo = 0x140;|vc2oscvari
+st-shift|kSampleShift = 4;|kSampleShift = 3;|vc2oscvari
+st-seek-half|: (int32_t)u16(kSeekTo), parts);|: (int32_t)u32(kSeekTo), parts);|vc2oscvari
+se-asks-bit|kAsksSeek = 0x80,|kAsksSeek = 0x40,|vc2oscvari
+se-asks-byte|(given[1] & kAsksSeek) != 0|(given[0] & kAsksSeek) != 0|vc2oscvari
+se-held|(was & kHolds) != 0 && (given[0] & kHolds) == 0|(was & kHolds) != 0 && (given[1] & kHolds) == 0|vc2oscvari
+se-held-not|&& (given[0] & kHolds) == 0) {|) {|vc2oscvari
+se-pending|        tail.seekPending = 1;\n||vc2oscvari
+se-gain|        setF32(kGainTarget, 0.0f);\n||vc2oscvari
+se-gain-at|kGainTarget = 0x1dc;|kGainTarget = 0x1e0;|vc2oscvari
+se-flags-from|kFlagsFrom = 0x34,|kFlagsFrom = 0x30,|vc2oscvari
+se-flag-bytes|kFlagBytes = 3,|kFlagBytes = 2,|vc2oscvari
+se-count|if ((was & kCounts) == 0 && (u8(kFlags) & kCounts) != 0) setU8(kCount, 0);|if ((u8(kFlags) & kCounts) != 0) setU8(kCount, 0);|vc2oscvari
+se-count-at|kCount = 0x19c,|kCount = 0x19e,|vc2oscvari
+se-counts-bit|kCounts = 0x02,|kCounts = 0x01,|vc2oscvari
+se-matched|setU8(kMatched, 1);|setU8(kMatched, 0);|vc2oscvari
+se-matched-test|if ((was & kHolds) == 0 && (u8(kFlags) & kHolds) != 0)|if ((u8(kFlags) & kHolds) != 0)|vc2oscvari
+se-vari-kept|(uint8_t)((u8(kFlags) & ~kVariOff) \| (was & kVariOff))|u8(kFlags)|vc2oscvari
+se-vari-bit|kVariOff = 0x20;|kVariOff = 0x10;|vc2oscvari
+se-bytes|    for (uint32_t k = 1; k < kFlagBytes; ++k) setU8(kObject + k, u8(kFlags + k));\n||vc2oscvari
+k2-settings|.settingsWay = Vc2OscSettings::vari,|.settingsWay = Vc2OscSettings::none,|vc2osckinds

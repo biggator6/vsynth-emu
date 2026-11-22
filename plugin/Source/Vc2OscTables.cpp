@@ -29,7 +29,7 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893c6420, &t.variOffScale }, { 0x893c6764, &t.variOffFold }, { 0x893c6424, &t.variOffGlide },
         { 0x893c6428, &t.variOffFade }, { 0x893c84a0, &t.liteUpdateFilter }, { 0x893c8650, &t.liteSettingsTwo32 },
         { 0x893c6e60, &t.headsSeekHalf }, { 0x893ca150, &t.modeOneFraction }, { 0x893ca154, &t.modeOneScale },
-        { 0x893cc8c0, &t.modeOneSetUpWord }, { 0x893ccfd4, &t.modeOneTenths },
+        { 0x893cc8c0, &t.modeOneSetUpWord }, { 0x893ccfd4, &t.modeOneTenths }, { 0x893c8960, &t.variStep },
     });
 }
 // [FW] each word where its routine reads it; an address of 0 is a word the routine doesn't read, left 0

@@ -60,6 +60,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscWalkEvents.cpp
     Source/Vc2OscWalkStart.cpp
     Source/Vc2OscModeOneStart.cpp
+    Source/Vc2OscVari.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp

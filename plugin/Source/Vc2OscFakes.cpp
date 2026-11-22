@@ -11,7 +11,6 @@
 namespace {
 constexpr uint32_t kOsClock = 0x893018d0;   // [FW] the OS's millisecond word, which a carrier's init reads (v266)
 
-uint32_t settingsOffset(uint32_t at) { return at - kOscSettingsAt; }
 uint32_t outOf(uint32_t at) { return at == kOscOutAt ? 1 : kOscOther; }
 uint8_t byteAt(Sh4& cpu, uint32_t at) {
     uint8_t b = 0;
@@ -20,23 +19,7 @@ uint8_t byteAt(Sh4& cpu, uint32_t at) {
 }
 
 // How a hooked routine's arguments read into its call, one shape each; each gives the address of the voice the call is
-// on (its object's less the object's offset)
-uint32_t self(Sh4& c, OscCall&, uint32_t) { return c.r[4]; }
-uint32_t routine(Sh4& c, OscCall& t, uint32_t at) {
-    t.a = at;
-    return self(c, t, at);
-}
-// A kind's routine, and the pitch ramp's value and factor as it finds them (v236: its update reads them through the
-// targets, so the ramps' ticks before or after it show)
-uint32_t kindRoutine(Sh4& c, OscCall& t, uint32_t at) {
-    t.b = c.rd32(c.r[4] + kOscRampValueAt);
-    t.c = c.rd32(c.r[4] + kOscRampFactorAt);
-    return routine(c, t, at);
-}
-uint32_t routineSettings(Sh4& c, OscCall& t, uint32_t at) {
-    t.b = settingsOffset(c.r[5]);
-    return routine(c, t, at);
-}
+// on (its object's less the object's offset; v330: a kind's routine on the voice itself went with the last of them)
 uint32_t renderBy(Sh4& c, OscCall& t, uint32_t at) {   // (out, the object, third)
     t.a = at;
     t.b = outOf(c.r[4]);
@@ -94,13 +77,14 @@ struct OscHook {
 // settings and render and kind 6's start and render (v266), the vibrato's four (v267), kinds 5's and 6's updates
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
-// renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole: rom.4's own run, and
-// the routines they call hooked
+// renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
+// update, players' start and settings (v330): rom.4's own run, and the routines they call hooked
 const OscHook kHooks[] = {
-    { 0x893c88b0, kKindCall, kindRoutine, none },
-    { 0x893c8670, kKindCall, kindRoutine, none },   // v328: mode 1's set-up 0x893cc760 rom.4's own
     { 0x893cc0d0, kEventPosition, eventAt, positions, fromVariNoteOn },
-    { 0x893b0280, kKindSettings, routineSettings, none },
+    // v330: VariPhrase's players' set-ups its start runs on the object, by the wave's type
+    { 0x893cc2e0, kObjectCall, objectRoutine, none }, { 0x893cd1d0, kObjectCall, objectRoutine, none },
+    { 0x893cc8f0, kObjectCall, objectRoutine, none }, { 0x893cc310, kObjectCall, objectRoutine, none },
+    { 0x893ccff0, kObjectCall, objectRoutine, none },
     // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's, BACKING's, ENSEMBLE's, the
     // period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327)
     { 0x893c9450, kRenderBy, renderBy, rendered },

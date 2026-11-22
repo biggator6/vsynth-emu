@@ -1546,6 +1546,84 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's VariPhrase update, start and settings (2026-11-22, v330) {#vc2-osc-vari-update}
+
+Step 4.3's fifty-eighth version, the first piece of item 11's fifth part. Kind 2's (VariPhrase's) update `0x893c88b0`,
+its players' start `0x893c8670` and its settings `0x893b0280` are the voice's own (`Vc2OscVari.cpp`), ways of kind 2's
+row. They were the last of a kind's routines the voice reached by address, so `Vc2OscParts::kindCall` and
+`kindSettings` and the rows' `update` and `settings` words are gone, and the ways' `routine` is now `none`. The kinds'
+settings are a table of ways (Vc2OscVoiceGet.cpp).
+
+**The update.** It steps five of the voice's words 0.7 of the way to their targets (the pool word `0x893c8960`), each by
+FSUB and FMAC (the product, then the sum), in this order:
+- the pitch (+0x1cc) toward the tuned ratio (`0x893afd10`);
+- the formant (+0x1d0) toward its target (`0x893afeb0`);
+- the level (+0x1d4) toward the block's +0x18 (the voice's +0x6c), with no target routine;
+- the walk (+0x1d8) toward `0x893afdf0`;
+- the gain (+0x1dc) toward `0x893aff30`.
+These are the words a legato's take keeps (v230). VariPhrase's note-on runs the update, then the start.
+
+**The start** (the routine after the update in the note-on, `0x893af420`):
+- the gain's (`0x893aff30`) and the level's (`0x893aff60`) targets into +0x1dc and +0x1e0;
+- by the wave's type, its player's set-up on the object: `0x893cc2e0` for type 1, BACKING's note-on `0x893cd1d0` for
+  3, ENSEMBLE's `0x893cc8f0` for 5, `0x893cc310` for 6, the period-jump player's `0x893ccff0` for 8, none for 2, 4
+  and 7 (the switch at `0x893c86b0`);
+- when the block's seek point (+0x144) isn't its range's start (+0x13c), whole words in samples or half words in
+  events, the band seek by type: `0x893cc630` for 1 and 6, `0x893cd440` for 3 and 5, `0x893cd090` for 8 (the switches
+  at `0x893c8764` and `0x893c8800`). In samples the seek is given the point × 16, in events its number.
+The set-ups go out by address on the object (`Vc2OscParts::objectCall`, which v328 removed with its last caller, back
+until the players come); the seeks by the voice's `seekBy`, the band players' out by address.
+
+**The settings** (given the settings' +0xb0, whose +0x34…+0x36 are the new block's flags):
+- with the second flag's 0x80, the object's 0x04 held and the new first flag's 0x04 clear: a seek pending (+0xa8c) and
+  the gain's target 0;
+- the three flags into the voice's +0x138…+0x13a;
+- with the object's 0x02 clear and the new flags' set: the count's byte (+0x19c) 0; with its 0x04 clear and theirs:
+  the matched count's byte (+0x19d) 1;
+- the object's bytes 0…2 the flags, but byte 0's 0x20 (Vari off) kept as it was.
+All under the OS's interrupt mask from the flags on, which the port doesn't need (as the re-seek's).
+
+**Found.**
+- by events the start gives a band seek the seek point's number, in samples the point × 16: the units right, where
+  LITE's note-on (v329) shifts its word for every type.
+- the object's Vari off (byte 0's 0x20) keeps through the settings, which only a note-on sets, though the settings
+  copy the new flags' 0x20 into the block's +0x138, which VariPhrase's install reads to choose Vari off's render.
+
+**The checks.** The update's, the start's and the settings' hooks are gone from both checks: rom.4's own run. The
+players' set-ups are hooked as a player's routine on the object (`kObjectCall`), logging the routine and the voice.
+The kinds' routine and settings by address are gone from the hooks and the calls' kinds, with the decoders only they
+used. The draws:
+- before an update, a whole note-on and the kinds' note-on of a VariPhrase voice or block, the five words the update
+  steps and the level's target are drawn again moderate when not finite (`oscSteerVariWords`, Vc2OscDraws.cpp, from the
+  renders' generator). The step takes each from its target by FSUB, whose NaN's sign is the host's (`xtf::sub`): the
+  first coverage build, unoptimized, at 400 cases differed by a NaN's sign at +0x1dc where the optimized one didn't. A
+  case's noise gives the NaNs, and a target's product an infinity, which the next step makes a NaN.
+- in xt_vc2tone the same before a note-on of a VariPhrase block and an update of a VariPhrase voice (`toneSteerOscs`,
+  v329's `toneSteerSeeks` with it).
+- in xt_vc2tone, a COSM setter given a number past 1 (which reaches no COSM, its block COSM 1's) now draws that block as
+  for COSM 1 itself, its type COSM 1's three times in four. Its plant (`methods-cosm-bound`, the bound left off) had
+  been caught by one event's chance, and v330's draws moved it: the first whole `--tone` run missed it.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc logs 173, 1809 and 1765 players'
+  set-ups and draws 168, 1939 and 2045 words again finite; xt_vc2tone 516, 5253 and 5538 set-ups, 215, 2284 and 2572
+  words.
+- at 400 cases in xt_vc2osc, `Vc2OscVari.cpp` and `Vc2OscVoiceGet.cpp` are wholly reached, every line and branch, and
+  the unoptimized coverage build is 0 different too.
+- `mutate_vc2.py --osc`: 52 new plants on the update, the start, the settings, the step's pool word and the row, all
+  caught, and the tone's `link-object-call`. 18 older plants follow the text v330 changed (the rows' ways, the update's
+  switch, the settings' table, the note-on's two calls), caught. Gone with what they planted: `after-update-routine`,
+  `upd-way-settings`, `link-kind-call`, `link-kind-settings`. Dropped as nothing could show it: `vr-order`, the steps'
+  order, as no target reads a word the update steps. Not planted, for the same reason: in samples the seek point
+  compared by its low half alone, and in events by the whole word (the check's points differ, or are equal, whole).
+- the whole `--osc` (1,720) and `--tone` (758) lists caught, the latter after the COSM setter's draw above;
+  `mutate_panel.py rom4-no-osc` caught. No rom.2 port changed, so `mutate_tone.py --changed` plants nothing.
+- The first verify.sh run failed only on the build id: another session's build (its v453) installed the AU and VST3
+  two seconds before the run ended. Run again, it passed.
+
+**Next.** VariPhrase's event lookup `0x893cc0d0` for its note-on, its seeks `0x893cc630`, `0x893cd090`, `0x893cd440`;
+then its players' set-ups and renders (BACKING, ENSEMBLE, SOLO, the period-jump player).
+
 ### The VC-2's mode 1 seek (2026-11-22, v329) {#vc2-osc-mode-one-seek}
 
 Step 4.3's fifty-seventh version, the last piece of item 11's fourth part. Mode 1's seek `0x893cc830` is the voice's
@@ -1599,7 +1677,7 @@ already rom.4's own. The draws:
   note-on of a LITE type 1 block, the kinds' note-on, the re-seek, and an update with a seek pending. With the hook
   gone, the first run faulted there: the kinds' note-on reached the seek on a voice whose object's words were noise.
 - in xt_vc2tone, before a note-on, the tone's OSC voices whose block is LITE's of type 1 (LITE's note-on seeks on the
-  tone's own voice, before any take); before an update, its mode 1 voices with a seek pending (`toneSteerSeeks`).
+  tone's own voice, before any take); before an update, its mode 1 voices with a seek pending (`toneSteerSeeks`, from v330 `toneSteerOscs`).
   Its LITE blocks give the seek a word with the range in samples alone (their +0x14c is drawn as noise), so the
   by-events path is xt_vc2osc's.
 - in xt_vc2tone, before an update, one VariPhrase voice in four is given a seek pending and its level 0, so it

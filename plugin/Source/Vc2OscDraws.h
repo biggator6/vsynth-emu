@@ -59,6 +59,10 @@ void oscAnalogObject(Vc2OscVoice& o, std::mt19937& rng);
 bool oscIsVoiced(uint32_t kind);
 void oscDrawVoicedVoice(Vc2OscVoice& o, std::mt19937& rng);
 void oscDrawVoicedWords(std::span<uint32_t> words, std::mt19937& rng, uint32_t below);
+// v330: before VariPhrase's update or note-on, the five words its update steps (+0x1cc…+0x1dc) and the level's target
+// (+0x6c) drawn again moderate when not finite, as a note leaves them: the step takes each from its target by FSUB,
+// whose NaN's sign is the host's (xtf::sub; a case's noise had one); how many were drawn
+long oscSteerVariWords(Vc2OscVoice& o, std::mt19937& rng);
 
 // The vibrato's block as the converter could write it (v267; waves 0 and 1 alone: past them rom.4 reads what lies after
 // its table): alone, into a note-on's or the settings' words, or onto a voice's; and its fade's rates held to 1 over

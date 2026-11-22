@@ -76,6 +76,7 @@ struct Vc2OscTables {
     // its set-up's (v328): the object's +0x88, the loops' rates' tenths of a cent
     float modeOneSetUpWord = 0;     // 0x893cc8c0: 1/64
     float modeOneTenths = 0;        // 0x893ccfd4: 12000
+    float variStep = 0;             // 0x893c8960 (v330): VariPhrase's update's step to its targets, 0.7
     Vc2OscAnalogPool analog;       // the analog note-on's (v242, Vc2OscAnalogPool.h)
     Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };
