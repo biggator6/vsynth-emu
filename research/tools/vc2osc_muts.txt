@@ -1424,11 +1424,11 @@ beat-start-no-set|    b.start(b.tempo, b.orig, (int32_t)u32(kPosition16));\n    
 beat-trip-bit|kTripBit = 0x04|kTripBit = 0x02|vc2oscbeat
 beat-reset-not|b.reset((u8(kObject) & kTripBit) != 0);|b.reset((u8(kObject) & kTripBit) == 0);|vc2oscbeat
 beat-reset-no-set|    b.reset((u8(kObject) & kTripBit) != 0);\n    setBeat(*this, b);|    b.reset((u8(kObject) & kTripBit) != 0);|vc2oscbeat
-seek-own-vari-at|{ 0x893c6360, vc2OscSeekVariOff }|{ 0x893c6364, vc2OscSeekVariOff }|vc2oscbeat
-seek-own-heads-at|{ 0x893c6de0, vc2OscSeekHeads }|{ 0x893c6de4, vc2OscSeekHeads }|vc2oscbeat
-seek-own-swapped|{ 0x893c6360, vc2OscSeekVariOff }|{ 0x893c6360, vc2OscSeekHeads }|vc2oscbeat
+seek-own-vari-at|{ 0x893c6360, variOffSeek }|{ 0x893c6364, variOffSeek }|vc2oscbeat
+seek-own-heads-at|{ 0x893c6de0, headsSeek }|{ 0x893c6de4, headsSeek }|vc2oscbeat
+seek-own-swapped|{ 0x893c6360, variOffSeek }|{ 0x893c6360, headsSeek }|vc2oscbeat
 seek-sample-shift|kSampleShift = 4|kSampleShift = 3|vc2oscbeat
-seek-no-reset|    own->seek(*this, at >> kSampleShift);\n    beatReset();|    own->seek(*this, at >> kSampleShift);|vc2oscbeat
+seek-no-reset|    own->seek(*this, parts, at);\n    beatReset();|    own->seek(*this, parts, at);|vc2oscbeat
 seek-out-at|        parts.seek(routine, at);|        parts.seek(routine, at + 16);|vc2oscbeat
 xtbeat-start-pos|beatPos = (int32_t)((uint32_t)pos16 << 5);|beatPos = (int32_t)((uint32_t)pos16 << 4);|vc2xtbeat
 xtbeat-start-budget|    budget = (int32_t)((uint32_t)step << 1);\n    clk = trip = 0;|    budget = (int32_t)((uint32_t)step << 2);\n    clk = trip = 0;|vc2xtbeat
@@ -1562,7 +1562,7 @@ walk-retreat-first|    if (n <= 0) {|    if (n < 0) {|vc2oscwalk
 walk-retreat-ended|w.setByte(kEnded, kBefore);|w.setByte(kEnded, 0);|vc2oscwalk
 walk-retreat-next|    load(w);\n    readNext(w);\n}|    load(w);\n}|vc2oscwalk
 walk-negate|if (!way.keepsSign) w.setWord(kStep, vc2WalkPlus(0, -w.word(kStep)));|if (!way.keepsSign) w.setWord(kStep, w.word(kStep));|vc2oscwalk
-walk-keeps|vc2walk::modeOneCached, false, modeOneSeekOut,|vc2walk::modeOneCached, true, modeOneSeekOut,|vc2oscwalk
+walk-keeps|vc2walk::modeOneCached, false, modeOneSeek,|vc2walk::modeOneCached, true, modeOneSeek,|vc2oscwalk
 walk-cached-bytes|kCachedBytes = 0xb4,|kCachedBytes = 0xb0,|vc2oscwalk
 walk-cached-mode|kCachedMode = 2,|kCachedMode = 0,|vc2oscwalk
 walk-cached-pos|kCachedPos = 4;|kCachedPos = 8;|vc2oscwalk
@@ -1727,3 +1727,34 @@ hd-tab-set-word|{ 0x893cc8c0, &t.modeOneSetUpWord }|{ 0x893cc8c4, &t.modeOneSetU
 hd-tab-tenths|{ 0x893ccfd4, &t.modeOneTenths }|{ 0x893ccfd0, &t.modeOneTenths }|vc2osctables
 hd-seek-to|constexpr uint32_t kModeOneSeek = 0x893cc830;|constexpr uint32_t kModeOneSeek = 0x893cc834;|vc2oscwalk
 hd-start-jump|                                   vc2walk::modeOneJump };|                                   [](Vc2OscVoice&, Vc2OscParts&) {} };|vc2oscwalk
+# v329: mode 1's seek and the find (vc2oscwalkstart), its row in the voice's seeks (vc2oscbeat) and the start's seek
+# through it (vc2oscwalk).  Not planted, as nothing could show it: the find's numbers compared signed (the current and
+# the last event are below 0x8000 wherever the find runs: the seek holds the event's number before its jump, and the
+# start sets the last from the table's count)
+fd-start|if (lookup(w, eventNumber(w, kIndex)).pos >= at) {|if (lookup(w, eventNumber(w, kIndex) + 1).pos >= at) {|vc2oscwalkstart
+fd-back-test|if (lookup(w, eventNumber(w, kIndex)).pos >= at) {|if (lookup(w, eventNumber(w, kIndex)).pos > at) {|vc2oscwalkstart
+fd-back-stop|at < lookup(w, n).pos && n > 0;|at <= lookup(w, n).pos && n > 0;|vc2oscwalkstart
+fd-back-floor|at < lookup(w, n).pos && n > 0;|at < lookup(w, n).pos && n > 1;|vc2oscwalkstart
+fd-back-step|            w.setHalf(kIndex, n - 1);\n        }|            w.setHalf(kIndex, n - 2);\n        }|vc2oscwalkstart
+fd-fwd-last|if (n >= eventNumber(w, kLast)) {|if (n > eventNumber(w, kLast)) {|vc2oscwalkstart
+fd-fwd-at-last|            w.setHalf(kIndex, n - 1);\n            return;|            w.setHalf(kIndex, n);\n            return;|vc2oscwalkstart
+fd-fwd-test|if (lookup(w, (uint16_t)(n + 1)).pos >= at) {|if (lookup(w, (uint16_t)(n + 1)).pos > at) {|vc2oscwalkstart
+fd-fwd-back|            w.setHalf(kIndex, n);\n            return;|            w.setHalf(kIndex, n + 1);\n            return;|vc2oscwalkstart
+sk-samples|    if ((w.byte(kFlags) & kInSamples) != 0) {\n        const int32_t held|    if ((w.byte(kFlags) & kInSamples) == 0) {\n        const int32_t held|vc2oscwalkstart
+sk-hold-zero|std::min(std::max(at, 0), w.word(kFinal))|std::min(at, w.word(kFinal))|vc2oscwalkstart
+sk-hold-final|std::min(std::max(at, 0), w.word(kFinal))|std::max(at, 0)|vc2oscwalkstart
+sk-no-find|        find(w, held);\n||vc2oscwalkstart
+sk-pos|        w.setWord(kPos, held);\n||vc2oscwalkstart
+sk-samples-jump|        kVc2ModeOneWalk.startJump(v, p);\n        w.setWord(kPos, held);|        w.setWord(kPos, held);|vc2oscwalkstart
+sk-event-index|        w.setHalf(kIndex, at);\n||vc2oscwalkstart
+sk-event-hold|        if (!(eventNumber(w, kLast) >= (uint16_t)at)) w.setHalf(kIndex, w.half(kLast));\n||vc2oscwalkstart
+sk-event-signed|if (!(eventNumber(w, kLast) >= (uint16_t)at))|if (!(w.half(kLast) >= (int16_t)at))|vc2oscwalkstart
+sk-event-to|w.setHalf(kIndex, w.half(kLast));|w.setHalf(kIndex, w.half(kLast) - 1);|vc2oscwalkstart
+sk-event-jump|w.setHalf(kIndex, w.half(kLast));\n        kVc2ModeOneWalk.startJump(v, p);|w.setHalf(kIndex, w.half(kLast));|vc2oscwalkstart
+sk-beat-shift|kBeatPos = 0x64, kBeatShift = 5;|kBeatPos = 0x64, kBeatShift = 4;|vc2oscwalkstart
+sk-beat-at|kBeatPos = 0x64, kBeatShift = 5;|kBeatPos = 0x60, kBeatShift = 5;|vc2oscwalkstart
+sk-no-beat|    w.setWord(kBeatPos, (int32_t)((uint32_t)w.word(kPos) << kBeatShift));\n||vc2oscwalkstart
+seek-own-mode-one-at|{ 0x893cc830, vc2OscSeekModeOne }|{ 0x893cc834, vc2OscSeekModeOne }|vc2oscbeat
+seek-own-vari-shift|vc2OscSeekVariOff(v, at >> kSampleShift);|vc2OscSeekVariOff(v, at);|vc2oscbeat
+seek-own-heads-shift|vc2OscSeekHeads(v, at >> kSampleShift);|vc2OscSeekHeads(v, at);|vc2oscbeat
+walk-seek-at|v.seekBy(kModeOneSeek, at, p);|v.seekBy(kModeOneSeek, at + 16, p);|vc2oscwalk

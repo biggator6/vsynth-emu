@@ -172,6 +172,7 @@ struct RecordWord {
     uint32_t at, word;
 };
 constexpr uint32_t kHeadAt = 0x1a0, kHeadOf = 0x108, kLite = 1, kModeOneType = 1;
+constexpr uint32_t kTypeWord = (Vc2OscVoice::kWave - Vc2OscVoice::kOwn) / 4;   // a note-on's block's
 std::array<RecordWord, 5> modeOneRecords(std::mt19937& rng) {
     const int k = (int)(rng() % kOscRecords);
     return { { { 0x108, kOscEventsAt }, { 0x10c, kOscWaveAt }, { 0x128, oscHeaderAt(k) }, { 0x130, oscLoopAt(k) },
@@ -213,10 +214,19 @@ void oscSteerModeOneSetUp(Vc2OscVoice& o, OscShared& shared, uint32_t voiceAt) {
     o.setF32(Vc2OscVoice::kObject + ModeOne::kWalk, (rng() % 2 ? 1.0f : -1.0f) * oscWithin(rng, 0.1f, 3.0f));
 }
 
+bool oscIsModeOne(const Vc2OscVoice& o) { return o.kind() == kLite && o.u32(Vc2OscVoice::kWave) == kModeOneType; }
+
+bool oscBlockIsModeOne(const uint32_t* block) { return block[0] == kLite && block[kTypeWord] == kModeOneType; }
+
 void oscModeOneBlock(uint32_t* block, std::mt19937& rng) {
-    constexpr uint32_t kTypeWord = (Vc2OscVoice::kWave - Vc2OscVoice::kOwn) / 4;
-    if (block[0] != kLite || block[kTypeWord] != kModeOneType) return;
+    if (!oscBlockIsModeOne(block)) return;
     for (const auto& [at, word] : modeOneRecords(rng)) block[(at - Vc2OscVoice::kOwn) / 4] = word;
+}
+
+long oscSteerModeOneSeek(Vc2OscVoice& o, OscShared& shared, bool seeks) {
+    if (!seeks) return 0;
+    oscDrawModeOneWords(o, shared.renders, shared.records, kOscWaveAt);
+    return 1;
 }
 
 void oscDrawModeOneWords(Vc2OscVoice& o, std::mt19937& rng, const OscRecords& r, uint32_t waveAt) {

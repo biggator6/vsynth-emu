@@ -1546,6 +1546,87 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's mode 1 seek (2026-11-22, v329) {#vc2-osc-mode-one-seek}
+
+Step 4.3's fifty-seventh version, the last piece of item 11's fourth part. Mode 1's seek `0x893cc830` is the voice's
+own (`vc2OscSeekModeOne`, `Vc2OscWalkStart.cpp`), with the find `0x893cc100` it runs, which SOLO's walk shares. Three
+callers reach it: LITE's note-on of a type 1 wave, the re-seek, and the walk's start with the range in samples. With
+it LITE is whole: no routine of kind 1's goes out.
+
+**The seek.** It is given the object (r4) and a word (r5):
+- with the range in samples (byte 0's 0x80): the word held to 0…the last event's position (+0x20), signed; the find
+  for it; the jump `0x893ca160` (the wrapper of mode 1's jump `0x893ca190`, v327's); then the position (+0x38) the held
+  word, over the event's position the jump wrote.
+- else: the current event (+0xc) the word's low half, held to the last (+0xe), compared unsigned; the jump.
+- then the beat's position (+0x64) the position × 32, and the beat's reset `0x893cbfe0` (v325's).
+
+**The find.** It moves the current event by the positions the lookup `0x893cc0d0` gives (v328's), the numbers
+compared unsigned:
+- the current event's position above the word: back an event at a time while the position is above it, down to
+  event 0;
+- equal: where it is;
+- below: forward while the next event's is below, ending one before the first that isn't. At the last event it ends
+  at the one before it.
+
+**The voice's seeks.** v325's table by address gains mode 1's row. Each row is now given the word as the voice's
+callers give it: Vari off's and the heads' shift it down to a sample, as both begin; mode 1's takes it whole. Its row's
+`seekTo` (the start's) goes through the table too, so the start's seek ends in the beat's reset as rom.4's does.
+
+**Found.**
+- LITE's note-on seeks on the object as the voice's last set-up left it (its table, last event and positions). It
+  runs before the install pass the tone's note-on ends with, which sets the new wave up, and that set-up writes again
+  every word the seek wrote: the walk's by its start, the beat's by its start (XtBeat's start writes all its reset
+  does). So in a note-on only the seek's reads are left, through whatever table the object last named.
+- by events the seek takes its word as an event's number, and the two callers but the start give it a position: LITE's
+  note-on the block's seek point (+0x158) × 16 with no test of the range's kind (`0x893c8230…`), the re-seek the beat's
+  position over 32. Its low half, held to the last, lands on the last event of a wave of a few events. The note-on's is
+  undone by its set-up; the re-seek's, which a LITE settings asks with Time Trip on, stands. Kept as rom.4 has it.
+- from the words a start leaves, the find never reaches its stop at the last event. The seek holds its word to the
+  last event's position, which the start takes from the same lookup, so the next event's position is at least the word
+  by the time the walk gets there.
+
+**The checks.** The seek's hook is gone from both checks: rom.4's own runs. Its find, jump and beat's reset were
+already rom.4's own. The draws:
+- in xt_vc2osc, the mode 1 part plays 16 runs more a case after v328's, each from a seek on both sides (the voice
+  compared after it). The seek's word is drawn by a way from eight (`seekWord`). With the range in samples: about an
+  event's position half the time, on one a quarter, and below 0 or past the last event's an eighth each (the hold's two
+  ends). By events: a number up to two past the last, one time in eight 0x8000 up (the hold is unsigned), one in four
+  with high bits besides, which the seek drops. One time in four the last event's position is raised past the table's,
+  which reaches the find's stop at the last event (where the first plant run missed both its plants). Only past an
+  event 0: from it the stop leaves the event −1, whose entry the jump then reads far past the table.
+- before an event that can reach the seek on a mode 1 voice, its words are drawn about the case's table
+  (`oscSteerModeOneSeek`, `Vc2OscWalkDraws.cpp`, by v327's `oscDrawModeOneWords`, from the renders' generator): a
+  note-on of a LITE type 1 block, the kinds' note-on, the re-seek, and an update with a seek pending. With the hook
+  gone, the first run faulted there: the kinds' note-on reached the seek on a voice whose object's words were noise.
+- in xt_vc2tone, before a note-on, the tone's OSC voices whose block is LITE's of type 1 (LITE's note-on seeks on the
+  tone's own voice, before any take); before an update, its mode 1 voices with a seek pending (`toneSteerSeeks`).
+  Its LITE blocks give the seek a word with the range in samples alone (their +0x14c is drawn as noise), so the
+  by-events path is xt_vc2osc's.
+- in xt_vc2tone, before an update, one VariPhrase voice in four is given a seek pending and its level 0, so it
+  re-seeks. Its band players' seeks are now the only ones that go out by address, through the tone's link's seek.
+  Nothing else there set one, as VariPhrase's settings are still hooked. Mode 1's seeks had been the link's seek's only
+  reach, and the first whole `--tone` run missed its plant (`link-seek`).
+- the tests of LITE's kind and type 1 one routine each, a voice's and a note-on block's (`oscIsModeOne`,
+  `oscBlockIsModeOne`), which v328's install event and `toneOscModeOne` now call.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc's mode 1 part seeks 640, 6400 and
+  6400 times (306, 3245 and 3219 of them in samples), and its voice part steers 60, 532 and 537 events for the seek.
+  xt_vc2tone steers 124, 1183 and 1108 OSCs for it, and asks 52, 644 and 618 VariPhrase re-seeks, of which 40, 461
+  and 428 go out by a band player's seek.
+- at 400 cases in xt_vc2osc, `Vc2OscWalkStart.cpp` and `Vc2OscBeat.cpp` are wholly reached, every line and branch.
+- `mutate_vc2.py --osc`: 27 new plants on the seek, the find, the row and the start's seek through the table, all
+  caught. Six older plants follow the text or place v329 changed (the seeks' rows, the sample's shift now in two of
+  them, the call before the reset, mode 1's row's seek), caught, as are the four whose catch the hook gave before (the re-seek's and LITE's note-on's routine, the
+  note-on's seek's word, the start's seek's address). The whole `--osc` (1,670) and `--tone` (759) lists caught, the
+  latter after VariPhrase's re-seeks above (`link-seek` first). Not planted, as nothing could show it: the find's numbers
+  compared signed. The current and the last event are below 0x8000 wherever the find runs: the seek holds the event's
+  number before its jump, and the start sets the last from the table's count.
+- No rom.2 port changed, so `mutate_tone.py --changed` plants nothing.
+
+**Next.** VariPhrase: its update `0x893c88b0` and the routine after it `0x893c8670`, its settings `0x893b0280`, the
+event lookup `0x893cc0d0` for its note-on, its seeks `0x893cc630`, `0x893cd090`, `0x893cd440`; then its renders.
+
 ### The VC-2's mode 1 set-up (2026-11-21, v328) {#vc2-osc-mode-one-set-up}
 
 Step 4.3's fifty-sixth version, the fourth piece of item 11's fourth part's second half. Mode 1's set-up `0x893cc760`,

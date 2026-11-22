@@ -151,6 +151,12 @@ void oscDrawModeOneWords(Vc2OscVoice& o, std::mt19937& rng, const OscRecords& r,
 // renders' generator.  And a note-on's block of a LITE wave of type 1 given those record words (xt_vc2tone's)
 void oscSteerModeOneSetUp(Vc2OscVoice& o, OscShared& shared, uint32_t voiceAt);
 void oscModeOneBlock(uint32_t* block, std::mt19937& rng);
+// v329 (Vc2OscWalkDraws.cpp): whether a voice, or a note-on's block, is LITE's of type 1, mode 1's; and before an event
+// that `seeks` through mode 1's seek (0x893cc830), which walks the events from the object's current one, mode 1's
+// words drawn by oscDrawModeOneWords about the case's table, from the renders' generator: 1 if drawn
+bool oscIsModeOne(const Vc2OscVoice& o);
+bool oscBlockIsModeOne(const uint32_t* block);
+long oscSteerModeOneSeek(Vc2OscVoice& o, OscShared& shared, bool seeks);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
 void oscDrawWave(Vc2Fw& fw, OscShared& shared);
 // v327 (Vc2OscWalkDraws.cpp), at the wave's draw: a case's events' table at kOscEventsAt, 4…12 events of a stride of

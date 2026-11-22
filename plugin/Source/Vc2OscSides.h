@@ -17,6 +17,7 @@ struct OscCounts {
     long headsBlocks = 0;                           // v326: and through LITE's heads'
     long modeOneBlocks = 0;                         // v327: and through kind 1's mode 1's
     long modeOneSetUps = 0, setUpsInSamples = 0;    // v328: its set-ups, and those with the range in samples
+    long modeOneSeeks = 0;                           // v329: the events steered for its seek
     long liteUpdates = 0, liteSettings = 0;         // v324: LITE's update and settings on a type with a way
 };
 
@@ -77,6 +78,9 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v);
 void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same
 void oscWriteVoice(OscSides& s, int v);
+// v329 (Vc2OscEvents.cpp): before an event that `seeks` through mode 1's seek, voice `v`'s mode 1 words drawn
+// (oscSteerModeOneSeek), counted, and the voice written
+void oscSteerSeek(OscSides& s, int v, bool seeks);
 // v327 (Vc2OscModeOneCheck.cpp): the mode 1 part, after the hooks' install and before the voice part
 void oscModeOnePart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
 // v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them

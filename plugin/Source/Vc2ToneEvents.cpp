@@ -95,6 +95,7 @@ std::string toneUpdateOn(ToneSides& s, std::mt19937& rng) {
     s.n.updates += tone.head.state == Vc2Tone::kSounding;
     toneCountReleaseTicks(s, i);
     toneHoldOscVibratos(s, i, (int32_t)n);   // v319
+    toneSteerSeeks(s, i, false);             // v329: a seek pending re-seeks once the level has fallen
     std::string what =
         toneOn(s, i, kUpdateAt, { s.pool.addressOf(i), n }, [&] { tone.update((int32_t)n, partsOf(s, i)); });
     s.n.ends += tone.head.state == Vc2Tone::kEnded;

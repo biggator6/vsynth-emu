@@ -150,17 +150,30 @@ std::string toneDifference(ToneSides& s, int only) {
     return what.empty() ? toneOscCallsDifference(s) : what;
 }
 
-bool toneOscModeOne(ToneSides& s, int i, int osc) {
-    constexpr uint32_t kLite = 1, kModeOne = 1;   // [FW]
-    const Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
-    return v.kind() == kLite && v.u32(Vc2OscVoice::kWave) == kModeOne;
-}
+bool toneOscModeOne(ToneSides& s, int i, int osc) { return oscIsModeOne(s.parts[(size_t)i].oscs[(size_t)osc]); }
 
 void toneSteerModeOne(ToneSides& s, int i, int osc) {
     Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
     const uint32_t at = toneOscAt(s.pool.addressOf(i), osc);
     oscSteerModeOneSetUp(v, s.shared.osc, at);
     s.fw.cpu.write(at, &v, sizeof v);
+}
+
+void toneSteerSeeks(ToneSides& s, int i, bool noteOn) {
+    constexpr uint32_t kVariPhrase = 2, kLevelAt = 0x1e0;   // [FW] the kind; the object's level, the re-seek's wait
+    for (int osc = 0; osc < 2; ++osc) {
+        Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
+        const bool seeks = noteOn ? oscBlockIsModeOne(&s.shared.input.at(In::kOscs[(size_t)osc]))
+                                  : oscIsModeOne(v) && v.tail.seekPending != 0;
+        const bool band = !noteOn && v.kind() == kVariPhrase && s.shared.osc.renders() % 4 == 0;
+        if (band) {
+            v.tail.seekPending = 1;
+            v.setF32(kLevelAt, 0.0f);
+            ++s.n.bandReseeks;
+        }
+        s.n.modeOneSeeks += oscSteerModeOneSeek(v, s.shared.osc, seeks);
+        if (seeks || band) s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
+    }
 }
 
 namespace {
@@ -212,6 +225,7 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     // v328: a LITE wave of type 1 (the legato's kinds too) the records its set-up reads, from the renders' generator
     for (uint32_t block : In::kOscs) oscModeOneBlock(&s.shared.input.at(block), s.shared.osc.renders);
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
+    toneSteerSeeks(s, i, true);   // v329
     drawListedWords(s, i, rng);
 }
 #endif

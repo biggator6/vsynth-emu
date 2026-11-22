@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's mode 1 seek v329 (2026-11-22, on claude/vc2-part-4-3 after vc2-mode's 650bf26; HARDWARE_FIRMWARE.md, "The
+  VC-2's mode 1 seek"): step 4.3's fifty-seventh version, the last piece of item 11's fourth part; LITE whole. Mode 1's
+  seek 0x893cc830 is the voice's own (Vc2OscWalkStart.cpp, vc2OscSeekModeOne), with the find 0x893cc100: in samples the
+  word held to 0…the last event's position, the event found, mode 1's jump, the position; by events the number's low
+  half held to the last, the jump; then the beat's position × 32 and its reset. A row of the voice's seeks, each row now
+  given the word as its callers give it; the start's seek through the table. Found: LITE's note-on seeks on the object
+  its last set-up left, and the install pass's set-up writes it all again; by events the seek takes a position as an
+  event's number (the note-on's seek point × 16, the re-seek's beat position over 32); from a start's words the find
+  never reaches its stop at the last event. The checks no longer hook it: xt_vc2osc's mode 1 part plays 16 runs from a
+  seek (the last event's position raised one time in four), and both checks steer a mode 1 voice's words before a
+  note-on, a re-seek or an update that can reach it; xt_vc2tone asks a VariPhrase voice's re-seek now and then, its band
+  seeks the only ones left going out by address. 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's mode 1 set-up v328 (2026-11-21, on claude/vc2-part-4-3 after v327; HARDWARE_FIRMWARE.md, "The VC-2's mode
   1 set-up"): step 4.3's fifty-sixth version, the fourth piece of item 11's fourth part's second half. Mode 1's set-up
   0x893cc760 is the voice's own (Vc2OscModeOneStart.cpp): the table, samples and +0xe0 record from the head's words,

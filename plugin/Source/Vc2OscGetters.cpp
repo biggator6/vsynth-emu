@@ -177,6 +177,7 @@ std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int v) {
     if (pick == 1) s.voices[(size_t)v].setU32(Vc2OscVoice::kKind, kAnalog);
     steerLite(s, rng, v);
     oscSteerAnalog(s, rng, v);
+    oscSteerSeek(s, v, oscIsModeOne(s.voices[(size_t)v]));   // v329: LITE's note-on of a type 1 wave seeks
     ++s.n.noteOns;
     return oscBothSides(s, kKindNoteOn, { oscVoiceAt(v), (uint32_t)rng() }, OscAnswer::none, [&] {
         s.voices[(size_t)v].kindNoteOn(s.parts[(size_t)v], s.romShared);

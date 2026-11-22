@@ -226,14 +226,15 @@ void modeOneCached(Vc2OscVoice& v, Vc2OscParts& p, uint32_t cached) {
 } // namespace vc2walk
 
 namespace {
-// [FW] the start's seek for index 0, 0x893cc830, still rom.4's (v328), through the parts
-void modeOneSeekOut(Vc2OscVoice&, Vc2OscParts& p, int32_t at) {
+// [FW] the start's seek for index 0, 0x893cc830, from v329 the voice's own (vc2OscSeekModeOne, Vc2OscWalkStart.cpp)
+// with the beat's reset it ends in, by the voice's seeks' table
+void modeOneSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
     constexpr uint32_t kModeOneSeek = 0x893cc830;
-    p.seek(kModeOneSeek, at);
+    v.seekBy(kModeOneSeek, at, p);
 }
 } // namespace
 
-const Vc2WalkWay kVc2ModeOneWalk { vc2walk::modeOneJump, vc2walk::modeOneCached, false, modeOneSeekOut,
+const Vc2WalkWay kVc2ModeOneWalk { vc2walk::modeOneJump, vc2walk::modeOneCached, false, modeOneSeek,
                                    vc2walk::modeOneJump };
 
 // [FW] 0x893c9380: the next crossing (+0x2c): from the next event (forward) or the current (back); bouncing, nearer

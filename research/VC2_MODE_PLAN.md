@@ -1009,6 +1009,16 @@ version against rom.4's routines with what it calls hooked:
          wave; both read through it now, the link answering a pool tone's voice's words from its host
          (HARDWARE_FIRMWARE.md, "The VC-2's mode 1 set-up"). Next: mode 1's seek `0x893cc830` with the find
          `0x893cc100`.
+       - Mode 1's seek (v329): `0x893cc830` the voice's own with the find `0x893cc100` (`Vc2OscWalkStart.cpp`), a row of
+         the voice's seeks, each row now given the word as its callers give it. With the range in samples: the
+         position held to 0…the last event's, the event found for it, mode 1's jump, the position. By events: the
+         number's low half held to the last, the jump. Then the beat's position the position × 32 and the beat's reset
+         (HARDWARE_FIRMWARE.md, "The VC-2's mode 1 seek"). Found: LITE's note-on of a type 1 wave seeks on the object
+         as the voice's last set-up left it, before this note's install pass sets the new wave up; that set-up writes
+         again every word the seek wrote. By events the seek takes a position as an event's number (the note-on's seek
+         point × 16, the re-seek's beat position over 32), its low half held to the last; the re-seek's stands. And
+         from the words a start leaves, the find never reaches its stop at the last event. With it LITE is whole.
+         Next: VariPhrase's update, settings, lookup and seeks.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

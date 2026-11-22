@@ -94,7 +94,8 @@ struct OscHook {
 // settings and render and kind 6's start and render (v266), the vibrato's four (v267), kinds 5's and 6's updates
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
-// renders (v326) and kind 1's mode 1's (v327): rom.4's own run, and the routines they call hooked
+// renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole: rom.4's own run, and
+// the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893c88b0, kKindCall, kindRoutine, none },
     { 0x893c8670, kKindCall, kindRoutine, none },   // v328: mode 1's set-up 0x893cc760 rom.4's own
@@ -118,8 +119,9 @@ const OscHook kHooks[] = {
     { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
     { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
-    { 0x893cc830, kSeek, seek, seekFlags }, { 0x893cc630, kSeek, seek, seekFlags },
-    { 0x893cd090, kSeek, seek, seekFlags }, { 0x893cd440, kSeek, seek, seekFlags },
+    // the band players' seeks (v329: mode 1's, 0x893cc830, the voice's own)
+    { 0x893cc630, kSeek, seek, seekFlags }, { 0x893cd090, kSeek, seek, seekFlags },
+    { 0x893cd440, kSeek, seek, seekFlags },
 };
 
 } // namespace

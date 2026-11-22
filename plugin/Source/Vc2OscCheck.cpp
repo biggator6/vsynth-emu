@@ -215,7 +215,8 @@ int main(int argc, char** argv) {
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
                 "heads', %ld through mode 1's\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks,
                 n.modeOneBlocks);   // v322, v323, v326, v327
-    std::printf("mode 1's set-ups: %ld (%ld with the range in samples)\n", n.modeOneSetUps, n.setUpsInSamples);
+    std::printf("mode 1's set-ups: %ld (%ld with the range in samples); %ld events steered for its seek\n",
+                n.modeOneSetUps, n.setUpsInSamples, n.modeOneSeeks);   // v328, v329
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;

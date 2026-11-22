@@ -38,9 +38,8 @@ std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
     }
     if (pick == 3) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);   // a kind-3 voice found: its words so (a settings' copy leaves noise at +0x138)
-    constexpr uint32_t kLite = 1, kModeOne = 1;   // [FW] v328: LITE's install sets mode 1 up, the voice's own
-    Vc2OscVoice& o = s.voices[(size_t)v];
-    if (o.kind() == kLite && o.u32(Vc2OscVoice::kWave) == kModeOne) {
+    Vc2OscVoice& o = s.voices[(size_t)v];   // v328: LITE's install sets mode 1 up, the voice's own
+    if (oscIsModeOne(o)) {
         constexpr uint8_t kInSamples = 0x80;   // [FW] byte 0's
         oscSteerModeOneSetUp(o, s.shared, oscVoiceAt(v));
         oscWriteVoice(s, v);
@@ -75,7 +74,8 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     else oscSteerAnalog(s, rng, v);
     n = steerFactor(s.voices[(size_t)v], rng, n);
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
-    oscWriteVoice(s, v);
+    const Vc2OscVoice& seeking = s.voices[(size_t)v];   // v329: a seek pending re-seeks once the level has fallen
+    oscSteerSeek(s, v, oscIsModeOne(seeking) && seeking.tail.seekPending != 0);
     ++s.n.updates;
     constexpr uint32_t kLite = 1, kLiteTypes = 3;   // [FW] v324: LITE's kind and the wave types its update has ways for
     const Vc2OscVoice& o = s.voices[(size_t)v];
@@ -87,6 +87,7 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
 }
 
 std::string onReseek(OscSides& s, std::mt19937&, int v) {
+    oscSteerSeek(s, v, oscIsModeOne(s.voices[(size_t)v]));   // v329: by mode 1's seek, with the bit or without
     return oscBothSides(s, kReseek, { oscVoiceAt(v) }, Answer::none, [&] {
         s.voices[(size_t)v].reseek(s.parts[(size_t)v]);
         return 0u;
@@ -111,6 +112,7 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
         oscAnalogObject(s.voices[(size_t)v], rng);
         oscWriteVoice(s, v);
     }
+    oscSteerSeek(s, v, oscBlockIsModeOne(block.data()));   // v329: LITE's note-on seeks on the object as it finds it
     const uint32_t legato = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 2;
     s.fw.cpu.write(kOscBlockAt, block.data(), sizeof block);
     ++s.n.noteOns;
@@ -224,4 +226,9 @@ const OscEvent kEvents[] = { onConstruct, onInstall, onUpdate, onUpdate, onResee
 } // namespace
 
 std::span<const OscEvent> oscEvents() { return kEvents; }
+
+void oscSteerSeek(OscSides& s, int v, bool seeks) {
+    s.n.modeOneSeeks += oscSteerModeOneSeek(s.voices[(size_t)v], s.shared, seeks);
+    oscWriteVoice(s, v);
+}
 #endif
