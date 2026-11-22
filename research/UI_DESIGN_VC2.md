@@ -1,13 +1,14 @@
-# The VC-2 mode's pages: a draft (2026-11-22) {#vc2-pages}
+# The VC-2 mode's pages (2026-11-22) {#vc2-pages}
 
-A draft for the user to decide, not a decision: nothing here is built, and no editor code comes with it. Building the
-pages is step 4.5's second half (VC2_MODE_PLAN.md, step 5), once step 4.3's `Vc2Synth` is whole. The open choices are
-the d-n questions at the end ("The questions", {#vc2-questions}), each with a recommendation.
+The design of the VC-2 mode's pages, decided: the user took every recommendation of the d-n questions at the end ("The
+questions", {#vc2-questions}), 2026-11-22: "take the recommendations from VC-2 mode's pages". Nothing here is built yet,
+and no editor code came with it. Building the pages is step 4.5's second half (VC2_MODE_PLAN.md, step 5), once step
+4.3's `Vc2Synth` is whole.
 
 It is a file beside UI_DESIGN.md, not a section of it, for two reasons: it is longer than UI_DESIGN.md itself (a table of
-IDs for every card of six pages), and it is a draft. Once the user has answered, what is decided goes into UI_DESIGN.md's
-own sections as the pages are built, as D's design did (UI_DESIGN.md, "The steps", step 0), and this file goes.
-UI_DESIGN.md's "The VC-2 mode's pages" points here until then.
+IDs for every card of six pages), and it was written as a draft for the user's answers, which the questions keep. As the
+pages are built, what it says goes into UI_DESIGN.md's own sections, as D's design did (UI_DESIGN.md, "The steps", step
+0), and this file goes. UI_DESIGN.md's "The VC-2 mode's pages" points here until then.
 
 The mock-up is `UI_DESIGN_VC2.html` beside it: four of the pages drawn at 1200 × 750 in D's palette (SYNTH on zone 2,
 VOCODER with the mic silent, MODULATION, PLAY), a tab for each. FX and ZONES are D's own pages with rom.4's IDs and are
@@ -255,7 +256,7 @@ column's two, EXTIN's 5, VOCODER's 14), the envelopes' 130, the LFOs' 35 and eac
 
 None is left for a later page. As on D, a few have a second control on their own page (the faces' shared Pitch, Level,
 Coarse and Fine; Vel Sens on a panel and its envelope's tab; ANALOG's PW Env and Fat Env on the tab too); none is on
-two pages. 36 are shown dimmed if d-6 goes that way: the Growl's five on both COSMs of both zones (20), Harm Formant's
+two pages. 36 are shown dimmed (d-6): the Growl's five on both COSMs of both zones (20), Harm Formant's
 LFO and Envelope Depths (8), Wave start offset (4) and the second Wave Number (4).
 
 ## 4. The fit {#vc2-fit}
@@ -304,7 +305,7 @@ bar (d-3's other answer). And AMP's five names beside their knobs, 69 wide each.
   order of the V-Synth's types, whose COSM Type parameter is the plugin's choice list. A value past the faces shows
   none, with a line saying so.
 - **The control's kind.** The VC-2's parameters are integers to a host (v451: the set fixed with or without rom.4), so
-  D's rule (a choice a box, a switch a switch) can't tell them apart. The draft takes the kind from rom.4's value text
+  D's rule (a choice a box, a switch a switch) can't tell them apart. The kind comes from rom.4's value text
   (d-8): a value text of two names, OFF and ON or BYPASS and ON, a switch; other names a box; a range a knob, or a bar
   on an envelope. Without rom.4 every one is a stand-in, so a knob.
 
@@ -344,46 +345,47 @@ whole. "Mode off" in the sense of the V-Synth mode chosen needs no line: the VC-
   (d-9), in the editor's text, not in the parameters'.
 - The view of `Vc2Synth`'s state for the mic's checks and the bands.
 - `VSynthEmuEditorTest`: it stops holding the VC-2's parameters apart (UI_DESIGN.md, "Not shown anywhere"); in VC-2
-  mode every page and block at three sizes, every parameter reached (none left, but the dimmed ones if d-6 says
-  host-only), each zone's, COSM's and OSC's controls moving their own parameters alone, after a change of zone too,
+  mode every page and block at three sizes, every parameter reached (none left, the 36 dimmed ones too, d-6), each
+  zone's, COSM's and OSC's controls moving their own parameters alone, after a change of zone too,
   and the mic's checks each failing on its own cause. `mutate_panel.py --editor` gets the VC-2's plants.
 
 ## The questions {#vc2-questions}
 
-Each with its recommendation first.
+All fourteen decided as recommended, the user's words (2026-11-22): "take the recommendations from VC-2 mode's pages".
+Each question is kept as it was put, its recommendation first and the alternatives weighed after it.
 
-- **d-1, the pages.** Recommended: six in VC-2 mode, SYNTH, VOCODER, MODULATION, FX, PLAY, ZONES, the editor opening on
+- **d-1, the pages.** Decided as recommended (2026-11-22). Recommended: six in VC-2 mode, SYNTH, VOCODER, MODULATION, FX, PLAY, ZONES, the editor opening on
   SYNTH as for the V-Synth. Or five, with MODULATION's Matrix and assigns on PLAY (the VC-2 has no Multi Step Modulator,
   so MODULATION is light), or VOCODER first, opening there.
-- **d-2, HIRESO and LEGACY.** Recommended: one VOCODER page for both, the controls the chosen engine doesn't read dimmed
+- **d-2, HIRESO and LEGACY.** Decided as recommended (2026-11-22). Recommended: one VOCODER page for both, the controls the chosen engine doesn't read dimmed
   with a word naming the engine that does. Or every control live whatever the Type, or a tab for each engine.
-- **d-3, the zone choice.** Recommended: Z1 and Z2 chips at the path's left end, in the zones' colours, bound to
+- **d-3, the zone choice.** Decided as recommended (2026-11-22). Recommended: Z1 and Z2 chips at the path's left end, in the zones' colours, bound to
   Current Zone (0x140), so the zone is the patch's. Or the editor's own choice kept in the session, Current Zone a box
   on PLAY; or the chips in the page bar.
-- **d-4, the system's settings.** Recommended: each where what it does is: Master Level and Output Gain on FX's System
+- **d-4, the system's settings.** Decided as recommended (2026-11-22). Recommended: each where what it does is: Master Level and Output Gain on FX's System
   card, Clock Source on PLAY, External In Type on the mic's card, the assigns on MODULATION. Or all 18 on one SYSTEM
   card, on FX's System page, as the V-Synth's FX page holds Master, Output Gain and External In Type together.
-- **d-5, the patch EQ.** Recommended: on FX's System page, where the V-Synth's EQ is, as the effect chip runs it. Or on
+- **d-5, the patch EQ.** Decided as recommended (2026-11-22). Recommended: on FX's System page, where the V-Synth's EQ is, as the effect chip runs it. Or on
   the VOCODER page, beside the block it follows in the patch.
-- **d-6, the parameters nothing reads.** Recommended: shown in DETAILS, dimmed, with a line saying rom.4 holds them and
+- **d-6, the parameters nothing reads.** Decided as recommended (2026-11-22). Recommended: shown in DETAILS, dimmed, with a line saying rom.4 holds them and
   nothing found reads them (the Growl's five, Harm Formant's LFO and Envelope Depths, Wave start offset, and the second
   Wave Number until its reader is known): 36 in all. Or host-only, as the V-Synth's 17 are.
-- **d-7, Scale Tune.** Recommended: a card on PLAY, twelve upright bars and the switch on its title line. Or host-only,
+- **d-7, Scale Tune.** Decided as recommended (2026-11-22). Recommended: a card on PLAY, twelve upright bars and the switch on its title line. Or host-only,
   as the V-Synth's 13 are.
-- **d-8, a control's kind.** Recommended: from rom.4's value text (OFF/ON or BYPASS/ON a switch, other names a box, a
+- **d-8, a control's kind.** Decided as recommended (2026-11-22). Recommended: from rom.4's value text (OFF/ON or BYPASS/ON a switch, other names a box, a
   range a knob). Or a kind written in each table row.
-- **d-9, the values rom.4 can't write.** Recommended: on their strings' own scale, as the seven reverb values were put
+- **d-9, the values rom.4 can't write.** Decided as recommended (2026-11-22). Recommended: on their strings' own scale, as the seven reverb values were put
   on the manual's: COSM Type by the manual's names with GROWL in COMB's place, Structure 1…3, Split Point as a note,
   the patch EQ in Hz, Q and dB, Beam Type OFF and 1…4, Wave Number by the VC-2's library's names, Harm Formant Style
   bare. Or bare, as rom.4's routine gives them.
-- **d-10, the pad.** Recommended: Pad Mode and Pad Hold in the Time Trip column, the pad sending the pair Pad Mode names.
+- **d-10, the pad.** Decided as recommended (2026-11-22). Recommended: Pad Mode and Pad Hold in the Time Trip column, the pad sending the pair Pad Mode names.
   Or the pad always sending Time Trip Assign X and Y, as on the V-Synth, with Pad Mode a box on MODULATION.
-- **d-11, ZONES.** Recommended: sixteen cells, as on the V-Synth, zones 3 to 16 the patch's data. Or two cells, the
+- **d-11, ZONES.** Decided as recommended (2026-11-22). Recommended: sixteen cells, as on the V-Synth, zones 3 to 16 the patch's data. Or two cells, the
   zones the VC-2's patches use.
-- **d-12, the mic's state.** Recommended: in three places, the header's MIC chip, the path's VOCODER chip and the MIC IN
+- **d-12, the mic's state.** Decided as recommended (2026-11-22). Recommended: in three places, the header's MIC chip, the path's VOCODER chip and the MIC IN
   card's checklist. Or on the MIC IN card alone.
-- **d-13, MFX Send on AMP.** Recommended: a fifth knob on AMP, as it is the vocoder's output level. Or in AMP's DETAILS,
+- **d-13, MFX Send on AMP.** Decided as recommended (2026-11-22). Recommended: a fifth knob on AMP, as it is the vocoder's output level. Or in AMP's DETAILS,
   AMP keeping D's four.
-- **d-14, the VOCODER card's display.** Recommended: the engine's bands as they play (LEGACY's 10, HIRESO's 32), the
+- **d-14, the VOCODER card's display.** Decided as recommended (2026-11-22). Recommended: the engine's bands as they play (LEGACY's 10, HIRESO's 32), the
   mic's envelope in each band and the output's, which needs `Vc2Synth` to hand them out. Or a picture of the settings
   alone (the levels and the formant warp), which needs nothing from it.

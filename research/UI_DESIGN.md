@@ -257,9 +257,10 @@ reached by a control, and the set whole. The pages will be made from their IDs b
 
 ### The VC-2 mode's pages {#vc2-pages-pointer}
 
-A draft for the user to decide (2026-11-22), not built: `UI_DESIGN_VC2.md` beside this file, with its mock-up
-`UI_DESIGN_VC2.html`. Six pages in VC-2 mode, each of the 1,332 on one of them, and the open choices as questions d-1
-to d-14. What the user decides comes here as the pages are built (step 4.5's second half), and that file goes.
+Decided, not built (2026-11-22): `UI_DESIGN_VC2.md` beside this file, with its mock-up `UI_DESIGN_VC2.html`. Six
+pages in VC-2 mode, each of the 1,332 on one of them; its questions d-1 to d-14 all decided as recommended (the user:
+"take the recommendations from VC-2 mode's pages"). It comes here as the pages are built (step 4.5's second half), and
+that file goes.
 
 ### Still to do
 

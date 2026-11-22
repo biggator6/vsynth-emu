@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VC-2 pages draft</title>
+<title>VC-2 pages</title>
 <!-- The VC-2 mode's pages, a mock-up for research/UI_DESIGN_VC2.md (2026-11-22). D's palette and sizes
      (research/UI_DESIGN.md, "The look"); every control drawn from a table of rom.4 IDs, as the editor's would be.
-     Not the editor: a picture of it for the user to decide on. -->
+     Not the editor: a picture of it. Its questions d-1…d-14 decided as recommended (the user, 2026-11-22). -->
 <style>
 :root {
   --ground:#141518; --header:#0F1012; --panel:#1C1E22; --raised:#24272D; --lower:#1A1C20; --field:#0F1012;
@@ -62,7 +62,7 @@ body { margin: 0; background: #0B0C0E; color: var(--text); font-family: var(--sa
 </head>
 <body>
 <div class="top">
-  <h1>VC-2 PAGES · DRAFT</h1>
+  <h1>VC-2 PAGES · MOCK-UP</h1>
   <div class="tabs" role="tablist" aria-label="Pages drawn">
     <button type="button" data-page="synth" aria-pressed="true">SYNTH · zone 2</button>
     <button type="button" data-page="vocoder" aria-pressed="false">VOCODER · mic silent</button>
@@ -120,7 +120,7 @@ function header(mic) {
   const micDot = mic === 'ok' ? C.ready : C.warning, micLvl = mic === 'ok' ? 62 : 4;
   return `<div class="abs" style="left:0;top:0;width:1200px;height:48px;background:${C.header};border-bottom:1px solid ${C.divider}">
   <div class="abs" style="left:16px;top:9px;line-height:1.15"><div style="font-weight:700;font-size:15px;letter-spacing:.12em">V-SYNTH EMU</div>
-    <div class="mono" style="font-size:10px;color:${C.muted}">v452 · vc2 pages draft</div></div>
+    <div class="mono" style="font-size:10px;color:${C.muted}">v452 · vc2 pages</div></div>
   <div class="abs row" style="left:176px;top:11px;height:26px;border:1px solid ${C.track};border-radius:6px;overflow:hidden">
     <span style="padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;color:${C.label}">V-SYNTH</span>
     <span style="padding:0 16px;height:26px;line-height:26px;background:${C.accent};color:${C.ground};font-size:11px;font-weight:700;letter-spacing:.08em">VC-2</span></div>
