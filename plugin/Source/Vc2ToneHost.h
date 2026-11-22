@@ -58,7 +58,6 @@ public:
     Vc2OscSamples waveSamples() override;    // v323
     float boundFloat(uint32_t part, uint32_t offset) override;   // the tone's envelope's or LFO's; another's outside
     uint32_t address() override;                                 // the voice's, at the tone's +0x20 or +0xba4
-    void objectCall(uint32_t routine) override;
     int32_t eventPosition(uint32_t event) override;
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;

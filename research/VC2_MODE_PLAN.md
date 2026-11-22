@@ -1002,6 +1002,13 @@ version against rom.4's routines with what it calls hooked:
          mode 1's cached jump writes through the render's mask, an address error on the XT at every One Way or hold
          loop point; the walk's searches step by an event's own offset. Next: mode 1's set-up `0x893cc760` and seek
          `0x893cc830`, with SOLO's start `0x893cc1a0` and the lookup `0x893cc100`, which SOLO's walk shares.
+       - Mode 1's set-up (v328): `0x893cc760` the voice's own, with SOLO's start `0x893cc1a0` and its lookup
+         `0x893cc0d0` by a player's row (its seek and jump two more columns of `Vc2WalkWay`) and the loops' rates
+         `0x893ccf50`. Found: the set-up and LITE's settings read the records through the object's head, which a
+         legato's take brings from the earlier tone's voice, so a legato sets the new note up on the earlier note's
+         wave; both read through it now, the link answering a pool tone's voice's words from its host
+         (HARDWARE_FIRMWARE.md, "The VC-2's mode 1 set-up"). Next: mode 1's seek `0x893cc830` with the find
+         `0x893cc100`.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

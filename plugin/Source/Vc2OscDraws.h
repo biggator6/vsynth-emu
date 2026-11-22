@@ -144,6 +144,13 @@ void oscDrawBeatWords(Vc2OscVoice& o, std::mt19937& rng);
 // then one of four steers (Vc2OscWalkDraws.cpp's steerWalk): bouncing in either loop with the event ahead at the
 // loop's last point, a sample's step landing on the event ahead, at a loop point ahead or on it, or none
 void oscDrawModeOneWords(Vc2OscVoice& o, std::mt19937& rng, const OscRecords& r, uint32_t waveAt);
+// v328 (Vc2OscWalkDraws.cpp): before an install on a LITE voice of type 1, whose set-up is mode 1's: the record words
+// a note-on's block gives (the case's events' table, the wave, a header, a loop record, a +0xe0 record), the head at
+// the voice's own +0x108 (`voiceAt`), byte 0's frame the table's three times in four and the range in samples half the
+// time, the range's events (past the last now and then) and samples about the table's, the walk either way; from the
+// renders' generator.  And a note-on's block of a LITE wave of type 1 given those record words (xt_vc2tone's)
+void oscSteerModeOneSetUp(Vc2OscVoice& o, OscShared& shared, uint32_t voiceAt);
+void oscModeOneBlock(uint32_t* block, std::mt19937& rng);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
 void oscDrawWave(Vc2Fw& fw, OscShared& shared);
 // v327 (Vc2OscWalkDraws.cpp), at the wave's draw: a case's events' table at kOscEventsAt, 4…12 events of a stride of

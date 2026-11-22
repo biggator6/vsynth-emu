@@ -37,7 +37,9 @@ struct ToneCounts {
     long extInBlocks = 0, variOffBlocks = 0;   // v322, v323: the tones' renders with an OSC through each own render
     long headsBlocks = 0;                      // v326: and through LITE's heads'
     long liteSettings = 0, bothVari = 0;   // v324: LITE's settings on a type with a way, tones drawn two VariPhrases
-    std::array<long, 6> oscCalls {};
+    long modeOneSetUps = 0, modeOneTaken = 0;   // v328: mode 1's set-ups at an install, those through a take's head
+    long settingsTaken = 0;                     // v328: and the LITE settings through a take's head
+    std::array<long, kOscKinds> oscCalls {};
 };
 
 // v318: each tone's COSMs' slots (−1 none) its last note-on took and its destructor hasn't freed, and whether it has had
@@ -141,6 +143,15 @@ void toneOscBlockOfKind(ToneSides& s, int osc, uint32_t kind, uint32_t wave, std
 // Filters, the Growl), and what keeps COSM 1's mode at a note-on that starts no COSMs (v319)
 void toneOscSteady(ToneSides& s, int osc, uint32_t wave, std::mt19937& rng);
 void toneMakeOscAnalog(ToneSides& s, int i, int osc, uint32_t code, std::mt19937& rng);
+// v328 (Vc2ToneSides.cpp): whether tone i's OSC runs mode 1's set-up at an install (LITE's kind, type 1); and its
+// records, head and tempo words steered on both sides as its note-on leaves them (oscSteerModeOneSetUp)
+bool toneOscModeOne(ToneSides& s, int i, int osc);
+void toneSteerModeOne(ToneSides& s, int i, int osc);
+// v328: the voice whose records tone i's OSC's LITE settings read: the one its head names when that is another pool
+// tone's LITE voice holding a loop record's address, as a take leaves it (counted), else its own, as v324's steer made it
+uint32_t toneSettingsVoice(ToneSides& s, int i, int osc);
+// v328: tone i's OSC whose LITE voice's head a take left on another tone's, −1 none
+int toneTakenOsc(ToneSides& s, int i);
 void toneOscBeforeNoteOn(ToneSides& s, int i, std::mt19937& rng);
 void toneHoldOscVibratos(ToneSides& s, int i, int32_t n);
 std::string toneFeedMic(ToneSides& s, int i, std::mt19937& rng);
@@ -187,6 +198,9 @@ void toneEmptyLists(ToneSides& s);
 std::string toneLeaveLists(ToneSides& s, int i);
 void toneDrawLinks(ToneSides& s, int i, std::mt19937& rng);   // a tone on no list: links its constructor must clear
 std::string toneSetterOn(ToneSides& s, std::mt19937& rng);
+// An OSC's settings on tone i's OSC n, already prepared (Vc2ToneMethodCheck.cpp; v328: a take's note-on runs it too,
+// `readsLoop`, on a type whose way reads the loop record)
+std::string toneOscSettingsOf(ToneSides& s, int i, uint32_t n, std::mt19937& rng, bool readsLoop);
 // The render event on tone i, already prepared (Vc2ToneEvents.cpp; v321: a COSM's new block's setter runs it too)
 std::string toneRenderOf(ToneSides& s, int i, std::mt19937& rng);
 std::string toneKeyOffOn(ToneSides& s, std::mt19937& rng);

@@ -73,6 +73,9 @@ struct Vc2OscTables {
     // kind 1's mode 1's render (v327): the fraction's scale, a sample's
     float modeOneFraction = 0;      // 0x893ca150: 2^−24
     float modeOneScale = 0;         // 0x893ca154: 65536
+    // its set-up's (v328): the object's +0x88, the loops' rates' tenths of a cent
+    float modeOneSetUpWord = 0;     // 0x893cc8c0: 1/64
+    float modeOneTenths = 0;        // 0x893ccfd4: 12000
     Vc2OscAnalogPool analog;       // the analog note-on's (v242, Vc2OscAnalogPool.h)
     Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };

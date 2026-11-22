@@ -280,7 +280,7 @@ void toneDrawOscSettings(ToneSides& s, int i, uint32_t osc, std::mt19937& rng) {
         for (const auto& [at, bits] : oscAnalogWords(rng)) settings[(at - Vc2OscVoice::kOwn) / 4] = bits;
     }
     if (osc < 2) {   // v324: LITE's settings read the loop record through the head its note-on leaves
-        const uint32_t at = toneOscAt(s.pool.addressOf(i), which);
+        const uint32_t at = toneSettingsVoice(s, i, which);   // v328: a take's head kept
         s.n.liteSettings += oscSteerLiteSettings(v, settings, at, s.shared.osc.renders);
         writeToneOsc(s, i, which);
     }

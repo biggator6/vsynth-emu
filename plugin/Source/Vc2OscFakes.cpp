@@ -72,12 +72,21 @@ uint32_t positions(Sh4& c, const OscDraws& d) {   // the next of the drawn posit
     return 0;
 }
 
-// A hooked routine: where, what it logs as, how its arguments read, its answer
+// v328: the event lookup answers as drawn where VariPhrase's note-on calls it (0x893af420…0x893af7a0), whose positions
+// the port's parts draw; elsewhere (SOLO's start in mode 1's set-up) rom.4's own runs, as the port's own lookup does
+bool fromVariNoteOn(uint32_t pr) {
+    constexpr uint32_t kFrom = 0x893af420, kTo = 0x893af7a0;   // [FW]
+    return pr - kFrom < kTo - kFrom;
+}
+
+// A hooked routine: where, what it logs as, how its arguments read, its answer; and (v328) the callers it answers,
+// rom.4's own running for any other, or every caller
 struct OscHook {
     uint32_t at;
     OscKind kind;
     uint32_t (*decode)(Sh4&, OscCall&, uint32_t);
     uint32_t (*answer)(Sh4&, const OscDraws&);
+    bool (*from)(uint32_t pr) = nullptr;
 };
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
@@ -88,8 +97,8 @@ struct OscHook {
 // renders (v326) and kind 1's mode 1's (v327): rom.4's own run, and the routines they call hooked
 const OscHook kHooks[] = {
     { 0x893c88b0, kKindCall, kindRoutine, none },
-    { 0x893c8670, kKindCall, kindRoutine, none }, { 0x893cc760, kObjectCall, objectRoutine, none },
-    { 0x893cc0d0, kEventPosition, eventAt, positions },
+    { 0x893c8670, kKindCall, kindRoutine, none },   // v328: mode 1's set-up 0x893cc760 rom.4's own
+    { 0x893cc0d0, kEventPosition, eventAt, positions, fromVariNoteOn },
     { 0x893b0280, kKindSettings, routineSettings, none },
     // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's, BACKING's, ENSEMBLE's, the
     // period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327)
@@ -127,6 +136,7 @@ int oscVoiceNumber(uint32_t at) {
 void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log, int (*voiceOf)(uint32_t)) {
     for (const OscHook& h : kHooks) {
         fw.cpu.hook(h.at, [&draws, &log, h, voiceOf](Sh4& cpu) {
+            if (h.from != nullptr && !h.from(cpu.pr)) return;   // the routine itself, the pc left as it is
             OscCall call { h.kind, -1, 0, 0, 0 };
             call.voice = voiceOf(h.decode(cpu, call, h.at));
             log.push_back(call);

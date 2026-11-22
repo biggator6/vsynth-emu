@@ -44,6 +44,20 @@ constexpr TonePlain kPlains[] = {
 uint32_t toneDrawId(std::mt19937& rng) { return rng() % 2 == 0 ? rng() % 16 : (uint32_t)rng(); }
 Vc2ToneParts& partsOf(ToneSides& s, int i) { return s.parts[(size_t)i]; }
 
+// v328: tone i's OSCs whose install runs mode 1's set-up, counted (after a note-on, those whose head a take brought
+// apart); before an install pass their head and the words the set-up reads through it steered on both sides, as their
+// note-on leaves them: noise there, rom.4 would read wherever it pointed
+void toneModeOneSetUps(ToneSides& s, int i, bool steer) {
+    constexpr uint32_t kHeadAt = 0x1a0, kHeadOf = 0x108;   // [FW]
+    for (int osc = 0; osc < 2; ++osc) {
+        if (!toneOscModeOne(s, i, osc)) continue;
+        ++s.n.modeOneSetUps;
+        const uint32_t own = toneOscAt(s.pool.addressOf(i), osc) + kHeadOf;
+        if (!steer) s.n.modeOneTaken += s.parts[(size_t)i].oscs[(size_t)osc].u32(kHeadAt) != own;
+        if (steer) toneSteerModeOne(s, i, osc);
+    }
+}
+
 std::string toneInPlaceOn(ToneSides& s, std::mt19937& rng) {
     const int i = toneDrawLive(s, rng);
     const uint32_t id = toneDrawId(rng), at = s.pool.addressOf(i);
@@ -152,6 +166,7 @@ std::string toneAskOn(ToneSides& s, std::mt19937& rng) {
 std::string tonePlainOn(ToneSides& s, std::mt19937& rng) {
     const TonePlain& c = kPlains[rng() % std::size(kPlains)];
     const int i = toneDrawLive(s, rng);
+    if (c.at == kInstallAt) toneModeOneSetUps(s, i, true);   // v328
     return toneOn(s, i, c.at, { s.pool.addressOf(i) }, [&] { c.act(s.pool.tones[(size_t)i], partsOf(s, i)); });
 }
 
@@ -198,9 +213,15 @@ std::string toneNoteOnEvent(ToneSides& s, std::mt19937& rng) {
         s.fw, kNoteOnAt, { s.pool.addressOf(i), kToneInputAt }, "the note-on",
         [&] { tone.noteOn(s.shared.input, s.pool, s.owner, partsOf(s, i)); }, [&] { return toneDifference(s, -1); });
     if (what.empty()) what = toneMixRingsOf(s, i);
+    toneModeOneSetUps(s, i, false);   // v328: the note-on's install pass ran them
     toneNoted(s, i);
     s.n.takes += s.shared.players - players;
     s.n.fixes += s.shared.input.at(In::kOscs[1] + In::kWave) == kFixed && s.shared.input.at(In::kMix) == kFixMix;
+    // v328: half the time a take that left a LITE voice's head on the earlier tone's goes on into that OSC's settings,
+    // on a type that reads the loop record through it (aimed at, a settings event found about four such voices in 40
+    // cases, few of a type that reads it)
+    const int taken = toneTakenOsc(s, i);
+    if (what.empty() && taken >= 0 && rng() % 2) what = toneOscSettingsOf(s, i, (uint32_t)taken, rng, true);
     return what;
 }
 

@@ -66,8 +66,9 @@ struct ToneSetter {
     void (Vc2Tone::*plain)(const uint32_t*, Vc2ToneParts&);
     uint32_t block = In::kMix, stride = 0;
 };
+constexpr uint32_t kSetOscAt = 0x893b3110;   // [FW] the OSC block's setter
 constexpr ToneSetter kSetters[] = {
-    { 0x893b3110, 2, true, &Vc2Tone::setOscBlock, nullptr },
+    { kSetOscAt, 2, true, &Vc2Tone::setOscBlock, nullptr },
     { 0x893b31a0, Vc2Tone::kLfos, false, &Vc2Tone::setLfoBlock, nullptr, In::kLfos, In::kLfoStride },
     { 0x893b31f0, Vc2Tone::kEnvelopes, false, &Vc2Tone::setEnvelopeBlock, nullptr, In::kEnvelopes,
       In::kEnvelopeStride },
@@ -146,17 +147,27 @@ std::string toneSetterOn(ToneSides& s, std::mt19937& rng) {
         toneBothWord(s, i, kSyncOnAt, t.tail.syncOn, 1u);
     }
     if (set.plain) return toneOn(s, i, set.at, { tone, block }, [&] { (t.*set.plain)(in.block(offset), parts); });
-    if (set.numbered == &Vc2Tone::setOscBlock) {
-        toneDrawOscSettings(s, i, n, rng);
-        const uint32_t* settings = s.shared.osc.settings.data();
-        return toneOn(s, i, set.at, { tone, n, kOscSettingsAt }, [&] { t.setOscBlock(n, settings, parts); });
-    }
+    if (set.numbered == &Vc2Tone::setOscBlock) return toneOscSettingsOf(s, i, n, rng, false);
     const std::string what =
         toneOn(s, i, set.at, { tone, n, block }, [&] { (t.*set.numbered)(n, in.block(offset), parts); });
     // v321: half the time a COSM's new block goes on into a render of the tone, before an update converts again: only
     // there does the sound's own new block show, which 40 cases reached about twice
     if (what.empty() && set.numbered == &Vc2Tone::setCosmBlock && rng() % 2) return toneRenderOf(s, i, rng);
     return what;
+}
+
+std::string toneOscSettingsOf(ToneSides& s, int i, uint32_t n, std::mt19937& rng, bool readsLoop) {
+    toneDrawOscSettings(s, i, n, rng);
+    if (readsLoop) {   // v328: a type whose way reads the loop record, Vari off's (0) or the heads' (2)
+        constexpr uint32_t kTypeWord = 0xb0 / 4, kVariOff = 0, kHeads = 2;   // [FW]
+        s.shared.osc.settings[kTypeWord] = rng() % 2 != 0 ? kVariOff : kHeads;
+        s.fw.cpu.write(kOscSettingsAt, s.shared.osc.settings.data(), sizeof s.shared.osc.settings);
+    }
+    const uint32_t* settings = s.shared.osc.settings.data();
+    Vc2Tone& t = s.pool.tones[(size_t)i];
+    Vc2ToneParts& parts = s.parts[(size_t)i];
+    const std::initializer_list<uint32_t> args = { s.pool.addressOf(i), n, kOscSettingsAt };
+    return toneOn(s, i, kSetOscAt, args, [&] { t.setOscBlock(n, settings, parts); });
 }
 
 std::string toneKeyOffOn(ToneSides& s, std::mt19937& rng) {

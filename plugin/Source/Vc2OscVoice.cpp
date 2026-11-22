@@ -83,10 +83,10 @@ void Vc2OscVoice::construct() {
     tail.seekPending = 0;
 }
 
-void Vc2OscVoice::install(Vc2OscParts& parts) {
+void Vc2OscVoice::install(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     const Vc2OscKindRow& row = vc2OscKindRow(kind());
     switch (row.installs) {   // a kind's own install runs in the frame's place (v238: LITE's and VariPhrase's ported)
-        case Vc2OscInstall::lite: installLite(parts); return;
+        case Vc2OscInstall::lite: installLite(parts, shared); return;
         case Vc2OscInstall::vari: installVari(); return;
         case Vc2OscInstall::analog: installAnalog(); return;   // v248
         case Vc2OscInstall::frame: break;

@@ -19,6 +19,10 @@ inline constexpr uint32_t kNextKind = 0x6, kFirst = 0x7, kStride = 0x8;
 inline constexpr uint32_t kIndex = 0xc, kLast = 0xe, kTable = 0x10, kFinal = 0x20, kPrev = 0x24, kNext = 0x28;
 inline constexpr uint32_t kCross = 0x2c, kStep = 0x34, kPos = 0x38, kFrac = 0x3c, kRecord = 0x6c, kRate = 0xa0;
 inline constexpr uint32_t kFwdRate = 0xa4, kBackRate = 0xa8;
+// [FW] v328, the start's: the range's first and last events (half words) and its start and end, the beat's walk;
+// byte 0's 0x80, the range in samples
+inline constexpr uint32_t kRangeFirst = 0x14, kRangeLast = 0x16, kRangeStart = 0x18, kRangeEnd = 0x1c, kWalk = 0x7c;
+inline constexpr uint8_t kInSamples = 0x80;
 inline constexpr uint8_t kLoopsOn = 0x01, kActs = 0x01, kPasses = 0x02, kSets = 0x04, kMarkBits = kActs | kSets;
 inline constexpr uint8_t kOneSample = 0x01, kTurned = 0x02, kBounceBack = 0x04, kBounceFwd = 0x08;
 inline constexpr uint8_t kInBack = 0x10, kInFwd = 0x20, kHeld = 0x40, kBefore = 0xff;

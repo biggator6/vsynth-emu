@@ -10,12 +10,13 @@
 
 struct OscCounts {
     long events = 0, noteOns = 0, plain = 0, sampled = 0, updates = 0, takes = 0, renders = 0, settings = 0;
-    long getters = 0, seeks = 0, kindCalls = 0, gliding = 0, lookups = 0, objectCalls = 0;
+    long getters = 0, seeks = 0, kindCalls = 0, gliding = 0, lookups = 0;
     long carrierStarts = 0, carrierBlocks = 0, carrierSettings = 0, kind6Starts = 0, kind6Blocks = 0;   // v266
     long voicedSounding = 0, voicedNotFinite = 0;   // v266: those blocks with a sample that isn't 0, or isn't finite
     long extInBlocks = 0, variOffBlocks = 0;        // v322, v323: the renders through the EXT IN player's, Vari off's
     long headsBlocks = 0;                           // v326: and through LITE's heads'
     long modeOneBlocks = 0;                         // v327: and through kind 1's mode 1's
+    long modeOneSetUps = 0, setUpsInSamples = 0;    // v328: its set-ups, and those with the range in samples
     long liteUpdates = 0, liteSettings = 0;         // v324: LITE's update and settings on a type with a way
 };
 

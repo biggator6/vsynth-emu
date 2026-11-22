@@ -765,7 +765,7 @@ host-osc-value|{ return voice(osc).f32(kRatio); }|{ return voice(osc).f32(kRatio
 host-render-osc-buffer|{ voice(osc).render(buffer, link(osc)); }|{ voice(osc).render(buffer + 2, link(osc)); }|vc2tonehostosc
 host-count-osc|{ voice(osc).count(x); }|{ voice(osc).count(x + 1); }|vc2tonehostosc
 host-count-osc-matched|{ voice(osc).countMatched(x); }|{ voice(osc).countMatched(0); }|vc2tonehostosc
-host-install-osc-none|::installOsc(int osc) { voice(osc).install(link(osc)); }|::installOsc(int) {}|vc2tonehostosc
+host-install-osc-none|::installOsc(int osc) { voice(osc).install(link(osc), c_.shared); }|::installOsc(int) {}|vc2tonehostosc
 host-osc-kind|{ return (int32_t)voice(osc).kind(); }|{ return (int32_t)voice(0).kind(); }|vc2tonehostosc
 host-osc-flag|{ return voice(osc).tail.flag; }|{ return voice(1 - osc).tail.flag; }|vc2tonehostosc
 host-bind-osc-envelopes|binds[k] = envelopeAt(b.envelopes[k]);|binds[k] = envelopeAt(b.envelopes[0]);|vc2tonehostosc
@@ -797,7 +797,6 @@ link-bound-tone|return host_.mods.boundFloat(self, part, offset);|return host_.m
 link-bound-in-tone|if (part - self < Vc2Tone::kSize)|if (part - self < Vc2Tone::kSize / 2)|vc2tonehostosc
 link-bound-outside|return outside().boundFloat(part, offset);|return 0.0f;|vc2tonehostosc
 link-address|{ return host_.self() + kOscsAt[(size_t)osc_]; }|{ return host_.self() + kOscsAt[0]; }|vc2tonehostosc
-link-object-call|{ outside().objectCall(routine); }|{ outside().objectCall(routine + 4); }|vc2tonehostosc
 link-event-position|{ return outside().eventPosition(event); }|{ return outside().eventPosition(event + 1); }|vc2tonehostosc
 link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHeader(at + 4); }|vc2tonehostosc
 link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc
@@ -807,3 +806,14 @@ link-input-peak|{ return outside().inputPeak(); }|{ return 0.0f; }|vc2tonehostos
 link-input-frames|{ return outside().inputFrames(); }|{ return outside().inputFrames() + 1; }|vc2tonehostosc
 # v323: the wave Vari off's renders (ported in the voice) read, which the link passes on (vc2tonehostosc)
 link-wave-samples|{ return outside().waveSamples(); }|{ return Vc2OscSamples {}; }|vc2tonehostosc
+# v328: the records an object's head names, read through it (vc2toneplayers, Vc2OscPlayers.cpp's head word, and
+# vc2tonelite, Vc2OscLite.cpp's LITE settings' loop record, xt_vc2osc's ports under xt_vc2tone), and a pool tone's OSC
+# voice's words, which the link gives from that tone's host (vc2tonehostosc): after a legato's take, the earlier
+# tone's voice's, which only xt_vc2tone takes.  v319's link-object-call went with the object call, whose last caller
+# was the set-up
+hd-own|return std::bit_cast<uint32_t>(parts.boundFloat(v.u32(kSelf), at));|return v.u32(kSelfAt + at);|vc2toneplayers
+hd-settings-own|parts.loopRecord(vc2OscHeadWord(*this, parts, kHeadLoop))|parts.loopRecord(u32(kLoopAt))|vc2tonelite
+link-voice-own|return host_.hostOf(pool.indexOf(at)).oscs[osc].f32(in);|return host_.oscs[osc].f32(in);|vc2tonehostosc
+link-voice-osc|- kOscsAt[osc];|- kOscsAt[0];|vc2tonehostosc
+link-voice-end|<= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) {|<= 0xb0 - sizeof(float)) {|vc2tonehostosc
+link-voice-pool|pool.holds(at) && osc < kOscsAt.size()|false && osc < kOscsAt.size()|vc2tonehostosc

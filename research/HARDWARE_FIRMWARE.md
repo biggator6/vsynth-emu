@@ -1546,6 +1546,97 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's mode 1 set-up (2026-11-21, v328) {#vc2-osc-mode-one-set-up}
+
+Step 4.3's fifty-sixth version, the fourth piece of item 11's fourth part's second half. Mode 1's set-up `0x893cc760`,
+which LITE's install runs for a wave of type 1, is the voice's own (`Vc2OscModeOneStart.cpp`). So are the walk's start
+it runs, SOLO's start `0x893cc1a0`, and that start's event lookup `0x893cc0d0` (`Vc2OscWalkStart.cpp`). The seek
+`0x893cc830` the start makes with the range in samples still goes out.
+
+**The set-up.** It reads the wave's records through the object's head (+0x44, the voice's +0x1a0): +0 the events'
+table, +4 the samples, +0x20 the header, +0x28 the loop record, +0x2c the +0xe0 record. Then:
+- the table to +0x10, the +0xe0 record to +0x6c, the samples to +0xec;
+- byte 3 keeps 0x70, the end byte +4 is 0, +0x88 is 1/64 (its pool word `0x893cc8c0`);
+- the events' layout by the header's format (+1) and the frame (byte 0's 0x40): format 3…5 (a signed byte) the first
+  half word 14, the stride 46 mono or 88 stereo; any other 8, 10 or 16. A frame's bytes (+9) are 6 or 12;
+- the walk's start with mode 1's row;
+- `0x893ccf50`: the rate factor (+0xa0) 1, the loops' (+0xa4, +0xa8) exp2 of the loop record's +0x14 and +0x16 over
+  12000 (its pool word `0x893ccfd4`);
+- the beat's start (v325's `beatStart`), which keeps byte 3's 0x81 alone.
+
+**The walk's start.** `0x893cc1a0` is SOLO's start, given a player's index (r5) like the walk's crossings (v327). It
+picks its seek and its jump from the tables at `0x8993fc00` and `0x8993fc14`: two more columns of a player's row,
+`Vc2WalkWay`'s `seekTo` and `startJump`. Mode 1's are the seek `0x893cc830`, still out, and `0x893ca160`, which wraps
+the jump `0x893ca190`. The start:
+- the last event (+0xe): the table's count less 1. The count is the high half of the table's word at +8 (`0x893cc0d0`
+  forms an event's entry as v327's load does: (stride × n + first) half words, the bytes unsigned). The last event's
+  position goes to +0x20.
+- with the range in samples (byte 0's 0x80): the current event (+0xc) 0, then the seek to the range's start (+0x18),
+  or its end (+0x1c) when the walk (+0x7c) is negative. That is all.
+- else the range's two events (+0x14, +0x16) are each held to the last, compared unsigned. Their positions become the
+  range's start and end. The current event is the first, or the last walking back. The position is 0, then the jump to
+  the current event, which writes the position again.
+
+**Through the head.** The head is the voice's own +0x108 as its note-on leaves it (`vc2OscPlayerHead`, v238). A
+legato's take copies the earlier tone's voice's object whole and keeps six words (v230's `take`), so the head comes with
+it. It still names the earlier voice's +0x108. The install pass the note-on ends with then sets the new note up on the
+earlier note's table, samples, header, loop record and +0xe0 record: in rom.4, a legato between two notes of different
+waves of the same type plays the new note on the old wave's events. Kept as rom.4 has it. LITE's settings (v324) read
+the loop record through the head too. The port read the voice's own words in both places, which equals rom.4's only
+while the head is the voice's own. From v328 both read through the head (`vc2OscHeadWord`, `Vc2OscPlayers.cpp`), by
+`Vc2OscParts::boundFloat`. The link answers a pool tone's OSC voice's own words from that tone's host
+(`Vc2ToneOscLink::boundFloat` by `hostOf`, the take's way to the other tone). The set-up was the last of a player's
+routines on the object that went out, so `Vc2OscParts::objectCall` is gone.
+
+**The checks.** The set-up's hook is gone from both checks: rom.4's own runs in the voice. The event lookup's hook
+answers only calls from VariPhrase's note-on (`OscHook::from`, by the caller's PR), so the start's lookups run rom.4's
+own. The draws:
+- in xt_vc2osc, the mode 1 part plays 16 runs more a case after its 32, each from a set-up on both sides, the voice
+  compared after it. As half of the 32 they took the walk's state the steers draw, and three of v327's plants went
+  missed.
+- an install of a mode 1 voice is steered first (`oscSteerModeOneSetUp`, `Vc2OscWalkDraws.cpp`). The records at the
+  voice's +0x108…+0x134, as a note's block gives them. The head its own. The head's two tempo words 40…250 BPM: at 0
+  the beat's start divides 0 by 0, and xtf's FTRC takes the NaN otherwise than the interpreter. Byte 0's frame is
+  the table's, as a wave's table follows its own frame: the other frame's stride reads across entries, and positions
+  made of their halves leave the wave (seed 31337 found one). The range in samples half the time. The range's events past the last now
+  and then, one time in eight 0x8000 up (the hold is unsigned). The range's samples about the events'. The walk
+  ±0.1…3.
+- the events' table moves 32 KB up (0x8C0C8000). Its count is written at +0xa. Its stride and first follow a layout
+  drawn per case, wide or narrow, mono or stereo. Each header's format is drawn to match it (3…5 wide, else 0…2, 6,
+  7). One case in two the header's first half word is a mark, and one in two the entry past the last event a return
+  or a turn, each at an event's position. From a first of 8 or 14 half words, v327's searches meet these two, where
+  they had read zeros and two of its plants went missed. The bounce's steer (v327) leaves its mark closed one time in
+  four, where the walk back un-bounces: v327 reached that by chance alone.
+- in xt_vc2tone, a note-on's LITE type 1 blocks get the records too, after the legato's draws, which can make a block
+  so (`oscModeOneBlock`). An install pass's mode 1 voices are steered as above.
+- the legato's earlier mode 1 voice is steered as its note-on left it. One time in six an earlier voice bound to its own
+  tone's parts is made one and installed on both sides, which sets it up. A voice no note bound reads through address
+  0 once a player.
+- half the time a note-on whose take left a LITE voice's head on the earlier tone's goes on into that OSC's settings,
+  on type 0 or 2, whose ways read the loop record. LITE settings' steer keeps such a head where v324's made it the
+  voice's own (`toneSettingsVoice`).
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400), in both checks. xt_vc2osc's mode 1 part sets up 640,
+  6400 and 6400 times, its installs 16, 189 and 169. xt_vc2tone's install passes and note-ons set up 133, 1181 and
+  1089 times, 19, 175 and 173 of them through an earlier tone's head. 8, 103 and 92 LITE settings read through one.
+- at 400 cases in xt_vc2osc, `Vc2OscWalkStart.cpp`, `Vc2OscModeOneStart.cpp` and `Vc2OscPlayers.cpp` are wholly
+  reached, every line and branch. At 40 cases in xt_vc2tone, so are the first two and `Vc2ToneHostOsc.cpp`, whose new
+  test is one unsigned compare, so both of its sides are reached.
+- `mutate_vc2.py --osc`: 55 new plants on the set-up, the start, the lookup, the head's word, the pool words and the
+  row. `--tone`: 6 on the reads through a take's head, in `Vc2OscPlayers.cpp` and `Vc2OscLite.cpp` under xt_vc2tone
+  (two new port rows) and in the link. All caught. Five older plants follow the text v328 changed. `lite-setup` and
+  `link-object-call` went with what they planted. The whole `--osc` (1,643) and `--tone` (759) lists caught. Not
+  planted, as nothing could show them:
+  - the position the start writes before mode 1's jump writes it again;
+  - the hold of a range's event equal to the last;
+  - the format's sign;
+  - byte 3's 0x40…0x10 the set-up keeps, which the beat's start clears before anything reads them.
+  No rom.2 port changed, so no `mutate_tone.py` plants, by the rule from v327.
+
+**Next.** Mode 1's seek `0x893cc830`: the position held to the range's ends, the find `0x893cc100`, the jump
+`0x893ca160`, the beat's reset. Then the players VariPhrase's band waves use.
+
 ### The VC-2's mode 1 (2026-11-21, v327) {#vc2-osc-mode-one}
 
 Step 4.3's fifty-fifth version, the third piece of item 11's fourth part's second half. Kind 1's mode 1, the render

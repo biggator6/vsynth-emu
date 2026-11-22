@@ -19,7 +19,7 @@ void Vc2ToneHost::renderOsc(int osc, float* buffer) { voice(osc).render(buffer, 
 
 void Vc2ToneHost::countOsc(int osc, uint32_t x) { voice(osc).count(x); }
 void Vc2ToneHost::countOscMatched(int osc, uint32_t x) { voice(osc).countMatched(x); }
-void Vc2ToneHost::installOsc(int osc) { voice(osc).install(link(osc)); }
+void Vc2ToneHost::installOsc(int osc) { voice(osc).install(link(osc), c_.shared); }
 int32_t Vc2ToneHost::oscKind(int osc) { return (int32_t)voice(osc).kind(); }
 uint32_t Vc2ToneHost::oscFlag(int osc) { return voice(osc).tail.flag; }
 
@@ -75,15 +75,23 @@ float Vc2ToneOscLink::inputPeak() { return outside().inputPeak(); }
 const int32_t* Vc2ToneOscLink::inputFrames() { return outside().inputFrames(); }
 Vc2OscSamples Vc2ToneOscLink::waveSamples() { return outside().waveSamples(); }
 
-// A bound part in the tone, its envelopes' and LFOs', the host's; any other address, a wave's record, outside it
+// A word of a pool tone's OSC voice among its own, that tone's host's (v328: the records an object's head names, the
+// voice's own or, after a legato's take, the earlier tone's voice's); a bound part in the tone, its envelopes' and
+// LFOs', the host's; any other address, a wave's record, outside it
 float Vc2ToneOscLink::boundFloat(uint32_t part, uint32_t offset) {
-    const uint32_t self = host_.self();
+    const uint32_t self = host_.self(), at = part + offset;
+    const Vc2TonePool& pool = host_.c_.pool;
+    for (size_t osc = 0; pool.holds(at) && osc < kOscsAt.size(); ++osc) {
+        const uint32_t in = at - pool.addressOf(pool.indexOf(at)) - kOscsAt[osc];
+        if (in - Vc2OscVoice::kOwn <= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) {
+            return host_.hostOf(pool.indexOf(at)).oscs[osc].f32(in);
+        }
+    }
     if (part - self < Vc2Tone::kSize) return host_.mods.boundFloat(self, part, offset);
     return outside().boundFloat(part, offset);
 }
 
 uint32_t Vc2ToneOscLink::address() { return host_.self() + kOscsAt[(size_t)osc_]; }
-void Vc2ToneOscLink::objectCall(uint32_t routine) { outside().objectCall(routine); }
 int32_t Vc2ToneOscLink::eventPosition(uint32_t event) { return outside().eventPosition(event); }
 Vc2OscWaveHeader Vc2ToneOscLink::waveHeader(uint32_t at) { return outside().waveHeader(at); }
 Vc2OscLoopRecord Vc2ToneOscLink::loopRecord(uint32_t at) { return outside().loopRecord(at); }

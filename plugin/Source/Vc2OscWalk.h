@@ -30,13 +30,21 @@ struct Vc2WalkWords {
 // The SH-4's sum of two words, wrapping
 inline int32_t vc2WalkPlus(int32_t a, int32_t b) { return (int32_t)((uint32_t)a + (uint32_t)b); }
 
+// From v328 the start's two besides (the tables at 0x8993fc00 and 0x8993fc14, .data): the seek to a position and the
+// jump to the event +0xc names
 struct Vc2WalkWay {
     void (*jump)(Vc2OscVoice& v, Vc2OscParts& p);                         // to the event +0xc names
     void (*jumpCached)(Vc2OscVoice& v, Vc2OscParts& p, uint32_t cached);   // to a loop's cached event, by its address
     bool keepsSign;                                                       // a turn leaves the step as it is
+    void (*seekTo)(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);           // the start's, to a position ×16
+    void (*startJump)(Vc2OscVoice& v, Vc2OscParts& p);                    // the start's, to the event +0xc names
 };
-extern const Vc2WalkWay kVc2ModeOneWalk;   // index 0: 0x893ca190, 0x893ca1a0
+// index 0: 0x893ca190, 0x893ca1a0; the start's 0x893cc830 (still rom.4's, through the parts) and 0x893ca160 (its
+// wrapper of 0x893ca190)
+extern const Vc2WalkWay kVc2ModeOneWalk;
 
+// one-off: four routines' declarations, alike only in taking the voice, its parts and a player's row
 void vc2WalkCrossing(Vc2OscVoice& v, Vc2OscParts& p);                          // 0x893c9380
 void vc2WalkForward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);    // 0x893c8f50
 void vc2WalkBackward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);   // 0x893c9140
+void vc2WalkStart(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);      // 0x893cc1a0 (v328, Vc2OscWalkStart.cpp)

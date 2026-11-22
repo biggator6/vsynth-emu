@@ -38,8 +38,17 @@ std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
     }
     if (pick == 3) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);   // a kind-3 voice found: its words so (a settings' copy leaves noise at +0x138)
+    constexpr uint32_t kLite = 1, kModeOne = 1;   // [FW] v328: LITE's install sets mode 1 up, the voice's own
+    Vc2OscVoice& o = s.voices[(size_t)v];
+    if (o.kind() == kLite && o.u32(Vc2OscVoice::kWave) == kModeOne) {
+        constexpr uint8_t kInSamples = 0x80;   // [FW] byte 0's
+        oscSteerModeOneSetUp(o, s.shared, oscVoiceAt(v));
+        oscWriteVoice(s, v);
+        ++s.n.modeOneSetUps;
+        s.n.setUpsInSamples += (o.u8(Vc2OscVoice::kObject) & kInSamples) != 0;
+    }
     return oscBothSides(s, kInstall, { oscVoiceAt(v) }, Answer::none, [&] {
-        s.voices[(size_t)v].install(s.parts[(size_t)v]);
+        s.voices[(size_t)v].install(s.parts[(size_t)v], s.romShared);
         return 0u;
     });
 }

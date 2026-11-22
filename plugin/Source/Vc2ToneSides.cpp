@@ -2,8 +2,10 @@
 // XT_VC2TONE_MAIN only.
 #ifdef XT_VC2TONE_MAIN
 #include "Vc2ToneSides.h"
+#include "Vc2OscDraws.h"
 #include <algorithm>
 #include <cstring>
+#include <ranges>
 
 namespace {
 using In = Vc2ToneInput;
@@ -69,6 +71,20 @@ void drawFixedLegato(ToneSides& s, int from, std::mt19937& rng) {
     in.at(In::kOscs[1] + In::kLegato) = 1;
 }
 
+// v328: tone i's OSC made a mode 1 voice (LITE's kind, type 1) on both sides, as its note and install pass leave it:
+// its records, head and tempo words, then the install on both, which runs the set-up.  Only a voice bound to its
+// tone's own parts, as a note's binding leaves it: one no note bound reads through address 0 once a player
+void makeModeOne(ToneSides& s, int i, int osc) {
+    constexpr uint32_t kInstallAt = 0x893ae0f0, kLite = 1, kModeOne = 1;   // [FW] the voice's install
+    Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
+    const uint32_t tone = s.pool.addressOf(i);
+    if (!std::ranges::all_of(v.tail.binds, [&](uint32_t b) { return b - tone < Vc2Tone::kSize; })) return;
+    v.setU32(Vc2OscVoice::kKind, kLite);
+    v.setU32(Vc2OscVoice::kWave, kModeOne);
+    toneSteerModeOne(s, i, osc);
+    if (s.fw.call(kInstallAt, { toneOscAt(s.pool.addressOf(i), osc) })) s.parts[(size_t)i].installOsc(osc);
+}
+
 // The legato's tone: none, a tone made (its OSCs' kind and +0xb0 matched now and then), or a serial no tone has (with
 // the legato's switches off, or rom.4 would read from address 0)
 void drawPrevious(ToneSides& s, std::mt19937& rng) {
@@ -80,6 +96,10 @@ void drawPrevious(ToneSides& s, std::mt19937& rng) {
         in.at(In::kPrevious) = (uint32_t)s.pool.tones[(size_t)from].head.serial;
         for (size_t o = 0; o < In::kOscs.size(); ++o) {
             if (rng() % 2 != 0) continue;
+            // v328: a take brings the voice's object and head, through which the set-up reads its records: a mode 1
+            // voice made and set up one time in six, else a mode 1 voice's words as its note-on left them
+            if (rng() % 6 == 0) makeModeOne(s, from, (int)o);
+            else if (toneOscModeOne(s, from, (int)o)) toneSteerModeOne(s, from, (int)o);
             const Vc2OscVoice& was = s.parts[(size_t)from].oscs[o];   // v319: the real voice, its kind's words drawn
             toneOscBlockOfKind(s, (int)o, was.kind(), was.u32(Vc2OscVoice::kWave), rng);
         }
@@ -130,6 +150,51 @@ std::string toneDifference(ToneSides& s, int only) {
     return what.empty() ? toneOscCallsDifference(s) : what;
 }
 
+bool toneOscModeOne(ToneSides& s, int i, int osc) {
+    constexpr uint32_t kLite = 1, kModeOne = 1;   // [FW]
+    const Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
+    return v.kind() == kLite && v.u32(Vc2OscVoice::kWave) == kModeOne;
+}
+
+void toneSteerModeOne(ToneSides& s, int i, int osc) {
+    Vc2OscVoice& v = s.parts[(size_t)i].oscs[(size_t)osc];
+    const uint32_t at = toneOscAt(s.pool.addressOf(i), osc);
+    oscSteerModeOneSetUp(v, s.shared.osc, at);
+    s.fw.cpu.write(at, &v, sizeof v);
+}
+
+namespace {
+// v328: the voice a LITE voice's head names when that is another pool tone's LITE voice holding a loop record's address,
+// as a take leaves it; else its own
+uint32_t takenHead(ToneSides& s, int i, int osc) {
+    constexpr uint32_t kHeadAt = 0x1a0, kHeadOf = 0x108, kLoopAt = 0x130, kLite = 1;   // [FW]
+    const uint32_t own = toneOscAt(s.pool.addressOf(i), osc);
+    const Vc2OscVoice& self = s.parts[(size_t)i].oscs[(size_t)osc];
+    const uint32_t named = self.u32(kHeadAt) - kHeadOf;
+    const int t = s.pool.indexOf(named);
+    for (int o = 0; self.kind() == kLite && s.pool.holds(named) && named != own && o < 2; ++o) {
+        const Vc2OscVoice& v = s.parts[(size_t)t].oscs[(size_t)o];
+        const auto isLoop = [&](int k) { return oscLoopAt(k) == v.u32(kLoopAt); };
+        if (toneOscAt(s.pool.addressOf(t), o) != named || v.kind() != kLite) continue;
+        if (std::ranges::any_of(std::views::iota(0, kOscRecords), isLoop)) return named;
+    }
+    return own;
+}
+} // namespace
+
+uint32_t toneSettingsVoice(ToneSides& s, int i, int osc) {
+    const uint32_t at = takenHead(s, i, osc);
+    s.n.settingsTaken += at != toneOscAt(s.pool.addressOf(i), osc);
+    return at;
+}
+
+int toneTakenOsc(ToneSides& s, int i) {
+    for (int o = 0; o < 2; ++o) {
+        if (takenHead(s, i, o) != toneOscAt(s.pool.addressOf(i), o)) return o;
+    }
+    return -1;
+}
+
 void tonePrepare(ToneSides& s, int i, std::mt19937& rng) {
     toneDrawOscs(s, rng);
     toneDrawModulatorWords(s, i, rng);
@@ -144,6 +209,8 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     tonePrepare(s, i, rng);
     drawToneInput(s, rng);
     drawPrevious(s, rng);
+    // v328: a LITE wave of type 1 (the legato's kinds too) the records its set-up reads, from the renders' generator
+    for (uint32_t block : In::kOscs) oscModeOneBlock(&s.shared.input.at(block), s.shared.osc.renders);
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
     drawListedWords(s, i, rng);
 }

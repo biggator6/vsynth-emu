@@ -20,6 +20,9 @@ struct Vc2OscVariOff {
 // The object's head: the voice's own +0x108's address at +0x1a0, the block's +0x60 × `tenThousand` through 2^31 at
 // +0x1a8, the wave header's +0x1c at +0x1a4
 void vc2OscPlayerHead(Vc2OscVoice& v, Vc2OscParts& parts, float tenThousand);
+// v328: the word `at` past the address the head names, where it lies: after a note-on the voice's own (+0x108 + at),
+// after a legato's take the earlier tone's voice's, whose object the take brings with its head
+uint32_t vc2OscHeadWord(const Vc2OscVoice& v, Vc2OscParts& parts, uint32_t at);
 // A range's first and last sample
 struct Vc2OscFrames {
     uint32_t first = 0, last = 0;
@@ -45,6 +48,8 @@ void vc2OscWordsTo(Vc2OscVoice& v, const void* port, std::span<const XtWord> wor
 void vc2OscHeads(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool stereo);
 // v327 (Vc2OscModeOne.cpp): kind 1's mode 1's render, 0x893c9f60, mono or stereo by the object's byte 0, on the walk
 void vc2OscModeOne(Vc2OscVoice& v, float* out, Vc2OscParts& p);
+// v328 (Vc2OscModeOneStart.cpp): its set-up, 0x893cc760, which LITE's install runs for a wave of type 1
+void vc2OscModeOneSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

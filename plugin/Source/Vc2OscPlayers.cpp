@@ -9,6 +9,7 @@
 #include "Vc2OscTargets.h"
 #include "XtFloat.h"
 #include <array>
+#include <bit>
 
 using xtf::add;
 using xtf::div;
@@ -23,13 +24,13 @@ constexpr uint32_t kFlagsByte = 0x138, kCopiedFlags = 3;
 constexpr uint8_t kInSamples = 0x80, kVariOff = 0x20, kLoopModes = 0x01, kEventLoops = 0x08;
 
 // [FW] LITE's renders by the wave's type, without the flag (+0xa40) and with it: 0 Vari off's, 1 kind 1's mode 1
-// (which then sets up the object, 0x893cc760), 2 LITE's two heads
+// (which then sets up the object, 0x893cc760, the voice's own from v328), 2 LITE's two heads
 struct LiteRenders {
     uint32_t mono, stereo;
 };
 constexpr std::array<LiteRenders, 3> kLite { { { 0x893c63c0, 0x893c66e0 }, { 0x893c9f60, 0x893c9f60 },
                                                { 0x893c6e80, 0x893c6e8c } } };
-constexpr uint32_t kModeOne = 1, kModeOneSetup = 0x893cc760, kLiteStereo = 3;
+constexpr uint32_t kModeOne = 1, kLiteStereo = 3;
 
 // [FW] VariPhrase's by the wave's type 1…8: its render (0 none), its constant's place in its table (5 more with the
 // flag), and whether the block's Vari off turns it into Vari off's (LITE's type 0)
@@ -86,11 +87,11 @@ void bySamples(Vc2OscVoice& v, Vc2OscParts& parts, const Vc2ToneShared& shared) 
 }
 } // namespace
 
-void Vc2OscVoice::installLite(Vc2OscParts& parts) {
+void Vc2OscVoice::installLite(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     const uint32_t type = u32(kWave);
     if (type >= kLite.size()) return;
     tail.render = tail.flag != 0 ? kLite[type].stereo : kLite[type].mono;
-    if (type == kModeOne) parts.objectCall(kModeOneSetup);
+    if (type == kModeOne) vc2OscModeOneSetUp(*this, parts, shared);   // v328: 0x893cc760, the voice's own
     tail.installed = vc2OscTables().liteInstalled[type + (tail.flag != 0 ? kLiteStereo : 0)];
 }
 
@@ -144,6 +145,10 @@ void vc2OscPlayerHead(Vc2OscVoice& v, Vc2OscParts& parts, float tenThousand) {
     if (!(kTwo31 > times)) times = sub(times, add(kTwo31, kTwo31));
     v.setU32(kTimes, (uint32_t)xtf::ftrc(times));
     v.setU32(kHeaderWord, parts.waveHeader(v.u32(kHeaderAt)).word1c);
+}
+
+uint32_t vc2OscHeadWord(const Vc2OscVoice& v, Vc2OscParts& parts, uint32_t at) {
+    return std::bit_cast<uint32_t>(parts.boundFloat(v.u32(kSelf), at));
 }
 
 float vc2OscLoopRate(int16_t rate, const Vc2ToneShared& shared, float tenths) {

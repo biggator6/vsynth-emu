@@ -211,9 +211,11 @@ void Vc2OscVoice::updateLite(Vc2OscParts& parts, const Vc2ToneShared& shared) {
 // set, the object's 0x04 held and the +0x3c clear, a seek pending and the gain's target 0; with 0x04 clear and +0x3c
 // set, the matched count's byte 1; with 0x02 clear and +0x38 set, the count's byte 0; then the object's three bits
 // from the settings, as the note-on's from the block; then by the settings' type, through the loop record the note-on's
-// head leaves (+0x1a0, the voice's own +0x108's address, at +0x28: the voice's +0x130): type 0 Vari off's range and the
-// side the walk's sign plays, type 2 the heads' range and loops; type 1 and past 2 nothing
+// head leaves (+0x1a0, the voice's own +0x108's address, at +0x28: the voice's +0x130; v328: after a legato's take the
+// earlier tone's voice's): type 0 Vari off's range and the side the walk's sign plays, type 2 the heads' range and
+// loops; type 1 and past 2 nothing
 void Vc2OscVoice::settingsLite(const uint32_t* from, Vc2OscParts& parts) {
+    constexpr uint32_t kHeadLoop = 0x28;   // [FW]
     const uint8_t flags = u8(kObject);
     const bool held = (flags & kHoldBit) != 0;
     if (givenWord(from, kAskSeek) != 0 && held && givenWord(from, kHoldFrom) == 0) {
@@ -225,7 +227,7 @@ void Vc2OscVoice::settingsLite(const uint32_t* from, Vc2OscParts& parts) {
     uint8_t b = flags;
     for (const auto& [bit, at] : kBits) b = withBit(b, bit, givenWord(from, at - kWave));
     setU8(kObject, b);
-    const Vc2OscLoopRecord loop = parts.loopRecord(u32(kLoopAt));
+    const Vc2OscLoopRecord loop = parts.loopRecord(vc2OscHeadWord(*this, parts, kHeadLoop));   // v328: as rom.4 reads
     const uint32_t type = from[0];
     if (type == kVariOffType) {
         const Vc2OscVariOff w = vc2OscVariOffLoops(*this, loop, { u32(kFirst), u32(kFrames) - 1 });

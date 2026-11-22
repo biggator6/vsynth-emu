@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's mode 1 set-up v328 (2026-11-21, on claude/vc2-part-4-3 after v327; HARDWARE_FIRMWARE.md, "The VC-2's mode
+  1 set-up"): step 4.3's fifty-sixth version, the fourth piece of item 11's fourth part's second half. Mode 1's set-up
+  0x893cc760 is the voice's own (Vc2OscModeOneStart.cpp): the table, samples and +0xe0 record from the head's words,
+  byte 3 & 0x70, the end 0, +0x88 1/64, the events' layout by the header's format and the frame, then SOLO's start
+  0x893cc1a0 (Vc2OscWalkStart.cpp, with its lookup 0x893cc0d0: the last event from the table's count, the range's
+  events held to it unsigned, or with the range in samples the seek), the loops' rates 0x893ccf50 and the beat's start.
+  A player's row gains the start's seek and jump. Found: the set-up and LITE's settings (v324) read the records
+  through the object's head, which a legato's take brings from the earlier tone's voice, so a legato sets the new note
+  up on the earlier note's wave; both read through the head now (vc2OscHeadWord), the link answering a pool tone's
+  voice's words from its host. The checks no longer hook the set-up; xt_vc2osc steers an install's mode 1 voice and
+  plays 16 mode 1 part runs from a set-up after its 32; xt_vc2tone gives mode 1 blocks their records, makes an earlier
+  voice mode 1 for a take now and then, and goes on from a take into a settings. 0 different at seeds 2024, 7 and
+  31337. The seek 0x893cc830 still out. Not in the sound yet.
+
 The VC-2's mode 1 v327 (2026-11-21, on claude/vc2-part-4-3 after v326; HARDWARE_FIRMWARE.md, "The VC-2's mode 1"):
   step 4.3's fifty-fifth version, the third piece of item 11's fourth part's second half. Kind 1's mode 1's render
   0x893c9f60 (rom.2's 0x8950d880, which nothing ported, on rom.4's object) is the voice's own (Vc2OscModeOne.cpp), a row

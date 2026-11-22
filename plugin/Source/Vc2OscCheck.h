@@ -33,9 +33,9 @@ inline constexpr uint32_t kOscFramesAt = 0x8C057000;     // the effect chip's fr
 inline constexpr int kOscFrameWords = 32 * 8;            // [FW] a block's 32 frames of 8 words
 inline constexpr uint32_t kOscWaveAt = 0x8C0B0000;       // the wave Vari off's renders play (v323)
 inline constexpr uint32_t kOscWaveHalfwords = 16384;
-inline constexpr uint32_t kOscEventsAt = 0x8C0C0000;     // the events' table mode 1 walks (v327)
+inline constexpr uint32_t kOscEventsAt = 0x8C0C8000;     // the events' table mode 1 walks (v327; v328 32 KB up)
 
-enum OscKind : int32_t { kKindCall, kKindSettings, kRenderBy, kSeek, kObjectCall, kEventPosition };
+enum OscKind : int32_t { kKindCall, kKindSettings, kRenderBy, kSeek, kEventPosition, kOscKinds };
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
 // routine's address, a settings word's offset in the settings' block or a word's in the voice, the output as 1, a
@@ -47,10 +47,12 @@ struct OscCall {
 };
 
 // v327: the events' table mode 1 walks, at kOscEventsAt: its events' count, stride and first half word (the object's
-// +0x8, +0x7) and each event's position ×16; the region about it as rom.4's memory holds it, from `from`
+// +0x8, +0x7) and each event's position ×16; the region about it as rom.4's memory holds it, from `from`.  From v328
+// laid out as mode 1's set-up lays it out, by the header's format (`wide`) and the samples' frame (`stereo`)
 struct OscEventTable {
     int count = 0;
     uint8_t stride = 0, first = 0;
+    bool wide = false, stereo = false;
     std::vector<int32_t> positions {};
     uint32_t from = 0;
     std::vector<uint8_t> bytes {};
@@ -143,7 +145,6 @@ public:
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
     uint32_t address() override { return oscVoiceAt(voice_); }
-    void objectCall(uint32_t routine) override { log(kObjectCall, routine); }
     int32_t eventPosition(uint32_t event) override;
 
 private:

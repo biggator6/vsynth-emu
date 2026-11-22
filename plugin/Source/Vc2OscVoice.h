@@ -21,6 +21,7 @@
 
 // What the note-on reads of the wave's header the block's +0xd4 points at, by its offsets
 struct Vc2OscWaveHeader {
+    uint8_t format = 0;    // +0x01 (v328): 3…5 give mode 1's set-up its wider events' layout
     uint8_t flag = 0;      // +0x02: 1 sets the voice's +0xa40
     uint16_t rate = 0;     // +0x08: 44000 over it is +0xa6c; it scales +0xa80
     int8_t rootKey = 0;    // +0x0a: the root key, × 100 into +0xa80's exponent
@@ -99,10 +100,10 @@ public:
     // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read
     virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
-    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
-    // player's routine on the object; 0x893cc0d0(the object, event, &position, &…), an event's position ×16
+    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0);
+    // 0x893cc0d0(the object, event, &position, &…), an event's position ×16 (a player's routine on the object went
+    // with v328, mode 1's set-up its last)
     virtual uint32_t address() = 0;
-    virtual void objectCall(uint32_t routine) = 0;
     virtual int32_t eventPosition(uint32_t event) = 0;
     virtual Vc2OscWaveHeader waveHeader(uint32_t at) = 0;
     virtual Vc2OscLoopRecord loopRecord(uint32_t at) = 0;
@@ -119,14 +120,14 @@ public:
     static constexpr size_t kPitchRamp = 0, kFormantRamp = 1, kWalkRamp = 2;
 
     void construct();                                      // 0x893ae070 on a voice given
-    void install(Vc2OscParts& parts);                      // 0x893ae0f0
+    void install(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893ae0f0 (v328: mode 1's set-up's exp2)
     void update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893ae1c0
     void reseek(Vc2OscParts& parts);                       // 0x893aeed0
     // 0x893ae370, then the kind's note-on
     void noteOn(const uint32_t* block, uint32_t legato, Vc2OscParts& parts, const Vc2ToneShared& shared);
     void kindNoteOn(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893af0b0 (Vc2OscNoteOn.cpp)
     // v238 (Vc2OscPlayers.cpp): LITE's install 0x893af7a0, VariPhrase's 0x893af870 and its note-on 0x893af420
-    void installLite(Vc2OscParts& parts);
+    void installLite(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void installVari();
     void noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void noteOnLite(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c7c30 (v240, Vc2OscLite.cpp)
