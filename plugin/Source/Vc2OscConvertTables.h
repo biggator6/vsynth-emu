@@ -39,6 +39,13 @@ struct Vc2OscConvertTables {
     // 0x89541f34: the level curve, by an index −128…+255 (the calibration's Level byte is read signed: below 0 the
     // words before it; the Sub Level byte unsigned: past 127 the words after it)
     std::array<uint16_t, 384> level {};
+    // EXTIN's converter's (v393): its gain's divisor (0x8939edf8, 6), its velocity factor's (0x8939edec, 32768) and its
+    // depths' (0x8939edc4, 63); the formant law 0x8939c490's 0.2 (0x8939c59c), 1200 (0x8939c560), 12000 (0x8939c56c)
+    // and 63 (0x8939c568), its low hold `sumLeast`'s, and its rows: 11 of four pairs of a key and an offset, from rom.4's
+    // .data at 0x8993d0c8
+    float extinGainScale = 0, extinVelocityScale = 0, extinDepthTop = 0;
+    float formantStep = 0, formantCents = 0, formantMost = 0, formantDepth = 0;
+    std::array<std::array<int32_t, 8>, 11> formantRows {};
 };
 
 [[nodiscard]] bool vc2LoadOscConvert(const char* path);

@@ -35,10 +35,22 @@ auto secondPartWords(Vc2OscConvertTables& t) {
     });
 }
 
+// [FW] EXTIN's converter's and its formant law's (v393)
+auto extinWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939edf8, &t.extinGainScale }, { 0x8939edec, &t.extinVelocityScale }, { 0x8939edc4, &t.extinDepthTop },
+        { 0x8939c59c, &t.formantStep }, { 0x8939c560, &t.formantCents }, { 0x8939c56c, &t.formantMost },
+        { 0x8939c568, &t.formantDepth },
+    });
+}
+constexpr uint32_t kFormantRowsAt = 0x8993d0c8;   // [FW] .data, as C startup leaves it
+
 struct Read : Vc2OscConvertTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, convertWords(*this));
         vc2ReadPool(image, secondPartWords(*this));
+        vc2ReadPool(image, extinWords(*this));
+        image.read(kFormantRowsAt, formantRows.data(), sizeof formantRows);
         detune[0].slope = 1.0f;   // [FW] 0x8939c744: the first line is x itself (+ fldi0's 0)
         detune[1].slope = 2.0f;   // [FW] 0x8939c75a: fldi1, doubled
         for (uint32_t i = 0; i < cents.size(); ++i) cents[i] = image.rd8(kCentsAt + i);

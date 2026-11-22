@@ -2,6 +2,7 @@
 // the VOCODER's converters the ported ones, on the block's words copied in and out.
 #include "Vc2SetOscKinds.h"
 #include "Vc2OscAnalogConvert.h"
+#include "Vc2OscExtinConvert.h"
 #include "Vc2SetChildHead.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetOscBlock.h"
@@ -13,7 +14,8 @@ using xtf::flt;
 using xtf::mul;
 
 namespace {
-constexpr uint32_t kPcmStart = 0x8939e120, kPcmConvert = 0x8939e300, kExtinConvert = 0x8939e9e0;   // [FW] not ported
+constexpr uint32_t kPcmStart = 0x8939e120, kPcmConvert = 0x8939e300;   // [FW] not ported
+constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;          // [FW] EXTIN's converter's two bytes
 constexpr uint32_t kAnalogKind = 3, kExtinKind = 4, kVocoderKind = 5;   // [FW] the starts' kinds
 constexpr uint32_t kSwitchAt = 0, kTypeAt = 1;           // [FW] the record's OSC switch and type
 constexpr uint32_t kVibratoTypeAt = 0x1c, kRateAt = 0x1d, kDepthAt = 0x1e;   // [FW] the record's vibrato bytes
@@ -144,8 +146,10 @@ void pcmConvert(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
     reads.unportedOscKind(kPcmConvert, bytesOf(in), block);
 }
 
+// EXTIN's (0x8939e9e0, v393): the systems' byte +0x10203 and the input's part's header byte +0x1e besides
 void extinConvert(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) {
-    reads.unportedOscKind(kExtinConvert, bytesOf(in), block);
+    const Vc2OscExtinIn x { reads.oscSystems()[kExtinSystemAt], reads.oscHeader(in.part)[kExtinHeaderAt] };
+    vc2OscExtinConvert(bytesOf(in), worldOf(in, reads), x, reads.shared(), block);
 }
 
 void vocoderConvert(Vc2SetOscInput& in, uint32_t* block, Vc2SetReads& reads) { portedConvert(in, block, true, reads); }

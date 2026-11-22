@@ -3912,6 +3912,60 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's EXTIN converter (2026-11-22, v393) {#vc2-extin-converter}
+
+The OSC converter of type 2, EXTIN's, `0x8939e9e0` in `0x8939fbd0`'s switch, which v391's OSC blocks called by rom.4's
+address. Ported bit for bit: `vc2OscExtinConvert` and its formant law `vc2OscExtinFormant` (Vc2OscExtinConvert.cpp),
+their constants in `Vc2OscConvertTables`, checked in xt_vc2sets' eighth part with rom.4's own converter running there.
+Every address is rom.4's.
+
+**Its first part** writes the OSC block's head as the analog's converter and the VOCODER's do (v251's part): the same
+words, helpers and order. The one difference is the gain (+0x5c): 2^(Wave Gain/6) by powf (2 by `fldi1` doubled, 6 its
+own pool word `0x8939edf8`), with no calibration's factor. The port runs `vc2OscBlockConvert` and puts the gain over it.
+
+**Its own part**, after the head:
+- +0xb0 takes 1 when the systems' byte +0x10203 is 0, else 0.
+- With the part's header byte +0x1e set (the part by the input's +0), the kind becomes 7 when the input's kind byte
+  (+1) is 0, and nothing more is written.
+- Otherwise the kind becomes 6, and:
+  - a velocity factor: the shared curve on the velocity (+4), the sens (+0x5e) and the curve (+0x5c), ÷ 32768;
+  - +0x14, the formant: `0x8939c490` on the Harm Formant (+0x56), the OSC group's Formant sum, the Style (+0x66), the
+    Keyfollow (+0x58) and the block's key (+4);
+  - +0x30: 3 on OSC 1, 7 on OSC 2;
+  - +0x2c: the envelope depth (+0x5b) ÷ 63 × the velocity factor;
+  - +0x50: 0;
+  - +0x4c: the LFO depth (+0x5a) with the LFO group's Formant sum, held to ±63, ÷ 63;
+  - +0x18: the level curve's word 40 ÷ 32768.
+
+**The formant law** `0x8939c490(depth, sum, style, follow; the key on the stack)`:
+- Its row is the Style's, held to 10, of 11 rows of eight words in .data at `0x8993d0c8`: three keys and four offsets,
+  laid out as key, offset, key, offset, key, offset, (unread), offset. Row 0 is all 0 but its keys.
+- By the key: below the first key, the distance from it and the first offset; below the second, the distance from the
+  second and the second offset; below the third, the distance from the second key again and the third offset (as rom.4
+  does); else the distance from the third and the fourth offset.
+- The keyed part is (follow × the distance, an integer) × 0.2 ÷ 1200.
+- The depth plus the offset, as a halfword, × 12000 ÷ 63 plus the sum, held to ±12000, then ÷ 12000 × 63 ÷ 63.
+- Their sum, held to ±1.
+
+**The check.** EXTIN's converter now runs as rom.4's own on rom.4's side. The draws were widened so it reaches every
+path:
+- the Harm Formant's bytes are in their ranges three times in four: depth, LFO and envelope depths ±63, Keyfollow ±200,
+  Style 0…10;
+- the header's +0x1e and the systems' +3 are 0 half the time.
+
+The first run, with the record's bytes left as noise, was 0 different but missed four plants: the formant held at ±1
+for nearly every input, so its rows, two offsets and the sum never showed.
+
+The results:
+- 0 different at seeds 2024 (40 cases: 16,000 events, 1,419 converters; 1,766 calls of PCM's two routines not
+  ported), 7 and 31337 (400 cases each).
+- Every line and branch of Vc2OscExtinConvert.cpp is reached.
+- `mutate_vc2.py --sets`: the 52 EXTIN plants and the 159 OSC plants (one taken out with the call it named), all caught.
+- `--carrier`'s 49 plants in Vc2OscConvertTables.cpp: all caught. The panel's `rom4-no-oscconvert`, for
+  the tables' new reads: caught. verify.sh passes every line; fcheck's diff is the `OSC blocks:` line.
+- Split for the kit's 300 lines: the OSC part's draws moved as they stood into Vc2SetOscBlockDraws.cpp, with what it
+  shares in Vc2SetOscBlockCheck.h.
+
 ### The OSC blocks' check with Alias Cancel off (2026-11-22, v392) {#vc2-set-osc-alias}
 
 v391's check drew the parts' OSC systems as noise, where the analog's Alias Cancel switch (+0x10209) is nearly never 0,

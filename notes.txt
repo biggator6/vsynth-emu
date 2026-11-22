@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's EXTIN converter v393 (2026-11-22, after v392; HARDWARE_FIRMWARE.md, "The VC-2's EXTIN converter"): rom.4's
+  0x8939e9e0, which v391's OSC blocks called by address. vc2OscExtinConvert: v251's head with its own gain, then the
+  kind 6 or 7, the formant by 0x8939c490 on 11 .data rows, its depths and words. xt_vc2sets' eighth part runs rom.4's
+  own beside it: 0 different at seeds 2024, 7 and 31337; 52 new plants and the 159 OSC plants caught; --carrier's 49
+  in Vc2OscConvertTables.cpp caught. The OSC part's draws split into Vc2SetOscBlockDraws.cpp. Not in the sound yet.
+
 The OSC blocks' check with Alias Cancel off v392 (2026-11-22, after v391; HARDWARE_FIRMWARE.md, "The OSC blocks'
   check with Alias Cancel off"): v391's check drew the systems as noise, where Alias Cancel is nearly never 0, and
   missed a plant making it 1; it is 0 half the time now. 0 different at seeds 2024, 7 and 31337; the 159 OSC plants

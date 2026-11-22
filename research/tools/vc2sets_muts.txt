@@ -563,8 +563,62 @@ osc-ways-vocoder-start|{ vocoderStart, vocoderConvert } } };|{ analogStart, voco
 osc-ways-vocoder-convert|{ vocoderStart, vocoderConvert } } };|{ vocoderStart, analogConvert } } };|vc2setosckinds
 osc-ways-analog|kAnalogWays { analogStart, analogConvert };|kAnalogWays { analogStart, vocoderConvert };|vc2setosckinds
 osc-ways-less|in.record[kTypeAt] - 1u;|in.record[kTypeAt];|vc2setosckinds
-osc-ways-pcm-routine|reads.unportedOscKind(kPcmConvert, bytesOf(in), block);|reads.unportedOscKind(kExtinConvert, bytesOf(in), block);|vc2setosckinds
-osc-ways-extin-routine|reads.unportedOscKind(kExtinConvert, bytesOf(in), block);|reads.unportedOscKind(kPcmConvert, bytesOf(in), block);|vc2setosckinds
+osc-ways-pcm-routine|reads.unportedOscKind(kPcmConvert, bytesOf(in), block);|reads.unportedOscKind(kPcmStart, bytesOf(in), block);|vc2setosckinds
 osc-start-vocoder|    analogStart(in, block, reads);\n    block[0] = kVocoderKind;|    analogStart(in, block, reads);|vc2setosckinds
 osc-ported-vocoder|portedConvert(in, block, true, reads); }|portedConvert(in, block, false, reads); }|vc2setosckinds
 osc-world-alias|a.aliasCancel = sys[kSystemAt + 4];|a.aliasCancel = 1;|vc2setosckinds
+# EXTIN's converter (vc2oscextin, Vc2OscExtinConvert.cpp, and its constants, vc2setoscconvtables, v393), not planted:
+# the block's key read unsigned (0x8939c910 holds it to 0…127), the formant's offset as a word (no row's offset takes a
+# halfword past its range).
+extin-gain|    head.gain = shared.pow(kTwo, div(flt(s8(input, kGainAt)), t.extinGainScale));\n|\n|vc2oscextin
+extin-gain-at|kGainAt = 0x0a,|kGainAt = 0x0b,|vc2oscextin
+extin-gain-two|constexpr float kTwo = 2.0f;|constexpr float kTwo = 2.5f;|vc2oscextin
+extin-system|x.system == 0 ? 1 : 0;|x.system == 0 ? 0 : 1;|vc2oscextin
+extin-header|if (x.header != 0) {|if (x.header == 0) {|vc2oscextin
+extin-held-kind|kHeldKind = 7;|kHeldKind = 6;|vc2oscextin
+extin-own-kind|kOwnKind = 6,|kOwnKind = 7,|vc2oscextin
+extin-kind-test|if (u8(input, kKindAt) == 0) block[0] = kHeldKind;|block[0] = kHeldKind;|vc2oscextin
+extin-kind-at|kKindAt = 1,|kKindAt = 3,|vc2oscextin
+extin-osc-at|kOscAt = 2,|kOscAt = 1,|vc2oscextin
+extin-velocity-at|kVelocityAt = 4,|kVelocityAt = 3,|vc2oscextin
+extin-formant-at|kFormantAt = 0x56,|kFormantAt = 0x57,|vc2oscextin
+extin-follow-at|kFollowAt = 0x58;|kFollowAt = 0x5a;|vc2oscextin
+extin-lfo-at|kFormantLfoAt = 0x5a,|kFormantLfoAt = 0x5b,|vc2oscextin
+extin-env-at|kFormantEnvAt = 0x5b,|kFormantEnvAt = 0x5a,|vc2oscextin
+extin-curve-at|kCurveAt = 0x5c,|kCurveAt = 0x5d,|vc2oscextin
+extin-sens-at|kSensAt = 0x5e,|kSensAt = 0x5c,|vc2oscextin
+extin-row-at|kRowAt = 0x66;|kRowAt = 0x67;|vc2oscextin
+extin-env-words|kEnvWords[2] = { 3, 7 };|kEnvWords[2] = { 7, 3 };|vc2oscextin
+extin-osc-formant|kOscFormant = 2,|kOscFormant = 1,|vc2oscextin
+extin-lfo-formant|kLfoFormant = 3;|kLfoFormant = 2;|vc2oscextin
+extin-level-index|kLevelIndex = 40;|kLevelIndex = 41;|vc2oscextin
+extin-last-row|kLastRow = 10;|kLastRow = 9;|vc2oscextin
+extin-key-byte|kKeyByte = 4,|kKeyByte = 5,|vc2oscextin
+extin-zero|    block[kZeroWord] = 0;\n|\n|vc2oscextin
+extin-env-velocity|mul(div(flt(s8(input, kFormantEnvAt)), t.extinDepthTop), velocity)|div(flt(s8(input, kFormantEnvAt)), t.extinDepthTop)|vc2oscextin
+extin-lfo-hold|-kDepthMost, kDepthMost);|-kDepthMost, kDepthMost + 1);|vc2oscextin
+extin-level-scale|div(flt(vc2OscLevelWord(t, kLevelIndex)), t.extinVelocityScale)|div(flt(vc2OscLevelWord(t, kLevelIndex)), t.extinDepthTop)|vc2oscextin
+extin-velocity-scale|const float velocity = div(flt(curve), t.extinVelocityScale);|const float velocity = div(flt(curve), t.extinDepthTop);|vc2oscextin
+extin-span-first|if (key < r[0]) return { r[0], r[1] };|if (key < r[0]) return { r[0], r[3] };|vc2oscextin
+extin-span-first-test|if (key < r[0]) return|if (key <= r[0]) return|vc2oscextin
+extin-span-second|if (key < r[2]) return { r[2], r[3] };|if (key < r[2]) return { r[0], r[3] };|vc2oscextin
+extin-span-third|if (key < r[4]) return { r[2], r[5] };|if (key < r[4]) return { r[4], r[5] };|vc2oscextin
+extin-span-third-offset|if (key < r[4]) return { r[2], r[5] };|if (key < r[4]) return { r[2], r[6] };|vc2oscextin
+extin-span-last|return { r[4], r[7] };|return { r[4], r[6] };|vc2oscextin
+extin-formant-step|t.formantStep),|t.formantCents),|vc2oscextin
+extin-formant-sum|t.formantDepth), flt(sum)), t.sumLeast,|t.formantDepth), flt(sum / 2)), t.sumLeast,|vc2oscextin
+extin-formant-low|flt(sum)), t.sumLeast,|flt(sum)), -t.formantDepth,|vc2oscextin
+extin-formant-scaled|div(mul(div(held, t.formantMost), t.formantDepth), t.formantDepth)|div(held, t.formantDepth)|vc2oscextin
+extin-formant-held|return vc2OscHeld(add(scaled, keyed), -1.0f, 1.0f);|return add(scaled, keyed);|vc2oscextin
+extin-formant-keyed|add(scaled, keyed)|add(scaled, 0.0f)|vc2oscextin
+extin-ported-world|vc2OscExtinConvert(bytesOf(in), worldOf(in, reads), x, reads.shared(), block);|reads.unportedOscKind(0x8939e9e0, bytesOf(in), block);|vc2setosckinds
+extin-ported-system|reads.oscSystems()[kExtinSystemAt]|reads.oscSystems()[kExtinSystemAt + 1]|vc2setosckinds
+extin-ported-header|reads.oscHeader(in.part)[kExtinHeaderAt]|reads.oscHeader(0)[kExtinHeaderAt]|vc2setosckinds
+extin-pool-gain|{ 0x8939edf8, &t.extinGainScale }|{ 0x8939edfc, &t.extinGainScale }|vc2setoscconvtables
+extin-pool-velocity|{ 0x8939edec, &t.extinVelocityScale }|{ 0x8939edf8, &t.extinVelocityScale }|vc2setoscconvtables
+extin-pool-depth|{ 0x8939edc4, &t.extinDepthTop }|{ 0x8939edf8, &t.extinDepthTop }|vc2setoscconvtables
+extin-pool-step|{ 0x8939c59c, &t.formantStep }|{ 0x8939c560, &t.formantStep }|vc2setoscconvtables
+extin-pool-cents|{ 0x8939c560, &t.formantCents }|{ 0x8939c56c, &t.formantCents }|vc2setoscconvtables
+extin-pool-most|{ 0x8939c56c, &t.formantMost }|{ 0x8939c560, &t.formantMost }|vc2setoscconvtables
+extin-pool-formant-depth|{ 0x8939c568, &t.formantDepth }|{ 0x8939c56c, &t.formantDepth }|vc2setoscconvtables
+extin-rows-at|kFormantRowsAt = 0x8993d0c8;|kFormantRowsAt = 0x8993d0cc;|vc2setoscconvtables

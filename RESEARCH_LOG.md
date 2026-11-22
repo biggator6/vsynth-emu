@@ -4008,3 +4008,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The OSC blocks call more than the brief named: the dispatch, three kinds' starts, the converter frame with the vibrato's words, and the PCM and EXTIN converters, none ported. The dispatch, the starts, the frame and the analog's and VOCODER's converters are in v391; PCM's start and the PCM and EXTIN converters stay rom.4's own through Vc2SetReads.
 - The step counts' table is part 0's 64 bytes, with the update queue after it: the check keeps 16 parts' worth of its own copy, as a part past 0 counts into whatever follows.
 - To stop my plant run I ran pkill -f with a pattern every session's runs match. The two running sessions were told; neither had a run going then.
+
+### Session 24, continued (2026-11-22) — v392, v393: Alias Cancel, EXTIN's converter
+
+- The git guard refuses amends, so v391's missed Alias Cancel plant got a version of its own (v392); the converters start at v393.
+- EXTIN's converter equalled rom.4 on its first run, but four of its plants were missed: with the record's bytes as noise, the formant held at ±1 almost always. The Harm Formant's IDs gave the ranges to draw them in.
+- Its formant law's third span takes its distance from the second key, not the third. It is ported as rom.4 has it.

@@ -728,6 +728,9 @@ version against rom.4's routines with what it calls hooked:
         `Vc2SetReads::unportedOscKind`: PCM's start `0x8939e120` (its wave lookups `0x89394b30`, `0x89394c20`,
         `0x89394d10`, `0x89351840`, `0x89351ad0`, `0x89351ff0`, `0x893520a0`, `0x8939cd30`, `0x8939cba0`), the PCM
         converter `0x8939e300` and EXTIN's `0x8939e9e0` (its own level law `0x8939c490` on a .data table), a version each.
+      - EXTIN's converter done (v393): `vc2OscExtinConvert`, v251's head with its own gain, its kind 6 or 7 and its words,
+        the formant law `0x8939c490` on rom.4's .data rows; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's
+        EXTIN converter"). Left: PCM's start `0x8939e120` and the PCM converter `0x8939e300`.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.
