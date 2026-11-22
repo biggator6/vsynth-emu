@@ -255,6 +255,12 @@ The VC-2 mode's 1,332 (v451, `vc2…`, after the 763) have none yet either: its 
 come `VSynthEmuEditorTest` holds them apart (the user's decision, 2026-11-21): each one of the set in its order, none
 reached by a control, and the set whole. The pages will be made from their IDs by tables, as every other.
 
+### The VC-2 mode's pages {#vc2-pages-pointer}
+
+A draft for the user to decide (2026-11-22), not built: `UI_DESIGN_VC2.md` beside this file, with its mock-up
+`UI_DESIGN_VC2.html`. Six pages in VC-2 mode, each of the 1,332 on one of them, and the open choices as questions d-1
+to d-14. What the user decides comes here as the pages are built (step 4.5's second half), and that file goes.
+
 ### Still to do
 
 The user's testing notes (2026-11-14): the OSC display drawing the loaded wave and the chosen analog waveform (done in

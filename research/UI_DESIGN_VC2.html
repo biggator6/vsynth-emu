@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VC-2 pages draft</title>
+<!-- The VC-2 mode's pages, a mock-up for research/UI_DESIGN_VC2.md (2026-11-22). D's palette and sizes
+     (research/UI_DESIGN.md, "The look"); every control drawn from a table of rom.4 IDs, as the editor's would be.
+     Not the editor: a picture of it for the user to decide on. -->
+<style>
+:root {
+  --ground:#141518; --header:#0F1012; --panel:#1C1E22; --raised:#24272D; --lower:#1A1C20; --field:#0F1012;
+  --edge:#2C2F36; --divider:#2A2D33; --track:#33363D; --text:#ECEDEF; --label:#A3A8B2; --muted:#8E949F;
+  --dim:#6B717C; --accent:#F5A524; --mod:#46C2E0; --ready:#5FD28B; --warning:#E8743B; --zone3:#B9A3FF;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #0B0C0E; color: var(--text); font-family: var(--sans); }
+.top { padding: 14px 16px 10px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.top h1 { font-size: 14px; letter-spacing: .1em; margin: 0; font-weight: 700; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button { font: 600 12px var(--sans); letter-spacing: .06em; color: var(--label); background: var(--panel);
+  border: 1px solid var(--edge); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--accent); color: var(--ground); border-color: var(--accent); }
+.caption { width: 100%; font-size: 12px; color: var(--muted); line-height: 1.45; max-width: 1200px; }
+#wrap { padding: 0 16px 24px; overflow: hidden; }
+#stage { position: relative; width: 1200px; height: 750px; transform-origin: 0 0; }
+.frame { position: absolute; inset: 0; background: var(--ground); overflow: hidden; border-radius: 4px; }
+.abs { position: absolute; }
+.panel { position: absolute; background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; }
+.panel.sel { border-color: var(--accent); }
+.pname { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--text); }
+.lbl { font-size: 10px; font-weight: 600; color: var(--label); }
+.val { font: 10px var(--mono); color: var(--text); }
+.hint { font-size: 11px; color: var(--muted); }
+.cell { display: flex; flex-direction: column; align-items: center; }
+.cell .lbl, .cell .val { line-height: 13px; height: 13px; white-space: nowrap; }
+.grid { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; align-items: flex-start; }
+.boxc { width: 136px; height: 36px; display: flex; flex-direction: column; gap: 2px; }
+.boxc .b { height: 20px; background: var(--raised); border-radius: 4px; display: flex; align-items: center;
+  justify-content: space-between; padding: 0 8px; font: 11px var(--mono); color: var(--text); }
+.swc { width: 136px; height: 24px; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.pname { white-space: nowrap; }
+.pill { width: 26px; height: 14px; border-radius: 7px; background: var(--track); position: relative; flex: none; }
+.pill::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 5px; background: var(--muted); }
+.pill.on { background: var(--accent); }
+.pill.on::after { left: 14px; background: var(--ground); }
+.dimmed { opacity: .38; position: relative; }
+.tag { font: 600 8px var(--sans); letter-spacing: .06em; color: var(--accent); }
+.chip { display: flex; flex-direction: column; justify-content: center; height: 36px; padding: 0 10px; border-radius: 6px;
+  background: var(--panel); white-space: nowrap; }
+.chip b { font-size: 11px; font-weight: 700; color: var(--text); line-height: 15px; }
+.chip span { font-size: 10px; color: var(--label); line-height: 14px; }
+.chip.sel { background: var(--accent); } .chip.sel b, .chip.sel span { color: var(--ground); }
+.chip.fx span { color: var(--accent); } .chip.fx.off b, .chip.fx.off span { color: var(--muted); }
+.chip.warn span { color: var(--warning); }
+.field { background: var(--field); border-radius: 6px; position: absolute; overflow: hidden; }
+.row { display: flex; align-items: center; }
+.mono { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>VC-2 PAGES · DRAFT</h1>
+  <div class="tabs" role="tablist" aria-label="Pages drawn">
+    <button type="button" data-page="synth" aria-pressed="true">SYNTH · zone 2</button>
+    <button type="button" data-page="vocoder" aria-pressed="false">VOCODER · mic silent</button>
+    <button type="button" data-page="modulation" aria-pressed="false">MODULATION</button>
+    <button type="button" data-page="play" aria-pressed="false">PLAY</button>
+  </div>
+  <div class="caption" id="caption"></div>
+</div>
+<div id="wrap"><div id="stage"><div class="frame" id="frame"></div></div></div>
+<script>
+'use strict';
+const C = { ground:'#141518', header:'#0F1012', panel:'#1C1E22', raised:'#24272D', lower:'#1A1C20', field:'#0F1012',
+  edge:'#2C2F36', divider:'#2A2D33', track:'#33363D', text:'#ECEDEF', label:'#A3A8B2', muted:'#8E949F', dim:'#6B717C',
+  accent:'#F5A524', mod:'#46C2E0', ready:'#5FD28B', warning:'#E8743B', zone3:'#B9A3FF' };
+
+// ---- Controls, each as D draws it: a knob (a 30 dial in a 64 cell), a big knob (44), a box, a switch
+const pt = (cx, cy, r, deg) => [cx + r * Math.cos(deg * Math.PI / 180), cy + r * Math.sin(deg * Math.PI / 180)];
+function arc(cx, cy, r, a0, a1) {
+  if (Math.abs(a1 - a0) < 0.01) return '';
+  const [x0, y0] = pt(cx, cy, r, Math.min(a0, a1)), [x1, y1] = pt(cx, cy, r, Math.max(a0, a1));
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${Math.abs(a1 - a0) > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+// frac 0..1 of the 270° sweep from 135°; bipolar fills from the top (270°)
+function dial(size, frac, o = {}) {
+  const c = size / 2, w = size > 40 ? 4 : 3, r = c - w / 2 - (o.mod ? 4 : 1), a = 135 + 270 * frac;
+  const from = o.bip ? 270 : 135;
+  let s = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">`;
+  s += `<path d="${arc(c, c, r, 135, 405)}" fill="none" stroke="${C.track}" stroke-width="${w}" stroke-linecap="round"/>`;
+  s += `<path d="${arc(c, c, r, from, a)}" fill="none" stroke="${C.accent}" stroke-width="${w}" stroke-linecap="round"/>`;
+  if (o.mod) s += `<path d="${arc(c, c, r + 3.2 + w / 2, a - 40, a + 25)}" fill="none" stroke="${C.mod}" stroke-width="1.6"/>`;
+  if (size > 40) s += `<circle cx="${c}" cy="${c}" r="${r - 6}" fill="${C.divider}"/>`;
+  const [px, py] = pt(c, c, r - 6, a);
+  s += `<line x1="${c}" y1="${c}" x2="${px.toFixed(2)}" y2="${py.toFixed(2)}" stroke="${C.text}" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+  return s;
+}
+const wrapDim = (html, o) => o.dim ? `<div class="dimmed" title="${o.dim}">${html}</div>` : html;
+// [name, value, frac, opts]
+function knob(n, v, f, o = {}) {
+  const tag = o.tag ? `<span class="tag">${o.tag}</span>` : '';
+  return wrapDim(`<div class="cell" style="width:${o.w || 64}px">${dial(o.size || 30, f, o)}<span class="lbl">${n}</span><span class="val">${v}${tag ? ' ' : ''}</span>${tag}</div>`, o);
+}
+const big = (n, v, f, o = {}) => knob(n, v, f, Object.assign({ size: 44, w: o.w || 70 }, o));
+const box = (n, v, o = {}) => wrapDim(`<div class="boxc" style="width:${o.w || 136}px"><span class="lbl">${n}${o.tag ? ` <span class="tag">${o.tag}</span>` : ''}</span><div class="b"><span>${v}</span><svg width="8" height="6" viewBox="0 0 8 6" aria-hidden="true"><path d="M1 1l3 3 3-3" fill="none" stroke="${C.label}" stroke-width="1.4"/></svg></div></div>`, o);
+const sw = (n, on, o = {}) => wrapDim(`<div class="swc" style="width:${o.w || 136}px"><span class="pill${on ? ' on' : ''}"></span>${n}${o.tag ? ` <span class="tag">${o.tag}</span>` : ''}</div>`, o);
+const grid = (cells, items, style = '') => `<div class="grid" style="width:${72 * cells - 8}px;${style}">${items.join('')}</div>`;
+// A card: its frame, its name, what its title line holds at the right, its body
+function card(x, y, w, h, title, body, o = {}) {
+  return `<div class="panel${o.sel ? ' sel' : ''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;padding:12px">
+    <div class="row" style="height:24px;justify-content:space-between"><span class="pname">${title}</span><div class="row" style="gap:8px">${o.head || ''}</div></div>
+    <div style="margin-top:8px;position:relative;height:${h - 56}px">${body}</div></div>`;
+}
+
+// ---- The chrome: header, page bar, footer (D's regions)
+function header(mic) {
+  const micDot = mic === 'ok' ? C.ready : C.warning, micLvl = mic === 'ok' ? 62 : 4;
+  return `<div class="abs" style="left:0;top:0;width:1200px;height:48px;background:${C.header};border-bottom:1px solid ${C.divider}">
+  <div class="abs" style="left:16px;top:9px;line-height:1.15"><div style="font-weight:700;font-size:15px;letter-spacing:.12em">V-SYNTH EMU</div>
+    <div class="mono" style="font-size:10px;color:${C.muted}">v452 · vc2 pages draft</div></div>
+  <div class="abs row" style="left:176px;top:11px;height:26px;border:1px solid ${C.track};border-radius:6px;overflow:hidden">
+    <span style="padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;color:${C.label}">V-SYNTH</span>
+    <span style="padding:0 16px;height:26px;line-height:26px;background:${C.accent};color:${C.ground};font-size:11px;font-weight:700;letter-spacing:.08em">VC-2</span></div>
+  <div class="abs row" style="left:318px;top:8px;width:400px;height:32px;background:${C.panel};border:1px solid ${C.edge};border-radius:6px;padding:0 4px 0 12px;gap:10px">
+    <span class="mono" style="font-size:11px;color:${C.muted}">PATCH</span><span style="font-size:13px;font-weight:600;flex:1">INIT PATCH</span>
+    <span style="font-size:10px;color:${C.muted}">.p02</span>
+    <span style="height:24px;line-height:24px;padding:0 10px;border-radius:4px;background:${C.raised};font-size:11px;font-weight:600">Browse…</span></div>
+  <div class="abs row" title="${mic === 'ok' ? 'Vocoding · HIRESO' : 'Silent: no mic signal on MONO-L'}" style="left:728px;top:11px;width:76px;height:26px;background:${C.panel};border:1px solid ${mic === 'ok' ? C.edge : C.warning};border-radius:6px;padding:0 8px;gap:6px">
+    <span style="width:7px;height:7px;border-radius:4px;background:${micDot}"></span><span style="font-size:11px;font-weight:700;letter-spacing:.06em">MIC</span>
+    <span style="flex:1;height:4px;border-radius:2px;background:${C.track};position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:${micLvl}%;border-radius:2px;background:${micDot}"></span></span></div>
+  <div class="abs row" style="left:812px;top:13px;gap:6px;font-size:11px;color:${C.label}">Tempo<span class="mono" style="color:${C.text};background:${C.panel};border:1px solid ${C.edge};border-radius:4px;padding:3px 8px">120.0</span></div>
+  <div class="abs row" style="left:928px;top:17px;gap:8px;font-size:11px;font-weight:600"><span class="pill on"></span>Effects</div>
+  <div class="abs row" style="left:1018px;top:17px;gap:6px;font-size:11px;color:${C.label}"><span style="width:7px;height:7px;border-radius:4px;background:${C.ready}"></span>rom.4 ready</div>
+  <div class="abs" style="left:1124px;top:11px;height:26px;line-height:26px;padding:0 12px;border-radius:4px;background:${C.raised};font-size:11px;font-weight:600">ROM…</div>
+  </div>`;
+}
+const PAGES = ['SYNTH', 'VOCODER', 'MODULATION', 'FX', 'PLAY', 'ZONES'];
+function pageBar(active, hint) {
+  const tabs = PAGES.map(p => `<span style="display:flex;align-items:center;padding:0 14px;font-size:12px;font-weight:${p === active ? 700 : 600};letter-spacing:.1em;color:${p === active ? C.text : C.label};border-bottom:2px solid ${p === active ? C.accent : 'transparent'}">${p}</span>`).join('');
+  return `<div class="abs row" style="left:0;top:48px;width:1200px;height:34px;padding:0 16px;border-bottom:1px solid ${C.divider};align-items:stretch">${tabs}
+    <div style="flex:1"></div><div class="row hint" style="margin-right:16px">${hint}</div><div class="row" style="gap:8px;font-size:11px;font-weight:600"><span class="pill on"></span>Keyboard</div></div>`;
+}
+function footer() {
+  const x0 = 196, n = 42, kw = (1188 - x0) / n;
+  let keys = '';
+  for (let i = 0; i < n; i++) keys += `<div class="abs" style="left:${(x0 + i * kw).toFixed(1)}px;top:716px;width:${(kw - 1).toFixed(1)}px;height:30px;background:#D9DBE0;border-radius:0 0 2px 2px"></div>`;
+  for (let i = 0; i < n; i++) if ([0, 1, 3, 4, 5].includes(i % 7))
+    keys += `<div class="abs" style="left:${(x0 + (i + 0.68) * kw).toFixed(1)}px;top:716px;width:${(kw * 0.62).toFixed(1)}px;height:18px;background:#17181B;border-radius:0 0 2px 2px"></div>`;
+  const split = x0 + 21 * kw;   // zone 1 up to B3, zone 2 from C4: the patch's Range Uppers
+  return `<div class="abs" style="left:0;top:710px;width:1200px;height:40px;background:${C.header};border-top:1px solid ${C.divider}"></div>
+    <div class="abs hint" style="left:16px;top:722px">Keys <b style="color:${C.text}">POLY</b> · 2 zones</div>
+    <div class="abs" style="left:${x0}px;top:711px;width:${split - x0 - 2}px;height:4px;background:${C.accent};border-radius:2px"></div>
+    <div class="abs" style="left:${split}px;top:711px;width:${1188 - split}px;height:4px;background:${C.mod};border-radius:2px"></div>${keys}`;
+}
+const arrow = `<svg width="16" height="10" viewBox="0 0 16 10" aria-hidden="true"><path d="M1 5h12M9 1.5l4 3.5-4 3.5" fill="none" stroke="${C.dim}" stroke-width="1.4"/></svg>`;
+const chip = (n, s, cls = '') => `<div class="chip ${cls}"><b>${n}</b><span>${s}</span></div>`;
+function path(vocoder) {
+  const zone = (n, on, col) => `<div class="chip" style="padding:0 9px;${on ? `background:${col}` : ''}"><b style="${on ? `color:${C.ground}` : ''}">Z${n}</b><span style="${on ? `color:${C.ground}` : ''}">ZONE</span></div>`;
+  return `<div class="abs row" style="left:0;top:82px;width:1200px;height:52px;padding:0 12px;gap:6px">
+    ${zone(1, false, C.accent)}${zone(2, true, C.mod)}<div style="width:6px"></div>
+    ${chip('OSC 1', 'EXTIN')}${chip('OSC 2', 'VOCODER', 'sel')}${arrow}${chip('MOD', 'OFF')}${arrow}${chip('COSM 1', 'TVF')}${arrow}
+    ${chip('COSM 2', 'GROWL')}${arrow}${chip('AMP', 'TVA · 127')}${arrow}${vocoder}${arrow}
+    ${chip('MFX', 'ON', 'fx')}${chip('CHORUS', 'OFF', 'fx off')}${chip('REVERB', 'ON', 'fx')}
+    <div style="flex:1"></div><span class="lbl" style="font-size:11px;font-weight:400">Structure</span>
+    ${box('', '1', { w: 64 }).replace('<span class="lbl"></span>', '')}</div>`;
+}
+
+// ---- SYNTH, zone 2: OSC 1 on EXTIN, OSC 2 on VOCODER (selected), COSM 2 the Growl
+function oscPanel(x, name, type, display, bigs, smalls, sel) {
+  const t = `<div class="row" style="gap:8px;height:22px"><span class="pill on"></span><span class="pname">${name}</span><div style="flex:1"></div>${box('', type, { w: 104 }).replace('<span class="lbl"></span>', '')}</div>`;
+  return `<div class="panel${sel ? ' sel' : ''}" style="left:${x}px;top:134px;width:310px;height:304px;padding:10px 12px">${t}
+    <div style="position:relative;height:72px;margin-top:8px">${display}</div>
+    <div class="row" style="margin-top:10px;justify-content:space-between">${bigs.map(b => big(...b)).join('')}</div>
+    <div class="row" style="margin-top:8px;justify-content:space-between">${smalls.map(s => knob(s[0], s[1], s[2], Object.assign({ w: 47 }, s[3] || {}))).join('')}</div></div>`;
+}
+function micDisplay() {
+  let d = 'M0 36';
+  for (let i = 0; i <= 286; i += 2) d += `L${i} ${(36 - 22 * Math.sin(i / 14) * (0.6 + 0.4 * Math.sin(i / 47)) - 6 * Math.sin(i / 5)).toFixed(1)}`;
+  return `<div class="field" style="left:0;top:0;width:286px;height:72px"><svg width="286" height="72" aria-hidden="true"><path d="${d}" fill="none" stroke="${C.accent}" stroke-width="1.4"/></svg>
+    <span class="abs hint mono" style="left:8px;top:4px;font-size:10px">MIC · MONO-L · A3 220 Hz</span></div>`;
+}
+function carrierDisplay() {
+  let s = '';
+  for (let k = 1; k <= 34; k++) { const x = 6 + k * 8, h = Math.max(2, 56 / Math.pow(k, 0.55) * (x < 180 ? 1 : Math.exp(-(x - 180) / 30))); s += `<line x1="${x}" y1="66" x2="${x}" y2="${(66 - h).toFixed(1)}" stroke="${C.accent}" stroke-width="2"/>`; }
+  return `<div class="field" style="left:0;top:0;width:286px;height:72px"><svg width="286" height="72" aria-hidden="true">
+    <path d="M70 66 C 95 36, 150 30, 200 34 S 250 60, 280 64 L 280 66 Z" fill="${C.mod}" fill-opacity=".22" stroke="${C.mod}" stroke-width="1.2"/>${s}</svg>
+    <span class="abs hint mono" style="left:8px;top:4px;font-size:10px">SAW <span style="color:${C.accent}">■</span> NOISE <span style="color:${C.mod}">■</span> · BAL 64</span></div>`;
+}
+function cosmPanel(y, name, type, sub, display, knobs) {
+  const t = `<div class="row" style="gap:8px;height:20px"><span class="pill on"></span><span class="pname">${name}</span><div style="flex:1"></div>
+    ${box('', type, { w: 104 }).replace('<span class="lbl"></span>', '')}${sub ? box('', sub, { w: 72 }).replace('<span class="lbl"></span>', '') : ''}</div>`;
+  return `<div class="panel" style="left:840px;top:${y}px;width:348px;height:116px;padding:10px 12px">${t}
+    <div class="row" style="margin-top:8px;gap:8px;align-items:flex-start"><div style="position:relative;width:96px;height:62px;flex:none">${display}</div>
+    <div class="row" style="flex:1;justify-content:flex-start">${knobs.map(k => knob(k[0], k[1], k[2], Object.assign({ w: 44 }, k[3] || {}))).join('')}</div></div></div>`;
+}
+function synthPage() {
+  const trip = `<div class="panel" style="left:12px;top:134px;width:184px;height:304px;padding:10px">
+    <div class="row" style="height:22px;gap:4px"><span class="pname">TIME TRIP</span><div style="flex:1"></div>
+      <span style="font-size:9px;padding:2px 4px;border-radius:4px;color:${C.label};border:1px solid ${C.track};white-space:nowrap">OSC 1</span>
+      <span style="font-size:9px;padding:2px 4px;border-radius:4px;background:${C.mod};color:${C.ground};font-weight:700;white-space:nowrap">OSC 2</span></div>
+    <div class="field" style="left:10px;top:38px;width:164px;height:160px"><svg width="164" height="160" aria-hidden="true">
+      <circle cx="82" cy="80" r="62" fill="none" stroke="${C.track}" stroke-width="2"/><line x1="82" y1="80" x2="118" y2="44" stroke="${C.mod}" stroke-width="1.4"/>
+      <circle cx="118" cy="44" r="7" fill="${C.mod}"/></svg><span class="abs mono" style="left:8px;bottom:6px;font-size:10px;color:${C.mod}">TRIP X 98 · Y 99</span></div>
+    <div class="abs row" style="left:10px;top:206px;gap:8px"><div class="row" style="border:1px solid ${C.track};border-radius:5px;overflow:hidden;height:22px">
+      <span style="padding:0 7px;font-size:10px;color:${C.label}">X-Y</span><span style="padding:0 7px;line-height:22px;font-size:10px;font-weight:700;background:${C.accent};color:${C.ground}">TRIP</span></div>
+      ${sw('Pad Hold', false, { w: 84 })}</div>
+    <div class="abs" style="left:10px;top:238px">${sw('Time Trip', true, { w: 160 })}</div>
+    <div class="abs" style="left:10px;top:268px">${sw('Beat Keep', true, { w: 160 })}</div></div>`;
+  const osc1 = oscPanel(204, 'OSC 1', 'EXTIN', micDisplay(),
+    [['Pitch', '0', .5, { bip: 1 }], ['Harm Fmt', '+12', .6, { bip: 1 }], ['Coarse', '+7', .57, { bip: 1 }], ['Level', '110', .87]],
+    [['Fine', '0', .5, { bip: 1 }], ['Harm KF', '0', .5, { bip: 1 }], ['Style', '3', .3], ['Pitch KF', '+100', .75, { bip: 1 }], ['Gain', '0dB', .5, { bip: 1 }], ['Vel Sens', '+32', .75, { bip: 1 }]]);
+  const osc2 = oscPanel(522, 'OSC 2', 'VOCODER', carrierDisplay(),
+    [['Pitch', '0', .5, { bip: 1 }], ['Balance', '64', .5], ['Growl', '0', 0], ['Level', '127', 1]],
+    [['Coarse', '0', .5, { bip: 1 }], ['Fine', '0', .5, { bip: 1 }], ['Saw', '101', .8], ['Saw LPF', '90', .71], ['Noise', '95', .75], ['Noise LP', '12', .09]], true);
+  const tvf = `<div class="field" style="left:0;top:0;width:96px;height:62px"><svg width="96" height="62" aria-hidden="true"><path d="M6 40 L44 40 C 56 40, 58 14, 64 24 S 76 54, 90 56" fill="none" stroke="${C.accent}" stroke-width="1.8"/></svg></div>`;
+  let wob = 'M6 31';
+  for (let i = 6; i <= 90; i++) wob += `L${i} ${(31 + 16 * Math.sin((i - 6) / 5.2) * Math.exp(-(i - 6) / 120)).toFixed(1)}`;
+  const growl = `<div class="field" style="left:0;top:0;width:96px;height:62px"><svg width="96" height="62" aria-hidden="true"><path d="${wob}" fill="none" stroke="${C.accent}" stroke-width="1.6"/></svg><span class="abs mono" style="left:5px;bottom:3px;font-size:9px;color:${C.muted}">38 Hz</span></div>`;
+  const c1 = cosmPanel(134, 'COSM 1', 'TVF', 'LPF', tvf, [['Cutoff', '90', .7], ['Reso', '20', .16], ['KF', '+20', .55, { bip: 1 }], ['Env', '0', .5, { bip: 1 }], ['LFO', '0', .5, { bip: 1 }]]);
+  const c2 = cosmPanel(258, 'COSM 2', 'GROWL', '', growl, [['Intensity', '80', .63], ['Speed', '40', .31]]);
+  const ampKnob = (n, v, f, o = {}) => `<div class="row" style="gap:5px;width:64px">${dial(24, f, o)}<div style="line-height:12px"><div class="lbl">${n}</div><div class="val">${v}</div></div></div>`;
+  const amp = `<div class="panel" style="left:840px;top:382px;width:348px;height:56px;padding:8px 10px"><div class="row" style="justify-content:space-between;height:38px">
+    ${ampKnob('Level', '127', 1)}${ampKnob('Pan', '0', .5, { bip: 1 })}${ampKnob('MFX', '127', 1)}${ampKnob('Cho', '0', 0)}${ampKnob('Rev', '40', .31)}</div></div>`;
+  const list = ['SELECTED', 'DETAILS', 'ENVELOPES', 'LFOs'].map(e => `<div style="padding:7px 10px;border-radius:5px;font-size:11px;font-weight:600;letter-spacing:.06em;${e === 'DETAILS' ? `background:${C.divider};color:${C.text}` : `color:${C.label}`}">${e}</div>`).join('');
+  const dim0 = 'rom.4 holds it; nothing found reads it (d-6)';
+  const det = [knob('Noise HPF', '51', .4), knob('Dyn Thresh', '50', .39), knob('Dyn Sens', '38', .3), knob('Growl KF', '0', .5, { bip: 1 }),
+    knob('Growl LFO', '0', .5, { bip: 1 }), knob('Growl Env', '0', .5, { bip: 1 }), knob('Bal LFO', '0', .5, { bip: 1 }), knob('Bal Env', '0', .5, { bip: 1 }),
+    knob('Pitch KF', '+100', .75, { bip: 1 }), knob('Random', '0', 0), knob('Level KF', '0', .5, { bip: 1 }), knob('Gain', '0dB', .5, { bip: 1 }),
+    knob('Vib Type', '0', 0), knob('Vib Rate', '64', .5), knob('Vib Depth', '0', .5, { bip: 1 })];
+  const lower = `<div class="abs" style="left:0;top:438px;width:1200px;height:272px;background:${C.lower};border-top:1px solid ${C.divider}">
+    <div class="abs" style="left:12px;top:12px;width:148px"><div class="pname" style="color:${C.accent};margin:0 0 8px 10px">OSC 2 · Z2</div>${list}</div>
+    <div class="abs" style="left:170px;top:12px;width:1px;height:248px;background:${C.divider}"></div>
+    <div class="abs" style="left:184px;top:14px"><div class="row" style="gap:10px;margin-bottom:12px"><span class="pname">DETAILS</span><span class="hint">VOCODER: what its panel leaves · the vibrato on every Type</span></div>
+      ${grid(14, det)}
+      <div class="hint" style="margin-top:12px">PCM's DETAILS dims Wave Start (0x37f) and Wave No. 2 (0x389); EXTIN's Harm LFO and Harm Env (0x373, 0x374): ${dim0}.</div></div></div>`;
+  return header('ok') + pageBar('SYNTH', 'Z1 / Z2 is Current Zone: the rack and the panel below are that zone’s') +
+    path(chip('VOCODER', 'HIRESO')) + trip + osc1 + osc2 + c1 + c2 + amp + lower + footer();
+}
+
+// ---- VOCODER: LEGACY chosen (so HIRESO's controls dim), the mic silent
+function vocoderPage() {
+  const check = (ok, n, s) => `<div class="row" style="gap:8px;height:22px"><span style="width:14px;font-weight:700;color:${ok ? C.ready : C.warning}">${ok ? '✓' : '✕'}</span>
+    <span style="width:76px;font-size:11px;font-weight:600;color:${ok ? C.text : C.warning}">${n}</span><span class="hint" style="font-size:10.5px;color:${ok ? C.muted : C.warning}">${s}</span></div>`;
+  const meter = (n, lvl, txt, col) => `<div style="margin-top:12px"><div class="row" style="justify-content:space-between"><span class="lbl">${n}</span><span class="val" style="color:${col}">${txt}</span></div>
+    <div style="height:8px;margin-top:4px;border-radius:4px;background:${C.track};position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:${lvl}%;border-radius:4px;background:${col}"></span>
+    <span style="position:absolute;left:75%;top:-2px;width:1px;height:12px;background:${C.dim}"></span></div></div>`;
+  const lamp = (n, on, col) => `<span class="row" style="gap:6px;font-size:11px;font-weight:600;color:${on ? C.text : C.muted}"><span style="width:8px;height:8px;border-radius:4px;background:${on ? col : C.track}"></span>${n}</span>`;
+  const mic = card(12, 94, 340, 604, 'MIC IN', `
+    ${box('External In Type', 'MONO-L', { w: 316 })}
+    ${meter('INPUT', 3, '−72 dBFS', C.warning)}
+    <div class="row" style="gap:18px;margin-top:14px">${lamp('VOICED', false, C.ready)}${lamp('UNVOICED', false, C.mod)}</div>
+    <div class="row" style="justify-content:space-between;margin-top:14px"><span class="lbl">PITCH</span><span class="val">—  <span style="color:${C.muted}">not locked</span></span></div>
+    <div class="row" style="justify-content:space-between;margin-top:8px"><span class="lbl">AUTO NOTE</span><span class="val" style="color:${C.muted}">off</span></div>
+    <div class="row" style="justify-content:space-between;margin-top:8px"><span class="lbl">NOTES SOUNDING</span><span class="val">1 · C3</span></div>
+    ${meter('OUTPUT', 0, '−∞', C.mod)}
+    <div style="margin-top:18px;padding-top:12px;border-top:1px solid ${C.divider}">
+      ${check(true, 'Vocoder', 'ON · LEGACY')}${check(true, 'Input', 'the host gives 2 channels')}
+      ${check(false, 'Mic signal', 'quiet on MONO-L')}${check(true, 'Carrier', '1 note sounding')}${check(true, 'Level', 'Sound 127 · zone 1 MFX Send 127')}</div>
+    <div style="margin-top:12px;padding:10px;border-radius:6px;background:${C.field};border:1px solid ${C.warning};font-size:12px;line-height:1.45">
+      <b style="color:${C.warning}">Silent: no mic signal on MONO-L.</b><br><span style="color:${C.label}">The plugin's input is quiet on its left channel. Route the mic to the plugin's input in the host, or set External In Type to the channel it is on.</span></div>`);
+  let bars = '';
+  for (let b = 0; b < 10; b++) {
+    const x = 18 + b * 45, carrier = 150 - b * 9 - (b % 3) * 6;
+    bars += `<rect x="${x}" y="${200 - carrier}" width="16" height="${carrier}" rx="2" fill="${C.track}"/>`;
+    bars += `<rect x="${x + 18}" y="196" width="16" height="4" rx="2" fill="${C.accent}" fill-opacity=".5"/>`;
+    bars += `<text x="${x + 17}" y="216" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="${C.muted}">${b + 1}</text>`;
+  }
+  const bands = `<div class="field" style="left:0;top:0;width:480px;height:244px"><svg width="480" height="244" aria-hidden="true">${bars}
+    <line x1="10" y1="200" x2="470" y2="200" stroke="${C.divider}"/></svg>
+    <div class="abs row hint" style="left:10px;top:8px;gap:12px;font-size:10.5px"><span>LEGACY · 10 bands</span><span><span style="color:${C.label}">■</span> carrier</span><span><span style="color:${C.accent}">■</span> mic</span><span><span style="color:${C.mod}">■</span> out</span></div>
+    <div class="abs hint" style="left:10px;bottom:8px;font-size:10.5px">each band as the engine plays it (d-14)</div></div>`;
+  const hi = { dim: 'LEGACY doesn’t read it; HIRESO does (d-2)', tag: 'HIRESO' };
+  const voc = card(360, 94, 828, 300, 'VOCODER', `${bands}
+    <div class="abs" style="left:492px;top:0">${grid(4, [knob('Sound', '127', 1), knob('Depth', '127', 1, hi), knob('Direct', '0', 0), knob('Robot', '0', 0),
+      knob('Attack', '8', .08, hi), knob('Release', '18', .18, hi), sw('Stereo', true)], 'row-gap:14px')}
+      <div class="hint" style="margin-top:16px;width:296px;line-height:1.45">Dimmed: what LEGACY doesn’t read, by the ports’ settings routines; the word says which engine does.</div></div>`,
+    { head: `${box('', 'LEGACY', { w: 104 }).replace('<span class="lbl"></span>', '')}<span class="pill on"></span>` });
+  let warp = '';
+  for (let i = 0; i <= 150; i += 3) warp += `${i ? 'L' : 'M'}${(14 + i).toFixed(0)} ${(94 - Math.pow(i / 150, 0.82) * 80).toFixed(1)}`;
+  const small = (x, title, body, h) => card(x, 402, 201, h, title, body);
+  const formant = small(360, 'FORMANT', `${grid(2, [knob('Shift', '64', .5), knob('Template', '0', 0, hi)])}
+    <div class="field" style="left:0;top:66px;width:177px;height:100px"><svg width="177" height="100" aria-hidden="true"><line x1="14" y1="94" x2="164" y2="14" stroke="${C.divider}"/><path d="${warp}" fill="none" stroke="${C.accent}" stroke-width="1.6"/></svg>
+    <span class="abs hint mono" style="left:6px;top:4px;font-size:9px">warp · ratio 1.00</span></div>`, 221);
+  const cons = small(569, 'CONSONANTS', grid(2, [knob('Detect', '25', .5), knob('Level', '40', .31, hi), sw('Spread', false)], 'row-gap:8px'), 145);
+  const keys = small(778, 'KEYS & HOLD', grid(2, [box('Key Mode', 'ALWAYS-ON'), knob('Split', 'C#2', .29), knob('Dump', '100', .79)], 'row-gap:8px'), 157);
+  const auto = small(987, 'AUTO NOTE', grid(2, [sw('Auto Note', false), sw('Retrigger', false)], 'row-gap:8px'), 112);
+  return header('silent') + pageBar('VOCODER', 'The patch’s vocoder and the mic, the same for both zones') + mic + voc + formant + cons + keys + auto + footer();
+}
+
+// ---- MODULATION: the Matrix down the left, the controller assigns and Beam Type at the right
+function modulationPage() {
+  const rows = [['CC01', 'OSC2-PITCH', '+12', 'OFF', '0'], ['VELO', 'CSM1-PRM1', '+30', 'TVA-LVL', '+10'], ['PAD-X', 'MFX-PRM1', '+63', 'OFF', '0'],
+    ['AFT', 'OSC2-LFO-PCH', '+20', 'OFF', '0'], ['OFF', 'OFF', '0', 'OFF', '0'], ['OFF', 'OFF', '0', 'OFF', '0'], ['OFF', 'OFF', '0', 'OFF', '0'], ['OFF', 'OFF', '0', 'OFF', '0']];
+  const w = [16, 84, 0, 64, 0, 64], share = (616 - 228 - 30) / 2;
+  const col = i => w[i] || share;
+  const head = ['', 'Source', 'Destination 1', 'Sens 1', 'Destination 2', 'Sens 2'].map((h, i) => `<span class="lbl" style="width:${col(i)}px">${h}</span>`).join('');
+  const sel = (t, wd) => `<div class="row" style="width:${wd}px;height:22px;justify-content:space-between;padding:0 8px;border-radius:4px;background:${C.raised};font:11px var(--mono)">${t}<svg width="8" height="6" viewBox="0 0 8 6" aria-hidden="true"><path d="M1 1l3 3 3-3" fill="none" stroke="${C.label}" stroke-width="1.4"/></svg></div>`;
+  const bar = (t, wd) => { const v = parseInt(t, 10) || 0; return `<div style="width:${wd}px;height:22px;border-radius:4px;background:${C.raised};position:relative"><span style="position:absolute;top:0;bottom:0;${v >= 0 ? `left:50%;width:${v / 63 * 50}%` : `right:50%;width:${-v / 63 * 50}%`};background:${C.mod};opacity:.7;border-radius:4px"></span><span class="val" style="position:absolute;left:0;right:0;text-align:center;top:5px">${t}</span></div>`; };
+  const body = `<div class="row" style="gap:6px;height:16px">${head}</div>` + rows.map((r, i) => `<div class="row" style="gap:6px;margin-top:4px;height:26px">
+    <span class="mono" style="width:16px;font-size:11px;color:${C.label}">${i + 1}</span>${sel(r[0], 84)}${sel(r[1], share)}${bar(r[2], 64)}${sel(r[3], share)}${bar(r[4], 64)}</div>`).join('');
+  const matrix = card(12, 94, 640, 312, 'MATRIX', body);
+  const note = `<div class="abs hint" style="left:24px;top:424px;width:600px;line-height:1.5">Where the V-Synth’s Multi Step Modulator is: rom.4 has none. Its sources and destinations are rom.4’s own lists (MFX-PRM1…3 reach the part mixer’s levels on the VC-2).</div>`;
+  const a = [['Beam 1 L', 'CC16'], ['Beam 1 R', 'OFF'], ['Beam 2 L', 'CC17'], ['Beam 2 R', 'OFF'], ['Beam 3 L', 'CC18'], ['Beam 3 R', 'OFF'], ['Beam 4 L', 'CC19'],
+    ['Beam 4 R', 'OFF'], ['Pad X', 'CC80'], ['Pad Y', 'CC81'], ['Trip X', 'CC82'], ['Trip Y', 'CC83'], ['Knob 1', 'CC71'], ['Knob 2', 'CC74'], ['Beam Type', '4']];
+  const assigns = card(660, 94, 528, 268, 'CONTROLLER ASSIGNS', grid(7, a.map(x => box(x[0], x[1]))));
+  return header('ok') + pageBar('MODULATION', 'The Matrix’s eight Controls, and what each controller sends') + matrix + note + assigns + footer();
+}
+
+// ---- PLAY: the arpeggio and its pattern; the patch's keys and tune; Scale Tune
+function playPage() {
+  const arp = card(12, 94, 640, 178, 'ARPEGGIO', grid(8, [sw('Arpeggio', false), sw('Hold', false), box('Motif', 'UP'), knob('Octaves', '0', .5, { bip: 1 }),
+    knob('Velocity', 'REAL', 0), knob('Duration', '100', 1), box('Grid', '16TH'), knob('End Point', '32', 1), knob('Shuffle', '50', .5), box('Resolution', '16TH')], 'row-gap:8px'));
+  let pat = '';
+  const steps = [0, 4, 8, 10, 12, 16, 20, 24, 26, 28];
+  for (let l = 0; l < 16; l++) {
+    pat += `<span class="abs mono" style="left:0;top:${l * 22 + 3}px;font-size:9.5px;color:${C.muted}">${l < 4 ? ['C4', 'E4', 'G4', 'C5'][l] : 'OFF'}</span>`;
+    for (let s = 0; s < 32; s++) {
+      const on = l < 4 && steps.includes(s) && (s + l) % 3 !== 1;
+      pat += `<span class="abs" style="left:${44 + s * 17.2}px;top:${l * 22 + 2}px;width:14px;height:16px;border-radius:2px;background:${on ? C.accent : C.raised};opacity:${on ? 0.5 + 0.5 * ((s * 7 + l) % 5) / 4 : 1}"></span>`;
+    }
+  }
+  const pattern = card(12, 280, 640, 418, 'ARPEGGIO PATTERN', `<div style="position:relative;height:352px">${pat}</div>`, { head: `<span class="hint">the patch’s data, drawn</span>` });
+  const patch = card(660, 94, 528, 113, 'PATCH & TEMPO', grid(7, [knob('Category', '1', .09), box('Clock', 'INT'), knob('Tempo', '120.0', .43)]));
+  const porta = card(660, 215, 528, 113, 'PORTAMENTO', grid(7, [box('Mode', 'LEGATO'), box('Type', 'TIME'), knob('Time', '8', .06), knob('Velo Sens', '0', .5, { bip: 1 })]),
+    { head: `<span class="pill"></span>` });
+  const keys = card(660, 336, 528, 178, 'KEYS & TUNE', grid(7, [box('Voices', 'POLY'), sw('Legato', true), knob('Octave', '0', .5, { bip: 1 }), knob('Coarse', '0', .5, { bip: 1 }),
+    knob('Fine', '0', .5, { bip: 1 }), knob('Bend Up', '2', .04), knob('Bend Down', '2', .04)], 'row-gap:8px'));
+  const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'], cents = [0, -14, 4, 16, -14, -2, -10, 2, -16, -16, 18, -12];
+  const st = names.map((n, i) => `<div class="abs" style="left:${i * 42}px;top:0;width:38px;height:96px">
+    <div style="position:absolute;left:4px;right:4px;top:4px;height:62px;border-radius:4px;background:${C.raised}"><span style="position:absolute;left:0;right:0;top:31px;height:1px;background:${C.dim}"></span>
+    <span style="position:absolute;left:0;right:0;${cents[i] >= 0 ? `bottom:31px;height:${cents[i] / 100 * 31}px` : `top:31px;height:${-cents[i] / 100 * 31}px`};background:${C.accent};opacity:.75;border-radius:2px"></span></div>
+    <div class="lbl" style="position:absolute;top:70px;width:38px;text-align:center">${n}</div><div class="val" style="position:absolute;top:83px;width:38px;text-align:center">${cents[i] > 0 ? '+' : ''}${cents[i]}</div></div>`).join('');
+  const scale = card(660, 522, 528, 152, 'SCALE TUNE', `<div style="position:relative;height:96px">${st}</div>`, { head: `<span class="pill on"></span>` });
+  return header('ok') + pageBar('PLAY', 'The patch’s playing: arpeggio, keys, tune, tempo') + arp + pattern + patch + porta + keys + scale + footer();
+}
+
+const VIEWS = {
+  synth: [synthPage, 'SYNTH on zone 2 (Z2, Current Zone): OSC 1 on EXTIN (Harm Formant on its face), OSC 2 on VOCODER selected, its DETAILS open; COSM 2 the Growl (Intensity and Speed only); AMP with MFX Send as a fifth knob (d-13); VOCODER on the path; the pad on TIME-TRIP with Pad Hold (d-10); the header’s MIC chip green. Questions shown: d-3, d-9, d-10, d-12, d-13.'],
+  vocoder: [vocoderPage, 'VOCODER with LEGACY chosen and the mic silent: the MIC IN card’s checklist says why, and the header’s MIC chip turns the warning colour; HIRESO’s controls dimmed with the word HIRESO (d-2); the bands as LEGACY plays them (d-14). Questions shown: d-2, d-4 (External In Type here), d-12, d-14.'],
+  modulation: [modulationPage, 'MODULATION: the Matrix takes the Multi Step Modulator’s column (rom.4 has none); the fourteen controller assigns and Beam Type, three across. Question shown: d-1 (whether this page stays or folds into PLAY).'],
+  play: [playPage, 'PLAY: the arpeggio and its pattern (the patch’s data, drawn); Category, Clock and Tempo; portamento with its switch on the title; keys and tune; Scale Tune as twelve bars (d-7). Questions shown: d-4 (Clock here), d-7.'],
+};
+function show(name) {
+  document.getElementById('frame').innerHTML = VIEWS[name][0]();
+  document.getElementById('caption').textContent = VIEWS[name][1];
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.page === name)));
+}
+function fit() {
+  const avail = document.getElementById('wrap').clientWidth - 32, s = Math.min(1, avail / 1200);
+  const st = document.getElementById('stage');
+  st.style.transform = `scale(${s})`;
+  st.style.marginBottom = `${-750 * (1 - s)}px`;
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => show(b.dataset.page)));
+window.addEventListener('resize', fit);
+show('synth');
+fit();
+</script>
+</body>
+</html>
