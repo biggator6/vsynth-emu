@@ -3912,6 +3912,67 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2 part's sets' COSM inputs (2026-11-22, v390) {#vc2-set-cosm-inputs}
+
+Item 8's sixth child (VC2_MODE_PLAN.md, step 4.3; v314's note names it beside the OSC blocks'): C's COSM inputs, two a
+voice. `Vc2SetCosmInputs` is bit for bit against rom.4's own in `xt_vc2sets`' seventh part.
+
+**Its words.** There are 48 inputs of 60 bytes from `0x899955a8`, two a voice: `0x89399ae0(60, number, index)` gives
+0x899955a8 + 120 × the number + 60 × the index. Each is a COSM converter's input, v235's `Vc2CosmInput`.
+
+**The routines.**
+- The constructor `0x89399b10(input, call, block, M; the kind and the index on the stack)`:
+  - +0 takes the kind's byte, +1 the index's byte, +0x38 M, and +2 and +3 the voice's key and its +0x43.
+  - +6…+0x2f take the part's 42 bytes for the COSM, by the block move `0x895061bc`, from `0x89e2003c` + 0x540 × the
+    part + 84 × the kind + 42 × the index. The kind and the index are the stacked words, multiplied whole (`mul.l`),
+    not their bytes.
+  - Then the dispatcher `0x89399920(input, block)`, v235's `vc2CosmConvert`. It answers the input.
+- The conversion `0x89399b90(input, call, block)` writes the voice's two bytes again, then runs the dispatcher.
+- The update `0x89399bb0(input, call)` copies the part's 42 bytes again, by the input's +0 and +1 bytes this time. It
+  runs no dispatcher.
+- The copy `0x89399c00(input, block)` is the dispatcher alone (a `bra`). The end `0x89399b80` is a bare return.
+
+v235 named the builder's arguments (input, note, block, M, zone, COSM) by what the dispatcher reads. The input's +0 is
+the note's kind that C gives it, which places the 42 bytes with the part and the index; +1 is the index, which picks
+the Matrix reader. `Vc2CosmInput` keeps its field's name, `zone`.
+
+**The port.** It is v283's pool (`Vc2SetChildPool`, Vc2SetChildHead.h), with the voice's bytes at +2.
+- The part's bytes come by part, kind and index through `Vc2SetReads::cosmInputOf`, as 21 halfwords. `vc2ChildPart`
+  takes any count by part, kind and index now: the envelopes' and LFOs' 5, and these 21.
+- The dispatcher and the converters are the ported ones, `vc2CosmConvert` and `vc2CosmPortedConvert`.
+- The converters' Matrix readers go through `Vc2SetReads::matrixGroup`: `0x893a2960` for COSM 1, `0x893a2aa0` for COSM
+  2, one call a sum, as rom.4 calls them. Their velocity curve, powf and logf go through `Vc2SetReads::shared`.
+
+**The check**, xt_vc2sets' seventh part (Vc2SetCosmInputCheck.cpp), on the seed after the TVA's:
+- The sets' part's hooks on the inputs' routines come off. COSM's two Matrix readers are hooked to log the M they're
+  given and answer the drawn sums.
+- The dispatcher and its converters run as rom.4's own, with rom.4's velocity curve, powf and logf. The port's side
+  gets the same routines with the interpreter's registers kept (`SetKeptShared`, which v285's curve uses now too).
+- The parts' COSM bytes (`0x89e2003c`) are drawn as xt_vc2cosm draws an input (`vc2DrawCosmInput`): the type is mostly
+  one the port has, and each parameter is in its range.
+- Past the 16 parts' rows, 1024 more rows are drawn the same way at each case's start. An input's own +0 and +1, which
+  are any bytes, reach them, and so does a constructor's kind word up to 511.
+- The constructor's kind is one of the four, or one time in eight any word up to 511 (`setsMakeEvent`'s `Kind`). A
+  word reads 21,504 × (the word >> 8) bytes past where its byte would, modulo 2^32: the size of the 16 parts' rows. So
+  only a word past 255 tells the word from the byte, and it reads in the rows drawn past the parts'.
+- Each case puts noise in the inputs, then runs 400 events: the placement, the constructor, the end, the conversion,
+  the update, the copy and the dispatcher alone. After each it compares the inputs, W, the calls and the answer.
+- Not drawn: a constructor's kind past 511.
+
+The results:
+- Seed 2024, 40 cases: 16,000 events (1,769 placements, 3,535 constructors, 1,843 ends, 3,463 conversions, 1,837
+  updates, 1,738 copies, 1,815 dispatches; 28,530 Matrix sums), 0 different. The earlier parts' lines are as they
+  were.
+- Seeds 7 and 31337, 400 cases each: 160,000 events each, 0 different.
+- `mutate_vc2.py --sets`: 389 plants, none missed, the 15 new among them. `--settings` (whose check links
+  Vc2SetChildHead.cpp): 864, none missed.
+- verify.sh passes every line; fcheck's diff is the new `COSM inputs:` line alone.
+- Not planted: the constructor's index word for its byte. The sets' parts draw the index below 16, so the two are one.
+
+The first run differed in 3 of 40 cases. An update read the 42 bytes by an input's +0 and +1 drawn as any bytes. That
+reached past the parts' rows into other parts' noise, which gave a converter a gain table index past the table's end,
+where rom.4 reads on and the port gives 0 (v235). The rows past the parts' are drawn since.
+
 ### The VC-2 part's sets' TVA (2026-11-19, v285) {#vc2-set-tva}
 
 Step 4.3's thirteenth version (VC2_MODE_PLAN.md, step 4.3, item 8's fifth child, its last): C's TVA, one a voice.

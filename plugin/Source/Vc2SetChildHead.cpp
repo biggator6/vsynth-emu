@@ -40,6 +40,11 @@ void vc2ChildVoice(uint8_t* at, const Vc2SetCall& call, Vc2SetReads& reads) {
     at[1] = v.byte43;
 }
 
-void vc2ChildPart(uint8_t* object, Vc2ChildWords of, const Vc2SetCall& call, Vc2SetReads& reads) {
+template <size_t N>
+void vc2ChildPart(uint8_t* object, Vc2IndexWords<N> of, const Vc2SetCall& call, Vc2SetReads& reads) {
     vc2PartWords(object, (reads.*of)(vc2CallsPart(call, reads), object[kKind], object[kIndex]));
 }
+
+// The counts the children read so: the envelopes' and LFOs' five, the COSM inputs' 21 (v390)
+template void vc2ChildPart<5>(uint8_t*, Vc2IndexWords<5>, const Vc2SetCall&, Vc2SetReads&);
+template void vc2ChildPart<21>(uint8_t*, Vc2IndexWords<21>, const Vc2SetCall&, Vc2SetReads&);

@@ -99,7 +99,9 @@ VC2SYNTH+=(Vc2SynthCheck Vc2CheckWords XtLfo XtEnvelope XtCosm XtOsc XtExtIn XtL
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
          Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck
-         Vc2SetTva Vc2SetTvaCheck)
+         Vc2SetTva Vc2SetTvaCheck Vc2SetCosmInput Vc2SetCosmInputCheck Vc2CosmConvert Vc2CosmConverters Vc2CosmGrowl
+         Vc2CosmTvf Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive Vc2CosmBalanced Vc2CosmSideBand Vc2CosmTables Vc2Math
+         Vc2CosmFrameDraws)
 VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSettingsTables Vc2PartSettingsWords
     Vc2PartSettingsOsc Vc2PartSettingsOscCheck Vc2PartSettingsOscBlock Vc2PartSettingsVocoder
     Vc2PartSettingsVocoderCheck Vc2LibMath Vc2LibMathTables Vc2PartSettingsModes Vc2PartSettingsModesCheck
@@ -248,6 +250,7 @@ VC2PORTS=(
     "vc2setlfo|Vc2SetLfo.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmix|Vc2SetMix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2settva|Vc2SetTva.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setcosminput|Vc2SetCosmInput.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2settings|Vc2PartSettings.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2settingstables|Vc2PartSettingsTables.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2settingswords|Vc2PartSettingsWords.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"

@@ -81,6 +81,9 @@ done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake
    $( [ -f Vc2SetLfoCheck.cpp ] && echo Vc2SetChildHead.cpp Vc2SetLfo.cpp Vc2SetLfoCheck.cpp ) \
    $( [ -f Vc2SetMixCheck.cpp ] && echo Vc2SetMix.cpp Vc2SetMixCheck.cpp ) \
    $( [ -f Vc2SetTvaCheck.cpp ] && echo Vc2SetTva.cpp Vc2SetTvaCheck.cpp ) \
+   $( [ -f Vc2SetCosmInputCheck.cpp ] && echo Vc2SetCosmInput.cpp Vc2SetCosmInputCheck.cpp Vc2CosmConvert.cpp \
+      Vc2CosmConverters.cpp Vc2CosmGrowl.cpp Vc2CosmTvf.cpp Vc2CosmFilters.cpp Vc2CosmDynamics.cpp Vc2CosmDrive.cpp \
+      Vc2CosmBalanced.cpp Vc2CosmSideBand.cpp Vc2CosmTables.cpp Vc2Math.cpp Vc2CosmFrameDraws.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2sets" &
 # The part's settings by ID (v286) against rom.4's own readers, the read objects and the getter hooked
 [ -f Vc2PartSettingsCheck.cpp ] && cc -DXT_VC2SETTINGS_MAIN Vc2PartSettingsCheck.cpp Vc2PartSettings.cpp \

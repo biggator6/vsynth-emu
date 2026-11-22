@@ -9,6 +9,7 @@
 // each the draws (Vc2SetsDraws.cpp); after each C, M, W, the part's M, the calls and the answer.  XT_VC2SETS_MAIN only.
 #ifdef XT_VC2SETS_MAIN
 #include "Vc2CheckCalls.h"
+#include "Vc2CosmTables.h"
 #include "Vc2LibMathTables.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetsChildCheck.h"
@@ -226,7 +227,7 @@ int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offse
 
 long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
     const long children = vc2SetCommonPart(s, run) + vc2SetEnvelopePart(s, run) + vc2SetLfoPart(s, run);
-    return children + vc2SetMixPart(s, run) + vc2SetTvaPart(s, run);
+    return children + vc2SetMixPart(s, run) + vc2SetTvaPart(s, run) + vc2SetCosmInputPart(s, run);
 }
 
 uint32_t* setsPortWords(SetSides& s, uint32_t at) {
@@ -273,8 +274,8 @@ std::string setsOnBoth(SetSides& s, const Vc2CheckRoutine& routine, std::initial
 }
 
 int main(int argc, char** argv) {
-    const Vc2CheckStart start { "xt_vc2sets", vc2LoadAll<vc2LoadMatrix, vc2LoadLibMath, vc2LoadSetEnvelopes>,
-                                { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" } };
+    constexpr auto load = vc2LoadAll<vc2LoadMatrix, vc2LoadLibMath, vc2LoadSetEnvelopes, vc2LoadCosm>;
+    const Vc2CheckStart start { "xt_vc2sets", load, { "XT_VC2SETS_FIRST", "XT_VC2SETS_STOP" } };
     return vc2CheckMain<SetSides>(argc, argv, start, setsCase, saySetCounts, vc2SetsFurther);
 }
 #endif

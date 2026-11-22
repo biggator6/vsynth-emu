@@ -3994,3 +3994,11 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `PluginProcessor.h` had to shrink before it could take the patch's members: the per-OSC file buffer went to a header of its own, moved as it stood. The kit refused the new header at first because the old copy was still in place; the order is take out, then write.
 - The processor's accessor was first `vc2Store()`, the very name of the store layout's free function, which a member would have shadowed inside the class. It is `vc2PatchStore()`.
 - The test first left the VC-2's system parameters out, as no patch holds them, so a load that wrote them would have passed. It moves them to their tops before the loads now and asks that they stay.
+
+### Session 24 (2026-11-22) — v390: the sets' COSM inputs
+
+- Started from another session's brief: C's two children left by v314, the OSC blocks' and the COSM inputs', in v390–v399 beside step 4.3's v329 on. The COSM inputs came first, as everything they call was ported (v235…v241).
+- The first run differed in 3 of 40 cases. An input's own +0 and +1, drawn as any bytes, placed the update's read past the 16 parts' rows, into the noise other parts had left there. A converter then read the gain table past its end, where rom.4 reads on and the port gives 0. The check draws rows past the parts' now.
+- The constructor multiplies the kind's and the index's whole words, the update their bytes. A word reads 21,504 bytes a step of 256 past its byte, which is the size of the 16 parts' rows, so only a word past 255 can tell the two apart. The rows drawn past the parts' are where it reads.
+- My first plant run said every name was "not in vc2sets_muts.txt". zsh passed the unquoted list as one argument. The names go through a bash script now.
+- The port's shared routines run rom.4's own in the interpreter and leave r0 changed, which the check reads as rom.4's answer. v285 kept the registers inline for its curve; one class keeps them for all four now (SetKeptShared).

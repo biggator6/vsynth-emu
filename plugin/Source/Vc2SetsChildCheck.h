@@ -51,6 +51,11 @@ inline uint32_t setsAnyWord(std::mt19937& rng) {
     return (uint32_t)rng();
 }
 
+// A constructor's kind: the four, or now and then any word (v390: a part's own draw where a word places its reads)
+inline uint32_t setsAnyKind(std::mt19937& rng) {
+    return rng() % 8 ? rng() % 4 : (uint32_t)rng();
+}
+
 // The part's N words for a child as its object holds them from +6, drawn by `Of` on a whole object (v284)
 template <class Words, size_t N, auto Of>
 std::array<uint16_t, N> setsWordsDrawn(std::mt19937& rng) {
@@ -150,7 +155,8 @@ std::string setsChildEnd(Sides& x, std::mt19937& rng, const Vc2CheckRoutine& r, 
 
 // A child's events by the port's member and rom.4's routine, each counted in `byEvent[Counted]`, its pool said as its
 // counts' kPool: the placement (rom.4's given the object's bytes, a voice's number and an index), the constructor (on
-// a block `Block` draws, the kind and the index under `Indices` stacked), the end (a bare return in rom.4), the update
+// a block `Block` draws, M by `Matrix`, the kind by `Kind` and the index under `Indices` stacked), the end (a bare
+// return in rom.4), the update
 // (an object and C's call), the conversion (and a block `Block` draws) and the copy (an object and a block; the port's
 // member given the reads when it takes them)
 template <class Sides, uint32_t Routine, uint32_t Bytes, size_t Counted>
@@ -162,11 +168,12 @@ std::string setsPlaceEvent(Sides& x, std::mt19937& rng) {
                            [&] { return x.port.placeOf(n, i); });
 }
 
-template <class Sides, auto Block, uint32_t Routine, size_t Counted, uint32_t Indices, auto Matrix = setsAnyWord>
+template <class Sides, auto Block, uint32_t Routine, size_t Counted, uint32_t Indices, auto Matrix = setsAnyWord,
+          auto Kind = setsAnyKind>
 std::string setsMakeEvent(Sides& x, std::mt19937& rng) {
     const uint32_t at = setsCall(x.s, rng);
-    const Vc2SetChildCall c { x.any(rng), setsCallAt(x.s, at), Block(rng), Matrix(rng),
-                              rng() % 8 ? rng() % 4 : (uint32_t)rng(), rng() % 8 ? rng() % Indices : rng() % 16 };
+    const Vc2SetChildCall c { x.any(rng), setsCallAt(x.s, at), Block(rng), Matrix(rng), Kind(rng),
+                              rng() % 8 ? rng() % Indices : rng() % 16 };
     x.s.fw.cpu.wr32(kVc2Sp, c.kind);
     x.s.fw.cpu.wr32(kVc2Sp + 4, c.index);
     ++x.n.byEvent[Counted];

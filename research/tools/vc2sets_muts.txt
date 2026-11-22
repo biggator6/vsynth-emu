@@ -387,3 +387,21 @@ tva-make-block|madeByKind(c, reads);\n    velocityLevelOf(w, reads);\n    blockO
 tva-convert-voice|    vc2ChildVoice(&w.key, call, reads);\n|\n|vc2settva
 tva-convert-level|call, reads);\n    velocityLevelOf(w, reads);|call, reads);|vc2settva
 tva-convert-block|call, reads);\n    velocityLevelOf(w, reads);\n    blockOf(w, block, reads);|call, reads);\n    velocityLevelOf(w, reads);|vc2settva
+# The COSM inputs (vc2setcosminput, Vc2SetCosmInput.cpp, v390), not planted: the constructor's index word for its byte
+# (the sets' parts draw it below 16, so the two are one), and what Vc2SetCosmInput.h holds (the pool's place, two a
+# voice, the voice's bytes at +2).
+cosm-reader-which|kReaders[second ? 1 : 0]|kReaders[second ? 0 : 1]|vc2setcosminput
+cosm-reader-first|{ 0x893a2960, 0x893a2aa0 }|{ 0x893a2aa0, 0x893a2aa0 }|vc2setcosminput
+cosm-reader-second|{ 0x893a2960, 0x893a2aa0 }|{ 0x893a2960, 0x893a2960 }|vc2setcosminput
+cosm-reader-matrix|kReaders[second ? 1 : 0], matrix);|kReaders[second ? 1 : 0], matrix + 4);|vc2setcosminput
+cosm-types-type|vc2CosmPortedConvert(type, in, block|vc2CosmPortedConvert(type + 1, in, block|vc2setcosminput
+cosm-types-none|        (void)vc2CosmPortedConvert(type, in, block, matrix_, shared_);\n|\n|vc2setcosminput
+cosm-made-head|    vc2ChildMade(bytes, c, reads);\n|\n|vc2setcosminput
+cosm-made-matrix|    w.matrix = c.matrix;\n|\n|vc2setcosminput
+cosm-made-matrix-which|w.matrix = c.matrix;|w.matrix = c.object;|vc2setcosminput
+cosm-made-part|    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, reads), c.kind, c.index));\n|\n|vc2setcosminput
+cosm-made-kind-byte|reads), c.kind, c.index));|reads), bytes[0], c.index));|vc2setcosminput
+cosm-made-swap|reads), c.kind, c.index));|reads), c.index, c.kind));|vc2setcosminput
+cosm-made-part-which|reads.cosmInputOf(vc2CallsPart(c.call, reads),|reads.cosmInputOf(0,|vc2setcosminput
+cosm-made-block|c.index));\n    blockOf(w, block, reads);|c.index));|vc2setcosminput
+cosm-made-order|    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, reads), c.kind, c.index));\n    blockOf(w, block, reads);|    blockOf(w, block, reads);\n    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, reads), c.kind, c.index));|vc2setcosminput

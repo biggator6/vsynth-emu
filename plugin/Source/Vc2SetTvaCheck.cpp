@@ -15,15 +15,8 @@ std::array<uint16_t, 12> SetPortParts::tvaOf(uint32_t part, uint32_t kind) {
     return partWords<12>(kSetsTvaTable, part, kind, 0);
 }
 
-// rom.4's curve in the interpreter, its registers kept: the port runs after rom.4's routine, whose answer is read from
-// r0 after it
-int SetPortParts::velocityCurve(int velocity, int sens, int curve) {
-    uint32_t kept[16];
-    std::memcpy(kept, fw_.cpu.r, sizeof kept);
-    const int v = shared_.velocity(velocity, sens, curve);
-    std::memcpy(fw_.cpu.r, kept, sizeof kept);
-    return v;
-}
+// rom.4's curve in the interpreter, its registers kept (SetKeptShared, v390)
+int SetPortParts::velocityCurve(int velocity, int sens, int curve) { return kept_.velocity(velocity, sens, curve); }
 
 uint8_t SetPortParts::matrixControl(uint32_t matrix, uint32_t n) { return fw_.cpu.rd8(matrix + kSetsControlsAt + n); }
 

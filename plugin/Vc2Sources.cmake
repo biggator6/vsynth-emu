@@ -119,6 +119,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SetLfo.cpp
     Source/Vc2SetMix.cpp
     Source/Vc2SetTva.cpp
+    Source/Vc2SetCosmInput.cpp
     Source/Vc2PartSettings.cpp
     Source/Vc2PartSettingsTables.cpp
     Source/Vc2PartSettingsWords.cpp

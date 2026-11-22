@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 part's sets' COSM inputs v390 (2026-11-22, on its own branch from vc2-mode 650bf26, beside step 4.3's v329 on;
+  HARDWARE_FIRMWARE.md, "The VC-2 part's sets' COSM inputs"): item 8's sixth child, which v314 named. Vc2SetCosmInputs,
+  rom.4's 48 inputs word for word, two a voice: the constructor (the kind's and index's bytes, the voice's two bytes,
+  M, the part's 42 bytes placed by the kind and index words whole), the conversion, update and copy, each on the
+  dispatcher and the ported converters through Vc2SetReads (the part's bytes, COSM's Matrix readers, the shared
+  routines). xt_vc2sets gains a seventh part: 0 different at seeds 2024, 7 and 31337, the earlier parts' lines as they
+  were; mutate_vc2.py --sets 389 planted, 0 missed (15 new), --settings 864, 0 missed. Not in the sound yet.
+
 The VC-2's mode 1 set-up v328 (2026-11-21, on claude/vc2-part-4-3 after v327; HARDWARE_FIRMWARE.md, "The VC-2's mode
   1 set-up"): step 4.3's fifty-sixth version, the fourth piece of item 11's fourth part's second half. Mode 1's set-up
   0x893cc760 is the voice's own (Vc2OscModeOneStart.cpp): the table, samples and +0xe0 record from the head's words,

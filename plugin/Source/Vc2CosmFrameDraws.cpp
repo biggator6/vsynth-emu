@@ -2,8 +2,8 @@
 // the port has, each of that type's parameters in its range by its descriptor (rom.2's for the same type, the second
 // bank: pnames.py), at its ends, 0, within, past them or any 16 bits; a parameter a converter reads the gain table at
 // without a hold only within the table, as no stored setting is outside it (rom.4 reads whatever follows the table).
-// XT_VC2COSM_MAIN only.
-#ifdef XT_VC2COSM_MAIN
+// XT_VC2COSM_MAIN only, and (v390) xt_vc2sets' COSM inputs' part's, XT_VC2SETS_MAIN.
+#if defined(XT_VC2COSM_MAIN) || defined(XT_VC2SETS_MAIN)
 #include "Vc2CosmCheck.h"
 #include <algorithm>
 #include <array>

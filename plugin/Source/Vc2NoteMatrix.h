@@ -9,6 +9,8 @@
 #include <array>
 #include <cstdint>
 
+class Vc2ToneShared;
+
 // What C's routines are given beside C: the voice's +0x34 (its key table, source, part, number and three bytes), its
 // +0x53, and a word (0x893a76d0's the legato's struct, the retune's rom.4's 0x8953fb2c, else 0)
 struct Vc2SetCall {
@@ -85,6 +87,12 @@ public:
     virtual Vc2SetTvaGlobals tvaGlobals() = 0;
     virtual Vc2SetClock clock() = 0;
     virtual int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) = 0;
+    // The COSM inputs' (v390): the part's 42 bytes for one (0x89e2003c + 0x540 × part + 84 × kind + 42 × index, each a
+    // word as rom.4's constructor multiplies them), the routines the COSM converters share, and the sums a Matrix
+    // group's reader (by rom.4's address) returns for M, as it returns them
+    virtual std::array<uint16_t, 21> cosmInputOf(uint32_t part, uint32_t kind, uint32_t index) = 0;
+    virtual const Vc2ToneShared& shared() = 0;
+    virtual const int16_t* matrixGroup(uint32_t reader, uint32_t matrix) = 0;
 };
 
 struct Vc2NoteMatrixWords {
