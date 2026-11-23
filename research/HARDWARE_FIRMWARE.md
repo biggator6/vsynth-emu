@@ -3912,6 +3912,86 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's wave pool (2026-11-23, v501) {#vc2-wave-pool}
+
+The memory the wave store's records and chunks live in: rom.4's pool at `0x8997c51c`. The store's set-up
+(`0x89353ac0`) gives it 32 MB from the OS's allocator. Ported bit for bit as `Vc2WavePool` (Vc2WavePool.cpp) and
+checked in xt_vc2waves' second part, with rom.4's own routines running there. Every address is rom.4's.
+
+**Its words.** Four at `0x8997c51c` (.bss): the memory's address, the block a search starts from (the rover), the
+memory's size, and the bytes counted free.
+
+**A block.** A 24-byte header, then its payload: the previous block, the next, the state (0 free, 1 used, 2 the
+ring's head) and the payload's size in 24-byte units. The blocks form a ring through the head, which has no payload.
+A request of n bytes takes ((n − 1) / 40 · 40 + 63) / 24 units, the division by 40 toward zero.
+
+**An object** in the pool starts at its block's header. Its +0x10 is a word its wrapper gives and its +0x14 its
+vtable. The vtable's entry at +0x18 is the object's place (a word added to the block) and, at +0x20, the routine the
+pool calls when it moves the block, with how far it moved. The record's is `0x89353540` (v502 on).
+
+**The routines:**
+- Set-up `0x89350c10(pool, bytes)`: frees the old memory, then asks the OS for `bytes` (`0x89300770`). It makes the
+  head and one free block of (bytes − 89) by the size law, and gives 1, or 0 when it has no memory.
+- Alloc `0x89350cd0`: the first free block from the rover with room. That block is split (`0x89351430`): a block of
+  exactly the size is only marked used; otherwise a free remainder follows it, joined to a free block after, and
+  becomes the rover. 0 for none, for 0 bytes or for more than is free.
+- Calloc `0x89350de0`: an alloc of count × size, zeroed.
+- Free `0x89350e40`: the block's payload counted free, and the block released (`0x893514f0`): joined to a free block
+  before it and one after, the rover the block that remains.
+- Realloc `0x89350e90`: a smaller size splits the block where it is. A larger one takes a free next block when it has
+  room, else moves to the first free block with room (`0x89351590`: the block copied, its object told, the old one
+  released), else gives 0.
+- The largest free block `0x89351090`, used whole, from 10 units: its size said, the bytes free less that (not below
+  0), the rover left.
+- The compaction `0x89351120`: each used block after a free one slides down into it, its object told, the free space
+  joined after it. At the end the bytes free are the last block's, if it is free, and the rover is the head.
+- The objects' wrappers: alloc `0x89351690(bytes, extra)` (the object's +0x10 the extra), the largest
+  `0x893516c0` (+0x10 its size), free `0x893516e0` and realloc `0x893517c0`.
+- The OS's lock around each (`0x893018b0`, `0x893018c0`) isn't ported. Neither is the `bra .` rom.4 stops in on a ring
+  it finds broken (a block smaller than asked to split, a used block where a free one must be).
+
+**rom.4's own stop.** One call on a whole ring reaches that stop: a realloc to the same size, when the next block is
+used. The search finds a free block of exactly that size, and the move leaves no remainder. The used block after it
+is where realloc expects a free one, and rom.4 stops. Seed 2024 found it, as a step limit. The port goes on, and the
+check draws a size up instead. That is the move's only case of no remainder: any other realloc that moves has grown.
+
+**Past the memory's end.** The size law can give the set-up's block up to 22 bytes more than the OS gave. rom.4 then
+writes on past its memory when it moves or fills the last block: the check found it, a compaction writing a header's
+state there. The port's memory runs 24 bytes on, zeroed.
+
+**The check.** Each case sets a pool up and makes up to 160 drawn calls on it:
+- alloc, an object's alloc, calloc, the largest (as a payload or an object), free (either way), realloc (either way),
+  the compaction, and now and then a set-up again; each by weight, with now and then a null pointer;
+- pools of 2 to 64 KB, now and then 0, too large for the OS to give, or negative, and then a few calls on the pool
+  with no memory;
+- sizes up to an eighth or a sixty-fourth of the pool, now and then 0 or past what is free; the extra bytes 0…40; a
+  realloc's size never the block's own.
+
+The OS's allocator gives both sides the same memory, zeroed, and both sides' calls to it are logged. Every block a
+call gives gets noise for its payload (calloc's stays zeroed) and one of two vtables at +0x14, on both sides. The
+vtables' methods (the object 0 or 0x30 bytes in) log where they were called and how far. After each call the check
+compares the answer, the pool's words, its whole memory and both logs.
+
+The draws, besides:
+- A realloc a fourth of the time to a size that fills a block exactly: the block and its free next joined (half of
+  those), or a free block elsewhere larger than it, when the size law can ask for that many units. Half the time on
+  the newest block, whose free remainder the last split left as the rover.
+- A fourth of the requests one of three sizes (48, 200, 1000 bytes), and now and then exactly what is free.
+- A case in four asks for 1000 bytes nearly always, on a pool of 2 to 8 KB, with allocs, frees and the largest alone:
+  the pool fills and holes of one size build up, which the largest must choose among (the first from the rover).
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, about 6,000 calls a seed.
+- Every line of Vc2WavePool.cpp's routines is reached. The branches left are the port's own (an address outside its
+  memory) and four of rom.4's that no whole pool takes: the move with no remainder (only after the same-size realloc
+  above), alloc's test of the rover for 0 (free bytes imply a set-up pool), the largest's floor at 0 and the
+  compaction's test of the head (the pool keeps its free count equal to its free payloads, and its head is always
+  the head).
+- `mutate_vc2.py --waves`: 55 new plants for the pool, with the 52 of v500, 105 after two found equivalent: the
+  largest's floor at 0 and the compaction's recount of the free bytes, as the count is already that. Five missed at
+  first, each caught by a draw above: a request of exactly what's free, the fills (two), the rover a realloc
+  inherits, and the ties.
+
 ### The VC-2's wave index, parsed (2026-11-23, v500) {#vc2-wave-index}
 
 What fills the wave sets (v399): rom.4's parse of "D:\VC-2 Wave.bin" at boot, `0x8934d120`. Ported bit for bit as

@@ -67,3 +67,15 @@ struct Vc2WavesTally {
 // The index's parse: the disk image's index (`index`, empty when there is none), then `run.cases` cases of drawn
 // indexes, one to three parses each on the sets the last left
 long vc2WaveIndexPart(Vc2Fw& fw, const Vc2Run& run, const std::vector<uint8_t>& index);
+// The store's pool (v501, Vc2WavePoolCheck.cpp): `run.cases` cases of a set-up and up to 160 drawn calls on a small pool
+long vc2WavePoolPart(Vc2Fw& fw, const Vc2Run& run);
+// Its draws (Vc2WavePoolDraws.cpp): a request's size (up to an eighth or a sixty-fourth of the pool; a fourth of the
+// time one of three sizes, so free blocks tie for the largest; now and then 0, exactly what's free, or past it); a
+// pool's (2 KB to the most the check's OS gives, now and then 0, more, or negative); and a realloc's that fills
+// `block` exactly, the block and its free next joined or a larger free block elsewhere, when the size law can ask for
+// it (else a request's size)
+class Vc2WavePool;
+inline constexpr uint32_t kVc2PoolMemoryMost = 0x10000;   // the most memory the check's OS gives a pool
+uint32_t vc2PoolDrawBytes(std::mt19937& rng, const Vc2WavePool& pool);
+uint32_t vc2PoolDrawSize(std::mt19937& rng);
+uint32_t vc2PoolFittingBytes(std::mt19937& rng, const Vc2WavePool& pool, uint32_t block);

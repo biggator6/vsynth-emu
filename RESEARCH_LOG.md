@@ -4024,6 +4024,27 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 25, continued (2026-11-23) — v501: the wave pool
+
+- The store's records and chunks are objects in a pool of rom.4's own, with a compaction that moves them and tells
+  each through its vtable. Every later loader writes into it, so it came next.
+- The check's first runs faulted in the compaction. It calls the vtable of every used block, and calloc's blocks had
+  none, as the check left their payload zeroed. Every block gets a vtable now.
+- Then four seeds differed, each in a compaction: rom.4 wrote a header's state past the pool's memory. The size law
+  can give the set-up's block up to 22 bytes more than the OS gave, and moving or filling the last block writes
+  there. The port's memory runs 24 bytes on.
+- Seed 2024 then ran rom.4 into a step limit: a realloc to the same size with a used block after it moves into an
+  exact fit and stops in rom.4's own `bra .`. The port can't follow a stop, so the check draws no realloc to the same
+  size.
+- Coverage showed the calls rom.4 answers with 0 on a pool with no memory, and the null pointers, weren't drawn. They
+  are now.
+- Seven of the 55 plants missed at first. Two are equivalent and went: the pool keeps its free count equal to its free
+  payloads, so the largest's floor at 0 and the compaction's recount change nothing. The other five needed draws noise
+  rarely makes: a request of exactly what's free, reallocs that fill a block exactly, and ties for the largest. An
+  instrumented copy of the check showed 4,500 largest calls with no tie, and only 317 with two free blocks at all,
+  before cases of one size on small pools were added.
+- The pool's check reached the kit's 300 lines; its draws went to a file of their own.
+
 ### Session 25 (2026-11-23) — v500: the wave index, parsed
 
 - Started from the coordinator's brief: port what fills the wave store and the wave sets, as v500–v509. The earlier

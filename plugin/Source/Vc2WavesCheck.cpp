@@ -1,6 +1,6 @@
 // xt_vc2waves <rom.4> [cases] [seed] (v500): the VC-2's wave loaders against rom.4's own routines in the interpreter,
 // their file calls answered alike on both sides from the same files: the index's parse (Vc2WaveIndexCheck.cpp) on the
-// disk image's "VC-2 Wave.bin" and drawn ones.  A line a part, its first difference under it with XT_VC2WAVES_FIRST.
+// disk image's "VC-2 Wave.bin" and drawn ones; the store's pool (Vc2WavePoolCheck.cpp, v501) on drawn calls.  A line a part, its first difference under it with XT_VC2WAVES_FIRST.
 // XT_VC2WAVES_MAIN only.
 #ifdef XT_VC2WAVES_MAIN
 #include "Vc2WavesCheck.h"
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
     if (!run) return 2;
     const std::vector<uint8_t> index = indexOnDisk(argv[1]);
     if (index.empty()) std::printf("xt_vc2waves: no disk image beside rom.4, or no VC-2 index in it\n");
-    const long different = vc2WaveIndexPart(fw, *run, index);
+    const long different = vc2WaveIndexPart(fw, *run, index) + vc2WavePoolPart(fw, *run);
     std::printf("xt_vc2waves: %ld different\n", different);
     return different || index.empty() ? 1 : 0;
 }

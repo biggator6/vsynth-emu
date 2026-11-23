@@ -50,3 +50,56 @@ data-velocity-at|return &data.velocity[at - kVelocityDataAt];|return &data.veloc
 data-key-none|    if (at - kKeyDataAt < data.key.size()) return &data.key[at - kKeyDataAt];\n||vc2wavesetsdata
 data-key-end|if (at - kKeyDataAt < data.key.size())|if (at - kKeyDataAt <= data.key.size())|vc2wavesetsdata
 data-velocity-below|if (at - kVelocityDataAt < data.velocity.size())|if (at + 1 - kVelocityDataAt <= data.velocity.size())|vc2wavesetsdata
+pool-setup-less|kSetUpLess = 89|kSetUpLess = 88|vc2wavepool
+pool-unit-round|kUnitRound = 40|kUnitRound = 32|vc2wavepool
+pool-round-up|kRoundUp = 63;|kRoundUp = 64;|vc2wavepool
+pool-largest-least|kLargestLeast = 10;|kLargestLeast = 11;|vc2wavepool
+pool-overhang|kOverhang = 24;|kOverhang = 0;|vc2wavepool
+setup-free-old|        host.osFree(words.base);\n||vc2wavepool
+setup-negative|if (sw(bytes) <= 0 \|\||if (bytes == 0 \|\||vc2wavepool
+setup-gives|        return 0;\n    }\n    memory.assign|        return 1;\n    }\n    memory.assign|vc2wavepool
+setup-head-state|header(head, first, first, 0, kHead);|header(head, first, first, 0, kUsed);|vc2wavepool
+setup-rover|    words.rover = head;|    words.rover = first;|vc2wavepool
+setup-free|    words.free = word(first + kUnits) * kHeader;|    words.free = (word(first + kUnits) + 1) * kHeader;|vc2wavepool
+take-rover|    if (words.rover == next) words.rover = block;\n||vc2wavepool
+take-units|word(next + kUnits) + word(block + kUnits) + 1);\n    words.free += kHeader;|word(next + kUnits) + word(block + kUnits));\n    words.free += kHeader;|vc2wavepool
+take-free|word(next + kUnits) + word(block + kUnits) + 1);\n    words.free += kHeader;|word(next + kUnits) + word(block + kUnits) + 1);|vc2wavepool
+split-exact|        setWord(block + kState, kUsed);\n        return;|        setWord(block + kState, kFree);\n        return;|vc2wavepool
+split-rest-units|have - units - 1, kFree);|have - units, kFree);|vc2wavepool
+split-rover|    words.rover = rest;\n||vc2wavepool
+split-header|    words.free -= kHeader;\n    if (word(word(rest|    if (word(word(rest|vc2wavepool
+split-join|    if (word(word(rest + kNext) + kState) == kFree) takeNext(rest);\n||vc2wavepool
+release-prev-test|if (word(prev + kState) != kFree) {|if (word(prev + kState) == kHead) {|vc2wavepool
+release-rover-block|        words.rover = block;\n        return;|        return;|vc2wavepool
+release-both|words.free += 2 * kHeader;|words.free += kHeader;|vc2wavepool
+release-rover-prev|    words.rover = prev;\n}|}|vc2wavepool
+release-prev-units|setWord(prev + kUnits, word(block + kUnits) + word(prev + kUnits) + 1);|setWord(prev + kUnits, word(block + kUnits) + word(prev + kUnits));|vc2wavepool
+move-rest|header(after, to, word(to + kNext), rest - 1, kFree);|header(after, to, word(to + kNext), rest, kFree);|vc2wavepool
+move-told|host.moved(to, sw(to - from));|host.moved(to, sw(from - to));|vc2wavepool
+move-release|    release(from);\n}|    free(from + kHeader);\n}|vc2wavepool
+move-links|    setWord(to + kNext, next);\n    host.moved|    host.moved|vc2wavepool
+alloc-free-test|bytes > words.free|bytes >= words.free|vc2wavepool
+alloc-fit|if (word(block + kState) == kFree && sw(word(block + kUnits)) >= sw(units)) {\n            split|if (word(block + kState) == kFree && sw(word(block + kUnits)) > sw(units)) {\n            split|vc2wavepool
+alloc-count|words.free -= units * kHeader;\n            return block + kHeader;|words.free -= (units + 1) * kHeader;\n            return block + kHeader;|vc2wavepool
+calloc-zero|std::memset(bytesAt(payload), 0, bytes);|(void)0;|vc2wavepool
+calloc-size|const uint32_t bytes = count * size,|const uint32_t bytes = count + size,|vc2wavepool
+free-count|    words.free += word(block + kUnits) * kHeader;\n    release(block);|    release(block);|vc2wavepool
+free-null|    if (payload == 0) return;\n||vc2wavepool
+realloc-null|    if (payload == 0) return 0;\n    const uint32_t units = unitsOf(sw(bytes - 1)), block|    const uint32_t units = unitsOf(sw(bytes - 1)), block|vc2wavepool
+realloc-shrink|words.free += static_cast<uint32_t>(-grow) * kHeader;|words.free += static_cast<uint32_t>(-grow + 1) * kHeader;|vc2wavepool
+realloc-fits|const bool fits = sw(words.free) >= sw(need);|const bool fits = true;|vc2wavepool
+realloc-next-room|sw(word(next + kUnits) + 1) >= grow|sw(word(next + kUnits)) >= grow|vc2wavepool
+realloc-in-place|        split(block, units);\n        words.free -= need;\n        return payload;|        split(block, units);\n        return payload;|vc2wavepool
+realloc-move-join|            takeNext(to);\n||vc2wavepool
+realloc-move-fit|if (word(to + kState) == kFree && sw(word(to + kUnits)) >= sw(units)) {|if (word(to + kState) == kFree && sw(word(to + kUnits)) > sw(units)) {|vc2wavepool
+largest-strict|sw(word(block + kUnits)) > sw(most)) {|sw(word(block + kUnits)) >= sw(most)) {|vc2wavepool
+largest-state|    setWord(at + kState, kUsed);|    setWord(at + kState, kFree);|vc2wavepool
+compact-rover|    words.rover = words.base;\n}|}|vc2wavepool
+compact-rest|header(rest, block, after, units, kFree);|header(rest, block, after, units + 1, kFree);|vc2wavepool
+compact-told|host.moved(block, sw(block - next));|host.moved(next, sw(block - next));|vc2wavepool
+compact-join|            if (word(after + kState) == kFree) takeNext(rest);\n||vc2wavepool
+object-tag|setWord(payload - kHeader + kTag, tag);|setWord(payload - kHeader + kTag, tag + 1);|vc2wavepool
+object-alloc-size|return tagged(alloc(bytes + extra), extra);|return tagged(alloc(bytes), extra);|vc2wavepool
+object-realloc-size|realloc(object + kHeader, bytes + extra, host)|realloc(object + kHeader, bytes, host)|vc2wavepool
+object-largest-tag|return tagged(payload, bytes);|return tagged(payload, 0);|vc2wavepool
+object-free-null|if (object != 0) free(object + kHeader);|free(object + kHeader);|vc2wavepool

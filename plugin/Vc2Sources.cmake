@@ -129,6 +129,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2WaveStore.cpp
     Source/Vc2WaveSets.cpp
     Source/Vc2WaveIndex.cpp
+    Source/Vc2WavePool.cpp
     Source/Vc2PartSettings.cpp
     Source/Vc2PartSettingsTables.cpp
     Source/Vc2PartSettingsWords.cpp

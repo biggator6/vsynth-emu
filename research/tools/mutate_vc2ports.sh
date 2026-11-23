@@ -36,7 +36,7 @@
 # C's envelopes (vc2setenvelope, v282) and their tables (vc2setenvtables) under its third; the patch store (vc2patch,
 # v450), the .p02's reader (vc2patchfile) and the store's reads both images share (vc2patchxt, XtPatchStore.cpp) under
 # xt_vc2patch; the wave index's parse (vc2waveindex, v500) and the sets' data read by address (vc2wavesetsdata,
-# Vc2WaveSets.cpp) under xt_vc2waves.
+# Vc2WaveSets.cpp) and the store's pool (vc2wavepool, v501) under xt_vc2waves.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -214,6 +214,7 @@ VC2PORTS=(
     "vc2patchxt|XtPatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
     "vc2waveindex|Vc2WaveIndex.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
     "vc2wavesetsdata|Vc2WaveSets.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
+    "vc2wavepool|Vc2WavePool.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

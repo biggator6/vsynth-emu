@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's wave pool v501 (2026-11-23, after v500; HARDWARE_FIRMWARE.md, "The VC-2's wave pool"): rom.4's pool at
+  0x8997c51c that the wave store's records and chunks live in, Vc2WavePool: a ring of blocks with 24-byte headers on
+  the OS's memory, its set-up, alloc, calloc, free, realloc, the largest free block, the compaction (each moved
+  block's object told through its vtable, Vc2PoolHost::moved) and the objects' wrappers. The size law can give the
+  last block up to 22 bytes past the OS's memory, which rom.4 writes when it moves or fills it: the port's memory runs
+  24 bytes on. A realloc to the same size with a used next block runs rom.4 into its own stop; the check draws none.
+  xt_vc2waves' second part, small pools of drawn calls: 0 different at seeds 2024, 7, 31337 and 99. Not in the sound
+  yet.
+
 The VC-2's wave index, parsed v500 (2026-11-23, from vc2-mode 230b302; HARDWARE_FIRMWARE.md, "The VC-2's wave index,
   parsed"): the first of the wave loaders, a block of their own (v500–v509). rom.4's boot parse of "D:\VC-2 Wave.bin",
   0x8934d120, Vc2WaveIndex: the WLF0 header, the two versions, each section by its number (the waves into the

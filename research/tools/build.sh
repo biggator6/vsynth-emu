@@ -40,9 +40,11 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 [ -f Vc2PatchStoreCheck.cpp ] && cc -DXT_VC2PATCH_MAIN Vc2PatchStoreCheck.cpp Vc2PatchFileCheck.cpp Vc2PatchStore.cpp \
    Vc2PatchFile.cpp Vc2Params.cpp XtFxValueText.cpp XtPatchStore.cpp XtDiskImage.cpp "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp "${SH4[@]}" -o "$O/xt_vc2patch" &
-# rom.4's wave loaders (v500) against rom.4's own, their file calls answered alike: the index's parse
+# rom.4's wave loaders (v500) against rom.4's own, their file calls answered alike: the index's parse, the store's pool
 [ -f Vc2WavesCheck.cpp ] && cc -DXT_VC2WAVES_MAIN Vc2WavesCheck.cpp Vc2WaveIndexCheck.cpp Vc2WaveIndex.cpp \
-   Vc2WaveSets.cpp Vc2WaveStore.cpp Vc2PartSettingsWords.cpp XtDiskImage.cpp "${SH4[@]}" -o "$O/xt_vc2waves" &
+   Vc2WaveSets.cpp Vc2WaveStore.cpp Vc2PartSettingsWords.cpp XtDiskImage.cpp \
+   $( [ -f Vc2WavePool.cpp ] && echo Vc2WavePool.cpp Vc2WavePoolCheck.cpp Vc2WavePoolDraws.cpp ) "${SH4[@]}" \
+   -o "$O/xt_vc2waves" &
 # The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
 [ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
    Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp \

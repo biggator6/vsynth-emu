@@ -769,6 +769,11 @@ version against rom.4's routines with what it calls hooked:
           through rom.4's file calls (`Vc2Files`); xt_vc2waves, a harness of its own (HARDWARE_FIRMWARE.md, "The
           VC-2's wave index, parsed"). Left: the store's side and the samples; where the plugin gets its files is the
           user's call.
+        - The store's pool done (v501): `Vc2WavePool`, rom.4's pool at `0x8997c51c` that the records and chunks live
+          in, its set-up, alloc, calloc, free, realloc, largest, compaction and the objects' wrappers, a moved
+          block's object told through `Vc2PoolHost`; xt_vc2waves' second part (HARDWARE_FIRMWARE.md, "The VC-2's wave
+          pool"). Left: the store's set-up, records and chunks (their classes' moved methods on the host), the
+          library's records, the bank, its wave reader and the start-up load.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.
