@@ -56,10 +56,31 @@
 # XtPatchStore.cpp's reads (PORT=vc2patch, vc2patchfile, vc2patchxt: rom.4's patch store and its .p02 reader, v450),
 # through xt_vc2patch, [cases] its random stores beside the disk image's 128 patches (4).  --waves: vc2waves_muts.txt,
 # in Vc2WaveIndex.cpp, Vc2WaveSets.cpp's reads by address, Vc2WavePool.cpp and Vc2WaveRecords.cpp (PORT=vc2waveindex,
-# vc2wavesetsdata, vc2wavepool, vc2waverecords: the wave loaders, v500 on), through xt_vc2waves, [cases] its drawn cases beside the disk image's index (40).  One line
+# vc2wavesetsdata, vc2wavepool, vc2waverecords: the wave loaders, v500 on) and rom.4's own load, Vc2WaveBoot.cpp,
+# Vc2WaveBootKernel.cpp and Vc2BootFiles.cpp (vc2waveboot, vc2wavekernel, vc2bootfiles, v503), through xt_vc2waves,
+# [cases] its drawn cases beside the disk image's index (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
+# --changed <rev> after the list's switch (2026-11-23, the user's "Yes, all five"): only the plants whose planted file
+# (mutate_vc2ports.sh's VC2PORTS) differs between rev and the working tree, or whose line in the list is new or edited
+# since rev; a port not in VC2PORTS is planted whatever changed.  --list: say which plants a run would plant, and stop.
+import re
 import sys
 import mutlist
+
+PORT_FILES = re.compile(r'^\s*"([a-z0-9]+)\|([^|"]+)\|', re.M)   # VC2PORTS' rows: a port and the file it plants in
+
+
+def changed_names(listing, muts, rev):
+    """The plants of muts whose planted file or list line differs from rev's"""
+    files = dict(PORT_FILES.findall((mutlist.HERE / 'mutate_vc2ports.sh').read_text()))
+    changed = mutlist.changed_sources(rev)
+    lines = mutlist.changed_lines(listing, rev)
+    unknown = sorted({m[3] for m in muts} - set(files))
+    hit = sorted({files[m[3]] for m in muts if m[3] in files and files[m[3]] in changed})
+    print(f'mutate_vc2: changed against {rev}, with plants:', ' '.join(hit) or 'none',
+          f'(and {len(lines)} lines of the list)', *(['ports not in VC2PORTS:', *unknown] if unknown else []),
+          flush=True)
+    return [m[0] for m in muts if m[0] in lines or m[3] not in files or files[m[3]] in changed]
 
 # Each list's harness and its default [cases], by the switch that names it
 HARNESSES = {
@@ -109,8 +130,23 @@ HARNESSES = {
     '--libm': (mutlist.Harness('mutate_vc2', 'xt_vc2libm', 'vc2libm_muts.txt', ('vc2libm', '2024'), 'XT_VC2LIBM_STOP'),
                '20000'),
 }
-args = sys.argv[1:]
+args = [a for a in sys.argv[1:] if a != '--list']
 switch = args.pop(0) if args and args[0] in HARNESSES else ''
 harness, default = HARNESSES[switch]
+rev = args[1] if args[:1] == ['--changed'] and len(args) > 1 else None
+args = args[2:] if rev else args
 cases = args.pop(0) if args and args[0].isdigit() else default
-sys.exit(mutlist.run_plants(harness, args, cases))
+names = args
+if rev:
+    names = changed_names(harness.listing, mutlist.plants(mutlist.HERE / harness.listing, names, harness.runner,
+                                                          harness.defaults), rev)
+    if not names:
+        print(f'mutate_vc2: no plant of {harness.listing} changed against {rev}')
+        sys.exit(0)
+if '--list' in sys.argv:
+    chosen = mutlist.plants(mutlist.HERE / harness.listing, names, harness.runner, harness.defaults)
+    for m in chosen:
+        print(m[0], m[3])
+    print('mutate_vc2:', len(chosen), 'plants')
+    sys.exit(0)
+sys.exit(mutlist.run_plants(harness, names, cases))

@@ -13,7 +13,8 @@
 # run through xt_tone's MSM mode (`xt_tone rom msm`), [cases] its cases.  mode extin (v203): through xt_tone's EXT IN
 # mode (`xt_tone rom extin`), the only run that draws EXT IN.
 # --changed <rev> first (2026-11-21, the user's rule): only the plants whose port's file (mutate_tonefile.sh's
-# tonefile, mutate.sh's own table) differs between rev and the working tree; the whole list when one of those files is
+# tonefile, mutate.sh's own table) differs between rev and the working tree, or whose line in the list is new or edited
+# since rev (2026-11-23); the whole list when one of those files is
 # xt_tone's own check's, as every plant's verdict is the check's.  --list: say which plants a run would plant, and stop.
 import concurrent.futures as cf, os, re, subprocess, sys
 import mutlist
@@ -34,16 +35,15 @@ def changedPlants(muts):
     said = subprocess.run(['bash', '-c', SAY_FILES, D + '/mutate_tonefile.sh', *asked],
                           capture_output=True, text=True, check=True).stdout.split('\n')
     files = dict(zip(ports, said))
-    diff = subprocess.run(['git', '-C', D + '/../..', 'diff', '--name-only', rev, '--', 'plugin/Source'],
-                          capture_output=True, text=True, check=True).stdout.split()
-    changed = {os.path.basename(f) for f in diff}
+    changed = mutlist.changed_sources(rev)
+    lines = mutlist.changed_lines('tone_muts.txt', rev)   # plants new or edited in the list since rev
     hit = {p for p in ports if files[p] in changed}
     print(f'mutate_tone: changed against {rev}, with plants:',
-          ' '.join(sorted({files[p] for p in hit})) or 'none', flush=True)
+          ' '.join(sorted({files[p] for p in hit})) or 'none', f'(and {len(lines)} lines of the list)', flush=True)
     if hit & set(CHECK):
         print('mutate_tone: xt_tone\'s own check changed, so the whole list', flush=True)
         return muts
-    return [m for m in muts if m[3] in hit]
+    return [m for m in muts if m[3] in hit or m[0] in lines]
 muts = changedPlants(muts) if rev else muts
 if '--list' in sys.argv:
     for m in muts: print(m[0], m[3])
