@@ -1108,6 +1108,9 @@ version against rom.4's routines with what it calls hooked:
          the object's its set-up writes; its read can lead or lag the walk far and read past the wave (open what the XT
          holds there for real waves), the port's sample reader by the physical address as the SH-4's. Next: the
          analog oscillator's 19 renders.
+       - XtAnalog.h's split (v336): the MOD and the tone's render order into `XtToneMod.h`, the knobs and the block
+         into `XtAnalogBlock.h`, so `XtAnalogOsc` can open its state to the analog's renders by a word table
+         (HARDWARE_FIRMWARE.md, "XtAnalog.h's split"); XtAnalog.cpp left whole. Next: the 19 renders on it.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+XtAnalog.h's split v336 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v335's 7a63925; HARDWARE_FIRMWARE.md,
+  "XtAnalog.h's split"): step 4.3's sixty-fourth version, a move. XtAnalog.h (438 lines) split by part so the
+  analog's renders can open XtAnalogOsc to the voice's words: the MOD section and the tone's render order into
+  XtToneMod.h, the knobs and the converter's block into XtAnalogBlock.h, XtAnalog.h including both (242 lines).
+  XtAnalog.cpp (3749 lines) isn't split: its 334 lines past 120 columns and its 2053-line check would have to be
+  rewritten to pass the kit's guards, as PluginEditor's did (42dfd60), and the renders need nothing changed in it.
+  Every build, fcheck and verify.sh as they were.
+
 The VC-2's period-jump player v335 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v334's 3ed4d17;
   HARDWARE_FIRMWARE.md, "The VC-2's period-jump player"): step 4.3's sixty-third version. VariPhrase's type 8 is the
   voice's own: its render 0x893ca8b0 (the walk's step, a read kept within a period of the walk, its two taps a period

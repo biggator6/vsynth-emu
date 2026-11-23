@@ -1546,6 +1546,19 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### XtAnalog.h's split (2026-11-23, v336) {#xt-analog-header-split}
+
+Step 4.3's sixty-fourth version, a move with no code changed. The analog's 19 renders (next) are rom.2's code on rom.4's
+words, which mirror `XtAnalogOsc`'s members one for one but for SUPER-SAW's, FEEDBACK-OSC's and X-MOD's (no VC-2 code
+has those), so they can run on `XtAnalogOsc` through a word table, as LITE's heads run on `XtLitePlayer` (v326). That
+needs `XtAnalogOsc` open to the table, a line in XtAnalog.h, which at 438 lines takes no line until split
+(CLAUDE.md's rule). It is split by part: the MOD section and the tone's render order by Structure into
+`XtToneMod.h`, the knobs and the converter's block (`xtAnalogBlock`, its eight arguments kept as its callers give
+them, a one-off) into `XtAnalogBlock.h`, XtAnalog.h including both (242 lines), so every includer sees what it did.
+XtAnalog.cpp (3749 lines) is left whole: as moved, 334 of its lines pass 120 columns and its check is one 2053-line
+function, which the kit's guards refuse (PluginEditor's split was abandoned for the same, 42dfd60), and the renders
+need nothing changed in it. Results: every harness builds, fcheck as its baseline, verify.sh green.
+
 ### The VC-2's period-jump player (2026-11-23, v335) {#vc2-osc-jump}
 
 Step 4.3's sixty-third version, the sixth piece of item 11's fifth part. The period-jump player, VariPhrase's type 8,

@@ -4098,3 +4098,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
   moving SOLO's draws. Type 8 got a family of its own (its part, waves, generator, room), and SOLO's part drew as
   v334's again. The jump's own part then found the glide's negative period (a record left behind, the next far
   longer); waves of smooth periods, as a voice's are, ended it, and the loops could stay on.
+- v336 was to split XtAnalog.cpp, but a split moves its 334 over-long lines and its 2053-line check into files the
+  guards judge, as with PluginEditor. The analog's renders run on XtAnalogOsc by a word table instead, which needs
+  only XtAnalog.h opened: that header was split, the .cpp left whole.
