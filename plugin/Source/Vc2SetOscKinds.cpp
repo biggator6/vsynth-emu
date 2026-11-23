@@ -10,7 +10,7 @@
 #include "Vc2SetChildHead.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2SetOscBlock.h"
-#include "Vc2WaveStore.h"   // v398
+#include "Vc2WaveSets.h"   // v398, v399
 #include "XtFloat.h"
 #include <cstring>
 
@@ -137,7 +137,7 @@ void portedConvert(Vc2SetOscInput& in, uint32_t* block, bool vocoder, Vc2SetRead
 }
 
 // PCM's start's wave (v397): the store's own words when it holds the number loaded, else by the index of its set with
-// the key and velocity; whether it found them (the store's lookups the port's from v398)
+// the key and velocity; whether it found them (the store's lookups the port's from v398, the sets' from v399)
 bool pcmWaveFound(Vc2SetOscInput& in, uint8_t key, Vc2SetReads& reads) {
     uint8_t* input = bytesOf(in);
     uint8_t* wave = input + kPcmWaveAt;
@@ -146,7 +146,7 @@ bool pcmWaveFound(Vc2SetOscInput& in, uint8_t key, Vc2SetReads& reads) {
     const auto number = static_cast<uint16_t>(vc2in::s16(input, kPcmNumberAt) - 1 + kStoreBase);
     if (store.loadedRecord(number, memory) != 0) return vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);
     const auto index = static_cast<uint16_t>(store.setIndex(number, memory));
-    return index != 0 && reads.waveBySet({ index, key, in.velocity }, wave) != 0;
+    return index != 0 && reads.waveSets().waveWords(index, wave, key, in.velocity, store, memory);
 }
 
 // Each type's start (0x8939fb40's switch) and converter (0x8939fbd0's).  PCM's (0x8939e120, v397): the starts' words

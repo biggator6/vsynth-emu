@@ -756,6 +756,11 @@ version against rom.4's routines with what it calls hooked:
         (HARDWARE_FIRMWARE.md, "The VC-2's wave store"). Left: the words by a set's index `0x8939cba0` and its three
         sets (v399). `Vc2Synth` must give the store and the memory; the store's set-up and insert, which its loader
         runs, aren't ported.
+      - The wave sets (v399): `Vc2WaveSets`, the velocity's, key's and alias's sets (counts `0x8993448c`, tables
+        `0x89973084`, buffers `0x89989754`) with their routines `0x89394b30`, `0x89394c20`, `0x89394d10` and the words
+        by a set's index `0x8939cba0`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's wave sets"). Every
+        routine PCM's start calls is the port's now; `Vc2Synth` must give the store, the sets and the wave memory, and
+        the loaders that fill the store and the sets aren't ported.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

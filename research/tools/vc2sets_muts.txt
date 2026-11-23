@@ -905,6 +905,8 @@ vari-pool-level|{ 0x8939fb88, &t.variLevel }|{ 0x8939fb7c, &t.variLevel }|vc2set
 vari-ways-lite|    vc2OscPcmLite(bytesOf(in), reads.tripMoving(in.part), block);\n|\n|vc2setosckinds
 # PCM's start (vc2setosckinds, Vc2SetOscKinds.cpp; its tempo's divisor, vc2setenvtables, v397), not planted: the Wave
 # Number read unsigned (cut to a halfword after), its tempo's divisor for EXTIN's (both 10; its address is planted).
+# From v399, not planted: the index's cut to a halfword and its test for 0 (the sets take a halfword, and a number of
+# 0 finds nothing there and writes nothing).
 pstart-mode-at|kPcmModeAt = 0x62,|kPcmModeAt = 0x63,|vc2setosckinds
 pstart-kf-at|kPcmKfAt = 0x0e,|kPcmKfAt = 0x0c,|vc2setosckinds
 pstart-number-at|kPcmNumberAt = 0x44,|kPcmNumberAt = 0x46,|vc2setosckinds
@@ -921,11 +923,9 @@ pstart-number-less|vc2in::s16(input, kPcmNumberAt) - 1 + kStoreBase|vc2in::s16(i
 pstart-holds-test|if (store.loadedRecord(number, memory) != 0) return|if (store.loadedRecord(number, memory) == 0) return|vc2setosckinds
 pstart-words-number|vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory)|vc2WaveWords(store, number, wave, memory)|vc2setosckinds
 pstart-words-answer|return vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);|return !vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);|vc2setosckinds
-pstart-index-short|const auto index = static_cast<uint16_t>(|const auto index = static_cast<uint32_t>(|vc2setosckinds
-pstart-index-zero|return index != 0 && reads|return true && reads|vc2setosckinds
-pstart-index-key|{ index, key, in.velocity }|{ index, in.key, in.velocity }|vc2setosckinds
-pstart-index-velocity|{ index, key, in.velocity }|{ index, key, 0 }|vc2setosckinds
-pstart-index-answer|{ index, key, in.velocity }, wave) != 0;|{ index, key, in.velocity }, wave) == 0;|vc2setosckinds
+pstart-index-key|waveWords(index, wave, key, in.velocity|waveWords(index, wave, in.key, in.velocity|vc2setosckinds
+pstart-index-velocity|waveWords(index, wave, key, in.velocity|waveWords(index, wave, key, 0|vc2setosckinds
+pstart-index-answer|return index != 0 && reads.waveSets()|return index != 0 && !reads.waveSets()|vc2setosckinds
 pstart-legato-and|input[kPcmModeAt] == kLegato && in.legato != 0|input[kPcmModeAt] == kLegato \|\| in.legato != 0|vc2setosckinds
 pstart-legato-flag|block[kFlagAt] = legato ? 1 : 0;|block[kFlagAt] = 0;|vc2setosckinds
 pstart-legato-key|legato ? in.legatoKey : in.key|in.key|vc2setosckinds
@@ -994,17 +994,72 @@ store-loaded-busy-word|m.half(record + kBusyAt) == 0|m.word(record + kBusyAt) ==
 store-index-set-read|static_cast<int32_t>(m.word(set + kBlockData))|static_cast<int32_t>(m.word(set))|vc2wavestore
 store-index-none|return set == 0 ? kNoSet :|return set == 0 ? kNoRecord :|vc2wavestore
 store-words-zero|    if (number == 0) return false;\n|\n|vc2wavestore
-store-words-found-first|    put32(wave + kFoundAt, 1);\n    const uint32_t record = store.loadedRecord(static_cast<uint16_t>(number - 1 + kNumberBase), m);\n    if (record == 0) return false;|    const uint32_t record = store.loadedRecord(static_cast<uint16_t>(number - 1 + kNumberBase), m);\n    if (record == 0) return false;\n    put32(wave + kFoundAt, 1);|vc2wavestore
+store-words-found-first|    put32(wave + kFoundAt, 1);\n    return vc2WaveLoadedWords(store, static_cast<uint16_t>(number - 1 + kNumberBase), wave, m, true);|    return vc2WaveLoadedWords(store, static_cast<uint16_t>(number - 1 + kNumberBase), wave, m, true) && (put32(wave + kFoundAt, 1), true);|vc2wavestore
 store-words-key|number - 1 + kNumberBase|number + kNumberBase|vc2wavestore
 store-words-not-loaded|    if (record == 0) return false;\n    for|    if (record == 0) return true;\n    for|vc2wavestore
 store-words-kept|    std::memmove(wave + kChunksAt, wave + kKeptAt, sizeof(uint32_t) * kKept);\n|\n|vc2wavestore
 store-root-offset-zero|wave[kRootOffsetAt] = 0;|wave[kRootOffsetAt] = kLevelTop;|vc2wavestore
 store-stereo-byte|put32(wave + kStereoAt, m.byte(vpsc + kVpscStereoAt));|wave[kStereoAt] = m.byte(vpsc + kVpscStereoAt);|vc2wavestore
 store-zero-half-gone|    put16(wave + kZeroHalfAt, 0);\n|\n|vc2wavestore
-store-events-untested|vpno == 0 ? kNoVpno : m.word(vpno + kVpnoCountAt)|m.word(vpno + kVpnoCountAt)|vc2wavestore
+store-events-untested|fromStore && vpno == 0 ? kNoVpno : m.word(vpno + kVpnoCountAt)|m.word(vpno + kVpnoCountAt)|vc2wavestore
 store-events-word|put16(wave + kEventsAt,|put32(wave + kEventsAt,|vc2wavestore
 store-zero-gone|    put32(wave + kZeroAt, 0);\n|\n|vc2wavestore
 store-frames-from-data|m.word(m.word(record + kVpscAt) + kFramesAt)|m.word(vpsc + kFramesAt)|vc2wavestore
 store-switch-of-vpno|m.byte(vc2in::u32(wave, kChunksAt + 8) + kVplpSwitchAt)|m.byte(vc2in::u32(wave, kChunksAt + 4) + kVplpSwitchAt)|vc2wavestore
 store-vpno-of-vplp|vpno = vc2in::u32(wave, kChunksAt + 4)|vpno = vc2in::u32(wave, kChunksAt + 8)|vc2wavestore
 store-words-answer|    return true;\n}|    return false;\n}|vc2wavestore
+store-levels-always|    if (fromStore) {\n        wave[kVelocityLevelAt]|    if (true) {\n        wave[kVelocityLevelAt]|vc2wavestore
+store-levels-by-set|    if (fromStore) {\n        wave[kVelocityLevelAt]|    if (!fromStore) {\n        wave[kVelocityLevelAt]|vc2wavestore
+store-events-by-set-tested|fromStore && vpno == 0 ? kNoVpno|vpno == 0 ? kNoVpno|vc2wavestore
+store-words-from-sets|wave, m, true);|wave, m, false);|vc2wavestore
+# The wave sets (vc2wavesets, Vc2WaveSets.cpp, v399), not planted: an alias's link of 0 let past its test, which reads
+# the entry before the table's first (out of the port's array, not a planted error a run can be sure to show).
+sets-from-store|vc2WaveLoadedWords(store, alias.number, wave, m, false)|vc2WaveLoadedWords(store, alias.number, wave, m, true)|vc2wavesets
+sets-entries-at|kEntriesAt = 0x10,|kEntriesAt = 0x12,|vc2wavesets
+sets-entries|kEntries = 128,|kEntries = 127,|vc2wavesets
+sets-flag-from|kFlagFrom = 127,|kFlagFrom = 128,|vc2wavesets
+sets-mark-at|kMarkAt = 0xa;|kMarkAt = 0xb;|vc2wavesets
+sets-mark-m|{ ' ', 'M' }|{ ' ', 'N' }|vc2wavesets
+sets-linked-type|kLinkedType = 1;|kLinkedType = 2;|vc2wavesets
+sets-found-at|kFoundAt = 0,|kFoundAt = 8,|vc2wavesets
+sets-velocity-level-at|kVelocityLevelAt = 4,|kVelocityLevelAt = 9,|vc2wavesets
+sets-root-offset-at|kRootOffsetAt = 5,|kRootOffsetAt = 9,|vc2wavesets
+sets-key-level-at|kKeyLevelAt = 6,|kKeyLevelAt = 9,|vc2wavesets
+sets-type-at|kTypeAt = 7,|kTypeAt = 9,|vc2wavesets
+sets-marked-at|kMarkedAt = 0x5c;|kMarkedAt = 0x48;|vc2wavesets
+sets-velocity-entry|velocityBuffer, 4, 2 }|velocityBuffer, 6, 2 }|vc2wavesets
+sets-velocity-next|velocityBuffer, 4, 2 }|velocityBuffer, 4, 4 }|vc2wavesets
+sets-key-entry|keyBuffer, 6, 4 }|keyBuffer, 4, 4 }|vc2wavesets
+sets-key-next|keyBuffer, 6, 4 }|keyBuffer, 6, 2 }|vc2wavesets
+sets-velocity-count|&Vc2WaveSetCounts::velocity, &Vc2WaveSetTables::velocity|&Vc2WaveSetCounts::key, &Vc2WaveSetTables::velocity|vc2wavesets
+sets-key-table|&Vc2WaveSetCounts::key, &Vc2WaveSetTables::key|&Vc2WaveSetCounts::key, &Vc2WaveSetTables::velocity|vc2wavesets
+sets-held-count|std::min<uint32_t>(count, kVc2WaveSetEntries)|std::min<uint32_t>(count, 20)|vc2wavesets
+sets-stream-short|into.size() > bytes ? bytes :|into.size() > bytes ? 0 :|vc2wavesets
+sets-stream-from|into[i] = m.byte(at + i);|into[i] = m.byte(at + i + 1);|vc2wavesets
+sets-read-whole|!= buffer.size()) return false;|== 0) return false;|vc2wavesets
+sets-number-past|if (n == 0 \|\| n > heldCount(s.counts.*row.count)) return false;|if (n == 0 \|\| n >= heldCount(s.counts.*row.count)) return false;|vc2wavesets
+sets-entry-order|table[2 * (n - 1)], table[2 * (n - 1) + 1]|table[2 * (n - 1) + 1], table[2 * (n - 1)]|vc2wavesets
+sets-flag|out.flag = buffer[kEntriesAt] >= kFlagFrom;|out.flag = buffer[kEntriesAt] > kFlagFrom;|vc2wavesets
+sets-mark-second|buffer[kMarkAt] == kMark[0] && buffer[kMarkAt + 1] == kMark[1]|buffer[kMarkAt] == kMark[0]|vc2wavesets
+sets-bound|if (by > entry[0]) continue;|if (by >= entry[0]) continue;|vc2wavesets
+sets-first|out.first = entry[1];|out.first = entry[2];|vc2wavesets
+sets-second|out.second = entry[2];|out.second = entry[1];|vc2wavesets
+sets-next-at|vc2in::s16(entry, static_cast<int>(row.nextAt))|vc2in::s16(entry, 2)|vc2wavesets
+sets-alias-past|if (n == 0 \|\| n > heldCount(s.counts.alias)) return false;|if (n == 0 \|\| n >= heldCount(s.counts.alias)) return false;|vc2wavesets
+sets-alias-entry|    s.buffers.alias = s.tables.alias[n - 1];\n    out.type|    s.buffers.alias = s.tables.alias[n];\n    out.type|vc2wavesets
+sets-alias-type|out.type = s.buffers.alias[0];|out.type = s.buffers.alias[1];|vc2wavesets
+sets-alias-link-at|vc2in::s16(s.buffers.alias.data(), 2)|vc2in::s16(s.buffers.alias.data(), 0)|vc2wavesets
+sets-alias-link-below|if (link == 0 \|\| n <= link) return true;|if (link == 0 \|\| n <= link + 1) return true;|vc2wavesets
+sets-alias-linked|if (s.buffers.alias[0] == kLinkedType) out.number = link;|out.number = link;|vc2wavesets
+sets-alias-relink|    s.buffers.alias = s.tables.alias[link - 1];\n|\n|vc2wavesets
+sets-by-key|splitOf(*this, kKey, byVelocity.next, key, byKey, m)|splitOf(*this, kKey, byVelocity.next, velocity, byKey, m)|vc2wavesets
+sets-by-velocity|splitOf(*this, kVelocity, index, velocity, byVelocity, m)|splitOf(*this, kVelocity, index, key, byVelocity, m)|vc2wavesets
+sets-alias-of-velocity|aliasOf(*this, byKey.next, alias)|aliasOf(*this, byVelocity.next, alias)|vc2wavesets
+sets-marked|byVelocity.marked ? 1 : 0|byKey.marked ? 1 : 0|vc2wavesets
+sets-found-and|byVelocity.flag && byKey.flag ? 1 : 0|byVelocity.flag \|\| byKey.flag ? 1 : 0|vc2wavesets
+sets-velocity-level|wave[kVelocityLevelAt] = byVelocity.first;|wave[kVelocityLevelAt] = byKey.first;|vc2wavesets
+sets-root-offset|wave[kRootOffsetAt] = byKey.second;|wave[kRootOffsetAt] = byKey.first;|vc2wavesets
+sets-key-level|wave[kKeyLevelAt] = byKey.first;|wave[kKeyLevelAt] = byKey.second;|vc2wavesets
+sets-type|wave[kTypeAt] = alias.type;|wave[kTypeAt] = 0;|vc2wavesets
+sets-record-number|vc2WaveLoadedWords(store, alias.number, wave, m, false)|vc2WaveLoadedWords(store, byKey.next, wave, m, false)|vc2wavesets
+sets-written-first|    if (!named) return false;\n|    if (!named \|\| store.loadedRecord(alias.number, m) == 0) return false;\n|vc2wavesets

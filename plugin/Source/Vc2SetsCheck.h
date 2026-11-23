@@ -7,7 +7,7 @@
 #include "Vc2CheckMain.h"
 #include "Vc2RomShared.h"
 #include "Vc2Sets.h"
-#include "Vc2WaveStore.h"   // v398
+#include "Vc2WaveSets.h"   // v398, v399
 #include <cstring>
 #include <span>
 #include <type_traits>
@@ -137,14 +137,16 @@ public:
     Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
     float pitchSource() override;
     // v398: the store the port's own (`store`, written into rom.4's memory with the blocks before each event), the
-    // memory rom.4's, where the draws put the records, blocks and events' tables (v396's events' halfwords too), at most
-    // 65,536 bytes read a use (a bound a planted error's endless walk meets); 0x8939cba0 as hooked (v397)
+    // memory rom.4's, where the draws put the records, blocks, events' tables and sets' data (v396's events' halfwords
+    // too), at most 65,536 bytes read a use (a bound a planted error's endless walk meets); v399: the sets the port's
+    // own (`sets`) as the store is
     const Vc2WaveStore& waveStore() override { return store; }
     const Vc2WaveMemory& waveMemory() override;
-    uint32_t waveBySet(std::array<uint32_t, 3> args, uint8_t* wave) override;
+    Vc2WaveSets& waveSets() override { return sets; }
     uint32_t tripMoving(uint8_t part) override;   // v395: through rom.4's part table, as the draws aim it
     std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes
     Vc2WaveStore store {};
+    Vc2WaveSets sets {};
 
 private:
     // rom.4's memory as the store's, its reads counted since the last use

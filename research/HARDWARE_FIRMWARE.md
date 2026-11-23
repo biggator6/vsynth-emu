@@ -3912,6 +3912,77 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's wave sets (2026-11-22, v399) {#vc2-wave-sets}
+
+What PCM's start calls when the store holds no record of its Wave Number loaded but gives a set's index: `0x8939cba0`
+on the index, the wave's words (the input's +0xa0), the key Pitch KF gives and the velocity. Ported bit for bit as
+`Vc2WaveSets` (Vc2WaveSets.cpp), checked in xt_vc2sets' eighth part with rom.4's own routines running there. With it
+every routine PCM's start calls is the port's. Every address is rom.4's.
+
+**The sets.** Three, each a count, a table of 500 and a buffer its reads fill:
+- The counts are halfwords in .data at `0x8993448c`, `0x8993448e` and `0x89934490`, 0 after C startup.
+- The tables are in .bss from `0x89973084`. The velocity's set's and the key's are entries of two words, a stream of
+  memory (its start, its length); the alias's (`0x89974fc4`) are four bytes: a type, a byte and a halfword link.
+- The buffers are in .bss from `0x89989754`: 0x210 bytes for the velocity's set, 0x310 for the key's, 4 for the alias's.
+
+**The velocity's and the key's sets** (`0x89394b30`, `0x89394c20`, one code but for the row). A number of 0 or past
+the count gives 0. Otherwise the entry's stream goes through `0x89327b40`: it copies what was asked, or what's left
+if that is less, into the buffer, and gives how many bytes it copied. Anything short of the whole buffer gives 0. Then:
+- A flag (a word): the first entry's bound is 127 or more.
+- The velocity's set only: a mark (a word), when the buffer's +0xa and +0xb are `" M"`.
+- 128 entries from +0x10, of 4 bytes (the velocity's) or 6 (the key's). The first whose bound (its byte 0) the
+  velocity or key isn't above gives its byte 1, its byte 2 (the key's set's) and the next set's number, a halfword at
+  +2 or +4. None gives 0.
+
+**The alias's set** (`0x89394d10`; its stream `0x89394af0` is the table's own entry, so the read always takes all 4
+bytes). A number of 0 or past the count gives 0. The entry's type is its byte 0, and the number to take is the
+number. When the link is not 0 and is below the number, the linked entry is read into the buffer instead, and when
+its type is 1 the link is the number to take. Its own bound test in `0x89394af0` can't fail there, as the link is below
+the number, which passed the same bound, so the port has none.
+
+**The words by a set's index** (`0x8939cba0`). The velocity's set by the index and the velocity, then the key's by
+the number it gives and the key, then the alias's by the key's number; any of them giving 0 gives 0. Then it writes,
+whether or not the store holds the record:
+- +0x5c the velocity's mark, and +0 1 when both flags are set.
+- +4 the velocity's byte 1, +5 the key's byte 2 and +6 the key's byte 1 (the level curve's two and the root's offset,
+  127, 0 and 127 from the store), and +7 the alias's type.
+
+Then it fills the words of the store's record under the alias's number, if it is loaded, as `0x8939cd30` does (v398)
+but for +4…+7. It also reads the vpno's count without testing for no vpno. The two share `vc2WaveLoadedWords`. A
+record found this way with no vpno takes its count from address 4, and its events from 0 + 12. That is area 0 on the
+XT. The check maps 132 KB of noise there, enough for any halfword count.
+
+A count past 500 would read on into the next table in rom.4. The port holds a count to 500; the sets' loader, not
+ported, keeps them within.
+
+**The check.** rom.4's own `0x8939cba0` runs, inside PCM's start and alone as an event of its own, beside the store's
+three (v398); nothing is hooked. The sets' counts, tables and buffers are the port's copy, written into rom.4's memory
+before each event and compared after. The draws, at a case's start and one event in 32 (`Vc2SetOscStoreDraws.cpp`):
+- 32 streams of each of the two sets' data in Vc2Fw's RAM. Each is noise, `" M"` half the time and a space before
+  another byte a time in four. Each entry's next number is a set's (1…32) seven times in eight, 0 now and then. One
+  stream in eight has every bound below 32, its last 255 half the time. Three in eight have bounds rising from below
+  16 in steps of 1…4, as splits do, so a key a few steps off takes another entry: what PCM's start's key and its
+  centre show only there.
+- Counts of 16…48 mostly, now and then 0, 500 or any up to 500.
+- The table's entries: a stream each, its length whole mostly, short a time in eight, any word a time in sixteen.
+- An alias's type 1 half the time, its link 0 half the time, else a set's number.
+- Half of the store's records keyed by a set's number, and the store's sets' indices among them; 128 records now,
+  where v398 drew 64.
+- The alone event's number about the counts, and its key and velocity 0…127 mostly.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, about 95 of 1,050 alone events a run finding a record. Every line and
+  branch of Vc2WaveSets.cpp, Vc2WaveStore.cpp and the OSC blocks' files is reached. Seed 99 first found the read of a
+  count at address 4 past the 4 KB page.
+- `mutate_vc2.py --sets`: 50 new plants for the sets and four for the shared fill, with the store's and PCM's start's
+  re-pointed onto the calls that replaced theirs, all caught. Five missed at first:
+  - Two became equivalent and went: the index's cut to a halfword, and its test for 0.
+  - PCM's start's key centre and LEGATO's key: a key set's match is all that shows them now, and noise bounds hardly
+    ever move by a few keys. Rising bounds and 128 records caught both.
+  - The entries' count: caught by a stream whose last entry alone matches.
+
+  The whole list, 1019, all caught.
+
 ### The VC-2's wave store (2026-11-22, v398) {#vc2-wave-store}
 
 The store PCM's start (v397) looks a wave up in. It is rom.4's .bss at `0x8997c52c` and keeps a record for each wave

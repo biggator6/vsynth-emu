@@ -91,7 +91,8 @@ done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake
       $( [ -f Vc2OscPcmConvert.cpp ] && echo Vc2OscPcmConvert.cpp ) \
       $( [ -f Vc2OscPcmLite.cpp ] && echo Vc2OscPcmLite.cpp ) \
       $( [ -f Vc2OscPcmVari.cpp ] && echo Vc2OscPcmVari.cpp ) \
-      $( [ -f Vc2WaveStore.cpp ] && echo Vc2WaveStore.cpp Vc2SetOscStoreDraws.cpp Vc2PartSettingsWords.cpp ) ) \
+      $( [ -f Vc2WaveStore.cpp ] && echo Vc2WaveStore.cpp Vc2SetOscStoreDraws.cpp Vc2PartSettingsWords.cpp ) \
+      $( [ -f Vc2WaveSets.cpp ] && echo Vc2WaveSets.cpp ) ) \
    "${SH4[@]}" -o "$O/xt_vc2sets" &
 # The part's settings by ID (v286) against rom.4's own readers, the read objects and the getter hooked
 [ -f Vc2PartSettingsCheck.cpp ] && cc -DXT_VC2SETTINGS_MAIN Vc2PartSettingsCheck.cpp Vc2PartSettings.cpp \

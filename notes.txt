@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's wave sets v399 (2026-11-22, after v398; HARDWARE_FIRMWARE.md, "The VC-2's wave sets"): rom.4's three
+  sets a set's index is looked up in, Vc2WaveSets (counts, tables of 500 and buffers word for word): the velocity's
+  and the key's, one routine over a row (a stream of the wave memory read into the buffer, the first of 128 entries by
+  an upper bound), the alias's (its type and the record's number, its link's when that entry is of type 1), and the
+  words by a set's index 0x8939cba0, the store's fill shared with 0x8939cd30 (vc2WaveLoadedWords). Every routine PCM's
+  start calls is the port's. xt_vc2sets' eighth part: 0 different at seeds 2024, 7, 31337 and 99. Not in the sound
+  yet.
+
 The VC-2's wave store v398 (2026-11-22, after v397 and the merge of vc2-mode, c7b84c0; HARDWARE_FIRMWARE.md, "The
   VC-2's wave store"): rom.4's store at 0x8997c52c, Vc2WaveStore, its key and 128 lists of records, on the wave memory
   by rom.4's address (Vc2WaveMemory): the find 0x89353130, whether a record is loaded 0x89351840, a set's index

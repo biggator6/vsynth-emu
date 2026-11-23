@@ -82,26 +82,33 @@ int32_t Vc2WaveStore::setIndex(uint32_t key, const Vc2WaveMemory& m) const {
     return set == 0 ? kNoSet : static_cast<int32_t>(m.word(set + kBlockData));
 }
 
-bool vc2WaveWords(const Vc2WaveStore& store, uint16_t number, uint8_t* wave, const Vc2WaveMemory& m) {
-    if (number == 0) return false;
-    put32(wave + kFoundAt, 1);
-    const uint32_t record = store.loadedRecord(static_cast<uint16_t>(number - 1 + kNumberBase), m);
+bool vc2WaveLoadedWords(const Vc2WaveStore& store, uint32_t key, uint8_t* wave, const Vc2WaveMemory& m,
+                        bool fromStore) {
+    const uint32_t record = store.loadedRecord(key, m);
     if (record == 0) return false;
     for (const ChunkRow& c : kChunks) put32(wave + c.waveAt, chunkOf(record, c.recordAt, m));
     for (int i = 0; i < static_cast<int>(std::size(kDataWords)); ++i)
         put32(wave + kDataWordsAt + 4 * i, dataWord(record, kDataWords[i], m));
     std::memmove(wave + kChunksAt, wave + kKeptAt, sizeof(uint32_t) * kKept);
     const uint32_t vpsc = vc2in::u32(wave, kChunksAt), vpno = vc2in::u32(wave, kChunksAt + 4);
-    wave[kVelocityLevelAt] = kLevelTop;
-    wave[kRootOffsetAt] = 0;
-    wave[kKeyLevelAt] = kLevelTop;
-    wave[kTypeAt] = m.byte(vpsc + kVpscTypeAt);
+    if (fromStore) {
+        wave[kVelocityLevelAt] = kLevelTop;
+        wave[kRootOffsetAt] = 0;
+        wave[kKeyLevelAt] = kLevelTop;
+        wave[kTypeAt] = m.byte(vpsc + kVpscTypeAt);
+    }
     wave[kRootAt] = m.byte(vpsc + kVpscRootAt);
     put32(wave + kStereoAt, m.byte(vpsc + kVpscStereoAt));
     put16(wave + kZeroHalfAt, 0);
-    put16(wave + kEventsAt, vpno == 0 ? kNoVpno : m.word(vpno + kVpnoCountAt));
+    put16(wave + kEventsAt, fromStore && vpno == 0 ? kNoVpno : m.word(vpno + kVpnoCountAt));
     put32(wave + kZeroAt, 0);
     put32(wave + kFramesWordAt, m.word(m.word(record + kVpscAt) + kFramesAt));
     wave[kLoopSwitchAt] = m.byte(vc2in::u32(wave, kChunksAt + 8) + kVplpSwitchAt);
     return true;
+}
+
+bool vc2WaveWords(const Vc2WaveStore& store, uint16_t number, uint8_t* wave, const Vc2WaveMemory& m) {
+    if (number == 0) return false;
+    put32(wave + kFoundAt, 1);
+    return vc2WaveLoadedWords(store, static_cast<uint16_t>(number - 1 + kNumberBase), wave, m, true);
 }

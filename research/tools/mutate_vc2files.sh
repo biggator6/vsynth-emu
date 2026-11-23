@@ -66,7 +66,8 @@ VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2Matri
          Vc2CosmTvf Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive Vc2CosmBalanced Vc2CosmSideBand Vc2CosmTables Vc2Math
          Vc2CosmFrameDraws Vc2SetOscBlock Vc2SetOscKinds Vc2SetOscBlockCheck Vc2OscConvert Vc2OscAnalogConvert
          Vc2OscConvertTables Vc2VocoderOsc Vc2Carrier Vc2CarrierTables Vc2OscExtinConvert Vc2SetOscBlockDraws
-         Vc2OscPcmConvert Vc2OscPcmLite Vc2OscPcmVari Vc2WaveStore Vc2SetOscStoreDraws Vc2PartSettingsWords)
+         Vc2OscPcmConvert Vc2OscPcmLite Vc2OscPcmVari Vc2WaveStore Vc2SetOscStoreDraws Vc2PartSettingsWords
+         Vc2WaveSets)
 VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSettingsTables Vc2PartSettingsWords
     Vc2PartSettingsOsc Vc2PartSettingsOscCheck Vc2PartSettingsOscBlock Vc2PartSettingsVocoder
     Vc2PartSettingsVocoderCheck Vc2LibMath Vc2LibMathTables Vc2PartSettingsModes Vc2PartSettingsModesCheck

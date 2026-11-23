@@ -47,3 +47,9 @@ public:
 // 0x8939cd30: the wave's words (the OSC input's +0xa0…+0x5b, `wave`) from the store by a Wave Number (none for 0),
 // whether its record is loaded
 bool vc2WaveWords(const Vc2WaveStore& store, uint16_t number, uint8_t* wave, const Vc2WaveMemory& m);
+// The words of the record the store holds loaded under `key`, as 0x8939cd30 and (v399) 0x8939cba0 fill them alike:
+// the chunks' data and copies, the root key, stereo, the zeros, the events' count, the frames, the loop switch.
+// `fromStore`, 0x8939cd30's: the level curve's two, the root's offset and the type (+4…+7) its own, and 2 for the
+// count with no vpno; 0x8939cba0's sets give +4…+7, and it reads the vpno's count untested.  Whether loaded
+bool vc2WaveLoadedWords(const Vc2WaveStore& store, uint32_t key, uint8_t* wave, const Vc2WaveMemory& m,
+                        bool fromStore);

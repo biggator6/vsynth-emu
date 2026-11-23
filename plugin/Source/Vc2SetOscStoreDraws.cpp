@@ -19,8 +19,9 @@ constexpr uint32_t kSetAt = 0x4c, kBusyAt = 0x52, kBlockData = 28, kKeyBase = 30
 // [FW] what the wave's words read in a block's data: the vpsc's type (+1), stereo flag (+2) and frames (+4), the
 // vpno's count (+4), the vplp's loop switch (+0x1a); a set's index (+0)
 constexpr uint32_t kTypeAt = 1, kStereoAt = 2, kFramesAt = 4, kCountAt = 4, kSwitchAt = 0x1a;
-// The Wave Numbers drawn: 0…40, a time in four 128 or 256 up (keys in the same list)
-constexpr uint32_t kNumbers = 41, kListStep = 128;
+// The Wave Numbers drawn: 0…40, a time in four 128 or 256 up (keys in the same list); v399: the sets' numbers 1…32
+// mostly (half the records keyed by one, as the alias's set names them), their counts 16…48 mostly
+constexpr uint32_t kNumbers = 41, kListStep = 128, kSetNumbers = 32, kSetCountFrom = 16, kSetCounts = 33;
 
 // The blocks by what they're drawn as, a run each: the vpscs', the vplps', the data's, the sets'
 struct BlockRun {
@@ -39,9 +40,9 @@ void vplpSteered(uint8_t* data, std::mt19937& rng) { data[kSwitchAt] = (uint8_t)
 
 void noiseKept(uint8_t*, std::mt19937&) {}
 
-// A set's index 0 a time in four, else 1…512 mostly, now and then any word
+// A set's index 0 a time in four, else a set's number mostly (v399; 1…512 until then), now and then any word
 void setSteered(uint8_t* data, std::mt19937& rng) {
-    const uint32_t index = rng() % 4 == 0 ? 0 : rng() % 8 ? 1 + rng() % 512 : (uint32_t)rng();
+    const uint32_t index = rng() % 4 == 0 ? 0 : rng() % 8 ? 1 + rng() % kSetNumbers : (uint32_t)rng();
     std::memcpy(data, &index, sizeof index);
 }
 
@@ -90,7 +91,7 @@ void waveRecordsDrawn(Vc2Fw& fw, Vc2WaveStoreWords& w, std::mt19937& rng) {
     std::array<std::vector<uint32_t>, kLists> lists;
     for (uint32_t r = 0; r < kOscWaveRecords; ++r) {
         const uint32_t record = kOscWaveRecordsAt + kOscWaveRecordBytes * r;
-        const uint32_t key = (uint16_t)(oscStoreNumber(rng) + kKeyBase);
+        const uint32_t key = rng() % 2 ? (uint16_t)(oscStoreNumber(rng) + kKeyBase) : 1 + rng() % kSetNumbers;
         waveRecordDrawn(fw, record, key, rng);
         if (rng() % 8) lists[key % kLists].push_back(record + kNodeAt);
     }
@@ -110,6 +111,70 @@ int32_t storeKeyDrawn(std::mt19937& rng) {
                                                (int32_t)(rng() % 0x10000), 0 });
     return keys[rng() % 8 ? rng() % 2 : 2 + rng() % 3];
 }
+
+// v399: a set's streams as the draws make them, 32 of them in Vc2Fw's RAM (the velocity's from 0x8C070000, the key's
+// from 0x8C078000): their region, a stream's bytes, an entry's bytes and the place of its next set's number; a
+// velocity's set's " M" (+0xa); the entries from +0x10
+struct SetStreamRun {
+    uint32_t at, bytes, entryBytes, nextAt;
+};
+constexpr SetStreamRun kVelocityStreams { 0x8C070000, 0x210, 4, 2 }, kKeyStreams { 0x8C078000, 0x310, 6, 4 };
+constexpr uint32_t kOscSetStreams = 32, kMarkAt = 0xa, kSetEntriesAt = 0x10, kSetEntries = 128;
+
+// A stream's entry's bound by its way: every bound below 32, the last 255 half the time (a velocity or key above all
+// but the last); rising from below 16 in steps of 1…4, as splits do (a key or velocity a few steps off takes another
+// entry); or noise
+uint8_t boundDrawn(uint32_t way, uint32_t i, uint32_t from, uint32_t step, uint8_t noise, std::mt19937& rng) {
+    const auto rising = (uint8_t)std::min<uint32_t>(255, from + step * i);
+    const auto low = (uint8_t)(i + 1 == kSetEntries && rng() % 2 ? 255 : rng() % 32);
+    return way == 0 ? low : way < 4 ? rising : noise;
+}
+
+// The streams' data: noise, " M" half the time and a space before any other byte a time in four, an entry's next
+// number a set's seven times in eight (0 one time in 16 of those), the bounds low one stream in eight and rising three
+void setStreamsDrawn(Vc2Fw& fw, const SetStreamRun& run, std::mt19937& rng) {
+    std::vector<uint8_t> data(run.bytes * kOscSetStreams);
+    for (uint8_t& b : data) b = (uint8_t)rng();
+    for (uint32_t k = 0; k < kOscSetStreams; ++k) {
+        uint8_t* stream = data.data() + run.bytes * k;
+        const uint32_t mark = rng() % 4;
+        if (mark < 3) std::memcpy(stream + kMarkAt, mark < 2 ? " M" : " ", mark < 2 ? 2 : 1);
+        const uint32_t way = rng() % 8, from = rng() % 16, step = 1 + rng() % 4;
+        for (uint32_t i = 0; i < kSetEntries; ++i) {
+            uint8_t* entry = stream + kSetEntriesAt + run.entryBytes * i;
+            entry[0] = boundDrawn(way, i, from, step, entry[0], rng);
+            const auto next = (uint16_t)(rng() % 16 ? 1 + rng() % kSetNumbers : 0);
+            if (rng() % 8) std::memcpy(entry + run.nextAt, &next, sizeof next);
+        }
+    }
+    fw.cpu.write(run.at, data.data(), data.size());
+}
+
+// A set's count: 16…48 mostly, now and then 0, 500 or any to 500
+uint16_t setCountDrawn(std::mt19937& rng) {
+    const auto counts = std::to_array<uint16_t>({ (uint16_t)(kSetCountFrom + rng() % kSetCounts), 0,
+                                                  (uint16_t)kVc2WaveSetEntries,
+                                                  (uint16_t)(rng() % (kVc2WaveSetEntries + 1)) });
+    return counts[rng() % 8 ? 0 : 1 + rng() % 3];
+}
+
+// A velocity's or key's entry: one of the run's streams, its length the stream's mostly, short a time in eight, any
+// word a time in sixteen
+void setEntryDrawn(uint32_t* entry, const SetStreamRun& run, std::mt19937& rng) {
+    entry[0] = run.at + run.bytes * (uint32_t)(rng() % kOscSetStreams);
+    const auto lengths = std::to_array<uint32_t>({ run.bytes + (uint32_t)(rng() % 64), (uint32_t)(rng() % run.bytes),
+                                                   (uint32_t)rng() });
+    entry[1] = lengths[rng() % 8 ? 0 : 1 + rng() % 2];
+}
+
+// An alias's entry: its type 1 half the time or one of six, now and then any byte; its link 0 half the time, else a
+// set's number
+void aliasDrawn(std::array<uint8_t, 4>& entry, std::mt19937& rng) {
+    entry[0] = (uint8_t)(rng() % 4 ? (rng() % 2 ? 1 : rng() % 6) : rng());
+    entry[1] = (uint8_t)rng();
+    const auto link = (uint16_t)(rng() % 2 ? 0 : 1 + rng() % kSetNumbers);
+    std::memcpy(entry.data() + 2, &link, sizeof link);
+}
 } // namespace
 
 uint16_t oscStoreNumber(std::mt19937& rng) {
@@ -118,8 +183,8 @@ uint16_t oscStoreNumber(std::mt19937& rng) {
 
 void oscStoreDrawn(Vc2Fw& fw, Vc2WaveStore& store, std::mt19937& rng, bool all) {
     if (all) {
-        std::array<uint8_t, kOscZeroPageBytes> page;
-        setsNoise(page, rng);
+        std::vector<uint8_t> page(kOscZeroPageBytes);
+        for (uint8_t& b : page) b = (uint8_t)rng();
         if (fw.cpu.ptr(0, 1) == nullptr) fw.cpu.mapRam(0, kOscZeroPageBytes);
         fw.cpu.write(0, page.data(), page.size());
     }
@@ -128,5 +193,23 @@ void oscStoreDrawn(Vc2Fw& fw, Vc2WaveStore& store, std::mt19937& rng, bool all) 
         waveRecordsDrawn(fw, store.words, rng);
     }
     if (all || rng() % 8 == 0) store.words.key = storeKeyDrawn(rng);
+}
+
+uint16_t oscSetNumber(std::mt19937& rng) {
+    const auto numbers = std::to_array<uint16_t>({ (uint16_t)(1 + rng() % kSetNumbers), 0, (uint16_t)rng() });
+    return numbers[rng() % 8 ? 0 : 1 + rng() % 2];
+}
+
+void oscSetsDrawn(Vc2Fw& fw, Vc2WaveSets& sets, std::mt19937& rng, bool all) {
+    if (!all && rng() % 32) return;
+    setStreamsDrawn(fw, kVelocityStreams, rng);
+    setStreamsDrawn(fw, kKeyStreams, rng);
+    sets.counts = { setCountDrawn(rng), setCountDrawn(rng), setCountDrawn(rng) };
+    for (uint32_t i = 0; i < kVc2WaveSetEntries; ++i) {
+        setEntryDrawn(&sets.tables.velocity[2 * i], kVelocityStreams, rng);
+        setEntryDrawn(&sets.tables.key[2 * i], kKeyStreams, rng);
+        aliasDrawn(sets.tables.alias[i], rng);
+    }
+    setsNoise(sets.buffers, rng);
 }
 #endif

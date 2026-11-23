@@ -239,17 +239,4 @@ void oscSameRecordsDrawn(Vc2Fw& fw, std::span<const Vc2SetOscInput> inputs, std:
         for (uint32_t p = 0; p < kFewParts; ++p) fw.cpu.write(kOscTableAt + kOscPartRow * p + slot, r.data(), sizeof r);
     }
 }
-
-// v397: 0x8939cba0's answer nonzero three times in four (now and then any word); the wave's words it fills noise, but
-// the type one of its six mostly, the events' table aimed in its region and their count small, as an input's draws
-// keep them for the converter after
-uint32_t oscBySetAnswered(uint8_t* wave, std::mt19937& rng) {
-    const uint32_t answer = rng() % 8 ? (rng() % 4 ? 1u : 0u) : rng();
-    if (answer == 0) return answer;
-    bytesDrawn(wave, kOscWaveBytes, rng);
-    wave[kWaveTypeAt - kVariFlagAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
-    putAt(wave, kVariTableAt - kVariFlagAt, kOscEventsAt + (uint32_t)(rng() % kOscEventsAims));
-    putAt(wave, kVariEventsAt - kVariFlagAt, (uint16_t)(rng() % 25));
-    return answer;
-}
 #endif

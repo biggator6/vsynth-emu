@@ -4024,6 +4024,25 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 24, continued (2026-11-22) — v399: the wave sets
+
+- My notes had the sets' counts at 0xffff after C startup. rom.4's own .data copy says 0, and so do the image's
+  sections; the notes were wrong.
+- The first draws found a record by a set only 4 times in 1080: the sets' numbers and counts rarely lined up, and few
+  of the store's records carried a set's number. Numbers 1…32 against counts 16…48, and half the records keyed by one,
+  gave about 60.
+- Seed 99 found a second read at address 0. By a set's index the vpno's count is read with no test, so a record with
+  no vpno takes it from address 4, and the events read past the 4 KB page mapped there. The page is 132 KB now.
+- The alias's second bound test can't fail: the link it tests is already below the number, which passed the same
+  bound. Coverage showed it, and it isn't ported.
+- The kit refused a table entry type made 500 times (shape law; its manifest lives in the main checkout, which this
+  worktree doesn't write), so the two stream tables hold their entries as word pairs.
+- Five plants missed at first. Two became equivalent once the sets were ported: the index's cut to a halfword and its
+  test for 0. Two others were PCM start's key (its centre, LEGATO's key): while 0x8939cba0 was hooked, the call's log
+  showed the key, but now only a key set's match does, and noise bounds almost never move it by a few keys. Bounds that
+  rise in small steps, as splits do, and 128 store records in place of 64 caught both. The last needed a stream whose
+  last entry alone matched.
+
 ### Session 24, continued (2026-11-22) — v398: the wave store
 
 - The coordinator merged vc2-mode into this branch and ran the merge's checks while I mapped the store, read-only. The

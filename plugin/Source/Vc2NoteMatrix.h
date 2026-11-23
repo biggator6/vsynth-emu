@@ -11,6 +11,7 @@
 
 class Vc2ToneShared;
 class Vc2WaveMemory;
+class Vc2WaveSets;
 class Vc2WaveStore;
 struct Vc2MatrixGroups;
 
@@ -121,11 +122,10 @@ public:
     virtual float pitchSource() = 0;
     // PCM's start's (v397): the wave store (v398: Vc2WaveStore, rom.4's at 0x8997c52c) and the wave memory its records
     // and blocks lie in, by rom.4's address (VariPhrase's words read a wave's events there, v396's waveHalf until
-    // v398); and the wave's words by a set's index, the key and the velocity, rom.4's 0x8939cba0 (not ported yet),
-    // filling the wave's words at the input's +0xa0 (`wave`), its answer
+    // v398); and the wave sets a set's index is looked up in (v399: Vc2WaveSets, their buffers written)
     virtual const Vc2WaveStore& waveStore() = 0;
     virtual const Vc2WaveMemory& waveMemory() = 0;
-    virtual uint32_t waveBySet(std::array<uint32_t, 3> args, uint8_t* wave) = 0;
+    virtual Vc2WaveSets& waveSets() = 0;
     // LITE's words' (v395): a part's Time Trip under way, its trip object's +8 (Vc2TripObject::moving) by the part table
     // 0x8993d040
     virtual uint32_t tripMoving(uint8_t part) = 0;
