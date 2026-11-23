@@ -119,6 +119,10 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
     }
     if (block[kKindWord] == kVariPhrase) s.n.variDrawn += oscSteerVariWords(s.voices[(size_t)v], s.shared.renders);
     oscSteerBandBlock(block, s.shared);   // v333: a band player's set-up reads its records
+    if (oscSteerSoloNote(block, s.shared, &s.voices[(size_t)v]) != 0) {   // v334: SOLO's set-up's FTRCs
+        oscWriteRecords(s.fw, s.shared.records);
+        oscWriteVoice(s, v);
+    }
     const bool byEvents = oscVariByEvents((uint8_t)block[kFlagsWord], block[kWaveWord]);   // v331
     if (block[kKindWord] == kVariPhrase && byEvents) {
         oscSteerVariTable(s.voices[(size_t)v], s.shared.records.events);
@@ -213,7 +217,10 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
     // v332: else, half the time from the band players' generator, BACKING's or ENSEMBLE's, which VariPhrase's install
     // writes for its types 3 and 5
     if (pick == 3 && s.shared.bandRng() % 2) s.voices[(size_t)v].tail.render = kOscBandRenders[s.shared.bandRng() % 2];
+    // v334: else, half the time from SOLO's generator, SOLO's, which VariPhrase's install writes for its types 1 and 6
+    else if (pick == 3 && s.shared.soloRng() % 2) s.voices[(size_t)v].tail.render = kOscSoloRenders[0];
     s.n.bandBlocks += oscRendersBy(s.voices[(size_t)v], kOscBandRenders);
+    s.n.soloBlocks += oscRendersBy(s.voices[(size_t)v], kOscSoloRenders);
     s.n.extInBlocks += oscRendersBy(s.voices[(size_t)v], kOscExtInRenders);       // v322
     s.n.variOffBlocks += oscRendersBy(s.voices[(size_t)v], kOscVariOffRenders);   // v323
     s.n.headsBlocks += oscRendersBy(s.voices[(size_t)v], kOscHeadsRenders);       // v326

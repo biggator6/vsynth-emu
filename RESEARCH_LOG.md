@@ -4070,3 +4070,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - My test's parse of a host ID looked for "c2" in the whole head, and "vc2" has one: every COSM 1 control seemed to move COSM 2's. It reads the head after the prefix now.
 - The patch EQ's Q from its string would have been 0.5, 2.0, 3.5…: even steps fit 0.5~8.0 over six values. rom.2's routine on its EQ Mid 1 Q gives 0.5, 0.7, 1.0, 2.0, 4.0, 8.0, and rom.4's driver puts the patch EQ in those mid bands, so the editor asks rom.2's routine for both bands' Freq and Q.
 - Pad Mode's box beside Pad Hold cut TIME-TRIP at every size; it has a row of its own.
+
+### Session 25 (2026-11-23) — v334 on: step 4.3's rest
+
+- A fresh session for step 4.3's rest (SOLO, the period-jump player, the analog's renders, Vc2Synth), from c6ea59a in
+  its own worktree. The worktree had no JUCE: it was checked out from the main checkout's copy, its URL left as
+  `.gitmodules` names it.
+- SOLO could not go on `XtSoloVoice` as the hand-over expected: its state is a model (doubles, records by index, a
+  plan) that can't be laid back onto rom.4's object words, which the check compares. It went as mode 1's did, rom.4's
+  code on the words, and `XtSoloVoice` was left as it was.
+- The kit refused the band players' tail copied into SOLO's set-ups (template-law), so both run one `vc2WalkSetUp`.
+- The first seeds at 400 cases met SOLO's set-up taking FTRC of a NaN rate. Rather than guess, a -O0 -g build of the
+  check under lldb, stopped on that NaN, showed the two causes: a drawn header rate of 0, and rom.4's exp2 past its
+  seven octaves. A SOLO note-on now gets a tone's ranges. (A -O0 build of xt_vc2tone wasn't usable for this: it
+  differed throughout.)

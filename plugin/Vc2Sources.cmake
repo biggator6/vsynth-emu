@@ -63,6 +63,10 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscVari.cpp
     Source/Vc2OscBands.cpp
     Source/Vc2OscBandSetUp.cpp
+    Source/Vc2OscSolo.cpp
+    Source/Vc2OscSoloFrame.cpp
+    Source/Vc2OscSoloRecords.cpp
+    Source/Vc2OscSoloSetUp.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp

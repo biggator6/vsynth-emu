@@ -19,6 +19,7 @@ struct OscCounts {
     long headsBlocks = 0;                           // v326: and through LITE's heads'
     long modeOneBlocks = 0;                         // v327: and through kind 1's mode 1's
     long bandBlocks = 0;                            // v332: and through the band players', steered to a state
+    long soloBlocks = 0;                            // v334: and through SOLO's, the same
     long modeOneSetUps = 0, setUpsInSamples = 0;    // v328: its set-ups, and those with the range in samples
     long modeOneSeeks = 0;                           // v329: the events steered for its seek
     long liteUpdates = 0, liteSettings = 0;         // v324: LITE's update and settings on a type with a way
@@ -91,8 +92,9 @@ void oscModeOnePart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
 // events a number up to two past the last, one time in eight 0x8000 up, one in four with high bits besides
 int32_t oscSeekWord(bool inSamples, std::span<const int32_t> positions, int count, std::mt19937& rng);
 // v332 (Vc2OscBandsCheck.cpp): the band part, the band players' renders on voice 0, before any hook; from v333 their
-// set-ups and seek too
+// set-ups and seek too; v334: SOLO's part the same, its render, set-ups and seek
 void oscBandPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
+void oscSoloPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
 // v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them
 void oscVibratoPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);
 void oscDrawVibratoWords(Vc2VibratoWords& w, std::mt19937& rng);

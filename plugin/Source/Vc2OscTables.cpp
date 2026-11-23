@@ -195,8 +195,27 @@ auto vibratoWords(Vc2OscVibratoPool& v) {
     });
 }
 
+// [FW] SOLO's (v334): the block's rates', the frame's and grains', the grain parameters', the repeat's cost, the set-ups'
+auto soloWords(Vc2OscSoloPool& s) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x893c9b30, &s.offScale }, { 0x893c9b34, &s.offQ }, { 0x893c9b4c, &s.liftLow }, { 0x893c9b50, &s.liftTop },
+        { 0x893c9b38, &s.cubic }, { 0x893c9b3c, &s.cubicBase }, { 0x893c9b40, &s.coefScale }, { 0x893c9b44, &s.glide },
+        { 0x893c9b48, &s.sumMost }, { 0x893c9b20, &s.windowHalf }, { 0x893c9b24, &s.windowScale },
+        { 0x893c9b28, &s.ageUnit }, { 0x893c9b2c, &s.sixteenth }, { 0x893c9b54, &s.sampleScale },
+        { 0x893c9da0, &s.periodFloor }, { 0x893c9da4, &s.robotGlide }, { 0x893c9da8, &s.robotSwing },
+        { 0x893c9dac, &s.robotScale }, { 0x893c9db0, &s.rateFloor }, { 0x893c9db4, &s.triggerMost },
+        { 0x893c9db8, &s.triggerScale }, { 0x893c9dbc, &s.stepScale }, { 0x893c9dc0, &s.windowSteps },
+        { 0x893c9dc4, &s.cutoffScale }, { 0x893c9dc8, &s.cutoffMost }, { 0x893c9f40, &s.costAnchor },
+        { 0x893c9f44, &s.costWalk }, { 0x893c9f48, &s.costLowSlope }, { 0x893c9f4c, &s.costLowBase },
+        { 0x893c9f50, &s.costHighSlope }, { 0x893c9f54, &s.costHighBase }, { 0x893c9f58, &s.costScale },
+        { 0x893cc610, &s.setUpGain }, { 0x893cc61c, &s.setUpWindow }, { 0x893cc620, &s.setUpHalf },
+        { 0x893cc624, &s.setUpQ },
+    });
+}
+
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
+        vc2ReadPool(image, soloWords(solo));
         vc2ReadPool(image, vibratoWords(vibrato));
         vc2ReadFloats(image, { kVc2VibratoWavesAt, (int)vibrato.waves.size() }, vibrato.waves.data());
         vc2ReadPool(image, oscWords(*this));

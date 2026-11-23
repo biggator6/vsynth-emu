@@ -208,7 +208,9 @@ int main(int argc, char** argv) {
     oscVariOffPart(fw, *run, tally);
     oscVibratoPart(fw, *run, tally);
     shared.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' generator of its own
+    shared.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
     oscBandPart(s, *run, tally);
+    oscSoloPart(s, *run, tally);   // v334
     const std::string bands = oscCaptureBandStates(fw, shared, oscVoiceAt(0));   // v332: before the hooks
     oscInstallRom(fw, shared.draws, rom, oscVoiceNumber);
     oscModeOnePart(s, *run, tally);   // v327
@@ -225,10 +227,12 @@ int main(int argc, char** argv) {
                 "finite, %ld note-ons by events\n", n.seeks, n.objectCalls, n.gliding, n.variDrawn,
                 n.variByEvents);   // v330; v331: no event lookups, VariPhrase's by events
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
-                "heads', %ld through mode 1's, %ld through the band players'\n", n.extInBlocks, n.variOffBlocks,
-                n.headsBlocks, n.modeOneBlocks, n.bandBlocks);   // v322, v323, v326, v327, v332
+                "heads', %ld through mode 1's, %ld through the band players', %ld through SOLO's\n", n.extInBlocks,
+                n.variOffBlocks, n.headsBlocks, n.modeOneBlocks, n.bandBlocks, n.soloBlocks);   // v322…v332, v334
     std::printf("band players: %ld note-ons given a band wave, %ld re-seeks a set-up state\n", shared.bandSetUps,
                 shared.bandSeeks);   // v333
+    std::printf("solo: %ld renders steered to a set-up state, %ld note-ons given a SOLO wave, %ld re-seeks a set-up "
+                "state\n", shared.soloSteers, shared.soloSetUps, shared.soloSeeks);   // v334
     std::printf("mode 1's set-ups: %ld (%ld with the range in samples); %ld events steered for its seek\n",
                 n.modeOneSetUps, n.setUpsInSamples, n.modeOneSeeks);   // v328, v329
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324

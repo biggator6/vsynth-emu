@@ -194,9 +194,10 @@ struct Ahead {
 constexpr Ahead kAheadFwd { kNext, kBounceBack, kBackEnd, kFwdEnd, true };       // [FW] 0x893c9386…
 constexpr Ahead kAheadBack { kPrev, kBounceFwd, kFwdStart, kBackStart, false };  // [FW] 0x893c93f0…
 bool past(const Ahead& a, int32_t x, int32_t y) { return a.forward ? x > y : y > x; }   // x past y, the way it walks
+} // namespace
 
 // [FW] 0x893ca1b2…: the walk at `pos`, its fraction 0; the next event's kind and position read `stride` half words
-// past `from`, or, the current the last, none and 16 past the last event's position
+// past `from`, or, the current the last, none and 16 past the last event's position.  v334: SOLO's jumps' too
 void jumpTail(Vc2WalkWords& w, int32_t pos, uint32_t from) {
     w.setWord(kPos, pos);
     w.setWord(kFrac, 0);
@@ -206,6 +207,8 @@ void jumpTail(Vc2WalkWords& w, int32_t pos, uint32_t from) {
     w.setByte(kNextKind, e.kind);
     w.setWord(kNext, e.pos);
 }
+
+namespace {
 // [FW] 0x893ca190: mode 1's jump to the current event: loaded, the walk at its position; the next read from its entry's
 // +8 (rom.4's −8 is taken off r4, which nothing reads after it, where 0x893ca1a0 takes it off r6)
 void modeOneJump(Vc2OscVoice& v, Vc2OscParts& p) {

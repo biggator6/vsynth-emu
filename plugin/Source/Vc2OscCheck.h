@@ -34,6 +34,10 @@ inline constexpr uint32_t kOscWaveHalfwords = 16384;
 // v332: the band players' waves, after it in the same wave memory, up to the events' table's region (0x8C0C0000)
 inline constexpr uint32_t kOscBandAt = kOscWaveAt + kOscWaveHalfwords * 2, kOscBandBytes = 0x8000;
 inline constexpr uint32_t kOscEventsAt = 0x8C0C8000;     // the events' table mode 1 walks (v327; v328 32 KB up)
+// v334: SOLO's waves, above the interpreter's stack (kVc2Sp), in the wave memory the port's parts hold from kOscWaveAt
+// (the events' table's region and the stack's between, which no port reads through the wave memory)
+inline constexpr uint32_t kOscSoloAt = 0x8C0E0000, kOscSoloBytes = 0x8000;
+inline constexpr uint32_t kOscWaveBytes = kOscSoloAt + kOscSoloBytes - kOscWaveAt;
 
 // v330: a kind's routine and its settings by address went, the last VariPhrase's; a player's set-up came back.  v331:
 // the event lookup went, the voice's own
@@ -81,14 +85,16 @@ struct OscRecords {
 struct OscBandWave {
     uint32_t at = 0, room = 0;
     bool stereo = false, looped = false;
+    bool solo = false;   // v334: SOLO's layout (one band, the events SOLO's), its band 0 the samples
     int frames = 0, events = 0;
     uint32_t vpdt = 0, cached = 0, loop = 0, header = 0;
     std::array<uint32_t, 6> bands {};
     std::vector<int32_t> positions {};   // v333: its events' (×16), which the band part's seeks are drawn about
 };
-// v332: an object as rom.4's set-up of a band player left it, BACKING's or ENSEMBLE's
+// v332: an object as rom.4's set-up of a band player left it, BACKING's or ENSEMBLE's; from v334 any player's by the
+// wave's type (BACKING 3, ENSEMBLE 5, SOLO 1 and 6)
 struct OscBandState {
-    bool ensemble = false;
+    uint32_t type = 0;
     std::array<uint8_t, Vc2OscVoice::kObjectBytes> object {};
 };
 uint32_t oscVoiceAt(int voice);
@@ -128,8 +134,9 @@ struct OscShared {
     // v322: the renders' draws (the EXT IN player's frames and level, from v323 Vari off's wave and words) from a
     // generator of their own, so the run's other draws stay as they were; seeded from the run's.  `extIn` until v323
     std::mt19937 renders {};
-    // v323: what rom.4 has at kOscWaveAt; from v332 the band waves above Vari off's (kOscBandAt)
-    std::vector<int16_t> wave = std::vector<int16_t>(kOscWaveHalfwords + kOscBandBytes / 2);
+    // v323: what rom.4 has at kOscWaveAt; from v332 the band waves above Vari off's (kOscBandAt), from v334 SOLO's
+    // (kOscSoloAt)
+    std::vector<int16_t> wave = std::vector<int16_t>(kOscWaveBytes / 2);
     // v332: the band players' draws, from a generator of their own seeded from the run's, and the states rom.4's own
     // set-ups left on the run's two band waves before any hook, which a render through a band player is steered to
     std::mt19937 bandRng {};
@@ -138,6 +145,11 @@ struct OscShared {
     // v333: those two band waves, which a note-on's block of a band player is given; the note-ons and re-seeks steered
     std::vector<OscBandWave> bandWaves {};
     long bandSetUps = 0, bandSeeks = 0;
+    // v334: SOLO's the same, from a generator of its own (so the band players' draws stay as they were); its states
+    // among bandStates by their type
+    std::mt19937 soloRng {};
+    std::vector<OscBandWave> soloWaves {};
+    long soloSteers = 0, soloSetUps = 0, soloSeeks = 0;
     Vc2MicRing ring {};
     std::array<float, Vc2Kind6::kBlock> unvoiced {};
     OscRecords records {};

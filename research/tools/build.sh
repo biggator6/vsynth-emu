@@ -211,6 +211,8 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscVariDraws.cpp ] && echo Vc2OscVariDraws.cpp ) \
    $( [ -f Vc2OscBands.cpp ] && echo Vc2OscBands.cpp Vc2OscBandDraws.cpp Vc2OscBandVpdt.cpp ) \
    $( [ -f Vc2OscBandSetUp.cpp ] && echo Vc2OscBandSetUp.cpp ) \
+   $( [ -f Vc2OscSolo.cpp ] && echo Vc2OscSolo.cpp Vc2OscSoloFrame.cpp Vc2OscSoloRecords.cpp Vc2OscSoloSetUp.cpp \
+      Vc2OscPlayerSteers.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
       Vc2CosmAdapterWords.cpp Vc2CosmAdapterBlocks.cpp Vc2CosmTbAdapter.cpp Vc2CosmBufferedAdapters.cpp Vc2CosmDsp.cpp \
@@ -233,6 +235,8 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscVariDraws.cpp ] && echo Vc2OscVariDraws.cpp ) \
    $( [ -f Vc2OscBands.cpp ] && echo Vc2OscBands.cpp Vc2OscBandDraws.cpp Vc2OscBandVpdt.cpp Vc2OscBandsCheck.cpp ) \
    $( [ -f Vc2OscBandSetUp.cpp ] && echo Vc2OscBandSetUp.cpp ) \
+   $( [ -f Vc2OscSolo.cpp ] && echo Vc2OscSolo.cpp Vc2OscSoloFrame.cpp Vc2OscSoloRecords.cpp Vc2OscSoloSetUp.cpp \
+      Vc2OscPlayerSteers.cpp ) \
    $( [ -f Vc2OscAnalog.cpp ] && echo Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp ) \
    $( [ -f Vc2OscAnalogSub.cpp ] && echo Vc2OscAnalogSub.cpp ) \
    $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp ) \

@@ -62,6 +62,12 @@ void vc2OscLoopRates(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared
 // reset (Vc2OscBeat.cpp)
 void vc2OscBandSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared, bool ensemble);
 void vc2OscSeekBands(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
+// v334 (Vc2OscSolo.cpp, Vc2OscSoloSetUp.cpp): SOLO's render, 0x893c9450, mono or stereo by the object's byte 0; its
+// set-ups, 0x893cc2e0 (type 1) and 0x893cc310 (type 6), which VariPhrase's start runs; its seek, 0x893cc630, before
+// the beat's reset (Vc2OscBeat.cpp)
+void vc2OscSolo(Vc2OscVoice& v, float* out, Vc2OscParts& p);
+void vc2OscSoloSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared, bool typeSix);
+void vc2OscSeekSolo(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

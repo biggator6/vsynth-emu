@@ -45,6 +45,19 @@ extern const Vc2WalkWay kVc2ModeOneWalk;
 // v333 (Vc2OscBands.cpp, v332's row): index 16, the band players', 0x893cbdd0, 0x893cbdf0; the start's 0x893cd440 and
 // 0x893cbda0
 extern const Vc2WalkWay kVc2BandWalk;
+// v334 (Vc2OscSoloRecords.cpp): indexes 4 and 8, SOLO's, 0x893c9e90, 0x893c9eb0; the start's 0x893cc630 and 0x893c9e70
+extern const Vc2WalkWay kVc2SoloWalk;
+
+// v334: the events' layout a set-up gives the object: the first half word, the stride mono and stereo (half words)
+struct Vc2WalkLayout {
+    uint8_t first, mono, stereo;
+};
+// the band players' (their tail 0x893cd370's) and SOLO's (0x893cc2e0's and 0x893cc310's), Vc2OscWalkStart.cpp's
+extern const Vc2WalkLayout kVc2BandLayout, kVc2SoloLayout;
+// v334 (Vc2OscWalkStart.cpp): the events' table and the loops' cached events from the head's words, the layout and a
+// frame's bytes by byte 0's stereo, then the walk's start with the player's row; the band players' tail's and SOLO's
+// set-ups' alike
+void vc2WalkSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkLayout& layout, const Vc2WalkWay& way);
 
 // one-off: seven routines' declarations, alike only in taking the voice and its parts
 void vc2WalkCrossing(Vc2OscVoice& v, Vc2OscParts& p);                          // 0x893c9380

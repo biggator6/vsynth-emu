@@ -181,6 +181,10 @@ std::string oscOnKindNoteOn(OscSides& s, std::mt19937& rng, int v) {
     Vc2OscVoice& o = s.voices[(size_t)v];
     if (o.kind() == kVariPhrase) s.n.variDrawn += oscSteerVariWords(o, s.shared.renders);
     oscSteerBandVoice(o, s.shared);   // v333: a band player's set-up reads the records its block gave
+    if (oscSteerSoloVoice(o, s.shared) != 0) {   // v334: SOLO's set-up's FTRCs
+        oscWriteRecords(s.fw, s.shared.records);
+        oscWriteVoice(s, v);
+    }
     constexpr uint32_t kFlagsAt = 0x138;   // [FW] v331: the block's flags, by which its note-on reads by events
     if (o.kind() == kVariPhrase && oscVariByEvents(o.u8(kFlagsAt), o.u32(Vc2OscVoice::kWave))) {
         oscSteerVariTable(o, s.shared.records.events);

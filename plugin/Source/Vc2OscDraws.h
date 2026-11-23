@@ -127,35 +127,73 @@ inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c
 inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e8c };
 inline constexpr std::array<uint32_t, 1> kOscModeOneRenders { 0x893c9f60 };   // v327: mono and stereo alike
 inline constexpr std::array<uint32_t, 2> kOscBandRenders { 0x893cadc0, 0x893ca1f0 };   // v332: BACKING's, ENSEMBLE's
+inline constexpr std::array<uint32_t, 1> kOscSoloRenders { 0x893c9450 };   // v334: SOLO's, mono and stereo alike
 // v332 (Vc2OscBandDraws.cpp): the band players' set-ups (BACKING's 0x893cd1d0, ENSEMBLE's 0x893cc8f0), from v333 the
 // voice's own, and their seek (0x893cd440)
 inline constexpr std::array<uint32_t, 2> kOscBandSetUps { 0x893cd1d0, 0x893cc8f0 };
 inline constexpr uint32_t kOscBandSeek = 0x893cd440;
-// v332 (Vc2OscBandVpdt.cpp): a band wave's parts: its vpdt; its loop; its cached loop events; band k's frames, sized as
-// BACKING's; the room the vpdt, the cached events, two records and the bands take
-std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng);
-std::vector<int32_t> oscBandPositions(const std::vector<uint8_t>& vpdt, bool stereo);   // v333: its events' positions
+// v334: SOLO's render, set-ups (type 1's, type 6's) and seek, the voice's own
+inline constexpr uint32_t kOscSoloRender = 0x893c9450, kOscSoloSeek = 0x893cc630;
+inline constexpr std::array<uint32_t, 2> kOscSoloSetUps { 0x893cc2e0, 0x893cc310 };
+// v334: the players whose states the checks capture and steer to, by the wave's type: BACKING's, ENSEMBLE's, SOLO's
+// two; SOLO's or not (its waves, generator and counts), rom.4's set-up, its render
+struct OscPlayerRow {
+    uint32_t type;
+    bool solo;
+    uint32_t setUp, render;
+};
+inline constexpr std::array<OscPlayerRow, 4> kOscPlayers { { { 3, false, 0x893cd1d0, 0x893cadc0 },
+                                                            { 5, false, 0x893cc8f0, 0x893ca1f0 },
+                                                            { 1, true, 0x893cc2e0, kOscSoloRender },
+                                                            { 6, true, 0x893cc310, kOscSoloRender } } };
+const OscPlayerRow* oscPlayerOf(uint32_t type);   // its row, or none
+// v334: a band's segment as the vpdt's builder lays it out: its start (×16) and entry's offset, its records' starts,
+// lengths (×16) and offsets
+struct OscBandRecord {
+    int32_t start, length;
+    uint32_t at;
+};
+struct OscBandSegment {
+    int32_t start;
+    uint32_t entry;
+    std::vector<OscBandRecord> records;
+};
+// v332 (Vc2OscBandVpdt.cpp): a band wave's parts: its vpdt (v334: or a SOLO wave's, band 0's segments into `zero` when
+// given); its loop; its cached loop events (v334: SOLO's by its events and band 0's segments); band k's frames, sized
+// as BACKING's; the room the vpdt, the cached events, two records and the bands take
+std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng, bool solo = false,
+                                 std::vector<OscBandSegment>* zero = nullptr);
+std::vector<int32_t> oscBandPositions(const std::vector<uint8_t>& vpdt, bool stereo, bool solo = false);   // v333
 XtLoop oscBandLoop(int frames, std::mt19937& rng);
 void oscBandCachedEvents(uint8_t* to, const std::vector<uint8_t>& vpdt, bool stereo, const XtLoop& loop);
+void oscSoloCachedEvents(uint8_t* to, const std::vector<int32_t>& events, const std::vector<OscBandSegment>& zero,
+                         const XtLoop& loop);
 uint32_t oscBandFrames(int k, int frames);
-uint32_t oscBandRoom(int frames, bool stereo, uint32_t vpdtBytes);
+uint32_t oscBandRoom(int frames, bool stereo, uint32_t vpdtBytes, bool solo = false);
 inline constexpr uint32_t kOscBandRecordRoom = 0x40, kOscBandCachedBytes = 4 * 0xb4;   // [FW] 4 × kXtMbLoopEventBytes
 inline constexpr int kOscBandTail = 64;
 // A band wave built at `at` in `room` bytes of the wave memory, into rom.4's memory and the port's parts' both: its
 // vpdt (2…5 events, the first at 0 and the last at the end, each band 1…3 segments of records 8…207 samples, their
 // repeat budgets any), its cached loop events (xtMbLoopEvents's, a loop on two times in three) and loop record, and
-// six bands of noise sized as BACKING's (ENSEMBLE's are smaller), mono or stereo; from `rng`
-OscBandWave oscDrawBandWave(Vc2Fw& fw, OscShared& shared, uint32_t at, uint32_t room, std::mt19937& rng);
+// six bands of noise sized as BACKING's (ENSEMBLE's are smaller), mono or stereo; from `rng`.  v334: or a SOLO wave
+// (`solo`): its vpdt SOLO's, its cached events SOLO's, band 0 alone its samples
+OscBandWave oscDrawBandWave(Vc2Fw& fw, OscShared& shared, uint32_t at, uint32_t room, std::mt19937& rng,
+                            bool solo = false);
 // The object's words as VariPhrase's note-on leaves them before a band player's set-up, on `w`: the head at the voice's
 // own +0x108 (`voiceAt`) and its records, byte 0 (stereo by the wave, the range in samples three times in four, the
 // loops, Vari off, Tempo Sync, Time Trip, the wrap), byte 2 (the events' ways), byte 3 any, the range by events and in
-// samples, the tempos, the pitch, the walk and the gain's two; the rest of the object 0
-void oscBandNote(Vc2OscVoice& o, const OscBandWave& w, uint32_t voiceAt, bool ensemble, std::mt19937& rng);
-// rom.4's own set-up of a band player on the object `o` holds, in its memory at `voiceAt`, and its words back into `o`;
-// what faults.  Only before the hooks, which take the set-ups by their addresses
-std::string oscBandSetUp(Vc2Fw& fw, Vc2OscVoice& o, uint32_t voiceAt, bool ensemble);
+// samples, the tempos, the pitch, the walk and the gain's two; the rest of the object 0.  From v334 by the wave's
+// type (`type`, a row of kOscPlayers): SOLO's also Robot Voice one time in four, the formant, the Energy (0 one time
+// in four) and Robot Voice's depth
+void oscBandNote(Vc2OscVoice& o, const OscBandWave& w, uint32_t voiceAt, uint32_t type, std::mt19937& rng);
+// A range's last event (oscBandNote's): the first or past it within the wave's events; ENSEMBLE's the wave's last
+uint16_t oscBandLastEvent(const OscBandWave& w, uint32_t first, bool ensemble, std::mt19937& rng);
+// rom.4's own set-up of a player (v334: by the wave's type) on the object `o` holds, in its memory at `voiceAt`, and its
+// words back into `o`; what faults.  Only before the hooks, which take the set-ups by their addresses
+std::string oscBandSetUp(Vc2Fw& fw, Vc2OscVoice& o, uint32_t voiceAt, uint32_t type);
 // Before any hook: the run's two band waves (mono and stereo) in kOscBandAt's two halves, and on each, four notes of
-// each player set up by rom.4 at `voiceAt`, their objects into the shared states
+// each player set up by rom.4 at `voiceAt`, their objects into the shared states; from v334 SOLO's the same, its two
+// waves in kOscSoloAt's halves, from SOLO's generator
 std::string oscCaptureBandStates(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt);
 // Before a render through a band player, the object one of the captured states of its player, the pitch 0.25…4 and the
 // walk ±0.1…2.5 drawn again; from the band players' generator.  1 if steered
@@ -169,6 +207,13 @@ long oscSteerBands(Vc2OscVoice& o, OscShared& shared);
 void oscSteerBandBlock(std::span<uint32_t> block, OscShared& shared);
 void oscSteerBandVoice(Vc2OscVoice& o, OscShared& shared);
 long oscSteerBandSeek(Vc2OscVoice& o, OscShared& shared);
+// v334 (Vc2OscPlayerSteers.cpp; the three above from v334 SOLO's too, by its types 1 and 6, its re-seek's with the
+// block's 0x20 clear): before a note-on of VariPhrase's of SOLO's types, the block's float words (what the targets
+// read) moderate and the voice's rate and formant factors (its tail's, when given) ½…2, from SOLO's generator, as a
+// tone gives them: SOLO's set-up takes FTRC of the rate and formant the update leaves, and a NaN's FTRC is the host's
+// (xtf's 0, the interpreter's 0x80000000); on a block, or on a voice's own block words; 1 if steered
+long oscSteerSoloNote(std::span<uint32_t> block, OscShared& shared, Vc2OscVoice* o);
+long oscSteerSoloVoice(Vc2OscVoice& o, OscShared& shared);
 // Whether a voice's render is one of `renders` (its kind renders by +0xa44, and that names one); before a render, a
 // voice's words as the render needs them (`oscPlaysExtIn` and `oscSteerExtIn` until v323):
 // - through the EXT IN player (v322), its level (+0x1e0) and target (+0x1dc) within ±1 as a note gives them (the

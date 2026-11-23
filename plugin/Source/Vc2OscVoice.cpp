@@ -64,11 +64,12 @@ struct OwnRender {
 void bandsBacking(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscBands(v, out, p, false); }
 void bandsEnsemble(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscBands(v, out, p, true); }
 // v327: kind 1's mode 1's (Vc2OscModeOne.cpp), one routine for mono and stereo
-constexpr std::array<OwnRender, 9> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
-                                                   { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
-                                                   { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo },
-                                                   { 0x893c9f60, vc2OscModeOne }, { 0x893cadc0, bandsBacking },
-                                                   { 0x893ca1f0, bandsEnsemble } } };
+// v334: SOLO's (Vc2OscSolo.cpp), one routine for mono and stereo
+constexpr std::array<OwnRender, 10> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
+                                                    { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
+                                                    { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo },
+                                                    { 0x893c9f60, vc2OscModeOne }, { 0x893cadc0, bandsBacking },
+                                                    { 0x893ca1f0, bandsEnsemble }, { 0x893c9450, vc2OscSolo } } };
 } // namespace
 
 bool Vc2OscVoice::renderOwn(uint32_t routine, float* out, Vc2OscParts& parts) {

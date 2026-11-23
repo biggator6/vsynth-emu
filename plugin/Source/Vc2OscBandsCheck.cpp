@@ -5,7 +5,9 @@
 // of blocks, before each run the words a note's updates, settings and clock move drawn again on both sides (the pitch,
 // the walk, the gain's target, byte 0's loops, Vari off and wrap, byte 2, the beat's clocks and steps) and one time in
 // three (v333) a seek on both sides (0x893cd440, its word about the wave's events by mode 1's ways); after each block
-// the output and the voices' words.  XT_VC2OSC_MAIN only.
+// the output and the voices' words.  v334: SOLO's part the same on SOLO's waves in kOscSoloAt's room (types 1 and 6,
+// set-ups 0x893cc2e0 and 0x893cc310 against vc2OscSoloSetUp, its render 0x893c9450, its seek 0x893cc630), its runs
+// moving its formant, Energy and Robot Voice too.  XT_VC2OSC_MAIN only.
 #ifdef XT_VC2OSC_MAIN
 #include "Vc2OscPlayers.h"
 #include "Vc2OscSides.h"
@@ -15,10 +17,13 @@
 namespace {
 constexpr int kNotes = 3, kRuns = 8, kBlocks = 8;
 // [FW] the object's words (the voice's offsets): byte 0 (its loops, wrap, range in samples and Vari off bits), byte 2,
-// byte 3, the end, the current event, the clocks and steps, the pitch, the walk, the gain's target
+// byte 3, the end, the current event, the clocks and steps, the pitch, the walk, the gain's target; v334: SOLO's
+// formant, Energy and Robot Voice's depth
 constexpr uint32_t kFlagsAt = 0x15c, kEventBitsAt = 0x15e, kWalkBitsAt = 0x15f, kEndedAt = 0x160, kEventAt = 0x168;
 constexpr uint32_t kClocksAt = 0x19c, kStepsAt = 0x19d, kPitchAt = 0x1cc, kWalkAt = 0x1d8, kTargetAt = 0x1dc;
-constexpr uint8_t kLoopsOn = 0x01, kBeat = 0x06, kWraps = 0x08, kVariOff = 0x20, kInSamples = 0x80;
+constexpr uint32_t kFormantAt = 0x1d0, kEnergyAt = 0x1d4, kDepthAt = 0x1f0;
+constexpr uint8_t kLoopsOn = 0x01, kBeat = 0x06, kWraps = 0x08, kRobot = 0x10, kVariOff = 0x20, kInSamples = 0x80;
+constexpr uint32_t kObject = Vc2OscVoice::kObject;
 
 struct BandCounts {
     long notes = 0, ensembles = 0, stereo = 0, blocks = 0, crossed = 0, ended = 0, wraps = 0, variOff = 0;
@@ -34,8 +39,9 @@ float movedWalk(std::mt19937& rng) {
     return (rng() % 2 ? 1.0f : -1.0f) * oscWithin(rng, 0.05f, 1.5f);
 }
 
-// The words a note's updates, settings and clock move, drawn again before a run
-void bandMoves(Vc2OscVoice& v, bool ensemble, std::mt19937& rng) {
+// The words a note's updates, settings and clock move, drawn again before a run; v334: SOLO's formant, Energy (0 now
+// and then), Robot Voice and its depth besides
+void bandMoves(Vc2OscVoice& v, bool ensemble, bool solo, std::mt19937& rng) {
     if (rng() % 2 == 0) v.setF32(kPitchAt, std::exp2(oscWithin(rng, -2.0f, 2.0f)));
     if (rng() % 2 == 0) v.setF32(kWalkAt, movedWalk(rng));
     if (rng() % 4 == 0) v.setF32(kTargetAt, oscWithin(rng, 0.0f, 2.0f) / 65536.0f);
@@ -46,6 +52,14 @@ void bandMoves(Vc2OscVoice& v, bool ensemble, std::mt19937& rng) {
     if (rng() % 8 == 0) v.setU8(kEventBitsAt, (uint8_t)(rng() & 7));
     v.setU8(kClocksAt, (uint8_t)(v.u8(kClocksAt) + rng() % 3));
     if (rng() % 4 == 0) v.setU8(kStepsAt, (uint8_t)rng());
+    if (!solo) return;
+    // v334: one run in eight a pitch of 4…8, where the grain parameters' cutoff and the filter's coefficient meet
+    // their caps
+    if (rng() % 8 == 0) v.setF32(kPitchAt, std::exp2(oscWithin(rng, 2.0f, 3.0f)));
+    if (rng() % 2 == 0) v.setF32(kFormantAt, std::exp2(oscWithin(rng, -1.0f, 1.0f)));
+    if (rng() % 2 == 0) v.setF32(kEnergyAt, rng() % 4 == 0 ? 0.0f : oscWithin(rng, 0.0f, 1.5f));
+    flipped(v, rng, kRobot, 4);
+    if (rng() % 4 == 0) v.setF32(kDepthAt, oscWithin(rng, 0.0f, 1.0f));
 }
 
 std::string bandBlock(OscSides& s, BandCounts& n, uint32_t routine, std::mt19937& rng) {
@@ -68,16 +82,23 @@ std::string bandBlock(OscSides& s, BandCounts& n, uint32_t routine, std::mt19937
     return vc2FirstDifference(s.fw, kOscOutAt, s.shared.out.data(), sizeof s.shared.out, "the output");
 }
 
+// Noise in the head's words a set-up writes: bytes 4…7 (the end, the event's two flag bytes, which its jump writes,
+// the events' first), the table, the cached events, the stride's and the frame's bytes; then `floats` finite
+void noiseInHead(Vc2OscVoice& v, std::span<const uint32_t> floats, std::mt19937& rng) {
+    constexpr std::array<uint32_t, 3> kWords { 0x4, 0x10, 0x6c };   // [FW]
+    for (uint32_t at : kWords) v.setU32(kObject + at, (uint32_t)rng());
+    v.setU8(kObject + 8, (uint8_t)rng());   // [FW] the stride's byte; byte 9 the frame's
+    v.setU8(kObject + 9, (uint8_t)rng());
+    for (uint32_t at : floats) v.setF32(kObject + at, oscWithin(rng, -2.0f, 2.0f));
+}
+
 // v333: noise in the words the set-up writes (the end, the table, the layout's bytes, the cached events, the gain's
 // rate, the loops' rates, every band's words, the tree's state), finite where floats, so that a write left out shows;
 // band 0's smoother, which it leaves, is read as a float too.  But band 0's shift and stride, which neither set-up
 // writes (nor rom.2's note-ons, the same code), as the note leaves them: noise there, a render reads far from the wave
 void noiseUnderSetUp(Vc2OscVoice& v, std::mt19937& rng) {
-    constexpr uint32_t kObject = Vc2OscVoice::kObject;
     constexpr uint32_t kBandsFrom = 0xec, kBandsTo = 0x41c, kBandStride = 0x88;   // [FW]
     constexpr std::array<uint32_t, 3> kBandFloats { 0x40, 0x44, 0x48 };            // [FW] the gain, the smoother's two
-    // [FW] bytes 4…7 (the end, the event's two flag bytes, which its jump writes, the events' first), the table, cached
-    constexpr std::array<uint32_t, 3> kWords { 0x4, 0x10, 0x6c };
     constexpr std::array<uint32_t, 4> kFloats { 0x88, 0xa0, 0xa4, 0xa8 };           // [FW] the gain's rate, the rates
     constexpr std::array<std::pair<uint32_t, uint32_t>, 2> kTrees { { { 0x51c, 0x5e4 }, { 0x6e4, 0x7ac } } };
     constexpr std::array<uint32_t, 2> kLeft { 0x4, 0x8 };   // [FW] band 0's shift and stride
@@ -88,75 +109,104 @@ void noiseUnderSetUp(Vc2OscVoice& v, std::mt19937& rng) {
     for (uint32_t k = 0; k < kBandsTo - kBandsFrom; k += kBandStride) {
         for (uint32_t f : kBandFloats) v.setF32(kObject + kBandsFrom + k + f, oscWithin(rng, -2.0f, 2.0f));
     }
-    for (uint32_t at : kWords) v.setU32(kObject + at, (uint32_t)rng());
-    v.setU8(kObject + 8, (uint8_t)rng());   // [FW] the stride's byte; byte 9 the frame's
-    v.setU8(kObject + 9, (uint8_t)rng());
-    for (uint32_t at : kFloats) v.setF32(kObject + at, oscWithin(rng, -2.0f, 2.0f));
+    noiseInHead(v, kFloats, rng);
     for (const auto& [from, to] : kTrees) {
         for (uint32_t at = from; at < to; at += 4) v.setF32(kObject + at, oscWithin(rng, -1.0f, 1.0f));
     }
 }
+// v334: SOLO's: noise in its record block and grains (+0xec…+0x190) and the head's words, the gain's rate, the rate
+// and the loops' rates finite; every one of them its set-up writes before it reads it
+void noiseUnderSoloSetUp(Vc2OscVoice& v, std::mt19937& rng) {
+    constexpr uint32_t kFrom = 0xec, kTo = 0x190;                                        // [FW]
+    constexpr std::array<uint32_t, 5> kFloats { 0x88, 0x9c, 0xa0, 0xa4, 0xa8 };           // [FW]
+    for (uint32_t at = kFrom; at < kTo; at += 4) v.setU32(kObject + at, (uint32_t)rng());
+    noiseInHead(v, kFloats, rng);
+}
 
-// v333: the player's set-up on both sides, on the words a note-on leaves
-std::string setUpBoth(OscSides& s, BandCounts& n, bool ensemble) {
+// v334: SOLO's range in samples ending where the forward loop ends (its cached end's position), where its set-up takes
+// the last sample from the last event's
+void soloLoopAtEnd(OscSides& s, Vc2OscVoice& v, const OscBandWave& w) {
+    constexpr uint32_t kFwdEndPos = 0xb4 + 0x4, kEndAt = 0x178;   // [FW] the cached events'; the voice's range end
+    if (!w.looped || (v.u8(kFlagsAt) & kInSamples) == 0) return;
+    int32_t end = 0;
+    std::memcpy(&end, reinterpret_cast<const uint8_t*>(s.shared.wave.data()) + (w.cached + kFwdEndPos - kOscWaveAt),
+                sizeof end);
+    v.setU32(kEndAt, (uint32_t)end);
+}
+
+// v333: the player's set-up on both sides, on the words a note-on leaves; v334: by the wave's type
+std::string setUpBoth(OscSides& s, BandCounts& n, uint32_t type) {
     Vc2OscVoice& v = s.voices[0];
     n.setUpsInSamples += (v.u8(kFlagsAt) & kInSamples) != 0;
-    return oscBothSides(s, kOscBandSetUps[ensemble ? 1 : 0], { oscVoiceAt(0) + Vc2OscVoice::kObject },
-                        OscAnswer::none, [&] {
-                            vc2OscBandSetUp(v, s.parts[0], s.romShared, ensemble);
-                            return 0u;
-                        });
+    const OscPlayerRow& row = *oscPlayerOf(type);
+    return oscBothSides(s, row.setUp, { oscVoiceAt(0) + Vc2OscVoice::kObject }, OscAnswer::none, [&] {
+        constexpr uint32_t kEnsemble = 5, kSix = 6;   // [FW] the types
+        if (row.solo) vc2OscSoloSetUp(v, s.parts[0], s.romShared, type == kSix);
+        else vc2OscBandSetUp(v, s.parts[0], s.romShared, type == kEnsemble);
+        return 0u;
+    });
 }
 
 // v333: a seek on both sides (0x893cd440 against the voice's own, its beat's reset with it), its word about the wave's
-// events
+// events; v334: SOLO's 0x893cc630 on its waves
 std::string seekBoth(OscSides& s, BandCounts& n, const OscBandWave& w, std::mt19937& rng) {
     Vc2OscVoice& v = s.voices[0];
     const bool inSamples = (v.u8(kFlagsAt) & kInSamples) != 0;
     const int32_t at = oscSeekWord(inSamples, w.positions, w.events, rng);
+    const uint32_t routine = w.solo ? kOscSoloSeek : kOscBandSeek;
     ++n.seeks;
     n.seeksInSamples += inSamples;
-    return oscBothSides(s, kOscBandSeek, { oscVoiceAt(0) + Vc2OscVoice::kObject, (uint32_t)at }, OscAnswer::none,
-                        [&] {
-                            v.seekBy(kOscBandSeek, at, s.parts[0]);
-                            return 0u;
-                        });
+    return oscBothSides(s, routine, { oscVoiceAt(0) + Vc2OscVoice::kObject, (uint32_t)at }, OscAnswer::none, [&] {
+        v.seekBy(routine, at, s.parts[0]);
+        return 0u;
+    });
 }
 
 std::string bandPartNote(OscSides& s, BandCounts& n, const OscBandWave& w, std::mt19937& rng) {
-    const bool ensemble = rng() % 2 == 0;
+    constexpr std::array<uint32_t, 2> kBandTypes { 3, 5 }, kSoloTypes { 1, 6 };   // [FW]
+    const bool second = rng() % 2 == 0;
+    const uint32_t type = (w.solo ? kSoloTypes : kBandTypes)[second ? 1 : 0];
+    const bool ensemble = !w.solo && second;
     Vc2OscVoice& v = s.voices[0];
-    oscBandNote(v, w, oscVoiceAt(0), ensemble, rng);
-    noiseUnderSetUp(v, rng);
+    oscBandNote(v, w, oscVoiceAt(0), type, rng);
+    if (w.solo && rng() % 8 == 0) soloLoopAtEnd(s, v, w);
+    if (w.solo) noiseUnderSoloSetUp(v, rng);
+    else noiseUnderSetUp(v, rng);
     oscWriteVoice(s, 0);
-    std::string what = setUpBoth(s, n, ensemble);
+    std::string what = setUpBoth(s, n, type);
     ++n.notes;
-    n.ensembles += ensemble;
+    n.ensembles += second;
     n.stereo += w.stereo;
+    const uint32_t routine = oscPlayerOf(type)->render;
     for (int run = 0; run < kRuns && what.empty(); ++run) {
-        bandMoves(v, ensemble, rng);
+        bandMoves(v, ensemble, w.solo, rng);
         oscWriteVoice(s, 0);
         if (rng() % 3 == 0) what = seekBoth(s, n, w, rng);
-        for (int k = 0; k < kBlocks && what.empty(); ++k) what = bandBlock(s, n, kOscBandRenders[ensemble], rng);
+        for (int k = 0; k < kBlocks && what.empty(); ++k) what = bandBlock(s, n, routine, rng);
     }
     return what;
 }
 
-std::string bandCase(OscSides& s, BandCounts& n, std::mt19937& rng) {
-    const OscBandWave w = oscDrawBandWave(s.fw, s.shared, kOscBandAt, kOscBandBytes, rng);
+std::string bandCase(OscSides& s, BandCounts& n, bool solo, std::mt19937& rng) {
+    const uint32_t at = solo ? kOscSoloAt : kOscBandAt, room = solo ? kOscSoloBytes : kOscBandBytes;
+    const OscBandWave w = oscDrawBandWave(s.fw, s.shared, at, room, rng, solo);
     std::string what;
     for (int k = 0; k < kNotes && what.empty(); ++k) what = bandPartNote(s, n, w, rng);
     return what;
 }
-} // namespace
 
-void oscBandPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally) {
+// The players' part: the band players' or SOLO's
+void playersPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally, bool solo) {
     BandCounts n;
     for (int v = 0; v < kOscVoices; ++v) oscWriteVoice(s, v);
-    vc2RunCases(run, tally, "", n.blocks, [&](std::mt19937& rng, bool) { return bandCase(s, n, rng); });
-    std::printf("bands: %d cases, %ld notes (%ld ENSEMBLE's, %ld stereo, %ld set up in samples), %ld seeks (%ld in "
-                "samples), %ld blocks (%ld crossing an event or a loop, %ld past an end, %ld with the wrap on, %ld "
-                "under Vari off)\n", run.cases, n.notes, n.ensembles, n.stereo, n.setUpsInSamples, n.seeks,
-                n.seeksInSamples, n.blocks, n.crossed, n.ended, n.wraps, n.variOff);
+    vc2RunCases(run, tally, "", n.blocks, [&](std::mt19937& rng, bool) { return bandCase(s, n, solo, rng); });
+    std::printf("%s: %d cases, %ld notes (%ld %s, %ld stereo, %ld set up in samples), %ld seeks (%ld in samples), %ld "
+                "blocks (%ld crossing an event or a loop, %ld past an end, %ld with the wrap on, %ld under Vari off)\n",
+                solo ? "solo" : "bands", run.cases, n.notes, n.ensembles, solo ? "type 6's" : "ENSEMBLE's", n.stereo,
+                n.setUpsInSamples, n.seeks, n.seeksInSamples, n.blocks, n.crossed, n.ended, n.wraps, n.variOff);
 }
+} // namespace
+
+void oscBandPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally) { playersPart(s, run, tally, false); }
+void oscSoloPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally) { playersPart(s, run, tally, true); }
 #endif

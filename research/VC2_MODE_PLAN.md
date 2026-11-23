@@ -1092,6 +1092,14 @@ version against rom.4's routines with what it calls hooked:
          neither set-up writes band 0's shift and stride; the set-ups' gains and byte 3's 0x40 and the seek's clear of
          the position show in no word. Next: SOLO (`0x893c9450`, `0x893cc2e0`/`0x893cc310`, `0x893cc630`) and the
          period-jump player (`0x893ca8b0`, `0x893ccff0`, `0x893cd090`).
+       - SOLO (v334): its render `0x893c9450`, set-ups `0x893cc2e0`/`0x893cc310` and seek `0x893cc630` the voice's
+         own, rom.4's code on the object's words as mode 1's was (`Vc2OscSolo*.cpp`; `XtSoloVoice`'s model of records by
+         index can't be laid back onto the words), its row of the walk `kVc2SoloWalk`; the band players' tail and its
+         set-ups share `vc2WalkSetUp` (HARDWARE_FIRMWARE.md, "The VC-2's SOLO"). Found: type 1 and type 6 differ only in
+         byte 3's 0x80, which gates the next record's length, the period's glide and the second tap (type 6 rom.2's
+         SOLO); Robot Voice is rom.4's own, the grains at the pitch ratio × 440 Hz, its swing × the +0x94 word that
+         VariPhrase's note-on writes 0 (open what sets it). Next: the period-jump player (`0x893ca8b0`, `0x893ccff0`,
+         `0x893cd090`).
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

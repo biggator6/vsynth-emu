@@ -103,10 +103,11 @@ struct Vc2OscOwnSeek {
     uint32_t at;
     void (*seek)(Vc2OscVoice&, Vc2OscParts&, int32_t);
 };
-constexpr std::array<Vc2OscOwnSeek, 4> kOwnSeeks { { { 0x893c6360, variOffSeek },
+constexpr std::array<Vc2OscOwnSeek, 5> kOwnSeeks { { { 0x893c6360, variOffSeek },
                                                      { 0x893cc830, vc2OscSeekModeOne },
                                                      { 0x893c6de0, headsSeek },
-                                                     { 0x893cd440, vc2OscSeekBands } } };
+                                                     { 0x893cd440, vc2OscSeekBands },
+                                                     { 0x893cc630, vc2OscSeekSolo } } };   // v334: SOLO's
 } // namespace
 
 void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> words, Vc2OscPlace place) {

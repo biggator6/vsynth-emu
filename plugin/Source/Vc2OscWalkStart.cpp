@@ -1,6 +1,7 @@
 // The walk's start (v328): rom.4's 0x893cc1a0, SOLO's start, which mode 1's set-up runs with its own row, and the
 // event lookup 0x893cc0d0 it reads by; from v329 mode 1's seek 0x893cc830 and the find 0x893cc100 it runs, from v333
 // the band players' seek's code too.  Every address is rom.4's, every offset the object's.
+#include "Vc2OscPlayers.h"
 #include "Vc2OscWalkSteps.h"
 #include <algorithm>
 
@@ -70,6 +71,25 @@ void vc2WalkStart(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way) {
     w.setHalf(kIndex, w.half(back ? kRangeLast : kRangeFirst));
     w.setWord(kPos, 0);
     way.startJump(v, p);
+}
+
+// [FW] v334: the band players' layout and SOLO's
+const Vc2WalkLayout kVc2BandLayout { 14, 46, 88 }, kVc2SoloLayout { 8, 10, 16 };
+
+// [FW] v334: the head's +0 (the events' table) and +0x2c (the loops' cached events); a frame's bytes, mono and stereo
+void vc2WalkSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkLayout& layout, const Vc2WalkWay& way) {
+    using namespace vc2walk;
+    constexpr uint32_t kTableFrom = 0x0, kCachedFrom = 0x2c, kFrame = 0x9;
+    constexpr uint8_t kStereo = 0x40, kMonoFrame = 6, kStereoFrame = 12;
+    Vc2WalkWords w { v, p };
+    // one-off: rom.4's words written in its order, the one place the players' set-ups write them (this is the template)
+    w.setWord(kTable, (int32_t)vc2OscHeadWord(v, p, kTableFrom));
+    w.setWord(kRecord, (int32_t)vc2OscHeadWord(v, p, kCachedFrom));
+    w.setByte(kFirst, layout.first);
+    const bool stereo = (w.byte(kFlags) & kStereo) != 0;
+    w.setByte(kStride, stereo ? layout.stereo : layout.mono);
+    w.setByte(kFrame, stereo ? kStereoFrame : kMonoFrame);
+    vc2WalkStart(v, p, way);
 }
 
 // [FW] v331: 0x893cc0d0's position (×16) of event `event`, as VariPhrase's note-on reads its range by events

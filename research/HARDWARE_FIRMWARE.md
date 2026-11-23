@@ -1546,6 +1546,108 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's SOLO (2026-11-23, v334) {#vc2-osc-solo}
+
+Step 4.3's sixty-second version, the fifth piece of item 11's fifth part. SOLO, VariPhrase's types 1 and 6, is the
+voice's own whole: its render `0x893c9450`, its set-ups `0x893cc2e0` (type 1) and `0x893cc310` (type 6), and its seek
+`0x893cc630`.
+
+**What rom.4's SOLO is.** rom.2's `0x8950cd90` chain, which `XtSoloVoice` ports on a model of its own (doubles, a plan
+of records by index). That model can't be laid back onto the object's words, so the port is rom.4's code on the words
+themselves, as mode 1's was (v327; `Vc2OscSolo*.cpp`, the offsets in `Vc2OscSolo.h`). The object is rom.2's with the
+inserted word at +0x94: the record block four bytes up (rom.4's +0xec, rom.2's +0xe8), and past it the grains' words
+(+0x128 on) laid out otherwise again (VC2_VOCAL_DESIGNER.md, "The VariPhrase players and key assign in rom.4"). Its
+walk is the players' shared walk (v327) with SOLO's row: indexes 4 and 8 in the walk's jump tables (`0x893c9e90`,
+`0x893c9eb0`) and the start's tables' entries 1 and 2 (seek `0x893cc630`, jump `0x893c9e70`), `kVc2SoloWalk`. Its
+jumps read the next event from the entry itself, where mode 1's reads it 8 bytes on.
+
+The render (`vc2OscSolo`): the beat's block (`0x893c89a0`), the block's rates (`0x893c94a0`), the next crossing, then
+32 frames, each a step (`0x893c9540`) and the reads (`0x893c97b0`):
+- **The block's rates.** The rate the grains and the filter take (+0x9c) is the pitch × the loops' rate factor, the
+  pitch alone under Robot Voice. The Energy filter's Q and cutoff: with the Energy 0, 1.2 and the cutoff × ⅛; else 1.2
+  less the Energy, lifted by (2·rate − 1) × Energy between rates ½ and 1 and (2 − rate) × Energy between 1 and 2. The
+  coefficient is cutoff × (3.096 − 4.421 × cutoff²) × 2. Both glide ⅛ of the way, the coefficient held under 1.9 less
+  the Q.
+- **The step.** Half the walk step onto the position's 20-bit fraction. Forward: at the range's end ended there, or,
+  with byte 0's 0x08 and the range by events, to the range's first event (the walk's wrap); past the next crossing,
+  the walk forward with SOLO's row; past the next segment's start (unless that segment's first record reaches the
+  range's end), into it with its first record. Back the mirror, the range's start 0 once the backward loop turned the
+  walk (byte 3's 0x08), and after the walk's crossing it compares the crossing, not the position (rom.4's r1, as mode
+  1's). Then the anchor a step (+0x30) on: past the record's end it wraps back into the record if the position hasn't
+  passed the end and the budget allows a repeat (all its bits, or its repeat cost taken from it), or the record reaches
+  the range's end; else the next records load while the position is past them. A still walk moves the anchor by the
+  side the position is on.
+- **The trigger.** A timer a sample (4096) on; past the trigger's period, the period off it and, before the end, the
+  grain parameters (`0x893c9c60`) and the next grain by the toggle (A or B): its age the timer, its window's place the
+  age × the windows' step, its start the record's start and the offset, its formant and second-tap weights, its
+  period the record's length.
+- **The reads.** Each grain's window (its place held to 1; under ½ the place, else 1 less it; × 2; the place a step on)
+  and its read (its age × its formant weight in 1/4096 samples, plus its start's sixteenths, split into a sample and a
+  fraction; held to the last sample). Mono or stereo (a frame word's halves). With the two grains' second-tap weights
+  summing above 0, each read moves toward a second read a period on by its weight; B's weight is the sum less A's,
+  as FADD then FSUB leave it. The windows' mix, then the Energy filter, whose output is the input less Q × the band
+  state less the low state; then the gain's glide × 65536.
+
+**The grain parameters** are rom.2's but under Robot Voice. The period is the record's length (at least 160 sixteenths);
+walking forward with byte 3's 0x80, past the record's start it glides toward the next record's by how far in the
+position is (past its end the next's, the second tap's weight 1). The rate and formant are floored; an unvoiced record
+keeps them only by its info's bits 0x01 and 0x02 and takes their product for both. The trigger's period is period /
+rate (at most 524287) × 256; the anchor step rate × 16 (at least 16); the start offset what the formant's span leaves
+of the period; the windows' step 8 over that span; a voiced record's cutoff 16 over the trigger's span (at most ½).
+**Robot Voice is rom.4's own** (`vc2run solo` found it differs): a smoothed copy of the period (+0x18c, 0.1 of the way
+a trigger) gives a swing, the smoothed less the period held within ±6% of it, and the rate becomes rate × (period +
+swing × the object's +0x94) × 0.000623582746, which is 27.5/44100: the period cancels, and the grains sound at the
+pitch ratio × 440 Hz. The +0x94 word is rom.4's inserted one. VariPhrase's note-on writes it 0 and nothing else in
+what is ported writes it (the take keeps it), so the swing is multiplied by 0 throughout: open what, if anything, sets
+it.
+
+**The set-ups** are rom.2's SOLO note-on (`0x8950fba0`) and differ only in byte 3: type 1 clears all of it, type 6
+leaves 0x80. That bit gates the next record's length on a load and the period's glide and second tap in the grain
+parameters: type 6 is rom.2's SOLO as `XtSoloVoice` has it (f3 = 0x80), type 1 the same without them. In order: the
+end 0, the gain's rate 1/64, the toggle 0, the rate the pitch, the samples, the table, the cached events and the events'
+layout (first 8, stride 10 or 16, frame 6 or 12: `vc2WalkSetUp`, which the band players' tail runs too); the walk's
+start with SOLO's row; the smoothed period the record's length; the grain parameters; both grains' ages and the timer
+the anchor's way into the record (× 256), their starts the record's; the last sample the range's end's (the last
+event's where the forward loop ends there) less 1; the windows' places by their ages (B's from ½); both grains'
+weights and periods; the cutoff, coefficient and states 0, the Q 1.2; the loops' rates and the beat's start.
+
+**The seek** is the walk's seek (`vc2WalkSeek`, v333) with SOLO's row, in samples from the event 0. Then in samples the
+segments go forward while the next starts at or before the position and before the last event, each with its first
+record, and the records while their end is at or before it; the anchor the record's start. rom.4 resets the beat
+before the segments, which read and write nothing of it; the voice's `seekBy` resets it after.
+
+**The checks.**
+- The band players' waves and states are now the players' (`kOscPlayers` by the wave's type). A SOLO wave is a band
+  wave in SOLO's layout (`oscBandVpdt`'s `solo`): its events from +0x10, one band, one record in 16 of two entries
+  (0xffff going on), its cached loop events built from band 0's segments as `xtMbLoopEvents` builds a band's. They lie
+  in their own room, `kOscSoloAt` (0x8C0E0000, above the interpreter's stack), in the wave memory the port's parts hold.
+  SOLO's draws come from a generator of their own, so the band players' stay as they were.
+- xt_vc2osc's SOLO part runs as the band part does: notes of types 1 and 6 on both sides over noise in what the set-up
+  writes, Robot Voice one note in four, runs of blocks with the formant, Energy and Robot Voice moved, a seek one run
+  in three. Before the hooks, four notes of each type on two SOLO waves are captured. In the voice part and
+  xt_vc2tone a render through SOLO is steered to a captured state, a note-on of types 1 or 6 is given a captured
+  wave's records, and a re-seek of types 1 or 6 with the block's 0x20 clear a captured state.
+- **What a SOLO note-on needs.** SOLO's set-up takes FTRC of the rate and the period's ratio, and FTRC of a NaN is
+  the host's (xtf's 0, the interpreter's 0x80000000), so the note-on's pitch and formant must be finite as a tone
+  gives them. Two draws made them NaN: a drawn wave header's rate of 0 (the note-on's rate ratio ∞, × a ratio scale of
+  0), and the formant's exp2 past ±7 octaves, where rom.4's exp2 reads other tables. A SOLO note-on is now given a
+  real wave's header and loop record (`oscRealWave`), the block's float words moderate, the formant's base within an
+  octave and its depths small, and the voice's rate and formant factors ½…2 (`oscSteerSoloNote`).
+- SOLO's waves now and then hold a record under the period's floor (4…15 samples), one with no repeat budget, and a
+  note's range in samples now and then ends where the forward loop ends; one SOLO run in eight takes a pitch of 4…8,
+  where the cutoff and the filter's coefficient meet their caps. So those ways run.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400) in both checks. At 400 the SOLO part set up 1,200 notes
+  (about half type 6's, half stereo, three in four in samples), ran about 3,250 seeks and 76,800 blocks (about 3,100
+  crossing an event or a loop); the voice part steered about 580 SOLO renders, 700 note-ons and 180 re-seeks,
+  xt_vc2tone about 2,700 OSC blocks of SOLO's types.
+- Coverage under xt_vc2osc at 40 cases: `Vc2OscSoloFrame.cpp`, `Vc2OscSoloSetUp.cpp`'s lines, `Vc2OscWalkStart.cpp` and
+  `Vc2OscBandSetUp.cpp` whole; unreached, the formant's floor (about 2⁻²¹), the repeat cost's lower line (the grain
+  parameters hold the anchor step at 16 or more, so it never runs), the seek's segment that starts at the last event
+  (no segment starts there), and the coefficient's and cutoff's caps and the anchor's record reaching the range's end,
+  which need pitches above 4 or rarer states.
+
 ### The VC-2's band players' set-ups and seek (2026-11-23, v333) {#vc2-osc-band-setups}
 
 Step 4.3's sixty-first version, the fourth piece of item 11's fifth part. BACKING's set-up `0x893cd1d0` and

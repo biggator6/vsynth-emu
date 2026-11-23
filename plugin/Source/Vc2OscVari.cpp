@@ -30,20 +30,25 @@ constexpr std::array<Vc2OscTargets::Word, 2> kStartTargets { { { 0x1dc, &Vc2OscT
                                                               { 0x1e0, &Vc2OscTargets::level } } };
 // [FW] the players by the wave's type 1…8 (the switches at 0x893c86b0, 0x893c8764 and 0x893c8800): the set-up the
 // start runs on the object and the seek to the block's seek point, 0 none; and (v333) whose set-up is the voice's own,
-// the band players' (Vc2OscBandSetUp.cpp), BACKING's or ENSEMBLE's, the others still out by their addresses
-enum class OwnSetUp : uint8_t { none, backing, ensemble };
+// the band players' (Vc2OscBandSetUp.cpp), BACKING's or ENSEMBLE's, from v334 SOLO's (Vc2OscSoloSetUp.cpp), types 1 and
+// 6; the others still out by their addresses
+using OwnSetUp = void (*)(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+void setUpBacking(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s) { vc2OscBandSetUp(v, p, s, false); }
+void setUpEnsemble(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s) { vc2OscBandSetUp(v, p, s, true); }
+void setUpSolo(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s) { vc2OscSoloSetUp(v, p, s, false); }
+void setUpSoloSix(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& s) { vc2OscSoloSetUp(v, p, s, true); }
 struct VariPlayer {
     uint32_t setUp, seek;
     OwnSetUp own;
 };
-constexpr std::array<VariPlayer, 8> kPlayers { { { 0x893cc2e0, 0x893cc630, OwnSetUp::none },
-                                                { 0, 0, OwnSetUp::none },
-                                                { 0x893cd1d0, 0x893cd440, OwnSetUp::backing },
-                                                { 0, 0, OwnSetUp::none },
-                                                { 0x893cc8f0, 0x893cd440, OwnSetUp::ensemble },
-                                                { 0x893cc310, 0x893cc630, OwnSetUp::none },
-                                                { 0, 0, OwnSetUp::none },
-                                                { 0x893ccff0, 0x893cd090, OwnSetUp::none } } };
+constexpr std::array<VariPlayer, 8> kPlayers { { { 0x893cc2e0, 0x893cc630, setUpSolo },
+                                                { 0, 0, nullptr },
+                                                { 0x893cd1d0, 0x893cd440, setUpBacking },
+                                                { 0, 0, nullptr },
+                                                { 0x893cc8f0, 0x893cd440, setUpEnsemble },
+                                                { 0x893cc310, 0x893cc630, setUpSoloSix },
+                                                { 0, 0, nullptr },
+                                                { 0x893ccff0, 0x893cd090, nullptr } } };
 // [FW] the block's flags (+0x138; 0x80 the range in samples), the range's start and the seek point (+0x13c, +0x144:
 // words in samples, half words in events)
 constexpr uint32_t kFlags = 0x138, kFrom = 0x13c, kSeekTo = 0x144;
@@ -76,7 +81,7 @@ void Vc2OscVoice::startVari(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     const uint32_t type = u32(kWave) - 1;   // unsigned: type 0 and past 8 run neither switch's way
     if (type >= kPlayers.size()) return;
     const VariPlayer& player = kPlayers[type];
-    if (player.own != OwnSetUp::none) vc2OscBandSetUp(*this, parts, shared, player.own == OwnSetUp::ensemble);
+    if (player.own != nullptr) player.own(*this, parts, shared);
     else if (player.setUp != 0) parts.objectCall(player.setUp);
     const bool inSamples = (u8(kFlags) & kInSamples) != 0;
     const bool moved = inSamples ? u32(kSeekTo) != u32(kFrom) : u16(kSeekTo) != u16(kFrom);

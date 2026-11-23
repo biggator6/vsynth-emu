@@ -98,6 +98,7 @@ int main(int argc, char** argv) {
     std::vector<OscCall> oscRom;
     ToneSides s { fw, pool, shared, parts, owner, rom, oscRom };
     shared.osc.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' states, before the hooks
+    shared.osc.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
     std::string start = oscCaptureBandStates(fw, shared.osc, oscVoiceAt(0));
     toneInstallRom(fw, rom, shared.fade, shared.osc.draws, oscRom);
     if (start.empty()) start = toneOscSetUp(s);   // v319: the records' exp2 octaves, the carriers' rate, kind 6's globals
@@ -137,6 +138,8 @@ int main(int argc, char** argv) {
                 n.headsBlocks, shared.osc.bandSteers);   // v322, v323, v326, v332
     std::printf("band players: %ld OSC blocks given a band wave, %ld re-seeks a set-up state\n", shared.osc.bandSetUps,
                 shared.osc.bandSeeks);   // v333
+    std::printf("solo: %ld OSCs' renders steered to a set-up state, %ld OSC blocks given a SOLO wave, %ld re-seeks a "
+                "set-up state\n", shared.osc.soloSteers, shared.osc.soloSetUps, shared.osc.soloSeeks);   // v334
     std::printf("lite: %ld settings on a type with a way, %ld through an earlier tone's head; %ld inputs of two "
                 "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head, %ld earlier voices' heads "
                 "stale), %ld OSCs steered for its seek\n", n.liteSettings, n.settingsTaken, n.bothVari,

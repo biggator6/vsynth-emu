@@ -59,16 +59,17 @@ struct OscHook {
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
 // renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
-// update, players' start and settings (v330) and its note-on's event lookup (v331), and the band players' renders
-// (v332), set-ups and seek (v333): rom.4's own run, and the routines they call hooked, each by its address
+// update, players' start and settings (v330) and its note-on's event lookup (v331), the band players' renders (v332),
+// set-ups and seek (v333), and SOLO's render, set-ups and seek (v334): rom.4's own run, and the routines they call
+// hooked, each by its address
 const OscHook kHooks[] = {
     // v330: VariPhrase's players' set-ups its start runs on the object, by the wave's type (v333: the band players'
-    // two rom.4's own)
-    { 0x893cc2e0, kObjectCall, objectRoutine, none }, { 0x893cc310, kObjectCall, objectRoutine, none },
+    // two rom.4's own; v334: SOLO's two)
     { 0x893ccff0, kObjectCall, objectRoutine, none },
-    // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's and the period-jump player's; Vari off's
-    // two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327, BACKING's and ENSEMBLE's from v332)
-    { 0x893c9450, kRenderBy, renderBy, rendered }, { 0x893ca8b0, kRenderBy, renderBy, rendered },
+    // v238: the players' renders LITE's and VariPhrase's installs write (the period-jump player's; Vari off's two
+    // rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327, BACKING's and ENSEMBLE's from v332,
+    // SOLO's from v334)
+    { 0x893ca8b0, kRenderBy, renderBy, rendered },
     // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
     // install adds (0x893c3e60's)
     { 0x893c3890, kRenderBy, renderBy, rendered }, { 0x893c3580, kRenderBy, renderBy, rendered },
@@ -82,9 +83,9 @@ const OscHook kHooks[] = {
     { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
     { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
-    // the players' seeks: SOLO's and the period-jump player's (v329: mode 1's, 0x893cc830, the voice's own; v333: the
-    // band players', 0x893cd440)
-    { 0x893cc630, kSeek, seek, seekFlags }, { 0x893cd090, kSeek, seek, seekFlags },
+    // the players' seeks: the period-jump player's (v329: mode 1's, 0x893cc830, the voice's own; v333: the band
+    // players', 0x893cd440; v334: SOLO's, 0x893cc630)
+    { 0x893cd090, kSeek, seek, seekFlags },
 };
 
 } // namespace

@@ -268,6 +268,11 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     for (uint32_t block : In::kOscs) oscModeOneBlock(&s.shared.input.at(block), s.shared.osc.renders);
     // v333: a band player's of type 3 or 5 the records its set-up reads, from the band players' generator
     for (uint32_t block : In::kOscs) oscSteerBandBlock({ &s.shared.input.at(block), kOscBlockWords }, s.shared.osc);
+    // v334: a SOLO's type the targets' words moderate, from SOLO's generator (SOLO's set-up's FTRCs)
+    for (uint32_t block : In::kOscs) {
+        oscSteerSoloNote({ &s.shared.input.at(block), kOscBlockWords }, s.shared.osc, nullptr);
+    }
+    oscWriteRecords(s.fw, s.shared.osc.records);
     toneSteerOscs(s, i, true);   // v329, v330; from v331 before the input's write, as it holds a block's events
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
     drawListedWords(s, i, rng);

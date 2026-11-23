@@ -28,7 +28,8 @@ VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePor
          Vc2Kind6Core Vc2Kind6Tables Vc2OscDraws Vc2OscPartDraws Vc2OscRecords Vc2OscFakes Vc2OscPortParts
          Vc2VocoderOsc XtExtIn Vc2OscVariOffRender Vc2OscBeat Vc2OscHeads XtLitePlayer
          Vc2OscModeOne Vc2OscWalk Vc2OscWalkEvents Vc2OscWalkDraws Vc2OscWalkStart Vc2OscModeOneStart Vc2OscVari
-         Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt Vc2OscBandSetUp)
+         Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt Vc2OscBandSetUp Vc2OscSolo Vc2OscSoloFrame
+         Vc2OscSoloRecords Vc2OscSoloSetUp Vc2OscPlayerSteers)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
         Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub
@@ -37,7 +38,7 @@ VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc
         Vc2OscDraws Vc2OscPartDraws Vc2VocoderOsc XtExtIn Vc2OscBeat Vc2OscHeads XtLitePlayer
         Vc2OscModeOne Vc2OscWalk Vc2OscWalkEvents Vc2OscWalkDraws Vc2OscModeOneCheck Vc2OscWalkStart
         Vc2OscModeOneStart Vc2OscVari Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt Vc2OscBandsCheck
-        Vc2OscBandSetUp)
+        Vc2OscBandSetUp Vc2OscSolo Vc2OscSoloFrame Vc2OscSoloRecords Vc2OscSoloSetUp Vc2OscPlayerSteers)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes Vc2TvaDraws)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive

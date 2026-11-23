@@ -9,16 +9,13 @@
 #include "Vc2OscWalk.h"
 
 namespace {
-// [FW] the head's words: the events' table, band 0's samples (band k's 4k on), the cached loop events
-constexpr uint32_t kTableFrom = 0x0, kSamplesFrom = 0x4, kCachedFrom = 0x2c;
+// [FW] the head's words: band 0's samples (band k's 4k on); v334: the events' table and the cached loop events
+// vc2WalkSetUp's (Vc2OscWalkStart.cpp), with the events' layout (kVc2BandLayout)
+constexpr uint32_t kSamplesFrom = 0x4;
 // [FW] the object's: byte 0 (0x40 stereo), byte 3 (the walk's bits: 0x40 kept, ENSEMBLE's 0x80 band 0's records
-// alone), the end, the events' first half word, stride and a frame's bytes, the table, the position ×16, the walk, the
-// cached events, the gain's rate
-constexpr uint32_t kFlags = 0x0, kWalkBits = 0x3, kEnded = 0x4, kFirst = 0x7, kStride = 0x8, kFrame = 0x9;
-constexpr uint32_t kTable = 0x10, kPos = 0x38, kCached = 0x6c, kWalk = 0x7c, kGainRate = 0x88;
+// alone), the end, the position ×16, the walk, the gain's rate
+constexpr uint32_t kFlags = 0x0, kWalkBits = 0x3, kEnded = 0x4, kPos = 0x38, kWalk = 0x7c, kGainRate = 0x88;
 constexpr uint8_t kStereo = 0x40, kKeeps = 0x40, kBandZeroAlone = 0x80;
-// [FW] the events' layout and a frame's bytes, mono and stereo
-constexpr uint8_t kFirstHalf = 14, kMonoStride = 46, kStereoStride = 88, kMonoFrame = 6, kStereoFrame = 12;
 // [FW] the bands from +0xec, 0x88 apart; a band's words: its data, the position's shift, the walk list's stride, the
 // fraction's and the step's shifts (half words), the read's start offset, the mask, the gain, the smoother's two
 constexpr uint32_t kBandZero = 0xec, kBandStride = 0x88;
@@ -88,14 +85,9 @@ void ensembleBands(Vc2WalkWords& w, Vc2OscVoice& v, Vc2OscParts& p) {
 // events' layout and a frame's bytes by byte 0's stereo, the walk's start with the band players' row (index 16), the
 // tree's state 0, the right's too in stereo
 void tail(Vc2WalkWords& w, Vc2OscVoice& v, Vc2OscParts& p) {
-    w.setWord(kTable, (int32_t)vc2OscHeadWord(v, p, kTableFrom));
-    w.setWord(kCached, (int32_t)vc2OscHeadWord(v, p, kCachedFrom));
     w.setReal(kGainRate, vc2OscTables().bands.gainRate);
-    w.setByte(kFirst, kFirstHalf);
+    vc2WalkSetUp(v, p, kVc2BandLayout, kVc2BandWalk);   // v334: the table, cached events, layout, walk's start
     const bool stereo = (w.byte(kFlags) & kStereo) != 0;
-    w.setByte(kStride, stereo ? kStereoStride : kMonoStride);
-    w.setByte(kFrame, stereo ? kStereoFrame : kMonoFrame);
-    vc2WalkStart(v, p, kVc2BandWalk);
     for (uint32_t side = 0; side < (stereo ? 2u : 1u); ++side) {
         for (uint32_t i = 0; i < kTreeFloats; ++i) w.setReal(kTreeAt[side] + 4 * i, 0.0f);
     }
