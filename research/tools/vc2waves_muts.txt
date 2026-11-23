@@ -103,3 +103,50 @@ object-alloc-size|return tagged(alloc(bytes + extra), extra);|return tagged(allo
 object-realloc-size|realloc(object + kHeader, bytes + extra, host)|realloc(object + kHeader, bytes, host)|vc2wavepool
 object-largest-tag|return tagged(payload, bytes);|return tagged(payload, 0);|vc2wavepool
 object-free-null|if (object != 0) free(object + kHeader);|free(object + kHeader);|vc2wavepool
+pool-byte|    return o < memory.size() ? memory[o] : 0;|    return o < memory.size() ? static_cast<uint8_t>(memory[o] ^ 1) : 0;|vc2wavepool
+rec-base-vtable|kBaseVtable = 0x898ca8bc|kBaseVtable = 0x898ca8b8|vc2waverecords
+rec-record-vtable|kRecordVtable = 0x898ca8e0|kRecordVtable = 0x898ca8e4|vc2waverecords
+rec-data-vtable|kDataVtable = 0x898ca9b8|kDataVtable = 0x898ca9bc|vc2waverecords
+rec-plain-slot|{ 3, 0x2c, 0x898ca94c }|{ 3, 0x30, 0x898ca94c }|vc2waverecords
+rec-plain-vtable|{ 7, 0x3c, 0x898ca9dc }|{ 7, 0x3c, 0x898ca9d8 }|vc2waverecords
+rec-plain-six|{ 6, 0x40, 0x898caa00 }|{ 6, 0x3c, 0x898caa00 }|vc2waverecords
+insert-empty|        setWord(node + kNext, 0);\n        setWord(node + kPrev, 0);|        setWord(node + kNext, 0);|vc2waverecords
+insert-ring-prev|        setWord(node + kPrev, word(head + kPrev));|        setWord(node + kPrev, head);|vc2waverecords
+insert-ring-link|        setWord(word(head + kPrev) + kNext, node);\n||vc2waverecords
+insert-two|        setWord(head + kNext, node);\n        setWord(head + kPrev, node);\n    }|        setWord(head + kPrev, node);\n    }|vc2waverecords
+insert-head|    head = node;\n    setWord(node + kKey|    setWord(node + kKey|vc2waverecords
+insert-key|setWord(node + kKey, static_cast<uint32_t>(key));|setWord(node + kKey, static_cast<uint32_t>(key) + 128);|vc2waverecords
+unlink-alone|        head = 0;\n        return;|        return;|vc2waverecords
+unlink-head-key|    if (static_cast<int32_t>(word(head + kKey)) == key) head = prev;\n||vc2waverecords
+unlink-two|        setWord(prev + kNext, 0);\n        setWord(prev + kPrev, 0);\n        return;|        setWord(prev + kNext, 0);\n        return;|vc2waverecords
+unlink-ring|    setWord(word(node + kNext) + kPrev, prev);\n}|}|vc2waverecords
+destroy-data-slot|word(object + kWhichAt) == 0 ? kDataFirst : kDataSecond;|word(object + kWhichAt) == 0 ? kDataSecond : kDataFirst;|vc2waverecords
+destroy-plain|        setWord(word(object + kOwnerAt) + c->slot, 0);\n||vc2waverecords
+destroy-base|    setWord(object + kVtableAt, kBaseVtable);\n    pool_.freeObject(object);|    pool_.freeObject(object);|vc2waverecords
+destroy-unlink|        unlink(object + kNodeAt);|        (void)0;|vc2waverecords
+make-remove-first|    if (recordOf(key) != 0) remove(key);\n||vc2waverecords
+make-extra|static_cast<uint32_t>(type) + 1);|static_cast<uint32_t>(type));|vc2waverecords
+make-slots|for (uint32_t i = 0; i < kSlots; ++i) setWord(record + kSlotsAt + 4 * i, 0);|for (uint32_t i = 0; i < kSlots - 1; ++i) setWord(record + kSlotsAt + 4 * i, 0);|vc2waverecords
+make-bytes|kZeroedBytes = 6;|kZeroedBytes = 4;|vc2waverecords
+make-no-room|    if (record == 0) return kVc2RecordNoRoom;\n    setWord(record + kVtableAt|    if (record == 0) return kVc2RecordNone;\n    setWord(record + kVtableAt|vc2waverecords
+chunk-numbers|n - 1 >= kChunks|n - 1 > kChunks|vc2waverecords
+chunk-destroy-old|    if (const uint32_t old = word(record + slot); old != 0) destroy(old);\n||vc2waverecords
+chunk-plain-size|pool_.allocObject(kChunkBytes, extra)|pool_.allocObject(kChunkBytes, extra + 4)|vc2waverecords
+chunk-data-size|pool_.allocObject(kDataBytes, extra + kDataExtra)|pool_.allocObject(kDataBytes, extra + kDataExtra - 2)|vc2waverecords
+chunk-owner|        setWord(chunk + kOwnerAt, record);\n        setWord(record + slot, chunk);|        setWord(record + slot, chunk);|vc2waverecords
+chunk-no-room|    if (chunk == 0) return kVc2RecordNoRoom;|    if (chunk == 0) return kVc2ChunkNone;|vc2waverecords
+data-zero|    setWord(chunk + kDataZeroAt, 0);\n||vc2waverecords
+data-band0|setWord(chunk + kBandsAt, chunk + kDataBytes);|setWord(chunk + kBandsAt, chunk + kDataBytes + 4);|vc2waverecords
+data-bands|for (uint32_t i = 1; i < kBands; ++i) setWord|for (uint32_t i = 1; i < kBands - 1; ++i) setWord|vc2waverecords
+data-second|const bool second = word(record + kDataFirst) != 0;|const bool second = n == kSecondNumber;|vc2waverecords
+data-tail-even|((word(chunk + kDataTagAt) - kDataExtra) & ~1u)|(word(chunk + kDataTagAt) - kDataExtra)|vc2waverecords
+data-tail-size|kDataTail = 32,|kDataTail = 30,|vc2waverecords
+remove-none|    if (record == 0) return kVc2RecordNone;\n    for|    if (record == 0) return kVc2ChunkNone;\n    for|vc2waverecords
+remove-chunks|        if (const uint32_t chunk = word(record + kSlotsAt + 4 * i); chunk != 0) destroy(chunk);\n||vc2waverecords
+moved-owner|setWord(chunk + kOwnerAt, word(chunk + kOwnerAt) + static_cast<uint32_t>(by));|setWord(chunk + kOwnerAt, word(chunk + kOwnerAt));|vc2waverecords
+moved-head|    if (head == node - static_cast<uint32_t>(by)) head = node;\n||vc2waverecords
+moved-links|    setWord(prev + kNext, node);\n    setWord(next + kPrev, node);|    setWord(prev + kNext, node);|vc2waverecords
+moved-bands|for (uint32_t i = 0; i < kBands; ++i) addTo(|for (uint32_t i = 1; i < kBands; ++i) addTo(|vc2waverecords
+moved-data-slot|(word(block + kWhichAt) == 0 ? kDataFirst : kDataSecond));|(word(block + kWhichAt) == 0 ? kDataSecond : kDataFirst));|vc2waverecords
+moved-plain|        addTo(word(block + kOwnerAt) + c->slot);|        (void)c;|vc2waverecords
+moved-other|        os_.moved(block, by);|        (void)by;|vc2waverecords

@@ -25,6 +25,11 @@ int32_t sw(uint32_t v) { return static_cast<int32_t>(v); }
 
 uint32_t Vc2WavePool::unitsFor(uint32_t bytes) { return unitsOf(sw(bytes - 1)); }
 
+uint8_t Vc2WavePool::byte(uint32_t at) const {
+    const uint32_t o = at - words.base;
+    return o < memory.size() ? memory[o] : 0;
+}
+
 uint8_t* Vc2WavePool::bytesAt(uint32_t at) {
     const uint32_t o = at - words.base;
     return o < memory.size() ? &memory[o] : nullptr;

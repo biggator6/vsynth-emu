@@ -774,6 +774,11 @@ version against rom.4's routines with what it calls hooked:
           block's object told through `Vc2PoolHost`; xt_vc2waves' second part (HARDWARE_FIRMWARE.md, "The VC-2's wave
           pool"). Left: the store's set-up, records and chunks (their classes' moved methods on the host), the
           library's records, the bank, its wave reader and the start-up load.
+        - The store's records done (v502): `Vc2WaveRecords`, a record's and a chunk's making, a record's deletion with
+          every class's destructor, the lists' insert and unlink, every class's moved method as the pool's host;
+          xt_vc2waves' third part (HARDWARE_FIRMWARE.md, "The VC-2's wave store's records"). The block is v500–v549
+          now (the coordinator's, 2026-11-23). Left: the store's set-up with its sampling record (v503), the loader's
+          context, the Wave Number records, the bank, its wave reader and the start-up load.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

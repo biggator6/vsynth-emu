@@ -122,6 +122,14 @@ std::string vc2FileCallsDifference(const std::vector<Vc2FileCall>& mine, const s
            + say(b, theirs.end());
 }
 
+std::string vc2CallOutcome(Vc2Fw& fw, bool ok, std::pair<int64_t, int64_t> answers,
+                           const std::function<std::string()>& memory) {
+    if (!ok) return "a call faults: " + fw.cpu.error();
+    if (answers.first != answers.second)
+        return "a call gives " + std::to_string(answers.first) + ", rom.4's " + std::to_string(answers.second);
+    return memory();
+}
+
 std::string vc2BytesDifference(Vc2Fw& fw, uint32_t at, const void* mine, size_t bytes, const char* what) {
     std::vector<uint8_t> theirs(bytes);
     fw.cpu.read(at, theirs.data(), bytes);
@@ -153,7 +161,7 @@ int main(int argc, char** argv) {
     if (!run) return 2;
     const std::vector<uint8_t> index = indexOnDisk(argv[1]);
     if (index.empty()) std::printf("xt_vc2waves: no disk image beside rom.4, or no VC-2 index in it\n");
-    const long different = vc2WaveIndexPart(fw, *run, index) + vc2WavePoolPart(fw, *run);
+    const long different = vc2WaveIndexPart(fw, *run, index) + vc2WavePoolPart(fw, *run) + vc2WaveRecordsPart(fw, *run);
     std::printf("xt_vc2waves: %ld different\n", different);
     return different || index.empty() ? 1 : 0;
 }

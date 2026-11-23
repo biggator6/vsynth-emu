@@ -4024,6 +4024,20 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 25, continued (2026-11-23) — v502: the wave store's records
+
+- The coordinator widened the block to v500–v549 and kept the plugin's wiring out until the user decides where the
+  files come from. The question of hand-porting against running the loaders in the interpreter went to the user.
+- The store's set-up turned out to make a sampling record of 32 frames that succeeds, which calls four more routines
+  and a loop-events builder. So v502 is the records and chunks alone, and the set-up is v503.
+- The chunk classes are a table: a slot and a vtable each, a destructor that clears the slot and a moved method that
+  moves it. Only the data's class is longer: seven band pointers and a choice of two slots.
+- The records' check passed on its first run, so coverage came first. All the lines were reached. The branches left
+  are dead in a consistent list, or need a negative key, which no caller gives (v398's find assumes the same). Records
+  that find no room needed objects that fill the pool.
+- The kit asked for the pool's rig to be shared rather than copied (Vc2WavePoolRig.h), and for the per-call outcome
+  to be one function (`vc2CallOutcome`).
+
 ### Session 25, continued (2026-11-23) — v501: the wave pool
 
 - The store's records and chunks are objects in a pool of rom.4's own, with a compaction that moves them and tells

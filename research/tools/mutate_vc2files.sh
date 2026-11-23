@@ -82,4 +82,4 @@ VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSetting
 VC2PATCH=(Vc2PatchStore Vc2PatchFile Vc2PatchStoreCheck Vc2PatchFileCheck Vc2Params XtFxValueText)
 # xt_vc2waves' (v500): the wave loaders and the sets and store they fill
 VC2WAVES=(Vc2WavesCheck Vc2WaveIndexCheck Vc2WaveIndex Vc2WaveSets Vc2WaveStore Vc2PartSettingsWords Vc2WavePool
-          Vc2WavePoolCheck Vc2WavePoolDraws)
+          Vc2WavePoolCheck Vc2WavePoolDraws Vc2WaveRecords Vc2WaveRecordsCheck)

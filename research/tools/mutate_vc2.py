@@ -55,8 +55,8 @@
 # xt_vc2sets, [cases] its cases (40).  --patch: vc2patch_muts.txt, in Vc2PatchStore.cpp, Vc2PatchFile.cpp and
 # XtPatchStore.cpp's reads (PORT=vc2patch, vc2patchfile, vc2patchxt: rom.4's patch store and its .p02 reader, v450),
 # through xt_vc2patch, [cases] its random stores beside the disk image's 128 patches (4).  --waves: vc2waves_muts.txt,
-# in Vc2WaveIndex.cpp, Vc2WaveSets.cpp's reads by address and Vc2WavePool.cpp (PORT=vc2waveindex, vc2wavesetsdata,
-# vc2wavepool: the wave loaders, v500 on), through xt_vc2waves, [cases] its drawn cases beside the disk image's index (40).  One line
+# in Vc2WaveIndex.cpp, Vc2WaveSets.cpp's reads by address, Vc2WavePool.cpp and Vc2WaveRecords.cpp (PORT=vc2waveindex,
+# vc2wavesetsdata, vc2wavepool, vc2waverecords: the wave loaders, v500 on), through xt_vc2waves, [cases] its drawn cases beside the disk image's index (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 import sys
 import mutlist

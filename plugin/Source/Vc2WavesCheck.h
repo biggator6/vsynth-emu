@@ -5,6 +5,7 @@
 // (Vc2WaveIndexCheck.cpp).  XT_VC2WAVES_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2Files.h"
+#include "Vc2WavePoolRig.h"   // the pool's rig, which the pool's and the records' parts share (v502)
 #include <functional>
 #include <string>
 #include <vector>
@@ -51,6 +52,10 @@ private:
 void vc2HookFiles(Vc2Fw& fw, Vc2FileList& files);
 // The first call that differs between the port's log and rom.4's, as text; empty when none does
 std::string vc2FileCallsDifference(const std::vector<Vc2FileCall>& mine, const std::vector<Vc2FileCall>& theirs);
+// A call made on both sides, as text: that rom.4's faulted (not `ok`), that the answers differ (the port's, rom.4's),
+// or else what `memory()` finds different; empty when nothing does
+std::string vc2CallOutcome(Vc2Fw& fw, bool ok, std::pair<int64_t, int64_t> answers,
+                           const std::function<std::string()>& memory);
 // The first byte of `bytes` at `at` in rom.4's memory that differs from the port's `mine`, as text; empty when none does
 std::string vc2BytesDifference(Vc2Fw& fw, uint32_t at, const void* mine, size_t bytes, const char* what);
 
@@ -69,13 +74,13 @@ struct Vc2WavesTally {
 long vc2WaveIndexPart(Vc2Fw& fw, const Vc2Run& run, const std::vector<uint8_t>& index);
 // The store's pool (v501, Vc2WavePoolCheck.cpp): `run.cases` cases of a set-up and up to 160 drawn calls on a small pool
 long vc2WavePoolPart(Vc2Fw& fw, const Vc2Run& run);
+// The store's records and chunks (v502, Vc2WaveRecordsCheck.cpp): `run.cases` cases of up to 120 drawn calls on a store
+long vc2WaveRecordsPart(Vc2Fw& fw, const Vc2Run& run);
 // Its draws (Vc2WavePoolDraws.cpp): a request's size (up to an eighth or a sixty-fourth of the pool; a fourth of the
 // time one of three sizes, so free blocks tie for the largest; now and then 0, exactly what's free, or past it); a
 // pool's (2 KB to the most the check's OS gives, now and then 0, more, or negative); and a realloc's that fills
 // `block` exactly, the block and its free next joined or a larger free block elsewhere, when the size law can ask for
 // it (else a request's size)
-class Vc2WavePool;
-inline constexpr uint32_t kVc2PoolMemoryMost = 0x10000;   // the most memory the check's OS gives a pool
 uint32_t vc2PoolDrawBytes(std::mt19937& rng, const Vc2WavePool& pool);
 uint32_t vc2PoolDrawSize(std::mt19937& rng);
 uint32_t vc2PoolFittingBytes(std::mt19937& rng, const Vc2WavePool& pool, uint32_t block);

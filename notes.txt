@@ -335,6 +335,13 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's wave store's records v502 (2026-11-23, after v501; HARDWARE_FIRMWARE.md, "The VC-2's wave store's
+  records"): what the loaders build in the store and its pool, Vc2WaveRecords: a record made (0x89353b40), a chunk made
+  (0x89353ef0: nine plain classes and the data's, which hangs in one of two slots), a record deleted with every class's
+  destructor (0x89354490), the lists' insert and unlink, and every class's moved method, which the pool calls through
+  the records as its host. The block is now v500–v549 (the coordinator's, 2026-11-23). xt_vc2waves' third part: 0
+  different at seeds 2024, 7, 31337 and 99. Not in the sound yet.
+
 The VC-2's wave pool v501 (2026-11-23, after v500; HARDWARE_FIRMWARE.md, "The VC-2's wave pool"): rom.4's pool at
   0x8997c51c that the wave store's records and chunks live in, Vc2WavePool: a ring of blocks with 24-byte headers on
   the OS's memory, its set-up, alloc, calloc, free, realloc, the largest free block, the compaction (each moved

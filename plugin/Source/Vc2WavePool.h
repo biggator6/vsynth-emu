@@ -13,6 +13,7 @@
 // same size whose next block is used moves into a free block of exactly that size, then finds a used block after it
 // and stops there; the port goes on, and the check draws no such call.  Bit for bit:
 // xt_vc2waves' second part.  HARDWARE_FIRMWARE.md, "The VC-2's wave pool".  The notes' task.
+#include "Vc2WaveStore.h"   // Vc2WaveMemory: the pool's memory read by address, as the store's lookups read it
 #include <cstdint>
 #include <vector>
 
@@ -32,9 +33,11 @@ public:
     virtual void moved(uint32_t block, int32_t by) = 0;
 };
 
-class Vc2WavePool {
+class Vc2WavePool : public Vc2WaveMemory {
 public:
     static constexpr uint32_t kAt = 0x8997c51c;
+    // Vc2WaveMemory (v502): a byte of the memory by rom.4's address, 0 outside it
+    uint8_t byte(uint32_t at) const override;
     Vc2WavePoolWords words {};
     // The pool's memory, from words.base: the OS's, zeroed when the port takes it, and 24 bytes past it, which the size
     // law can give the last block (rom.4 writes on into whatever follows the OS's memory there)

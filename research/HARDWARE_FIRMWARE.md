@@ -3912,6 +3912,66 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's wave store's records (2026-11-23, v502) {#vc2-wave-records}
+
+What the loaders build in the wave store (v398) and its pool (v501): records and their chunks, made, deleted and
+moved. Ported bit for bit as `Vc2WaveRecords` (Vc2WaveRecords.cpp) and checked in xt_vc2waves' third part, with
+rom.4's own routines running there. Every address is rom.4's.
+
+**A record** is an 88-byte pool object, with these words:
+- +0x10 the extra bytes it was made with (its type + 1) and +0x14 its vtable (`0x898ca8e0`);
+- its node at +0x18, on the store's list of its key mod 128: the previous node, the next and the key;
+- its chunks' slots +0x24…+0x4c, by chunk number: 1 +0x24, 2 +0x28, 3 +0x2c, 4 +0x30, 5 +0x34, 8 +0x38, 7 +0x3c,
+  6 +0x40, 10 +0x44, 11 +0x48, 12 +0x4c (v398's getter reads the same);
+- bytes +0x50 and +0x51, halfwords +0x52 (the busy flag v398 tests) and +0x54, all 0 when made.
+
+**A chunk** is a pool object of 28 bytes and its extra: its class's vtable at +0x14, its record at +0x18, its data
+after. Nine plain classes, one a number (1…7, 10, 12; vtables `0x898ca904`…`0x898caa48`). The data's class
+(`0x898ca9b8`, chunks 8 and 11) is 64 bytes before its data and asks 32 more:
+- seven band pointers from +0x1c, the first its data, the rest 0;
+- +0x38 which slot it hangs in: 0 the record's +0x38, 1 its +0x48;
+- +0x3c a word 0, and 32 bytes zeroed after the extra (`0x89353790`).
+
+**The routines:**
+- Making a record `0x89353b40(store, key, type)`: the store's record of the key (by the store's key, v398's find)
+  deleted first, then the object, its slots and bytes cleared, and its node put at the head of its list (`0x893533d0`:
+  alone, or before the head in its ring, and made the head). 1, or −1 with no room.
+- Making a chunk `0x89353ef0(store, key, n, extra)`: −5 with no record, for n outside 1…12, or 9. The slot's old chunk
+  is destroyed first. A data chunk asked as 8 or 11 hangs in +0x48 only when +0x38 holds one, and in +0x38 otherwise. 1,
+  or −1 with no room.
+- Deleting a record `0x89354490(store, key)`: each chunk's destructor in slot order, then the record's. −3 with no
+  record. A destructor (given 3) clears the record's slot, or unlinks the record's node (`0x89353460`), writes the base
+  vtable `0x898ca8bc` and frees the object.
+- The unlink: a node alone leaves its list empty. In a ring, the list's head becomes the node's previous when the
+  head's key is the node's. A ring of two leaves the other alone, with links of 0.
+- The moved methods, which the pool's compaction and realloc call:
+  - a record's (`0x89353540`) moves its chunks' record pointers and its list's head and neighbours' links to it;
+  - a plain chunk's moves its slot in the record;
+  - the data's moves its seven band pointers and its slot.
+  The port's `moved` finds the class by the object's vtable. An object of no class of the store's goes on to the OS's
+  host.
+
+**Not reached.** Keys are never negative, as v398 found: the lists' test for a negative key mod 128 isn't drawn.
+Neither are the branches a consistent list never takes: a node with a previous node but no next, or a listed record
+whose list has no head.
+
+**The check.** Each case sets a pool of 8 to 64 KB up on both sides (`0x89350c10`), under a store with no records and
+its key −1. Then up to 120 calls are drawn, after each of which the check compares the answer, the store's words, the
+pool's words and its whole memory, and both sides' logs:
+- a record made: twelve keys, three to each of the lists 0, 1 and 56, and a type 0…40;
+- a chunk made: its number 1…12 mostly, now and then 0, 9 or 13; its extra mostly under 100, now and then more than
+  the pool holds;
+- a record deleted, and the pool compacted;
+- an object of the check's own alloc'd or freed: its vtable logs its moves on both sides and its payload is noise. A
+  sixth of them take nearly all that's free, so a record or chunk then finds no room;
+- the store's key set, −1 three times in four.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, 4,800 calls a seed.
+- Every line of Vc2WaveRecords.cpp is reached. The branches left are those above.
+- `mutate_vc2.py --waves`: 47 new plants for the records, and one for the pool's read by address (which v398's find
+  now reads records through). All were caught on the first run. The whole list, 152, all caught.
+
 ### The VC-2's wave pool (2026-11-23, v501) {#vc2-wave-pool}
 
 The memory the wave store's records and chunks live in: rom.4's pool at `0x8997c51c`. The store's set-up

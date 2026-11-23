@@ -16,65 +16,13 @@ constexpr uint32_t kSetUp = 0x89350c10, kAlloc = 0x89350cd0, kCalloc = 0x89350de
 constexpr uint32_t kRealloc = 0x89350e90, kLargest = 0x89351090, kCompact = 0x89351120;                 // [FW]
 constexpr uint32_t kAllocObject = 0x89351690, kLargestObject = 0x893516c0, kFreeObject = 0x893516e0;   // [FW]
 constexpr uint32_t kReallocObject = 0x893517c0;                                                         // [FW]
-constexpr uint32_t kOsAlloc = 0x89300770, kOsFree = 0x89300840, kLock = 0x893018b0, kUnlock = 0x893018c0;   // [FW]
-constexpr uint32_t kLockHolder = 0x8992e208;   // [FW] the OS's object its lock's semaphore is read from (+0x2c)
-// The check's RAM: the OS's object, the largest's answer, the two vtables and their methods, and the OS's memory
-constexpr uint32_t kOsObject = 0x8C030000, kOut = 0x8C030100, kVtables = 0x8C030200, kMethods = 0x8C030300;
-constexpr uint32_t kMemoryAt = 0x8C100000, kMemoryMost = kVc2PoolMemoryMost;
-constexpr uint32_t kVtableBytes = 0x40, kAdjustAt = 0x18, kMethodAt = 0x20, kVtableAt = 0x14, kHeader = 24;
-constexpr uint32_t kUnitsAt = 0xc, kOverhang = 24;   // the port's memory past the OS's (Vc2WavePool.h)
-constexpr uint32_t kAdjusts[] = { 0, 0x30 };
+constexpr uint32_t kOut = 0x8C030100;   // the check's RAM: the largest's answer
+constexpr uint32_t kMemoryAt = kVc2PoolMemoryAt, kMemoryMost = kVc2PoolMemoryMost, kVtables = kVc2PoolVtables;
+constexpr uint32_t kVtableBytes = kVc2PoolVtableBytes, kVtableAt = 0x14, kHeader = 24, kUnitsAt = 0xc;
 constexpr int kSteps = 160;
-
-struct Logs {
-    std::vector<std::pair<uint32_t, int32_t>> moved;   // where each object was told, and how far
-    std::vector<uint32_t> os;                          // the OS's calls: what each asked
-};
-
-// The port's host: the OS's memory at the same place, and a moved block's object found through its vtable as rom.4's
-// call finds it, the check's vtables' adjust
-class PortHost : public Vc2PoolHost {
-public:
-    Vc2WavePool& pool;
-    Logs logs;
-    explicit PortHost(Vc2WavePool& p) : pool(p) {}
-    uint32_t osAlloc(uint32_t bytes) override {
-        logs.os.push_back(bytes);
-        return bytes <= kMemoryMost ? kMemoryAt : 0;
-    }
-    void osFree(uint32_t at) override { logs.os.push_back(at); }
-    void moved(uint32_t block, int32_t by) override {
-        const uint32_t k = (pool.word(block + kVtableAt) - kVtables) / kVtableBytes;
-        logs.moved.emplace_back(block + (k < 2 ? kAdjusts[k] : 0), by);
-    }
-};
-
-// rom.4's side: the OS's allocator and lock hooked, the vtables and their methods logging
-void hookRom(Vc2Fw& fw, Logs& logs) {
-    fw.cpu.wr32(kLockHolder, kOsObject);
-    for (uint32_t k = 0; k < 2; ++k) {
-        fw.cpu.wr32(kVtables + kVtableBytes * k + kAdjustAt, kAdjusts[k]);
-        fw.cpu.wr32(kVtables + kVtableBytes * k + kMethodAt, kMethods + 0x10 * k);
-        fw.cpu.hook(kMethods + 0x10 * k, [&logs](Sh4& c) {
-            logs.moved.emplace_back(c.r[4], static_cast<int32_t>(c.r[5]));
-            c.ret(0);
-        });
-    }
-    fw.cpu.hook(kOsAlloc, [&logs](Sh4& c) {
-        logs.os.push_back(c.r[4]);
-        if (c.r[4] <= kMemoryMost) {   // the memory zeroed as the port's, the 24 bytes after it too
-            const std::vector<uint8_t> zeros(c.r[4] + kOverhang);
-            c.write(kMemoryAt, zeros.data(), zeros.size());
-        }
-        c.ret(c.r[4] <= kMemoryMost ? kMemoryAt : 0);
-    });
-    fw.cpu.hook(kOsFree, [&logs](Sh4& c) {
-        logs.os.push_back(c.r[4]);
-        c.ret(0);
-    });
-    fw.cpu.hook(kLock, [](Sh4& c) { c.ret(0); });
-    fw.cpu.hook(kUnlock, [](Sh4& c) { c.ret(0); });
-}
+using Logs = Vc2PoolLogs;
+using PortHost = Vc2PoolCheckHost;
+void hookRom(Vc2Fw& fw, Logs& logs) { vc2HookPoolRom(fw, logs); }
 
 // A live block the check holds: its address as its call gave it, and whether that is an object (its block) or a payload
 struct Live {
@@ -278,10 +226,8 @@ long vc2WavePoolPart(Vc2Fw& fw, const Vc2Run& run) {
         int bare = 0;   // calls on a pool with no memory, a few at most
         for (int k = 0; k < kSteps && d.empty() && (pool.words.base != 0 || bare++ < kBareSteps); ++k, ++calls) {
             const auto [call, name] = drawnCall(s);
-            d = !call.ok ? "a call faults: " + fw.cpu.error() : "";
-            if (d.empty() && call.mine != call.theirs)
-                d = "a call gives " + std::to_string(call.mine) + ", rom.4's " + std::to_string(call.theirs);
-            if (d.empty()) d = poolDifference(fw, pool, theirs, host.logs);
+            d = vc2CallOutcome(fw, call.ok, { call.mine, call.theirs },
+                               [&] { return poolDifference(fw, pool, theirs, host.logs); });
             if (d.empty() && call.block) dress(s, call.block, call.noisy);
             if (!d.empty()) d = "call " + std::to_string(k) + ", " + name + ": " + d;
         }
