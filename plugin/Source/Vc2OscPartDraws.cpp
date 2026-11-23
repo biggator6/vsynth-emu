@@ -112,7 +112,7 @@ void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng) {
     d.peak = rng() % 4 == 0 ? 0.0f : vc2DrawLevel(rng);
     fw.cpu.wr32(kPeakAt, std::bit_cast<uint32_t>(d.peak));
     d.rendered = (uint32_t)rng();
-    d.seekFlags = (uint8_t)rng();
+    rng();   // v335: the seek's flags byte drew here until the seeks were the voice's own; kept, so the draws after stay
     shared.calls.clear();
     constexpr uint32_t kFramesPointerAt = 0x8993eadc;   // [FW] where the part reads the effect chip's frames from
     for (int32_t& w : d.frames) w = (int32_t)shared.renders();

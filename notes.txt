@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's period-jump player v335 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v334's 3ed4d17;
+  HARDWARE_FIRMWARE.md, "The VC-2's period-jump player"): step 4.3's sixty-third version. VariPhrase's type 8 is the
+  voice's own: its render 0x893ca8b0 (the walk's step, a read kept within a period of the walk, its two taps a period
+  apart crossfaded, the voice's gain), its set-up 0x893ccff0 and its seek 0x893cd090 (Vc2OscJump*.cpp), its row of the
+  walk. The record block's code is SOLO's and the jump's one code (Vc2OscRecordBlock.cpp), and the frames' half step,
+  lerp, gain glide and block on the walk mode 1's, SOLO's and the jump's (Vc2OscFrameSteps.cpp). With it every
+  player's set-up and seek is the voice's own: Vc2OscParts::seek and objectCall are gone with their hooks. Found:
+  after a walk the jump compares the new crossing, not the position; it glides the voice's gain words (the object's
+  −0x80), not the ones its set-up writes; its read can lag or lead the walk far (seeks in samples, One Way, a stuck
+  backward walk, a position outside the range), reading what memory holds there, which the port's sample reader now
+  reaches by the physical address as the SH-4 does. The checks play type 8 as a family of its own on waves of periods
+  (smooth record lengths), Tempo Sync and Time Trip off.
+  0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's SOLO v334 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v333's c6ea59a; HARDWARE_FIRMWARE.md, "The
   VC-2's SOLO"): step 4.3's sixty-second version. SOLO, VariPhrase's types 1 and 6, is the voice's own: its render
   0x893c9450 (the block's rates, the frame's step, the anchor's records, the trigger, the grains' reads, the second

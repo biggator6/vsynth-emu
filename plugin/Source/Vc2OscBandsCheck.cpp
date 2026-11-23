@@ -25,6 +25,8 @@ constexpr uint32_t kFormantAt = 0x1d0, kEnergyAt = 0x1d4, kDepthAt = 0x1f0;
 constexpr uint8_t kLoopsOn = 0x01, kBeat = 0x06, kWraps = 0x08, kRobot = 0x10, kVariOff = 0x20, kInSamples = 0x80;
 constexpr uint32_t kObject = Vc2OscVoice::kObject;
 
+constexpr uint32_t kEnsemble = 5, kSix = 6, kJump = 8;   // [FW] ENSEMBLE's, SOLO's type 6, the period-jump player's
+
 struct BandCounts {
     long notes = 0, ensembles = 0, stereo = 0, blocks = 0, crossed = 0, ended = 0, wraps = 0, variOff = 0;
     long setUpsInSamples = 0, seeks = 0, seeksInSamples = 0;   // v333
@@ -39,20 +41,21 @@ float movedWalk(std::mt19937& rng) {
     return (rng() % 2 ? 1.0f : -1.0f) * oscWithin(rng, 0.05f, 1.5f);
 }
 
-// The words a note's updates, settings and clock move, drawn again before a run; v334: SOLO's formant, Energy (0 now
-// and then), Robot Voice and its depth besides
-void bandMoves(Vc2OscVoice& v, bool ensemble, bool solo, std::mt19937& rng) {
+// The words a note's updates, settings and clock move, drawn again before a run, by the note's type; v334: SOLO's
+// formant, Energy (0 now and then), Robot Voice and its depth besides.  ENSEMBLE's loops stay off; v335: the period-jump
+// player's range's way (in samples or by events) the note's, its pitch held to 4 (oscBandNote)
+void bandMoves(Vc2OscVoice& v, uint32_t type, std::mt19937& rng) {
     if (rng() % 2 == 0) v.setF32(kPitchAt, std::exp2(oscWithin(rng, -2.0f, 2.0f)));
     if (rng() % 2 == 0) v.setF32(kWalkAt, movedWalk(rng));
     if (rng() % 4 == 0) v.setF32(kTargetAt, oscWithin(rng, 0.0f, 2.0f) / 65536.0f);
-    if (!ensemble) flipped(v, rng, kLoopsOn, 4);   // ENSEMBLE's off (oscBandNote)
+    if (type != kEnsemble) flipped(v, rng, kLoopsOn, 4);
     if ((v.u8(kFlagsAt) & kBeat) == 0) flipped(v, rng, kVariOff, 8);   // never under the beat (bandFlags)
     flipped(v, rng, kWraps, 8);
-    flipped(v, rng, kInSamples, 8);
+    if (type != kJump) flipped(v, rng, kInSamples, 8);
     if (rng() % 8 == 0) v.setU8(kEventBitsAt, (uint8_t)(rng() & 7));
     v.setU8(kClocksAt, (uint8_t)(v.u8(kClocksAt) + rng() % 3));
     if (rng() % 4 == 0) v.setU8(kStepsAt, (uint8_t)rng());
-    if (!solo) return;
+    if (!(type == 1 || type == kSix)) return;   // [FW] SOLO's types
     // v334: one run in eight a pitch of 4…8, where the grain parameters' cutoff and the filter's coefficient meet
     // their caps
     if (rng() % 8 == 0) v.setF32(kPitchAt, std::exp2(oscWithin(rng, 2.0f, 3.0f)));
@@ -140,20 +143,27 @@ std::string setUpBoth(OscSides& s, BandCounts& n, uint32_t type) {
     n.setUpsInSamples += (v.u8(kFlagsAt) & kInSamples) != 0;
     const OscPlayerRow& row = *oscPlayerOf(type);
     return oscBothSides(s, row.setUp, { oscVoiceAt(0) + Vc2OscVoice::kObject }, OscAnswer::none, [&] {
-        constexpr uint32_t kEnsemble = 5, kSix = 6;   // [FW] the types
-        if (row.solo) vc2OscSoloSetUp(v, s.parts[0], s.romShared, type == kSix);
+        if (row.family == OscFamily::jump) vc2OscJumpSetUp(v, s.parts[0], s.romShared);
+        else if (row.family == OscFamily::solo) vc2OscSoloSetUp(v, s.parts[0], s.romShared, type == kSix);
         else vc2OscBandSetUp(v, s.parts[0], s.romShared, type == kEnsemble);
         return 0u;
     });
 }
 
 // v333: a seek on both sides (0x893cd440 against the voice's own, its beat's reset with it), its word about the wave's
-// events; v334: SOLO's 0x893cc630 on its waves
-std::string seekBoth(OscSides& s, BandCounts& n, const OscBandWave& w, std::mt19937& rng) {
+// events; v334: SOLO's 0x893cc630 on its waves; v335: the type's (the period-jump player's 0x893cd090)
+std::string seekBoth(OscSides& s, BandCounts& n, const OscBandWave& w, uint32_t type, std::mt19937& rng) {
     Vc2OscVoice& v = s.voices[0];
     const bool inSamples = (v.u8(kFlagsAt) & kInSamples) != 0;
-    const int32_t at = oscSeekWord(inSamples, w.positions, w.events, rng);
-    const uint32_t routine = w.solo ? kOscSoloSeek : kOscBandSeek;
+    int32_t at = oscSeekWord(inSamples, w.positions, w.events, rng);
+    if (type == kJump) {
+        // v335: within the note's range (the object's +0x14…+0x1c): a position outside it is held at its end with the
+        // records left where they were, and the period-jump player's glide takes its read out of the wave
+        const int32_t from = inSamples ? (int32_t)v.u32(kObject + 0x18) : v.u16(kObject + 0x14);
+        const int32_t to = inSamples ? (int32_t)v.u32(kObject + 0x1c) : v.u16(kObject + 0x16);
+        at = std::clamp(at, std::min(from, to), std::max(from, to));
+    }
+    const uint32_t routine = oscPlayerOf(type)->seek;
     ++n.seeks;
     n.seeksInSamples += inSamples;
     return oscBothSides(s, routine, { oscVoiceAt(0) + Vc2OscVoice::kObject, (uint32_t)at }, OscAnswer::none, [&] {
@@ -162,11 +172,12 @@ std::string seekBoth(OscSides& s, BandCounts& n, const OscBandWave& w, std::mt19
     });
 }
 
+// A note of one of the part's types: BACKING's or ENSEMBLE's, SOLO's two, or (v335, on a wave of periods) the
+// period-jump player's
 std::string bandPartNote(OscSides& s, BandCounts& n, const OscBandWave& w, std::mt19937& rng) {
     constexpr std::array<uint32_t, 2> kBandTypes { 3, 5 }, kSoloTypes { 1, 6 };   // [FW]
     const bool second = rng() % 2 == 0;
-    const uint32_t type = (w.solo ? kSoloTypes : kBandTypes)[second ? 1 : 0];
-    const bool ensemble = !w.solo && second;
+    const uint32_t type = w.periods ? kJump : (w.solo ? kSoloTypes : kBandTypes)[second ? 1 : 0];
     Vc2OscVoice& v = s.voices[0];
     oscBandNote(v, w, oscVoiceAt(0), type, rng);
     if (w.solo && rng() % 8 == 0) soloLoopAtEnd(s, v, w);
@@ -175,38 +186,44 @@ std::string bandPartNote(OscSides& s, BandCounts& n, const OscBandWave& w, std::
     oscWriteVoice(s, 0);
     std::string what = setUpBoth(s, n, type);
     ++n.notes;
-    n.ensembles += second;
+    n.ensembles += type == kEnsemble || type == kSix;
     n.stereo += w.stereo;
     const uint32_t routine = oscPlayerOf(type)->render;
     for (int run = 0; run < kRuns && what.empty(); ++run) {
-        bandMoves(v, ensemble, w.solo, rng);
+        bandMoves(v, type, rng);
         oscWriteVoice(s, 0);
-        if (rng() % 3 == 0) what = seekBoth(s, n, w, rng);
+        if (rng() % 3 == 0) what = seekBoth(s, n, w, type, rng);
         for (int k = 0; k < kBlocks && what.empty(); ++k) what = bandBlock(s, n, routine, rng);
     }
     return what;
 }
 
-std::string bandCase(OscSides& s, BandCounts& n, bool solo, std::mt19937& rng) {
-    const uint32_t at = solo ? kOscSoloAt : kOscBandAt, room = solo ? kOscSoloBytes : kOscBandBytes;
-    const OscBandWave w = oscDrawBandWave(s.fw, s.shared, at, room, rng, solo);
+// A case: a wave of the family's in its room (v335: by the family, the period-jump player's waves of periods), notes
+std::string bandCase(OscSides& s, BandCounts& n, OscFamily family, std::mt19937& rng) {
+    const OscBandWave w = oscDrawBandWave(s.fw, s.shared, oscFamilyRoom(family), kOscSoloBytes, rng,
+                                          oscFamilyRecords(family));
     std::string what;
     for (int k = 0; k < kNotes && what.empty(); ++k) what = bandPartNote(s, n, w, rng);
     return what;
 }
 
-// The players' part: the band players' or SOLO's
-void playersPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally, bool solo) {
+// The players' part: the band players', SOLO's or (v335) the period-jump player's
+void playersPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally, OscFamily family) {
     BandCounts n;
     for (int v = 0; v < kOscVoices; ++v) oscWriteVoice(s, v);
-    vc2RunCases(run, tally, "", n.blocks, [&](std::mt19937& rng, bool) { return bandCase(s, n, solo, rng); });
-    std::printf("%s: %d cases, %ld notes (%ld %s, %ld stereo, %ld set up in samples), %ld seeks (%ld in samples), %ld "
+    vc2RunCases(run, tally, "", n.blocks, [&](std::mt19937& rng, bool) { return bandCase(s, n, family, rng); });
+    constexpr std::array<const char*, 3> kNames { "bands", "solo", "jump" }, kSeconds { " ENSEMBLE's, ", " type 6's, ",
+                                                                                      "" };
+    const size_t f = (size_t)family;
+    const std::string second = family == OscFamily::jump ? "" : std::to_string(n.ensembles) + kSeconds[f];
+    std::printf("%s: %d cases, %ld notes (%s%ld stereo, %ld set up in samples), %ld seeks (%ld in samples), %ld "
                 "blocks (%ld crossing an event or a loop, %ld past an end, %ld with the wrap on, %ld under Vari off)\n",
-                solo ? "solo" : "bands", run.cases, n.notes, n.ensembles, solo ? "type 6's" : "ENSEMBLE's", n.stereo,
-                n.setUpsInSamples, n.seeks, n.seeksInSamples, n.blocks, n.crossed, n.ended, n.wraps, n.variOff);
+                kNames[f], run.cases, n.notes, second.c_str(), n.stereo, n.setUpsInSamples, n.seeks, n.seeksInSamples,
+                n.blocks, n.crossed, n.ended, n.wraps, n.variOff);
 }
 } // namespace
 
-void oscBandPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally) { playersPart(s, run, tally, false); }
-void oscSoloPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally) { playersPart(s, run, tally, true); }
+void oscPlayersPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally, OscFamily family) {
+    playersPart(s, run, tally, family);
+}
 #endif

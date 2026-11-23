@@ -1,8 +1,8 @@
 // SOLO's records and grains' parameters on the OSC voice (v334): rom.4's 0x893c9b80 and 0x893c9bf0 (rom.2's 0x8950d4c0,
-// 0x8950d530), 0x893c9e50 (0x8950d770), 0x893c9c60 (0x8950d5a0), 0x893c9dd0 (0x8950d6f0) and the jumps 0x893c9e90 and
-// 0x893c9eb0 (0x8950d790, 0x8950d7d0), SOLO's row of the walk (Vc2OscSolo.h).  The records are the vpdt's: a length
-// (×16) and an info word, 0xffff continuing a length.  HARDWARE_FIRMWARE.md, "The VC-2's SOLO".  Every address is
-// rom.4's, every offset the object's.  Audio thread.
+// 0x8950d530), 0x893c9c60 (0x8950d5a0), 0x893c9dd0 (0x8950d6f0) and the jumps 0x893c9e90 and 0x893c9eb0 (0x8950d790,
+// 0x8950d7d0), SOLO's row of the walk (Vc2OscSolo.h); from v335 the records' walks, segment entries and jumps' records
+// the record players' (Vc2OscRecordBlock.cpp) on SOLO's layout.  HARDWARE_FIRMWARE.md, "The VC-2's SOLO".  Every address
+// is rom.4's, every offset the object's.  Audio thread.
 #include "Vc2OscPlayers.h"
 #include "Vc2OscSolo.h"
 #include "Vc2OscTables.h"
@@ -15,137 +15,45 @@ using xtf::div;
 using xtf::flt;
 using xtf::mul;
 using xtf::sub;
-constexpr uint32_t kRecordBytes = 4, kInfoAt = 2, kOnward = 0xffff;   // [FW] a record; its info; a length going on
-constexpr uint32_t kEntryBytes = 12, kStartAt = 8;   // [FW] a segment entry: its first record (bit 0 a flag), its start
 constexpr uint8_t kForward = 0x80;   // [FW] byte 3's: the walk forward, where a load reads the next length too
 
-uint16_t lengthAt(const Vc2WalkWords& w, uint32_t at) { return (uint16_t)w.memoryHalf(at); }
-// The budget from an info word: its bits << 6
-int32_t budgetOf(int32_t info) { return (int32_t)((uint32_t)(info & kBudgetBits) << kBudgetShift); }
-
-// A record's whole length from its first entry, `at` past its last
-int32_t lengthFrom(const Vc2WalkWords& w, uint32_t& at) {
-    int32_t length = 0;
-    uint16_t part = kOnward;
-    while (part == kOnward) {
-        part = lengthAt(w, at);
-        length = vc2WalkPlus(length, part);
-        at += kRecordBytes;
-    }
-    return length;
-}
-
-// [FW] a jump to an event's position (an event's entry, or a loop's cached event): the anchor and the walk there, the
-// next event read from the entry; from the slot (the entry's +8, the cached event's) the segment entry and the record,
-// the segment and the next; the record's end the position + the mark − the record's first length, then the record
-// loaded from it; an unvoiced record clears the Energy filter's cutoff
+// [FW] a jump to an event's position: the anchor there, the jump's records (vc2JumpRecords); an unvoiced record clears
+// the Energy filter's cutoff
 void jumpTo(Vc2WalkWords& w, int32_t pos, uint32_t entry, uint32_t slot) {
     w.setWord(kAnchor, pos);
-    vc2walk::jumpTail(w, pos, entry);
-    const uint32_t table = (uint32_t)w.word(vc2walk::kTable);
-    const uint32_t segment = w.memory(slot) + table, record = w.memory(slot + 4) + table;
-    const uint16_t mark = (uint16_t)w.memoryHalf(slot + 8);
-    w.setWord(kEntryAfter, (int32_t)segment);
-    w.setWord(kNextRecord, (int32_t)record);
-    const int32_t start = segmentEntry(w, segment);
-    segmentEntry(w, (uint32_t)w.word(kEntryAfter));
-    w.setWord(kSegment, start);
-    w.setWord(kRecEnd, vc2WalkPlus(pos, (int32_t)mark - (int32_t)lengthAt(w, record)));
-    loadNext(w);
+    vc2JumpRecords(w, kSoloRecords, pos, entry, slot);
     if ((w.half(kInfo) & kVoiced) == 0) w.setReal(kCutoff, 0.0f);
 }
 
-// [FW] 0x893c9e90 (the walk's for indexes 4 and 8, the start's 0x893c9e70 its wrapper): to the current event
-void soloJump(Vc2OscVoice& v, Vc2OscParts& p) {
-    Vc2WalkWords w { v, p };
-    const uint32_t entry = vc2walk::load(w);
-    constexpr uint32_t kSlotAt = 8;   // [FW] an entry's segment entry, record and mark
-    jumpTo(w, w.word(vc2walk::kPrev), entry, entry + kSlotAt);
-}
-// [FW] 0x893c9eb0: to a loop's cached event: its number the current event's, then its position, segment entry, record
-// and mark
-void soloCached(Vc2OscVoice& v, Vc2OscParts& p, uint32_t cached) {
-    Vc2WalkWords w { v, p };
-    constexpr uint32_t kPosAt = 4, kSlotAt = 8;   // [FW] a cached event's
-    w.setHalf(vc2walk::kIndex, w.memoryHalf(cached));
-    const uint32_t entry = vc2walk::load(w);
-    jumpTo(w, (int32_t)w.memory(cached + kPosAt), entry, cached + kSlotAt);
-}
-// [FW] the start's seek for indexes 1 and 2 (the table at 0x8993fc00), 0x893cc630, the voice's own (vc2OscSeekSolo)
-void soloSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
-    constexpr uint32_t kSoloSeek = 0x893cc630;
-    v.seekBy(kSoloSeek, at, p);
-}
 } // namespace
 
-// [FW] 0x893c9b80: the next record, from the next record's address: its length, info, start (the record's end) and end;
-// at or before the range's end its budget and, walking forward, the next one's length; past it unlimited, the next
-// length its own
+// [FW] 0x893c9b80: the next record (vc2RecordAfter), its length; at or before the range's end its budget and,
+// walking forward, the next one's length; past it unlimited, the next length its own
 int32_t loadNext(Vc2WalkWords& w) {
-    uint32_t at = (uint32_t)w.word(kNextRecord);
-    const int32_t length = lengthFrom(w, at);
-    const int16_t info = w.memoryHalf(at - kRecordBytes + kInfoAt);
-    w.setWord(kNextRecord, (int32_t)at);
-    w.setHalf(kInfo, info);
+    const int32_t length = vc2RecordAfter(w, kSoloRecords);
     w.setWord(kRecLength, length);
-    const int32_t start = w.word(kRecEnd);
-    w.setWord(kRecStart, start);
-    w.setWord(kRecEnd, vc2WalkPlus(start, length));
     if (!(w.word(vc2walk::kRangeEnd) >= w.word(kRecEnd))) {
-        w.setHalf(kBudget, kUnlimited);
+        w.setHalf(kBudget, vc2walk::kUnlimited);
         w.setWord(kNextLength, length);
-        return kUnlimited;
+        return vc2walk::kUnlimited;
     }
-    w.setHalf(kBudget, budgetOf(info));
-    if ((w.byte(vc2walk::kWalkBits) & kForward) != 0) w.setWord(kNextLength, lengthFrom(w, at));
+    w.setHalf(kBudget, vc2RecordBudget(w.half(kInfo)));
+    uint32_t at = (uint32_t)w.word(kNextRecord);
+    if ((w.byte(vc2walk::kWalkBits) & kForward) != 0) w.setWord(kNextLength, vc2RecordLength(w, at));
     return w.half(kBudget);
 }
 
-// [FW] 0x893c9bf0: the record before: back from the next record's address over the current record's entries to the
-// last entry of the one before (the next record's address then its end), its whole length back over its going-on
-// entries; its end the current's start, its start that less its length (at 0 at the least, its end then its length);
-// the next length the current's; its info and budget
+// [FW] 0x893c9bf0: the record before (vc2RecordBefore), its length; the next length the current's; the budget
 int32_t loadPrev(Vc2WalkWords& w) {
-    constexpr uint32_t kBack = 2 * kRecordBytes;
-    uint32_t at = (uint32_t)w.word(kNextRecord);
-    uint16_t part = kOnward;
-    int16_t info = 0;
-    while (part == kOnward) {
-        at -= kBack;
-        part = lengthAt(w, at);
-        info = w.memoryHalf(at + kInfoAt);
-        at += kRecordBytes;
-    }
-    w.setWord(kNextRecord, (int32_t)at);
-    int32_t length = part;
-    for (uint32_t before = at - kBack; lengthAt(w, before) == kOnward; before -= kRecordBytes) {
-        length = vc2WalkPlus(length, (int32_t)kOnward);
-    }
-    const int32_t end = w.word(kRecStart), next = w.word(kRecLength);
-    w.setWord(kRecLength, length);
-    w.setWord(kRecEnd, end);
+    const int32_t next = w.word(kRecLength);
+    w.setWord(kRecLength, vc2RecordBefore(w, kSoloRecords));
     w.setWord(kNextLength, next);
-    int32_t start = end - length;
-    if (!(start >= 0)) {
-        start = 0;
-        w.setWord(kRecEnd, length);
-    }
-    w.setWord(kRecStart, start);
-    w.setHalf(kInfo, info);
-    w.setHalf(kBudget, budgetOf(info));
-    return budgetOf(info);
+    return w.half(kBudget);
 }
 
-// [FW] 0x893c9e50: a segment entry at `at`: its first record (bit 0 cleared) into the table as the next segment's, its
-// start the next segment's, the entry after it; its start
-int32_t segmentEntry(Vc2WalkWords& w, uint32_t at) {
-    const uint32_t first = (w.memory(at) & ~1u) + (uint32_t)w.word(vc2walk::kTable);
-    const int32_t start = (int32_t)w.memory(at + kStartAt);
-    w.setWord(kEntryAfter, (int32_t)(at + kEntryBytes));
-    w.setWord(kNextFirst, (int32_t)first);
-    w.setWord(kNextSegment, start);
-    return start;
-}
+// [FW] SOLO's record block (Vc2OscSolo.h), its load of the next record
+const Vc2WalkRecords kSoloRecords { kBudget,     kInfo,      kSegment,  kNextSegment, kEntryAfter,
+                                    kNextFirst,  kNextRecord, kRecStart, kRecEnd,      loadNext };
 
 // [FW] 0x893c9c60: the grains' parameters.  The period the record's length (×16, at least 160), and walking forward
 // past the record's start a glide toward the next's by how far in the position is (past the end the next's, the
@@ -228,6 +136,8 @@ int32_t repeatCost(const Vc2WalkWords& w) {
 }
 } // namespace vc2solo
 
-// [FW] SOLO's row: its two jumps (0x893c9350's and 0x893c9364's entries for indexes 4 and 8), the step's sign negated at
-// a turn, the start's seek and jump (0x8993fc00's and 0x8993fc14's entries 1 and 2)
-const Vc2WalkWay kVc2SoloWalk { vc2solo::soloJump, vc2solo::soloCached, false, vc2solo::soloSeek, vc2solo::soloJump };
+// [FW] SOLO's row: its two jumps through jumpTo (0x893c9350's and 0x893c9364's entries for indexes 4 and 8, 0x893c9e90
+// and 0x893c9eb0), the step's sign negated at a turn, the start's seek and jump (0x8993fc00's and 0x8993fc14's entries
+// 1 and 2: 0x893cc630, the voice's own, vc2OscSeekSolo, and 0x893c9e70, 0x893c9e90's wrapper)
+const Vc2WalkWay kVc2SoloWalk { vc2RecordEvent<vc2solo::jumpTo>, vc2RecordCached<vc2solo::jumpTo>, false,
+                                vc2RecordSeek<0x893cc630>, vc2RecordEvent<vc2solo::jumpTo> };

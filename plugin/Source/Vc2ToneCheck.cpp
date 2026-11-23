@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
     ToneSides s { fw, pool, shared, parts, owner, rom, oscRom };
     shared.osc.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' states, before the hooks
     shared.osc.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
+    shared.osc.jumpRng.seed((uint32_t)run->seed * 7 + 5);   // v335: the period-jump player's
     std::string start = oscCaptureBandStates(fw, shared.osc, oscVoiceAt(0));
     toneInstallRom(fw, rom, shared.fade, shared.osc.draws, oscRom);
     if (start.empty()) start = toneOscSetUp(s);   // v319: the records' exp2 octaves, the carriers' rate, kind 6's globals
@@ -129,10 +130,9 @@ int main(int argc, char** argv) {
     const auto& k = n.oscKinds;
     const auto& c = n.oscCalls;
     std::printf("osc: note-ons by kind %ld %ld %ld %ld %ld %ld %ld %ld (%ld OSC 1s steady for a COSM 1 of its pitch), "
-                "%ld settings, %ld mic blocks; calls beyond the tone: %ld renders, %ld seeks (%ld VariPhrase re-seeks "
-                "asked, v329), %ld players' set-ups (v330)\n", k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7],
-                n.oscSteadied, n.oscSettings, n.micBlocks, c[kRenderBy], c[kSeek], n.bandReseeks,
-                c[kObjectCall]);   // v331: no event lookups
+                "%ld settings, %ld mic blocks; calls beyond the tone: %ld renders (%ld VariPhrase re-seeks asked, "
+                "v329)\n", k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], n.oscSteadied, n.oscSettings, n.micBlocks,
+                c[kRenderBy], n.bandReseeks);   // v331: no event lookups; v335: no seeks or set-ups beyond the tone
     std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's, %ld through "
                 "LITE's heads'; %ld OSCs' renders through the band players'\n", n.extInBlocks, n.variOffBlocks,
                 n.headsBlocks, shared.osc.bandSteers);   // v322, v323, v326, v332
@@ -140,6 +140,8 @@ int main(int argc, char** argv) {
                 shared.osc.bandSeeks);   // v333
     std::printf("solo: %ld OSCs' renders steered to a set-up state, %ld OSC blocks given a SOLO wave, %ld re-seeks a "
                 "set-up state\n", shared.osc.soloSteers, shared.osc.soloSetUps, shared.osc.soloSeeks);   // v334
+    std::printf("jump: %ld OSCs' renders steered to a set-up state, %ld OSC blocks given a wave of periods, %ld "
+                "re-seeks a set-up state\n", shared.osc.jumpSteers, shared.osc.jumpSetUps, shared.osc.jumpSeeks);
     std::printf("lite: %ld settings on a type with a way, %ld through an earlier tone's head; %ld inputs of two "
                 "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head, %ld earlier voices' heads "
                 "stale), %ld OSCs steered for its seek\n", n.liteSettings, n.settingsTaken, n.bothVari,

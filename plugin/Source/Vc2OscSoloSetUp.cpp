@@ -69,10 +69,9 @@ void vc2OscSoloSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared
 }
 
 // [FW] 0x893cc630: the walk's seek with SOLO's row (vc2WalkSeek), in samples from the event 0; then in samples the
-// segments forward while the next starts at or before the position and before the last event, each with its first
-// record, and the records forward while their end is at or before it; the anchor the record's start.  The beat's
-// reset (0x893cbfe0) comes before the segments in rom.4, which read and write nothing of it; the voice's seekBy resets
-// it after
+// records' walk forward to the position (vc2SeekRecords); the anchor the record's start.  The beat's reset
+// (0x893cbfe0) comes before the records' walk in rom.4, which reads and writes nothing of it; the voice's seekBy
+// resets it after
 void vc2OscSeekSolo(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
     using namespace vc2solo;
     using namespace vc2walk;
@@ -81,15 +80,6 @@ void vc2OscSeekSolo(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
     if (inSamples) w.setHalf(kIndex, 0);
     vc2WalkSeek(v, p, at, kVc2SoloWalk);
     if (!inSamples) return;
-    const int32_t to = w.word(kPos);
-    while (!(w.word(kNextSegment) > to) && !(w.word(kNextSegment) >= w.word(kFinal))) {
-        const int32_t next = w.word(kNextSegment);
-        w.setWord(kSegment, next);
-        w.setWord(kRecEnd, next);
-        w.setWord(kNextRecord, w.word(kNextFirst));
-        segmentEntry(w, (uint32_t)w.word(kEntryAfter));
-        loadNext(w);
-    }
-    while (!(w.word(kRecEnd) > to)) loadNext(w);
+    vc2SeekRecords(w, kSoloRecords);
     w.setWord(kAnchor, w.word(kRecStart));
 }

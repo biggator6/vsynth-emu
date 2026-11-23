@@ -67,6 +67,10 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscSoloFrame.cpp
     Source/Vc2OscSoloRecords.cpp
     Source/Vc2OscSoloSetUp.cpp
+    Source/Vc2OscRecordBlock.cpp
+    Source/Vc2OscFrameSteps.cpp
+    Source/Vc2OscJump.cpp
+    Source/Vc2OscJumpRecords.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp

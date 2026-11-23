@@ -2,6 +2,7 @@
 // the two grains' windows and reads (0x893c9a40, held to the last sample by 0x893c9ae0), mono or stereo by byte 0,
 // a second tap a period on when its weights sum above 0, the windows' mix, the Energy filter, the gain.
 // HARDWARE_FIRMWARE.md, "The VC-2's SOLO".  Every address is rom.4's, every offset the object's.  Audio thread.
+#include "Vc2OscPlayers.h"
 #include "Vc2OscSolo.h"
 #include "Vc2OscTables.h"
 #include "XtFloat.h"
@@ -38,11 +39,6 @@ void readOf(Vc2WalkWords& w, const Vc2OscSoloGrain& g, int32_t& at, float& frac)
     at = vc2WalkPlus(whole, (int32_t)(start >> kSixteenths));
 }
 
-// [FW] between a sample and the next by the fraction (FLOAT, FSUB, FMAC)
-float between(int a, int b, float f) {
-    const float s = flt(a);
-    return add(mul(sub(flt(b), s), f), s);
-}
 // One channel of the two grains' reads, its samples `bytes` apart, from the right half word on a stereo frame's
 struct Pair {
     float a, b;
@@ -51,7 +47,8 @@ Pair readPair(const Vc2WalkWords& w, const Vc2OscSamples& wave, const Vc2OscSolo
               uint32_t side) {
     const uint32_t from = (uint32_t)w.word(kSamples) + side;
     const uint32_t at = from + (uint32_t)t.a * frame, bt = from + (uint32_t)t.b * frame;
-    return { between(wave.at(at), wave.at(at + frame), t.fa), between(wave.at(bt), wave.at(bt + frame), t.fb) };
+    return { vc2OscBetween(wave.at(at), wave.at(at + frame), t.fa),
+             vc2OscBetween(wave.at(bt), wave.at(bt + frame), t.fb) };
 }
 
 // [FW] the second tap (0x893c97fe…, 0x893c9930…): each grain's fraction a period on (×1/16), split again, held to the
@@ -78,13 +75,6 @@ float filtered(Vc2WalkWords& w, float x, uint32_t band, uint32_t low) {
     const float y = sub(sub(x, mul(q, s1)), s2);
     w.setReal(band, add(mul(c, y), s1));
     return y;
-}
-// [FW] the gain a glide toward its target by its rate (FMAC), × 65536
-float glided(Vc2WalkWords& w) {
-    const float gain = w.real(kGain);
-    const float g = add(mul(w.real(kGainRate), sub(w.real(kTarget), gain)), gain);
-    w.setReal(kGain, g);
-    return mul(g, vc2OscTables().solo.sampleScale);
 }
 } // namespace
 
@@ -129,7 +119,7 @@ void frame(Vc2WalkWords& w, const Vc2OscSamples& wave, float* lr) {
         const float mixed = add(mul(t.wb, p.b), mul(p.a, t.wa));
         lr[side] = filtered(w, mixed, side == 0 ? kBandLeft : kBandRight, side == 0 ? kLowLeft : kLowRight);
     }
-    const float g = glided(w);
+    const float g = vc2OscGlide(w.v, Vc2WalkWords::at(kTarget), vc2OscTables().solo.sampleScale);
     lr[0] = mul(lr[0], g);
     lr[1] = stereo ? mul(lr[1], g) : lr[0];
 }

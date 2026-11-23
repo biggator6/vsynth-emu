@@ -212,10 +212,19 @@ auto soloWords(Vc2OscSoloPool& s) {
         { 0x893cc624, &s.setUpQ },
     });
 }
+// [FW] the period-jump player's (v335): its render's (0x893caba0…0x893cabb4) and its set-up's gain rate (0x893cd190)
+auto jumpWords(Vc2OscJumpPool& j) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x893caba0, &j.fadeTop }, { 0x893caba4, &j.fadeBottom }, { 0x893caba8, &j.fadeScale },
+        { 0x893cabac, &j.sixteenth }, { 0x893cabb0, &j.rateScale }, { 0x893cabb4, &j.sampleScale },
+        { 0x893cd190, &j.setUpGain },
+    });
+}
 
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, soloWords(solo));
+        vc2ReadPool(image, jumpWords(jump));
         vc2ReadPool(image, vibratoWords(vibrato));
         vc2ReadFloats(image, { kVc2VibratoWavesAt, (int)vibrato.waves.size() }, vibrato.waves.data());
         vc2ReadPool(image, oscWords(*this));

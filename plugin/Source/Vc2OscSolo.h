@@ -5,6 +5,7 @@
 // reads in Vc2OscSoloFrame.cpp, the records, the grain parameters and the jumps in Vc2OscSoloRecords.cpp, the
 // set-ups and the seek in Vc2OscSoloSetUp.cpp.  Every address is rom.4's, every offset the object's (the voice's
 // +0x15c).  HARDWARE_FIRMWARE.md, "The VC-2's SOLO".  Audio thread.
+#include "Vc2OscRecordBlock.h"
 #include "Vc2OscWalkSteps.h"
 
 namespace vc2solo {
@@ -36,12 +37,9 @@ inline constexpr uint32_t kTap = 0x154, kWindowStep = 0x160, kCutoff = 0x16c, kC
 inline constexpr uint32_t kBandLeft = 0x178, kLowLeft = 0x17c, kBandRight = 0x180, kLowRight = 0x184;
 inline constexpr uint32_t kRateTaken = 0x188, kSmooth = 0x18c;
 // [FW] byte 0's Robot Voice; byte 3's 0x08 (the backward loop turned it) and 0x80 (type 6's); the record's info: 0x04
-// voiced, 0x01 and 0x02 an unvoiced record's pitch and formant kept; the budget's bits (<< 6), all of them unlimited
+// voiced, 0x01 and 0x02 an unvoiced record's pitch and formant kept (its budget's bits, Vc2OscRecords.h)
 inline constexpr uint8_t kRobot = 0x10, kFromZero = 0x08, kTypeSix = 0x80;
-// one-off: the info word's bits, a declaration
-inline constexpr int16_t kVoiced = 0x04, kKeepsPitch = 0x01, kKeepsFormant = 0x02, kBudgetBits = 0x1f8;
-inline constexpr int16_t kUnlimited = 0x7e00;
-inline constexpr int kBudgetShift = 6;
+inline constexpr int16_t kVoiced = 0x04, kKeepsPitch = 0x01, kKeepsFormant = 0x02;
 inline constexpr int32_t kAgeStep = 0x1000;   // [FW] a sample's age, 1/4096
 
 // A grain's words: its age (1/4096 sample), its window's place, its start (×16), its formant weight, its second tap's
@@ -58,10 +56,10 @@ struct Vc2OscSoloTaps {
     float fa = 0, fb = 0, wa = 0, wb = 0;
 };
 
+extern const Vc2WalkRecords kSoloRecords;   // the record block's layout (Vc2OscSoloRecords.cpp)
 // one-off: the routines' declarations, alike only in taking the words
 int32_t loadNext(Vc2WalkWords& w);                    // 0x893c9b80: the budget
 int32_t loadPrev(Vc2WalkWords& w);                    // 0x893c9bf0: the budget
-int32_t segmentEntry(Vc2WalkWords& w, uint32_t at);   // 0x893c9e50: the segment's start
 void grainParams(Vc2WalkWords& w);                    // 0x893c9c60
 int32_t repeatCost(const Vc2WalkWords& w);            // 0x893c9dd0
 Vc2OscSoloTaps grains(Vc2WalkWords& w);               // 0x893c9a40 (Vc2OscSoloFrame.cpp)

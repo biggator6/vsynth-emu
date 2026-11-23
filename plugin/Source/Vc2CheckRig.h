@@ -27,10 +27,11 @@ inline constexpr int kVc2FadeBlocks = 1600;
 
 struct Vc2Fw {
     Sh4 cpu;
-    // rom.4 loaded, and RAM for the stack, the arguments and the buffers, as xt_vc2params has them
+    // rom.4 loaded, and RAM for the stack, the arguments and the buffers, as xt_vc2params has them; from v335 2 MB,
+    // the period-jump player's waves in xt_vc2osc above the first (its read leads the walk past a wave)
     bool start(const char* rom) {
         if (!cpu.loadRom(rom)) return false;
-        cpu.mapRam(0x8C000000, 0x00100000);
+        cpu.mapRam(0x8C000000, 0x00200000);
         return true;
     }
     bool call(uint32_t f, std::initializer_list<uint32_t> args, uint32_t* r0 = nullptr) {

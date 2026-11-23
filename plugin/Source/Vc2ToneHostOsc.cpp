@@ -64,7 +64,6 @@ uint32_t Vc2ToneOscLink::renderBy(uint32_t routine, float* out, uint32_t third) 
     return outside().renderBy(routine, out, third);
 }
 
-void Vc2ToneOscLink::seek(uint32_t routine, int32_t at) { outside().seek(routine, at); }
 int32_t Vc2ToneOscLink::osClock() { return outside().osClock(); }
 Vc2MicRing& Vc2ToneOscLink::micRing() { return outside().micRing(); }
 const float* Vc2ToneOscLink::unvoiced() { return outside().unvoiced(); }
@@ -89,6 +88,5 @@ float Vc2ToneOscLink::boundFloat(uint32_t part, uint32_t offset) {
 }
 
 uint32_t Vc2ToneOscLink::address() { return host_.self() + kOscsAt[(size_t)osc_]; }
-void Vc2ToneOscLink::objectCall(uint32_t routine) { outside().objectCall(routine); }
 Vc2OscWaveHeader Vc2ToneOscLink::waveHeader(uint32_t at) { return outside().waveHeader(at); }
 Vc2OscLoopRecord Vc2ToneOscLink::loopRecord(uint32_t at) { return outside().loopRecord(at); }

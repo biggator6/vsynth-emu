@@ -13,8 +13,6 @@ using namespace vc2walk;
 using xtf::add;
 using xtf::mul;
 using xtf::sub;
-constexpr int kFrames = 32, kFracBits = 20;   // [FW] a block; the position's fraction's bits
-constexpr uint32_t kFracMask = 0xfffff;
 constexpr uint8_t kWraps = 0x08;   // [FW] byte 0's: the walk wraps at an end (with the range by events)
 
 int32_t minus(int32_t a, int32_t b) { return (int32_t)((uint32_t)a - (uint32_t)b); }
@@ -129,18 +127,8 @@ bool wrapsAt(const Vc2WalkWords& w) { return (w.byte(kFlags) & (kWraps | kInSamp
 void forward(Vc2WalkWords& w, int32_t pos, int32_t frac) {
     const int32_t end = w.word(kRangeEnd);
     if (pos >= end && wrapsAt(w)) return wrapRange(w, kRangeFirst);
-    if (pos >= end) {
-        w.setByte(kEnded, 1);
-        pos = end;
-        frac = 0;
-    }
-    w.setWord(kPos, pos);
-    w.setWord(kFrac, frac);
-    if (pos >= w.word(kCross)) {
-        vc2WalkForward(w.v, w.p, kVc2SoloWalk);
-        vc2WalkCrossing(w.v, w.p);
-        pos = w.word(kPos);
-    }
+    pos = vc2WalkHeld(w, pos, frac, end, true);
+    if (pos >= w.word(kCross)) pos = vc2WalkCrossed(w, kVc2SoloWalk, true);
     const int32_t next = w.word(kNextSegment);
     const uint32_t first = (uint32_t)w.word(kNextFirst);
     if (pos >= next && w.word(kRangeEnd) > vc2WalkPlus(next, w.memoryHalf(first))) {
@@ -148,7 +136,7 @@ void forward(Vc2WalkWords& w, int32_t pos, int32_t frac) {
         w.setWord(kRecEnd, next);
         w.setWord(kNextRecord, (int32_t)first);
         w.setWord(kAnchor, next);
-        segmentEntry(w, (uint32_t)w.word(kEntryAfter));
+        vc2SegmentEntry(w, kSoloRecords, (uint32_t)w.word(kEntryAfter));
         loadNext(w);
     }
     anchorForward(w);
@@ -159,23 +147,13 @@ void forward(Vc2WalkWords& w, int32_t pos, int32_t frac) {
 void backward(Vc2WalkWords& w, int32_t pos, int32_t frac) {
     const int32_t start = (w.byte(kWalkBits) & kFromZero) != 0 ? 0 : w.word(kRangeStart);
     if (start >= pos && wrapsAt(w)) return wrapRange(w, kRangeLast);
-    if (start >= pos) {
-        w.setByte(kEnded, kBefore);
-        pos = start;
-        frac = 0;
-    }
-    w.setWord(kPos, pos);
-    w.setWord(kFrac, frac);
-    if (w.word(kCross) >= pos) {
-        vc2WalkBackward(w.v, w.p, kVc2SoloWalk);
-        vc2WalkCrossing(w.v, w.p);
-        pos = w.word(kCross);
-    }
+    pos = vc2WalkHeld(w, pos, frac, start, false);
+    if (w.word(kCross) >= pos) pos = vc2WalkCrossed(w, kVc2SoloWalk, false);
     constexpr uint32_t kEntryBytes = 12, kBack = 3 * kEntryBytes;   // [FW] a segment entry; from the entry after next
     if (w.word(kSegment) > pos) {
         const uint32_t from = (uint32_t)w.word(kEntryAfter) - kBack;
-        w.setWord(kSegment, segmentEntry(w, from));
-        segmentEntry(w, from + kEntryBytes);
+        w.setWord(kSegment, vc2SegmentEntry(w, kSoloRecords, from));
+        vc2SegmentEntry(w, kSoloRecords, from + kEntryBytes);
     }
     anchorBackward(w);
 }
@@ -207,26 +185,21 @@ void trigger(Vc2WalkWords& w) {
 // the position is on; then the trigger
 void step(Vc2WalkWords& w) {
     const int32_t half = w.word(kStep) >> 1;
-    const int32_t frac = vc2WalkPlus(w.word(kFrac), half);
-    const int32_t pos = vc2WalkPlus(w.word(kPos), frac >> kFracBits);
-    const int32_t kept = (int32_t)((uint32_t)frac & kFracMask);
+    int32_t kept = w.word(kFrac);
+    const int32_t pos = vc2WalkHalfStep(w.word(kPos), kept, w.word(kStep));
     if (half != 0) (half > 0 ? forward : backward)(w, pos, kept);
     else (w.word(kPos) >= w.word(kAnchor) ? anchorForward : anchorBackward)(w);
     trigger(w);
 }
+// A frame: stepped, then read
+void stepped(Vc2WalkWords& w, const Vc2OscSamples& wave, float* lr) {
+    step(w);
+    frame(w, wave, lr);
+}
 } // namespace
 } // namespace vc2solo
 
-// [FW] 0x893c9450: the beat's block (0x893c89a0, Vc2OscVoice::beatBlock) gives the step's word; the block's rates; the
-// next crossing (0x893c9380); then 32 frames, each stepped, then read
+// [FW] 0x893c9450: a block on the walk (vc2WalkBlock) with the block's rates, each frame stepped, then read
 void vc2OscSolo(Vc2OscVoice& v, float* out, Vc2OscParts& p) {
-    Vc2WalkWords w { v, p };
-    v.beatBlock(p);
-    vc2solo::blockRates(w);
-    vc2WalkCrossing(v, p);
-    const Vc2OscSamples wave = p.waveSamples();
-    for (int k = 0; k < vc2solo::kFrames; ++k) {
-        vc2solo::step(w);
-        vc2solo::frame(w, wave, out + 2 * k);
-    }
+    vc2WalkBlock(v, out, p, vc2solo::blockRates, vc2solo::stepped);
 }

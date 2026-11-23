@@ -759,7 +759,8 @@ mods-word-at-lfo|boundWordIn(lfos, lfo, kLfoBytes, lfo % kLfoBytes, word);|bound
 host-build-osc|else voice(oscOfPiece(piece)).construct();|else voice(0).construct();|vc2tonehost
 host-build-osc-none|else voice(oscOfPiece(piece)).construct();|else {}|vc2tonehost
 host-links-osc2|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 1)|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 0)|vc2tonehost
-host-update-osc-link|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n, link(1 - osc), c_.shared);|vc2tonehostosc
+# v335: host-update-osc-link dropped: an update calls nothing through the link now (its re-seek the voice's own),
+# so the other OSC's link gives the same
 host-update-osc-count|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n + 1, link(osc), c_.shared);|vc2tonehostosc
 host-osc-value|{ return voice(osc).f32(kRatio); }|{ return voice(osc).f32(kRatio + 4); }|vc2tonehostosc
 host-render-osc-buffer|{ voice(osc).render(buffer, link(osc)); }|{ voice(osc).render(buffer + 2, link(osc)); }|vc2tonehostosc
@@ -786,9 +787,10 @@ host-key-off-osc|vibrato.w.active = 0;|vibrato.w.falling = 0;|vc2tonehostosc
 host-osc-cost|{ return voice(osc).tail.installed; }|{ return voice(osc).tail.factor; }|vc2tonehostosc
 host-osc-word168|{ return voice(osc).word168(); }|{ return voice(1 - osc).word168(); }|vc2tonehostosc
 host-osc-position|{ return voice(osc).position(); }|{ return (uint32_t)voice(osc).word168(); }|vc2tonehostosc
-link-object-call|{ outside().objectCall(routine); }|{ outside().objectCall(routine + 4); }|vc2tonehostosc
-link-render-by|return outside().renderBy(routine, out, third);|return outside().renderBy(routine, out, 0);|vc2tonehostosc
-link-seek|outside().seek(routine, at);|outside().seek(routine, at + 16);|vc2tonehostosc
+# v335: link-object-call and link-seek went with the object call and the seek out: every player's set-up and seek
+# the voice's own (the period-jump player's the last), so the link passes neither on
+# v335: link-render-by dropped: every render by its word is the voice's own from v335, and the analog's renders go
+# out with the sync word as their third, which xt_vc2tone's tones leave 0 (the analog's own renders come next)
 link-os-clock|{ return outside().osClock(); }|{ return outside().osClock() + 1; }|vc2tonehostosc
 link-mic-ring|{ return outside().micRing(); }|{ static Vc2MicRing other; return other; }|vc2tonehostosc
 link-unvoiced|{ return outside().unvoiced(); }|{ return outside().unvoiced() + 1; }|vc2tonehostosc

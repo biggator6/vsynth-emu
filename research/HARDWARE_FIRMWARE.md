@@ -1546,6 +1546,111 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's period-jump player (2026-11-23, v335) {#vc2-osc-jump}
+
+Step 4.3's sixty-third version, the sixth piece of item 11's fifth part. The period-jump player, VariPhrase's type 8,
+is the voice's own whole: its render `0x893ca8b0`, its set-up `0x893ccff0` and its seek `0x893cd090`. With it every
+player's set-up and seek is the voice's own, so `Vc2OscParts::seek` and `objectCall` are gone, with the checks' hooks
+on them.
+
+**What it is.** rom.2's `0x8950e1d0` four bytes up from +0x94, on the object's words (`Vc2OscJump.h`): one walk through
+the events and loops (the players' walk, v327, with the jump's row: index 12 in the walk's jump tables, `0x893cad20`
+and `0x893cad40`, and the start's tables' entries 3, seek `0x893cd090` and jump `0x893cacf0`, `kVc2JumpWalk`), and a
+read that keeps within a period of the walk and jumps a period at a time, its two taps a period apart crossfaded by how
+far behind the walk the read is. Its record block is SOLO's laid four bytes down (no grain toggle), and past the
+record's end the read's words: the period, the read (×16) and its 20-bit fraction, the beat's step as the block took
+it, the walk's step, and the record's length, its inverse and the next record's length as floats.
+
+The render (`vc2OscJump`), a block on the walk as SOLO's is (`vc2WalkBlock`):
+- **The block's steps.** The beat's step taken (+0x11c). A record of no budget walks a sample a frame (±2^25 by the
+  step's sign) and reads a sample a frame; else the walk takes the beat's step and the read the rate factor × the
+  pitch × 2^25 (FTRC).
+- **The walk's step.** Half the walk's step onto the position (forward at 0 too); held at the range's end (forward) or
+  start (back) and ended there; crossing the next crossing, the walk that way with the jump's row; then past the
+  record's end the next record (forward), below its start the record before (back). After a walk both ways compare
+  rom.4's r1 after `0x893c9380`, which is the new crossing (it stores r1 at +0x2c), not the position: SOLO's and mode
+  1's frames take the position forward (they reload it), the jump's doesn't.
+- **The read.** Half the read's step on. The period glides from the record's length toward the next's by how far into
+  the record the position is (× the length's inverse, FMAC), FTRC into +0x110. Where the read may be: the position, at
+  least the period, at most the last event's position less the period. Past it, the read a period back (ended, to that
+  place); a period or more behind it, a period on (ended, a period behind that place). The crossfade: how far behind
+  the position the read is, in periods (the float period, not the FTRC), held to ⅖…⅗, into 0…1 (−0.4, × 5).
+- **The taps.** The read and the read a period on, each a sample (×16 down, unsigned) and its sixteenths (× 1/16),
+  each between its sample and the next (`vc2OscBetween`), the second crossfaded over the first; mono both sides the
+  one, stereo left then right; at the gain, the voice's at the object's −0x80 (the voice's +0xdc, as mode 1's), gliding
+  by its rate × 65536 (`vc2OscGlide`).
+- **The records.** The next record (`0x893cabe0`) and the one before (`0x893cac40`) are SOLO's walks
+  (`vc2RecordAfter`, `vc2RecordBefore`) with the length, its inverse and the next length as floats; at or before the
+  last event's position (+0x20, where SOLO's reads the range's end) the budget by the info's bits and the next length
+  read always (SOLO's only walking forward); past it unlimited and the next length its own. The jumps (`0x893cad20`,
+  `0x893cad40`) move the read with the position (its fraction 0), then SOLO's jump's records.
+- **The set-up** (`0x893ccff0`): byte 3 all but its 0x40 cleared, the end 0, the gain's rate 1/64 at +0x88 (which the
+  render doesn't read: it glides the voice's word at the object's −0x78), the samples from the head, the position and
+  the read 0; the table, cached events, SOLO's layout and the walk's start with the jump's row (`vc2WalkSetUp`); the
+  loops' rates and the beat's start. **The seek** (`0x893cd090`): the walk's seek with the jump's row, then in samples
+  SOLO's records' walk forward (`vc2SeekRecords`), without SOLO's event 0 first and anchor after.
+
+**One code for the record players** (`Vc2OscRecordBlock.h/.cpp`, `Vc2WalkRecords` a layout of the record block and
+its load): a record's whole length, the next record's walk, the record before, a segment entry, a jump's records, a
+seek's walk forward, and the walk row's two jumps through a player's own jump (`vc2JumpToEvent`, `vc2JumpToCached`;
+`vc2RecordEvent`, `vc2RecordCached`, `vc2RecordSeek` the row's ways), SOLO's moved there. The frames' shared steps
+(`Vc2OscFrameSteps.cpp`): the half step onto a position (`vc2WalkHalfStep`), a sample between two
+(`vc2OscBetween`), the gain's glide (`vc2OscGlide`), mode 1's and SOLO's moved there, and SOLO's and the jump's block on
+the walk (`vc2WalkBlock`); in the walk, the walk and the next crossing (`vc2WalkCrossed`, mode 1's `walked`) and the
+position held at a range's end (`vc2WalkHeld`, SOLO's).
+
+**The checks.** Type 8 is a family of its own, as SOLO's became one in v334 (`OscFamily`, `kOscPlayers`'
+`family`): its states captured on two waves of its own in its own room (`kOscJumpAt`, 0x8C108000, the interpreter's
+RAM 2 MB from v335), from its own generator (`OscShared::jumpRng`), so SOLO's part and captures draw as v334's did; a
+part of its own in xt_vc2osc (`oscPlayersPart`, by family; a `jump:` line), its notes set up and sought with its row's
+routines; the voice part's renders through the jump half the time SOLO's pick passes, from its generator; note-ons,
+re-seeks and renders of type 8 steered to its waves and states as SOLO's are, in xt_vc2tone through the shared steers.
+The checks' seek and object-call kinds, counts and hooks are gone.
+
+**What the check needed, and what it says of rom.4.** The jump's read keeps within a period of where it may be, but
+only a period a frame: from far behind or ahead it takes frames to come back, and meanwhile its taps read what lies
+there, on the XT whatever memory holds. Ways that put it there, each rom.4's own:
+- **Below the wave's first sample.** After seeks in samples the read lags (a seek moves the read by the jump to the
+  event, not to the point), and near the first event it goes below 0. `(uint32)read >> 4` shifted onto the samples'
+  address wraps past 2^32 into P2 or P3, which the SH-4 (MMU off) maps to the same physical RAM: the bytes below the
+  samples. The port's sample reader now goes by the 29-bit physical address as the interpreter's does
+  (`Vc2OscSamples::at`, `Sh4::phys`), so it reads those bytes too wherever they are in the wave memory; and SOLO's
+  room in the check moved 64 KB above the interpreter's stack (`kOscSoloAt` 0x8C0F0000), where nothing writes, as
+  rom.4 read the stack's words below its old place.
+- **One Way** (by the code). A loop's One Way sets the position less the crossing, then jumps: the jump moves the read
+  by the distance from that small position to the loop's start, so the read lands about a loop's end ahead of the
+  walk. The jump's room has 64 KB of zero memory on both sides for it.
+- **The record left behind.** After a walk the frame compares the crossing, not the position: walking back with the
+  crossing at or above the record's start, the position can pass below the record without the record before loading
+  (and stay there if the walk then stops or turns); held at the range's end after a seek outside the range, or in the
+  other way (in samples against a range by events), the position snaps there with the records where they were; a
+  walk faster than a record a frame (Tempo Sync's and Time Trip's beat, up to 32 times) leaves them behind too. Below
+  or past its record the period's glide from the record's length toward the next's runs on, and where the next is far
+  longer it goes negative: the read then runs away a period a frame.
+The check plays type 8 on waves like a voice's (`OscWaveRecords::periods`, `OscBandWave::periods`): SOLO's layout, its
+records periods each within ±4% of the one before (16…215 samples, `periodAfter`), so the glide stays near them far
+outside a record, and the record across the last event's position ending there; Tempo Sync and Time Trip off, its pitch
+to 4, its seeks within its range and in its range's way, the voice's gain words gain-like (in xt_vc2tone the note-on
+block's +0x88…+0x90). In xt_vc2tone a rate past 2 in those words took the glide to ∞, and with it the tone's mixer (a
+host crash) and rom.4's COSM (a fault): the render glides the voice's own words, not the object's the set-up writes.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400) in xt_vc2osc and xt_vc2tone. At 400 the jump's part set up
+  1,200 notes, ran about 3,200 seeks (three in four in samples) and 76,800 blocks (about 2,500 crossing an event or a
+  loop); the voice part rendered about 290 blocks through the jump and steered about 530 renders, 350 note-ons and 80
+  re-seeks to its states and waves; xt_vc2tone about 730 OSC renders and 1,435 OSC blocks of type 8 steered. SOLO's part
+  draws as v334's did (its line unchanged).
+- Coverage under xt_vc2osc at 40 cases: `Vc2OscJump.cpp`, `Vc2OscJumpRecords.cpp`, `Vc2OscFrameSteps.cpp`,
+  `Vc2OscSolo.cpp` and `Vc2OscWalk.cpp` whole; `Vc2OscRecordBlock.cpp` all but the seek's segment at the last event (no
+  segment starts there, v334's); SOLO's records as v334 left them (the formant's floor, the cost's lower line).
+- Planted errors: the changed plants (`mutate_vc2.py --osc --changed 3ed4d17`) 887 planted, 0 missed, 0 errors: about
+  95 new for the jump's files, the frames' steps and the walk's new code, and SOLO's and mode 1's re-aimed at the code
+  that is now shared (90); `--tone` 42 planted, 0 missed. Dropped with a note, as nothing can show them now: the
+  voice's seek out (`seek-out-at`, `reseek-own`), the re-seek's flags after a seek (`reseek-restore-was`: no seek
+  writes byte 0 now), the start's seek word's high half (`st-seek-half`), SOLO's half for its sign alone
+  (`so-half-step`), the link's seek, object call, update link and render word (`link-seek`, `link-object-call`,
+  `host-update-osc-link`, `link-render-by`). No rom.2 port changed (`mutate_tone.py --changed`: none).
+
 ### The VC-2's SOLO (2026-11-23, v334) {#vc2-osc-solo}
 
 Step 4.3's sixty-second version, the fifth piece of item 11's fifth part. SOLO, VariPhrase's types 1 and 6, is the

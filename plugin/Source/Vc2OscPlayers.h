@@ -68,6 +68,17 @@ void vc2OscSeekBands(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
 void vc2OscSolo(Vc2OscVoice& v, float* out, Vc2OscParts& p);
 void vc2OscSoloSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared, bool typeSix);
 void vc2OscSeekSolo(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
+// v335 (Vc2OscJump.cpp, Vc2OscJumpRecords.cpp): the period-jump player's render, 0x893ca8b0, mono or stereo by the
+// object's byte 0; its set-up, 0x893ccff0 (type 8), which VariPhrase's start runs; its seek, 0x893cd090, before the
+// beat's reset (Vc2OscBeat.cpp)
+void vc2OscJump(Vc2OscVoice& v, float* out, Vc2OscParts& p);
+void vc2OscJumpSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+void vc2OscSeekJump(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
+// v335 (Vc2OscFrameSteps.cpp): the frames' shared steps, mode 1's, SOLO's and the period-jump player's: a sample
+// between `a` and `b` by `f` (FLOAT, FSUB, FMAC); the gain (the voice's word past `target`) a glide toward its target
+// by its rate (the word past that, FMAC), × `scale`
+float vc2OscBetween(int a, int b, float f);
+float vc2OscGlide(Vc2OscVoice& v, uint32_t target, float scale);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

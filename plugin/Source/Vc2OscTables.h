@@ -5,6 +5,7 @@
 // voice", "The VC-2's OSC voice's note-on and targets", "The VC-2's players' installs and VariPhrase's note-on", "The
 // VC-2's LITE note-on", "The VC-2's analog note-on".
 #include "Vc2OscAnalogPool.h"
+#include "Vc2OscJumpPool.h"
 #include "Vc2OscSoloPool.h"
 #include "Vc2OscVibrato.h"
 #include <array>
@@ -91,6 +92,7 @@ struct Vc2OscTables {
     float variStep = 0;             // 0x893c8960 (v330): VariPhrase's update's step to its targets, 0.7
     Vc2OscBandTables bands;         // the band players' set-ups' (v333)
     Vc2OscSoloPool solo;            // SOLO's (v334, Vc2OscSoloPool.h)
+    Vc2OscJumpPool jump;            // the period-jump player's (v335, Vc2OscJumpPool.h)
     Vc2OscAnalogPool analog;       // the analog note-on's (v242, Vc2OscAnalogPool.h)
     Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };

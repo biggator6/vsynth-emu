@@ -1100,6 +1100,14 @@ version against rom.4's routines with what it calls hooked:
          SOLO); Robot Voice is rom.4's own, the grains at the pitch ratio × 440 Hz, its swing × the +0x94 word that
          VariPhrase's note-on writes 0 (open what sets it). Next: the period-jump player (`0x893ca8b0`, `0x893ccff0`,
          `0x893cd090`).
+       - The period-jump player (v335): its render `0x893ca8b0`, set-up `0x893ccff0` and seek `0x893cd090` the voice's
+         own (`Vc2OscJump*.cpp`), its row of the walk `kVc2JumpWalk`; SOLO's record block code and the frames' steps
+         made one for the players (`Vc2OscRecordBlock.cpp`, `Vc2OscFrameSteps.cpp`); `Vc2OscParts::seek` and
+         `objectCall` gone, every player's seek and set-up the voice's own (HARDWARE_FIRMWARE.md, "The VC-2's
+         period-jump player"). Found: after a walk it compares the new crossing; it glides the voice's gain words, not
+         the object's its set-up writes; its read can lead or lag the walk far and read past the wave (open what the XT
+         holds there for real waves), the port's sample reader by the physical address as the SH-4's. Next: the
+         analog oscillator's 19 renders.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

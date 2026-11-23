@@ -12,11 +12,6 @@ namespace {
 constexpr uint32_t kOsClock = 0x893018d0;   // [FW] the OS's millisecond word, which a carrier's init reads (v266)
 
 uint32_t outOf(uint32_t at) { return at == kOscOutAt ? 1 : kOscOther; }
-uint8_t byteAt(Sh4& cpu, uint32_t at) {
-    uint8_t b = 0;
-    cpu.read(at, &b, 1);
-    return b;
-}
 
 // How a hooked routine's arguments read into its call, one shape each; each gives the address of the voice the call is
 // on (its object's less the object's offset; v330: a kind's routine on the voice itself went with the last of them)
@@ -26,24 +21,9 @@ uint32_t renderBy(Sh4& c, OscCall& t, uint32_t at) {   // (out, the object, thir
     t.c = c.r[6];
     return c.r[5] - Vc2OscVoice::kObject;
 }
-uint32_t seek(Sh4& c, OscCall& t, uint32_t at) {   // (the object, at), and the object's flags as the player finds them
-    t.a = at;
-    t.b = c.r[5];
-    t.c = byteAt(c, c.r[4]);
-    return c.r[4] - Vc2OscVoice::kObject;
-}
-uint32_t objectRoutine(Sh4& c, OscCall& t, uint32_t at) {   // a player's routine on the object (v238)
-    t.a = at;
-    return c.r[4] - Vc2OscVoice::kObject;
-}
 
-// How a hooked routine answers, one shape each: its r0, after what it leaves in fr0 or the object
-uint32_t none(Sh4&, const OscDraws&) { return 0; }
+// How a hooked routine answers: its r0 (v335: a set-up's none and a seek's flags went with the last of them)
 uint32_t rendered(Sh4&, const OscDraws& d) { return d.rendered; }
-uint32_t seekFlags(Sh4& c, const OscDraws& d) {   // the seek's object's byte 0, as a player may leave it
-    c.write(c.r[4], &d.seekFlags, 1);
-    return 0;
-}
 // A hooked routine: where, what it logs as, how its arguments read, its answer (v328's answering by the caller went
 // with v331, the event lookup now the voice's own)
 struct OscHook {
@@ -60,16 +40,9 @@ struct OscHook {
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
 // renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
 // update, players' start and settings (v330) and its note-on's event lookup (v331), the band players' renders (v332),
-// set-ups and seek (v333), and SOLO's render, set-ups and seek (v334): rom.4's own run, and the routines they call
-// hooked, each by its address
+// set-ups and seek (v333), SOLO's render, set-ups and seek (v334) and the period-jump player's (v335), VariPhrase's
+// players all: rom.4's own run, and the routines they call hooked, each by its address
 const OscHook kHooks[] = {
-    // v330: VariPhrase's players' set-ups its start runs on the object, by the wave's type (v333: the band players'
-    // two rom.4's own; v334: SOLO's two)
-    { 0x893ccff0, kObjectCall, objectRoutine, none },
-    // v238: the players' renders LITE's and VariPhrase's installs write (the period-jump player's; Vari off's two
-    // rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327, BACKING's and ENSEMBLE's from v332,
-    // SOLO's from v334)
-    { 0x893ca8b0, kRenderBy, renderBy, rendered },
     // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
     // install adds (0x893c3e60's)
     { 0x893c3890, kRenderBy, renderBy, rendered }, { 0x893c3580, kRenderBy, renderBy, rendered },
@@ -83,9 +56,6 @@ const OscHook kHooks[] = {
     { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
     { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
-    // the players' seeks: the period-jump player's (v329: mode 1's, 0x893cc830, the voice's own; v333: the band
-    // players', 0x893cd440; v334: SOLO's, 0x893cc630)
-    { 0x893cd090, kSeek, seek, seekFlags },
 };
 
 } // namespace

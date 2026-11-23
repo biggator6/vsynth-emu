@@ -269,3 +269,26 @@ void vc2WalkForward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way) {
 void vc2WalkBackward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way) {
     vc2walk::crossed(v, p, way, vc2walk::kCrossBack);
 }
+
+// [FW] v335 (mode 1's v327, SOLO's and the period-jump player's): crossing the next crossing, the walk's crossing that
+// way by the row and the next crossing found; what the frame then compares, forward the position, back the crossing
+// (rom.4's r1 after 0x893c9380, not the position)
+int32_t vc2WalkCrossed(Vc2WalkWords& w, const Vc2WalkWay& way, bool forward) {
+    (forward ? vc2WalkForward : vc2WalkBackward)(w.v, w.p, way);
+    vc2WalkCrossing(w.v, w.p);
+    return w.word(forward ? vc2walk::kPos : vc2walk::kCross);
+}
+
+// [FW] v335 (SOLO's v334, the period-jump player's): the position and its fraction; at or past `end` that way held
+// there, its fraction 0, ended that way (1, or −1 before the start); the position
+int32_t vc2WalkHeld(Vc2WalkWords& w, int32_t pos, int32_t frac, int32_t end, bool forward) {
+    using namespace vc2walk;
+    if (forward ? pos >= end : end >= pos) {
+        w.setByte(kEnded, forward ? 1 : kBefore);
+        pos = end;
+        frac = 0;
+    }
+    w.setWord(kPos, pos);
+    w.setWord(kFrac, frac);
+    return pos;
+}

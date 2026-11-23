@@ -73,19 +73,23 @@ struct Vc2OscSamples {
     const int16_t* samples = nullptr;
     uint32_t address = 0;
     uint32_t count = 0;
+    // [FW] v335: by its 29-bit physical address, as the SH-4's areas P0…P3 mirror physical memory with the MMU off
+    // (Sh4::phys): a read that wraps past 2^32 (the period-jump player's read behind the wave's first sample) lands on
+    // the bytes below the samples, as on the XT
     int at(uint32_t word) const {
-        const uint32_t index = (word - address) / 2;
+        constexpr uint32_t kPhysical = 0x1fffffffu;
+        const uint32_t index = ((word & kPhysical) - (address & kPhysical)) / 2;
         return index < count ? samples[index] : 0;
     }
 };
 
-// What the voice calls on its parts and reads from them; a player's routine by its rom.4 address (a kind's routine on
-// the voice and its settings went with v330, VariPhrase's update and settings the last)
+// What the voice calls on its parts and reads from them; a player's render by its rom.4 address (a kind's routine on
+// the voice and its settings went with v330, VariPhrase's update and settings the last; the players' seeks and set-ups
+// on the object with v335, the period-jump player's the last)
 class Vc2OscParts {
 public:
     virtual ~Vc2OscParts() = default;
     virtual uint32_t renderBy(uint32_t routine, float* out, uint32_t third) = 0;   // routine(out, the object, third)
-    virtual void seek(uint32_t routine, int32_t at) = 0;      // a player's, routine(the object, at)
     // v266: what the voice's carrier and kind 6 read from outside it: the OS's millisecond word (0x893018d0), where a
     // carrier's phase starts; the mic ring (0x8a0f31cc), which the part's block mixer writes; the input stage's
     // unvoiced decision for the block, a float a sample (0x899d99dc, by 0x893ed500)
@@ -100,11 +104,9 @@ public:
     // v332 the band players' too, their vpdt, cached loop events and bands in it (its bytes, Vc2OscBands.cpp)
     virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
-    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
-    // player's routine on the object, by its address (v238; gone with v328, mode 1's set-up its last, and back from
-    // v330 for VariPhrase's players' set-ups).  The event lookup 0x893cc0d0 went with v331, the voice's own
+    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0).  The
+    // event lookup 0x893cc0d0 went with v331, the voice's own
     virtual uint32_t address() = 0;
-    virtual void objectCall(uint32_t routine) = 0;
     virtual Vc2OscWaveHeader waveHeader(uint32_t at) = 0;
     virtual Vc2OscLoopRecord loopRecord(uint32_t at) = 0;
 };

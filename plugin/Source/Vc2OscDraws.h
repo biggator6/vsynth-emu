@@ -128,6 +128,7 @@ inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e
 inline constexpr std::array<uint32_t, 1> kOscModeOneRenders { 0x893c9f60 };   // v327: mono and stereo alike
 inline constexpr std::array<uint32_t, 2> kOscBandRenders { 0x893cadc0, 0x893ca1f0 };   // v332: BACKING's, ENSEMBLE's
 inline constexpr std::array<uint32_t, 1> kOscSoloRenders { 0x893c9450 };   // v334: SOLO's, mono and stereo alike
+inline constexpr std::array<uint32_t, 1> kOscJumpRenders { 0x893ca8b0 };   // v335: the period-jump player's
 // v332 (Vc2OscBandDraws.cpp): the band players' set-ups (BACKING's 0x893cd1d0, ENSEMBLE's 0x893cc8f0), from v333 the
 // voice's own, and their seek (0x893cd440)
 inline constexpr std::array<uint32_t, 2> kOscBandSetUps { 0x893cd1d0, 0x893cc8f0 };
@@ -135,18 +136,26 @@ inline constexpr uint32_t kOscBandSeek = 0x893cd440;
 // v334: SOLO's render, set-ups (type 1's, type 6's) and seek, the voice's own
 inline constexpr uint32_t kOscSoloRender = 0x893c9450, kOscSoloSeek = 0x893cc630;
 inline constexpr std::array<uint32_t, 2> kOscSoloSetUps { 0x893cc2e0, 0x893cc310 };
+// v335: a player's family: its waves, generator, counts and room (the band players', SOLO's, the period-jump player's)
+enum class OscFamily : uint8_t { band, solo, jump };
 // v334: the players whose states the checks capture and steer to, by the wave's type: BACKING's, ENSEMBLE's, SOLO's
-// two; SOLO's or not (its waves, generator and counts), rom.4's set-up, its render
+// two, from v335 the period-jump player's; its family, rom.4's set-up, its render, its seek
 struct OscPlayerRow {
     uint32_t type;
-    bool solo;
-    uint32_t setUp, render;
+    OscFamily family;
+    uint32_t setUp, render, seek;
 };
-inline constexpr std::array<OscPlayerRow, 4> kOscPlayers { { { 3, false, 0x893cd1d0, 0x893cadc0 },
-                                                            { 5, false, 0x893cc8f0, 0x893ca1f0 },
-                                                            { 1, true, 0x893cc2e0, kOscSoloRender },
-                                                            { 6, true, 0x893cc310, kOscSoloRender } } };
+inline constexpr std::array<OscPlayerRow, 5> kOscPlayers { {
+    { 3, OscFamily::band, 0x893cd1d0, 0x893cadc0, kOscBandSeek },
+    { 5, OscFamily::band, 0x893cc8f0, 0x893ca1f0, kOscBandSeek },
+    { 1, OscFamily::solo, 0x893cc2e0, kOscSoloRender, kOscSoloSeek },
+    { 6, OscFamily::solo, 0x893cc310, kOscSoloRender, kOscSoloSeek },
+    { 8, OscFamily::jump, 0x893ccff0, 0x893ca8b0, 0x893cd090 },
+} };
+inline constexpr std::array<uint32_t, 3> kOscRecordTypes { 1, 6, 8 };   // v335: the record players', SOLO's family
 const OscPlayerRow* oscPlayerOf(uint32_t type);   // its row, or none
+// v335: the types whose render is `render` (a render's captured states)
+std::vector<uint32_t> oscTypesRendering(uint32_t render);
 // v334: a band's segment as the vpdt's builder lays it out: its start (×16) and entry's offset, its records' starts,
 // lengths (×16) and offsets
 struct OscBandRecord {
@@ -161,7 +170,15 @@ struct OscBandSegment {
 // v332 (Vc2OscBandVpdt.cpp): a band wave's parts: its vpdt (v334: or a SOLO wave's, band 0's segments into `zero` when
 // given); its loop; its cached loop events (v334: SOLO's by its events and band 0's segments); band k's frames, sized
 // as BACKING's; the room the vpdt, the cached events, two records and the bands take
-std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng, bool solo = false,
+// v335: a wave's records: the band players' (their layout), SOLO's (its layout; its brief, short and two-entry
+// records), or periods alone in SOLO's layout (the period-jump player's, OscBandWave::periods)
+enum class OscWaveRecords : uint8_t { band, solo, periods };
+// v335: a family's room in the wave memory (kOscBandAt, kOscSoloAt, kOscJumpAt; 0x8000 bytes each) and its waves'
+// records (the band players', SOLO's, periods)
+uint32_t oscFamilyRoom(OscFamily f);
+OscWaveRecords oscFamilyRecords(OscFamily f);
+std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng,
+                                 OscWaveRecords records = OscWaveRecords::band,
                                  std::vector<OscBandSegment>* zero = nullptr);
 std::vector<int32_t> oscBandPositions(const std::vector<uint8_t>& vpdt, bool stereo, bool solo = false);   // v333
 XtLoop oscBandLoop(int frames, std::mt19937& rng);
@@ -178,7 +195,7 @@ inline constexpr int kOscBandTail = 64;
 // six bands of noise sized as BACKING's (ENSEMBLE's are smaller), mono or stereo; from `rng`.  v334: or a SOLO wave
 // (`solo`): its vpdt SOLO's, its cached events SOLO's, band 0 alone its samples
 OscBandWave oscDrawBandWave(Vc2Fw& fw, OscShared& shared, uint32_t at, uint32_t room, std::mt19937& rng,
-                            bool solo = false);
+                            OscWaveRecords records = OscWaveRecords::band);   // v335: its records
 // The object's words as VariPhrase's note-on leaves them before a band player's set-up, on `w`: the head at the voice's
 // own +0x108 (`voiceAt`) and its records, byte 0 (stereo by the wave, the range in samples three times in four, the
 // loops, Vari off, Tempo Sync, Time Trip, the wrap), byte 2 (the events' ways), byte 3 any, the range by events and in

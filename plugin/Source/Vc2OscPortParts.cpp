@@ -21,11 +21,6 @@ uint32_t OscPortParts::renderBy(uint32_t routine, float* out, uint32_t third) {
     return s_.draws.rendered;
 }
 
-void OscPortParts::seek(uint32_t routine, int32_t at) {
-    log(kSeek, routine, (uint32_t)at, self_.u8(Vc2OscVoice::kObject));   // the object's flags as the player finds them
-    self_.setU8(Vc2OscVoice::kObject, s_.draws.seekFlags);              // and as it leaves them
-}
-
 float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
     const uint32_t in = part + offset - address();   // v328: the voice's own words, which its head names
     if (in - Vc2OscVoice::kOwn <= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) return self_.f32(in);

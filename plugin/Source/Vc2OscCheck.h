@@ -35,13 +35,18 @@ inline constexpr uint32_t kOscWaveHalfwords = 16384;
 inline constexpr uint32_t kOscBandAt = kOscWaveAt + kOscWaveHalfwords * 2, kOscBandBytes = 0x8000;
 inline constexpr uint32_t kOscEventsAt = 0x8C0C8000;     // the events' table mode 1 walks (v327; v328 32 KB up)
 // v334: SOLO's waves, above the interpreter's stack (kVc2Sp), in the wave memory the port's parts hold from kOscWaveAt
-// (the events' table's region and the stack's between, which no port reads through the wave memory)
-inline constexpr uint32_t kOscSoloAt = 0x8C0E0000, kOscSoloBytes = 0x8000;
-inline constexpr uint32_t kOscWaveBytes = kOscSoloAt + kOscSoloBytes - kOscWaveAt;
+// (the events' table's region and the stack's between, which no port reads through the wave memory).  v335: 64 KB
+// above the stack's top, which nothing writes: the period-jump player's read behind a wave's first sample reads what
+// is below its image, there 0 on both sides (the stack's words rom.4's alone)
+inline constexpr uint32_t kOscSoloAt = 0x8C0F0000, kOscSoloBytes = 0x8000;
+// v335: the period-jump player's waves (its family's, OscBandWave::periods), 64 KB above SOLO's and 64 KB below the
+// wave memory's end, zero on both sides: its read lags and leads the walk by up to about a wave
+inline constexpr uint32_t kOscJumpAt = 0x8C108000, kOscJumpBytes = 0x8000;
+inline constexpr uint32_t kOscWaveBytes = kOscJumpAt + kOscJumpBytes + 0x10000 - kOscWaveAt;
 
 // v330: a kind's routine and its settings by address went, the last VariPhrase's; a player's set-up came back.  v331:
 // the event lookup went, the voice's own
-enum OscKind : int32_t { kRenderBy, kSeek, kObjectCall, kOscKinds };
+enum OscKind : int32_t { kRenderBy, kOscKinds };   // v335: the seeks and object calls went, the voice's own
 
 // A call as either side made it: what, on which voice, and its arguments (a ramp's number, counts, floats' bits, a
 // routine's address, a settings word's offset in the settings' block or a word's in the voice, the output as 1, a
@@ -90,6 +95,10 @@ struct OscBandWave {
     uint32_t vpdt = 0, cached = 0, loop = 0, header = 0;
     std::array<uint32_t, 6> bands {};
     std::vector<int32_t> positions {};   // v333: its events' (×16), which the band part's seeks are drawn about
+    // v335: in SOLO's layout, its records periods alone (16…215 samples, none brief, short or of two entries), the
+    // period-jump player's: its read keeps within a period of the walk, so a period past half the wave or the glide
+    // to a far longer one below the record takes its reads out of the wave, where rom.4 reads other memory
+    bool periods = false;
 };
 // v332: an object as rom.4's set-up of a band player left it, BACKING's or ENSEMBLE's; from v334 any player's by the
 // wave's type (BACKING 3, ENSEMBLE 5, SOLO 1 and 6)
@@ -117,11 +126,10 @@ void oscFindZeroTunes(Vc2Fw& fw, OscRecords& r);
 // within an octave, so the note-on's root Hz is finite and above 0
 void oscRealWave(OscRecords& r, int k, std::mt19937& rng);
 
-// What the hooked routines answer, drawn once for both sides; the flags byte a seek leaves in the object (a player may
-// write it).  The ramps are the voice's own from v236, the vibrato from v267, the event lookup from v331
+// What the hooked routines answer, drawn once for both sides.  The ramps are the voice's own from v236, the vibrato
+// from v267, the event lookup from v331, the players' seeks from v335 (the flags byte a seek left went with them)
 struct OscDraws {
     uint32_t rendered = 0;
-    uint8_t seekFlags = 0;
     int32_t clock = 0;           // the OS's millisecond word a carrier's init reads (v266)
     float peak = 0.0f;           // the input stage's peak (0x899d9a5c), which kind 5's update reads (v321)
     std::array<int32_t, kOscFrameWords> frames {};   // the effect chip's frames, the EXT IN player's (v322)
@@ -150,6 +158,10 @@ struct OscShared {
     std::mt19937 soloRng {};
     std::vector<OscBandWave> soloWaves {};
     long soloSteers = 0, soloSetUps = 0, soloSeeks = 0;
+    // v335: the period-jump player's the same, its waves of periods in kOscJumpAt's room, so SOLO's draws stay
+    std::mt19937 jumpRng {};
+    std::vector<OscBandWave> jumpWaves {};
+    long jumpSteers = 0, jumpSetUps = 0, jumpSeeks = 0;
     Vc2MicRing ring {};
     std::array<float, Vc2Kind6::kBlock> unvoiced {};
     OscRecords records {};
@@ -164,7 +176,6 @@ class OscPortParts final : public Vc2OscParts {
 public:
     OscPortParts(int voice, OscShared& shared, Vc2OscVoice& self) : voice_(voice), s_(shared), self_(self) {}
     uint32_t renderBy(uint32_t routine, float* out, uint32_t third) override;
-    void seek(uint32_t routine, int32_t at) override;
     int32_t osClock() override { return s_.draws.clock; }
     Vc2MicRing& micRing() override { return s_.ring; }
     const float* unvoiced() override { return s_.unvoiced.data(); }
@@ -175,7 +186,6 @@ public:
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
     uint32_t address() override { return oscVoiceAt(voice_); }
-    void objectCall(uint32_t routine) override { log(kObjectCall, routine); }   // v330: VariPhrase's players' set-ups
 
 private:
     void log(OscKind kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {

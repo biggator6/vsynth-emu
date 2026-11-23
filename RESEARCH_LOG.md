@@ -4084,3 +4084,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
   check under lldb, stopped on that NaN, showed the two causes: a drawn header rate of 0, and rom.4's exp2 past its
   seven octaves. A SOLO note-on now gets a tone's ranges. (A -O0 build of xt_vc2tone wasn't usable for this: it
   differed throughout.)
+- v334 went in as two commits on the coordinator's word (no rewrite): ee08ad9, saved at the usage limit, and 3ed4d17.
+- v335, the period-jump player. The kit's template-law took the shared code out of SOLO and mode 1 a piece at a time
+  (the record block, the walk's crossing and held position, the half step, the block, the lerp and gain glide, the
+  row's jumps), each refused until its copies were gone. Writing the shared file I first overwrote an existing check
+  file of the same name (`Vc2OscRecords.cpp`); it was restored from the commit and the new code named
+  `Vc2OscRecordBlock`.
+- The first difference was the compare after a walk: rom.4's r1 after `0x893c9380` is the crossing both ways. The rest
+  were the check's: the jump's read leaving the wave. lldb hung this time (no CPU, likely waiting on the debugger's
+  authorisation), so a marker word the check wrote on both sides switched a frame trace in the port for one render;
+  AddressSanitizer found xt_vc2tone's host crash (the tone mixer fed an ∞ from the jump's gain glide).
+- The first plant run missed eight plants v334 caught: type 8 had joined SOLO's family and drawn from its generator,
+  moving SOLO's draws. Type 8 got a family of its own (its part, waves, generator, room), and SOLO's part drew as
+  v334's again. The jump's own part then found the glide's negative period (a record left behind, the next far
+  longer); waves of smooth periods, as a voice's are, ended it, and the loops could stay on.

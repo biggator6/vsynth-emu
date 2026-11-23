@@ -217,10 +217,13 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
     // v332: else, half the time from the band players' generator, BACKING's or ENSEMBLE's, which VariPhrase's install
     // writes for its types 3 and 5
     if (pick == 3 && s.shared.bandRng() % 2) s.voices[(size_t)v].tail.render = kOscBandRenders[s.shared.bandRng() % 2];
-    // v334: else, half the time from SOLO's generator, SOLO's, which VariPhrase's install writes for its types 1 and 6
+    // v334: else, half the time from SOLO's generator, SOLO's, which VariPhrase's install writes for its types 1 and 6;
+    // v335: else, half the time from its own generator, the period-jump player's, which it writes for type 8
     else if (pick == 3 && s.shared.soloRng() % 2) s.voices[(size_t)v].tail.render = kOscSoloRenders[0];
+    else if (pick == 3 && s.shared.jumpRng() % 2) s.voices[(size_t)v].tail.render = kOscJumpRenders[0];
     s.n.bandBlocks += oscRendersBy(s.voices[(size_t)v], kOscBandRenders);
     s.n.soloBlocks += oscRendersBy(s.voices[(size_t)v], kOscSoloRenders);
+    s.n.jumpBlocks += oscRendersBy(s.voices[(size_t)v], kOscJumpRenders);   // v335
     s.n.extInBlocks += oscRendersBy(s.voices[(size_t)v], kOscExtInRenders);       // v322
     s.n.variOffBlocks += oscRendersBy(s.voices[(size_t)v], kOscVariOffRenders);   // v323
     s.n.headsBlocks += oscRendersBy(s.voices[(size_t)v], kOscHeadsRenders);       // v326

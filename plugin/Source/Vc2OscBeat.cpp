@@ -103,11 +103,12 @@ struct Vc2OscOwnSeek {
     uint32_t at;
     void (*seek)(Vc2OscVoice&, Vc2OscParts&, int32_t);
 };
-constexpr std::array<Vc2OscOwnSeek, 5> kOwnSeeks { { { 0x893c6360, variOffSeek },
+constexpr std::array<Vc2OscOwnSeek, 6> kOwnSeeks { { { 0x893c6360, variOffSeek },
                                                      { 0x893cc830, vc2OscSeekModeOne },
                                                      { 0x893c6de0, headsSeek },
                                                      { 0x893cd440, vc2OscSeekBands },
-                                                     { 0x893cc630, vc2OscSeekSolo } } };   // v334: SOLO's
+                                                     { 0x893cc630, vc2OscSeekSolo },        // v334: SOLO's
+                                                     { 0x893cd090, vc2OscSeekJump } } };   // v335: the jump's
 } // namespace
 
 void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> words, Vc2OscPlace place) {
@@ -152,12 +153,11 @@ void Vc2OscVoice::beatReset() {
     setBeat(*this, b);
 }
 
+// From v335 every seek the voice's callers name is the voice's own (the period-jump player's the last); one it has
+// none of is not a player's, and does nothing
 void Vc2OscVoice::seekBy(uint32_t routine, int32_t at, Vc2OscParts& parts) {
     const auto* own = std::ranges::find(kOwnSeeks, routine, &Vc2OscOwnSeek::at);
-    if (own == kOwnSeeks.end()) {
-        parts.seek(routine, at);
-        return;
-    }
+    if (own == kOwnSeeks.end()) return;
     own->seek(*this, parts, at);
     beatReset();
 }

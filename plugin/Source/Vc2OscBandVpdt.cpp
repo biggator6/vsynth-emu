@@ -18,6 +18,7 @@ struct OscVpdtLayout {
     uint32_t first, mono, stereo;
     int bands;
     bool soloRecords;   // now and then a record of two entries, one under the period's floor, one of no budget
+    bool periods = false;   // v335: each record's length within ±4% of the one before, as a voice's periods
 };
 constexpr OscVpdtLayout kBandVpdt { 0x1c, 0x2e * 2, 0x58 * 2, 6, false }, kSoloVpdt { 0x10, 10 * 2, 16 * 2, 1, true };
 constexpr uint32_t kMonoSlot = 12, kStereoSlot = 24;
@@ -70,6 +71,14 @@ int32_t recordLength(const OscVpdtLayout& l, int k, bool brief, std::mt19937& rn
     return pick == 1 ? kSixteen * (4 + (int32_t)(rng() % 12)) : length;
 }
 uint16_t firstLength(const OscBandRecord& r) { return (uint16_t)std::min(r.length, (int32_t)kOnward); }
+// v335: a period after `last` (×16): the first 16…215 samples, then within ±4% of the one before, held to that span
+// (the period-jump player's glide from a record's length to the next's stays near them far outside the record)
+int32_t periodAfter(int32_t last, std::mt19937& rng) {
+    constexpr int32_t kLeast = 16 * kSixteen, kMost = 215 * kSixteen;
+    if (last == 0) return kSixteen * (16 + (int32_t)(rng() % 200));
+    const int32_t step = last * (int32_t)(rng() % 9) / 100 - last * 4 / 100;
+    return std::clamp(last + step, kLeast, kMost);
+}
 
 // A band's segments, each its records from its start past the next's (the last's past the wave's end), laid out: the
 // entries, a last one never reached, then each segment's records and four short ones for the last entry.  Band k's
@@ -80,12 +89,18 @@ std::vector<OscBandSegment> bandSegments(BandBytes& v, const OscVpdtLayout& l, i
     const std::vector<int32_t> starts = bandPositions(frames, (int)(rng() % 3), false, rng);
     std::vector<OscBandSegment> segs;
     const uint32_t entries = v.grow(kEntryBytes * (uint32_t)(starts.size() + 1));
+    int32_t before = 0;   // v335: the record before, a wave of periods' (across its segments)
     for (size_t i = 0; i < starts.size(); ++i) {
         const int32_t end = i + 1 < starts.size() ? starts[i + 1] : kSixteen * (frames + kOscBandTail);
         OscBandSegment s { starts[i], entries + kEntryBytes * (uint32_t)i, {} };
         const bool brief = l.soloRecords && rng() % 4 == 0;   // v334: SOLO's one segment in four
         for (int32_t at = s.start; at < end;) {
-            const int32_t length = recordLength(l, k, brief, rng);
+            int32_t length = l.periods ? periodAfter(before, rng) : recordLength(l, k, brief, rng);
+            before = length;
+            // v335: a wave of periods' record across the last event's position ends there, where the next record's
+            // load tests its end against that position
+            const int32_t lastAt = kSixteen * frames;
+            if (l.periods && at < lastAt && at + length > lastAt) length = lastAt - at;
             s.records.push_back({ at, length, v.grow(length > kOnward ? 2 * kRecordBytes : kRecordBytes) });
             at += length;
         }
@@ -133,9 +148,13 @@ uint32_t aligned(uint32_t at) { return (at + 3) & ~3u; }
 
 // The header, the events (kinds and positions), each band's segments and records, then each event's slots; band 0's
 // segments into `zero` when given
-std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng, bool solo,
+std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng, OscWaveRecords records,
                                  std::vector<OscBandSegment>* zero) {
-    const OscVpdtLayout& l = layoutOf(solo);
+    OscVpdtLayout l = layoutOf(records != OscWaveRecords::band);
+    if (records == OscWaveRecords::periods) {   // v335: SOLO's layout, its records periods (periodAfter)
+        l.soloRecords = false;
+        l.periods = true;
+    }
     const uint32_t stride = stereo ? l.stereo : l.mono, slot = stereo ? kStereoSlot : kMonoSlot;
     BandBytes v;
     v.grow(l.first + stride * (uint32_t)events);
