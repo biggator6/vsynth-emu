@@ -1194,3 +1194,5 @@ sbf-xt-detune|detR = sub(1.0f, mul(b.detune, K(0x39da7419)));|detR = add(1.0f, m
 sbf-xt-sub|subR = sub(1.0f, mul(b.subDetune, K(0x39da7419)));|subR = add(1.0f, mul(b.subDetune, K(0x39da7419)));|tonecosm
 sbf-xt-hpf|hpfH = mul(b.hpf, 0.5f);|hpfH = mul(b.hpf, 0.25f);|tonecosm
 sbf-xt-oct|oct = T.oct[clampi(b.octave, 0, 4)];|oct = T.oct[0];|tonecosm
+# v333, startAt's bands moved into XtMbState.h as State::startBands (the VC-2's band seek runs them too): its call
+mb-start-bands|    startBands(target);   // v333: XtMbState.h, the VC-2's band seek's too\n||toneband

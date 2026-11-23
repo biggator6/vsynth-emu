@@ -1,6 +1,6 @@
 // The walk's start (v328): rom.4's 0x893cc1a0, SOLO's start, which mode 1's set-up runs with its own row, and the
-// event lookup 0x893cc0d0 it reads by; from v329 mode 1's seek 0x893cc830 and the find 0x893cc100 it runs.  Every
-// address is rom.4's, every offset the object's.
+// event lookup 0x893cc0d0 it reads by; from v329 mode 1's seek 0x893cc830 and the find 0x893cc100 it runs, from v333
+// the band players' seek's code too.  Every address is rom.4's, every offset the object's.
 #include "Vc2OscWalkSteps.h"
 #include <algorithm>
 
@@ -80,19 +80,21 @@ int32_t vc2OscEventPosition(Vc2OscVoice& v, Vc2OscParts& p, uint32_t event) {
 // [FW] 0x893cc830 (v329): with the range in samples, `at` held to 0…the last event's position, the event found for
 // it, the jump there (0x893ca160), and the position `at`; else the current event `at`'s low half, held to the last
 // (unsigned), and the jump; then the beat's position the position × 32.  The beat's reset after it is the voice's
-// (Vc2OscVoice::seekBy).
-void vc2OscSeekModeOne(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
+// (Vc2OscVoice::seekBy).  From v333 the band players' seek's code too (0x893cd440, Vc2OscBands.cpp), by its row
+void vc2WalkSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at, const Vc2WalkWay& way) {
     using namespace vc2walk;
     Vc2WalkWords w { v, p };
     if ((w.byte(kFlags) & kInSamples) != 0) {
         const int32_t held = std::min(std::max(at, 0), w.word(kFinal));
         find(w, held);
-        kVc2ModeOneWalk.startJump(v, p);
+        way.startJump(v, p);
         w.setWord(kPos, held);
     } else {
         w.setHalf(kIndex, at);
         if (!(eventNumber(w, kLast) >= (uint16_t)at)) w.setHalf(kIndex, w.half(kLast));
-        kVc2ModeOneWalk.startJump(v, p);
+        way.startJump(v, p);
     }
     w.setWord(kBeatPos, (int32_t)((uint32_t)w.word(kPos) << kBeatShift));
 }
+
+void vc2OscSeekModeOne(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) { vc2WalkSeek(v, p, at, kVc2ModeOneWalk); }

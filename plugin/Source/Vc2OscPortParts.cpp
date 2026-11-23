@@ -43,6 +43,15 @@ float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
 
 Vc2OscWaveHeader OscPortParts::waveHeader(uint32_t at) { return recordAt(s_.records.headers, at, oscHeaderAt); }
 
-Vc2OscLoopRecord OscPortParts::loopRecord(uint32_t at) { return recordAt(s_.records.loops, at, oscLoopAt); }
+// v333: one in the wave memory as it holds it (a band wave's own, which the band players' set-ups read in xt_vc2osc's
+// band part)
+Vc2OscLoopRecord OscPortParts::loopRecord(uint32_t at) {
+    constexpr uint32_t kLoopBytes = 0x1c;   // [FW] its fields' span
+    const uint32_t inWave = at - kOscWaveAt;
+    if (inWave <= s_.wave.size() * sizeof(int16_t) - kLoopBytes) {
+        return oscLoopFrom(reinterpret_cast<const uint8_t*>(s_.wave.data()) + inWave);
+    }
+    return recordAt(s_.records.loops, at, oscLoopAt);
+}
 
 #endif

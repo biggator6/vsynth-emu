@@ -4,7 +4,8 @@
 // routines (their renders, setups, seeks, updates, the event lookup) stay rom.4's by address through Vc2OscParts.
 // Every address is rom.4's; every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's players' installs and
 // VariPhrase's note-on".  From v330 the players' update, start and settings are the voice's own (Vc2OscVari.cpp), from
-// v331 the event lookup (Vc2OscWalkStart.cpp); their renders, set-ups and band seeks still go out.
+// v331 the event lookup (Vc2OscWalkStart.cpp); their renders, set-ups and seeks but the band players' (v332, v333) and
+// LITE's still go out.
 #include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"

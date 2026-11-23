@@ -86,7 +86,12 @@ void oscWriteVoice(OscSides& s, int v);
 void oscSteerSeek(OscSides& s, int v, bool seeks);
 // v327 (Vc2OscModeOneCheck.cpp): the mode 1 part, after the hooks' install and before the voice part
 void oscModeOnePart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
-// v332 (Vc2OscBandsCheck.cpp): the band part, the band players' renders on voice 0, before any hook
+// v329 (the same, v333 its own): a seek's word by a way drawn from eight, about the events at `positions` of `count`:
+// in samples about an event's position half the time, on one a quarter, below 0 or past the last an eighth each; by
+// events a number up to two past the last, one time in eight 0x8000 up, one in four with high bits besides
+int32_t oscSeekWord(bool inSamples, std::span<const int32_t> positions, int count, std::mt19937& rng);
+// v332 (Vc2OscBandsCheck.cpp): the band part, the band players' renders on voice 0, before any hook; from v333 their
+// set-ups and seek too
 void oscBandPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
 // v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them
 void oscVibratoPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);

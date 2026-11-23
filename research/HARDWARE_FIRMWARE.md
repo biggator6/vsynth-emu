@@ -1546,6 +1546,73 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's band players' set-ups and seek (2026-11-23, v333) {#vc2-osc-band-setups}
+
+Step 4.3's sixty-first version, the fourth piece of item 11's fifth part. BACKING's set-up `0x893cd1d0` and
+ENSEMBLE's `0x893cc8f0`, which VariPhrase's start runs on the object for a wave of type 3 or 5, and their seek
+`0x893cd440` are the voice's own.
+
+**The set-ups** are rom.2's `0x89510980` and `0x89510130` on rom.4's object, the same code. ENSEMBLE's calls a tail,
+`0x893cd370`, of which BACKING's holds its own copy. In order (`vc2OscBandSetUp`, `Vc2OscBandSetUp.cpp`):
+- byte 3 with its bits but 0x40 cleared (seven stores, a bit each), ENSEMBLE's with 0x80 set (band 0's records
+  alone); the end 0; a gain of −1 when the walk is below 0, else 1;
+- band 0's data the head's +4 (the object's +0x44 names the voice's own +0x108 records), its fraction's and step's
+  shifts, start offset and mask from rom.4's tables (`0x89560308`, `0x89560314`, `0x89560320`, `0x89560338`), and the
+  gain;
+- BACKING's bands 1…5: each one's data two frames before its samples (the head's +4 + 4k), its walk list's stride
+  (`0x89560350`), its shift k − 1, the tabled words, the gain, its smoother's two 0. ENSEMBLE's: its data its
+  samples, its frames' shift (`0x895602f0`) and the stride, nothing else;
+- the tail: the events' table (the head's +0), the cached loop events (+0x2c), the gain's rate 1/64 (+0x88), the
+  events' first half word 14, stride 46 or 88 and frame 6 or 12 by stereo; the walk's start (`0x893cc1a0`, v328's
+  `vc2WalkStart`) with the band row (r5 = 4, shifted to the start's tables' fifth entry); the tree's state 0, 25 pairs
+  from +0x51c and in stereo 25 from +0x6e4;
+- the loops' rates `0x893ccf50` (mode 1's set-up's, `vc2OscLoopRates`) and the beat's start `0x893cbf40`;
+- ENSEMBLE's last: each of bands 1…5 its frame the position shifted down by its shift + 6, that frame's 12 values a
+  channel (interleaved in stereo), each a half word and its step to the next frame's, and its 6 phases 0.
+
+Neither set-up writes band 0's shift and stride (+4, +8), nor do rom.2's note-ons, the same code. The rom.2 port's
+`noteOn` sets them (−1 and 1), a difference no comparison has shown. Two of their writes show in no word: the gains,
+which the walk start's jump sets again for every band it reaches by the walk's sign (`0x8950f722`'s), and byte 3's
+0x40 kept, which the beat's start clears (it keeps 0x81) before anything reads it. The six tables hold rom.2's values
+(from `0x897edf78`), with three floats of 440 between the first two; the port reads rom.4's own at the start
+(`Vc2OscBandTables`).
+
+**The seek** is `0x893cd440`, rom.2's `0x89510bf0` on rom.4's object (`vc2OscSeekBands`, a row of the voice's own
+seeks). Its first part is mode 1's seek's code (v329), with the band row's jump `0x893cbda0`: one routine over the row
+now (`vc2WalkSeek`). In samples rom.4 clears the position before its jump. That shows in no word: the jump adds the
+event's position to it (`0x8950f722`'s), nothing reads it, and the seek then sets it. Then, in samples, each band's
+segments and records go forward to the position and its read starts there, band 0's alone with byte 3's 0x80 (rom.4's
+`0x893cbd60` and `0x893cbc60`, rom.2's `0x8950f6a0` and `0x8950f5a0`). That is rom.2's `startAt`'s own loop, moved
+into the state's header as `State::startBands` and run on a copy of the object's words. rom.4 resets the beat
+(`0x893cbfe0`) before the loop, which reads and writes nothing of it; the voice's `seekBy` resets it after.
+
+**The checks.**
+- xt_vc2osc's band part runs each note's set-up on both sides, on noise in the words it writes (finite where floats,
+  band 0's shift and stride left). Before one run in three it runs a seek on both, its word by v329's ways over the
+  wave's events (`oscSeekWord`, shared with the mode 1 part). The port's loop record is read from the wave memory where
+  it lies (`oscLoopFrom`), as a band wave holds its own.
+- In the voice part and xt_vc2tone the hooks on the set-ups and the seek are gone. Before a note-on of a VariPhrase
+  block of type 3 or 5, its records (the vpdt, the bands' data, the cached events) are one of the two captured waves',
+  its stereo bit the wave's, its range within the wave and the seek point the range's start half the time
+  (`oscSteerBandBlock`; before the kinds' note-on, the voice's own block words). Before a re-seek of VariPhrase of types
+  3…5 (the band seek's), the object is one of the captured states (`oscSteerBandSeek`).
+- **An older hazard.** The re-seek's steer moved what the renders' generator draws: VariPhrase's words were found
+  finite where noise had been. With that, xt_vc2tone at seed 31337 met the legato's earlier tone's mode 1 voice holding
+  a head that an earlier take had left on a voice since noted as EXT IN. The note-on's take brought that head into the
+  install pass, and mode 1's set-up faulted on the garbage records it named. Before a note-on such a voice is now
+  steered as its note left it (`steerStaleHeads`, Vc2ToneSides.cpp): 2 at 400 cases.
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400) in both checks. At 400 the band part set up 1,200 notes and
+  ran about 3,250 seeks (1,850–1,950 in samples); the voice part steered 640–720 band note-ons and about 475 re-seeks,
+  xt_vc2tone about 2,900 OSC blocks and 255 re-seeks. `Vc2OscBandSetUp.cpp` is covered whole in lines and branches
+  under both checks at 40 cases, `Vc2OscWalkStart.cpp` under xt_vc2osc.
+- 87 new and moved plants caught; the 4 that no word can show (the gains, byte 3's 0x40) left out. The whole `--osc`
+  and `--tone` lists caught; 10 of v330's players' table plants given the table's new text and caught, the 2 that
+  planted the band players' set-up addresses (no longer read) left out. `mutate_tone.py --changed HEAD` 57 caught,
+  `rom4-no-osc` caught; fcheck's baseline changed in count lines and the new `band players:` lines alone; verify.sh
+  passes.
+
 ### The VC-2's band players' renders (2026-11-22, v332) {#vc2-osc-band-renders}
 
 Step 4.3's sixtieth version, the third piece of item 11's fifth part. BACKING's render `0x893cadc0` and ENSEMBLE's

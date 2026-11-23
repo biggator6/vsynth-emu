@@ -70,7 +70,29 @@ void putLoop(Vc2Fw& fw, uint32_t at, const Vc2OscLoopRecord& loop) {
     put(fw, at + kBwdMode, loop.bwdMode);
     put(fw, at + kLoopFine, loop.fine);
 }
+
+// v333: a loop record's fields by their offsets, each where Vc2OscLoopRecord holds it
+using Loop = Vc2OscLoopRecord;
+constexpr std::array<XtWord, 10> kLoopFields { {
+    { 0, offsetof(Loop, tune), sizeof(Loop::tune) },
+    { kLoopStart, offsetof(Loop, loopStart), sizeof(Loop::loopStart) },
+    { kLoopEnd, offsetof(Loop, loopEnd), sizeof(Loop::loopEnd) },
+    { kBwdEnd, offsetof(Loop, bwdEnd), sizeof(Loop::bwdEnd) },
+    { kBwdStart, offsetof(Loop, bwdStart), sizeof(Loop::bwdStart) },
+    { kRateFwd, offsetof(Loop, rateFwd), sizeof(Loop::rateFwd) },
+    { kRateBwd, offsetof(Loop, rateBwd), sizeof(Loop::rateBwd) },
+    { kFwdMode, offsetof(Loop, fwdMode), sizeof(Loop::fwdMode) },
+    { kBwdMode, offsetof(Loop, bwdMode), sizeof(Loop::bwdMode) },
+    { kLoopFine, offsetof(Loop, fine), sizeof(Loop::fine) },
+} };
 } // namespace
+
+Vc2OscLoopRecord oscLoopFrom(const uint8_t* bytes) {
+    Vc2OscLoopRecord loop;
+    auto* to = reinterpret_cast<uint8_t*>(&loop);
+    for (const auto& [at, member, n] : kLoopFields) std::memcpy(to + member, bytes + at, n);
+    return loop;
+}
 
 uint32_t oscHeaderAt(int k) { return kOscRecordsAt + kOscRecordStride * (uint32_t)k; }
 uint32_t oscLoopAt(int k) { return kOscRecordsAt + kLoopsFrom + kOscRecordStride * (uint32_t)k; }

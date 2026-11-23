@@ -26,16 +26,18 @@ struct Layout {
 constexpr Layout kNarrow { 8, 10, 16 }, kWide { 14, 46, 88 };
 constexpr uint8_t kMonoFrame = 6, kStereoFrame = 12;
 constexpr int8_t kWideLeast = 3, kWideMost = 5;
+} // namespace
 
-// [FW] 0x893ccf50: the rate factor 1, the loops' from the loop record's (+0x14, +0x16) by exp2 over 12000
-void loopRates(Vc2WalkWords& w, const Vc2ToneShared& shared) {
+// [FW] 0x893ccf50: the rate factor 1, the loops' from the loop record's (+0x14, +0x16) by exp2 over 12000; from v333
+// the band players' set-ups' too
+void vc2OscLoopRates(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared) {
+    Vc2WalkWords w { v, p };
     const Vc2OscLoopRecord loop = w.p.loopRecord(vc2OscHeadWord(w.v, w.p, kLoopFrom));
     const float tenths = vc2OscTables().modeOneTenths;
     w.setReal(kRate, 1.0f);
     w.setReal(kFwdRate, vc2OscLoopRate(loop.rateFwd, shared, tenths));
     w.setReal(kBackRate, vc2OscLoopRate(loop.rateBwd, shared, tenths));
 }
-} // namespace
 
 // [FW] 0x893cc760: the table, the loops' record and the samples from the head's words; the walk's bits but 0x70
 // cleared, the end 0, +0x88 1/64; the events' layout by the header's format and the frame; then the walk's start with
@@ -55,6 +57,6 @@ void vc2OscModeOneSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& sha
     w.setByte(kStride, stereo ? l.stereo : l.mono);
     w.setByte(kFrame, stereo ? kStereoFrame : kMonoFrame);
     vc2WalkStart(v, p, kVc2ModeOneWalk);
-    loopRates(w, shared);
+    vc2OscLoopRates(v, p, shared);
     v.beatStart();
 }

@@ -1039,6 +1039,14 @@ version against rom.4's routines with what it calls hooked:
          event, which rom.4's set-up leaves for the wrap to read past the table; ENSEMBLE below 0 after a backward One
          Way from below the loop, its frames' index read unsigned. Next: the band players' set-ups (`0x893cd1d0`,
          `0x893cc8f0`) and their seek `0x893cd440`, then SOLO and the period-jump player.
+       - The band players' set-ups and seek (v333): BACKING's `0x893cd1d0` and ENSEMBLE's `0x893cc8f0` (with their
+         tail `0x893cd370`) the voice's own on the object's words (`Vc2OscBandSetUp.cpp`), each band's words from
+         rom.4's six tables, the walk's start with the band row, the loops' rates and the beat's start; their seek
+         `0x893cd440` mode 1's seek's code with the band row, then rom.2's `startAt`'s bands' part
+         (`State::startBands`) on a copy (HARDWARE_FIRMWARE.md, "The VC-2's band players' set-ups and seek"). Found:
+         neither set-up writes band 0's shift and stride; the set-ups' gains and byte 3's 0x40 and the seek's clear of
+         the position show in no word. Next: SOLO (`0x893c9450`, `0x893cc2e0`/`0x893cc310`, `0x893cc630`) and the
+         period-jump player (`0x893ca8b0`, `0x893ccff0`, `0x893cd090`).
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

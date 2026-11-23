@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's band players' set-ups and seek v333 (2026-11-23, on claude/vc2-part-4-3 after v332; HARDWARE_FIRMWARE.md,
+  "The VC-2's band players' set-ups and seek"): step 4.3's sixty-first version. BACKING's set-up 0x893cd1d0 and
+  ENSEMBLE's 0x893cc8f0, which VariPhrase's start runs for a wave of type 3 or 5, are the voice's own
+  (Vc2OscBandSetUp.cpp, on the object's words: the head's records, each band's words from rom.4's six tables, the
+  walk's start with the band row, the tree's state cleared, the loops' rates and the beat's start, ENSEMBLE's first
+  frames), and their seek 0x893cd440 too (mode 1's seek's code, now one routine over the row, then rom.2's startAt's
+  bands' part, moved into XtMbState.h as State::startBands, on a copy). Found: neither set-up writes band 0's shift and
+  stride; their gains and byte 3's 0x40 and the seek's clear of the position show in no word. The checks no longer
+  hook them: xt_vc2osc's band part sets each note up on both sides over noise and seeks now and then; a note-on of a
+  band player's block is given a captured band wave's records, a band re-seek a captured state; and xt_vc2tone steers
+  the legato's earlier mode 1 voice whose head a take left on a voice since noted otherwise, an older hazard the moved
+  draws met. 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 The VC-2's band players' renders v332 (2026-11-22, on claude/vc2-part-4-3 after v331; HARDWARE_FIRMWARE.md, "The
   VC-2's band players' renders"): step 4.3's sixtieth version. BACKING's 0x893cadc0 and ENSEMBLE's 0x893ca1f0 are the
   voice's own (Vc2OscBands.cpp): rom.4's beat block, then XtMbPlayer's block on a copy of the object's words, mapped

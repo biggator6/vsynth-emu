@@ -167,6 +167,8 @@ void toneSteerOscs(ToneSides& s, int i, bool noteOn) {
         const uint32_t* block = &s.shared.input.at(In::kOscs[(size_t)osc]);
         const bool seeks = noteOn ? oscBlockIsModeOne(block) : oscIsModeOne(v) && v.tail.seekPending != 0;
         const bool band = !noteOn && v.kind() == kVariPhrase && s.shared.osc.renders() % 4 == 0;
+        // v333: a re-seek through the band players' seek, the voice's own, on a captured state
+        const long reseeks = !noteOn && (band || v.tail.seekPending != 0) ? oscSteerBandSeek(v, s.shared.osc) : 0;
         if (band) {
             v.tail.seekPending = 1;
             v.setF32(kLevelAt, 0.0f);
@@ -184,7 +186,9 @@ void toneSteerOscs(ToneSides& s, int i, bool noteOn) {
                                    s.shared.osc.records.events);
             ++s.n.variByEvents;
         }
-        if (seeks || band || drawn != 0 || events) s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
+        if (seeks || band || drawn != 0 || events || reseeks != 0) {
+            s.fw.cpu.write(toneOscAt(s.pool.addressOf(i), osc), &v, sizeof v);
+        }
     }
 }
 
@@ -213,6 +217,31 @@ uint32_t toneSettingsVoice(ToneSides& s, int i, int osc) {
     return at;
 }
 
+namespace {
+// v333: whether `named` is a pool tone's mode 1 voice
+bool namesModeOne(ToneSides& s, uint32_t named) {
+    if (!s.pool.holds(named)) return false;
+    const int t = s.pool.indexOf(named);
+    const auto isIt = [&](int o) { return toneOscAt(s.pool.addressOf(t), o) == named && toneOscModeOne(s, t, o); };
+    return isIt(0) || isIt(1);
+}
+
+// v333: the legato's earlier tone's mode 1 voices whose head an earlier take left on a voice since noted otherwise: as
+// their note left them (toneSteerModeOne), as a take brings that head into the note-on's install pass, where noise in
+// the records it names would have rom.4 read wherever they point.  Found when v333's draws moved (seed 31337, 400 cases)
+void steerStaleHeads(ToneSides& s) {
+    constexpr uint32_t kHeadAt = 0x1a0, kHeadOf = 0x108;   // [FW]
+    const int from = s.pool.bySerial((int32_t)s.shared.input.at(In::kPrevious));
+    for (int o = 0; from >= 0 && o < 2; ++o) {
+        if (!toneOscModeOne(s, from, o)) continue;
+        const uint32_t named = s.parts[(size_t)from].oscs[(size_t)o].u32(kHeadAt) - kHeadOf;
+        if (named == toneOscAt(s.pool.addressOf(from), o) || namesModeOne(s, named)) continue;
+        toneSteerModeOne(s, from, o);
+        ++s.n.staleHeads;
+    }
+}
+} // namespace
+
 int toneTakenOsc(ToneSides& s, int i) {
     for (int o = 0; o < 2; ++o) {
         if (takenHead(s, i, o) != toneOscAt(s.pool.addressOf(i), o)) return o;
@@ -234,8 +263,11 @@ void tonePrepareNoteOn(ToneSides& s, int i, std::mt19937& rng) {
     tonePrepare(s, i, rng);
     drawToneInput(s, rng);
     drawPrevious(s, rng);
+    steerStaleHeads(s);   // v333
     // v328: a LITE wave of type 1 (the legato's kinds too) the records its set-up reads, from the renders' generator
     for (uint32_t block : In::kOscs) oscModeOneBlock(&s.shared.input.at(block), s.shared.osc.renders);
+    // v333: a band player's of type 3 or 5 the records its set-up reads, from the band players' generator
+    for (uint32_t block : In::kOscs) oscSteerBandBlock({ &s.shared.input.at(block), kOscBlockWords }, s.shared.osc);
     toneSteerOscs(s, i, true);   // v329, v330; from v331 before the input's write, as it holds a block's events
     s.fw.cpu.write(kToneInputAt, s.shared.input.words.data(), sizeof s.shared.input.words);
     drawListedWords(s, i, rng);

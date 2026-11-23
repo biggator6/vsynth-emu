@@ -227,6 +227,8 @@ int main(int argc, char** argv) {
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
                 "heads', %ld through mode 1's, %ld through the band players'\n", n.extInBlocks, n.variOffBlocks,
                 n.headsBlocks, n.modeOneBlocks, n.bandBlocks);   // v322, v323, v326, v327, v332
+    std::printf("band players: %ld note-ons given a band wave, %ld re-seeks a set-up state\n", shared.bandSetUps,
+                shared.bandSeeks);   // v333
     std::printf("mode 1's set-ups: %ld (%ld with the range in samples); %ld events steered for its seek\n",
                 n.modeOneSetUps, n.setUpsInSamples, n.modeOneSeeks);   // v328, v329
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324

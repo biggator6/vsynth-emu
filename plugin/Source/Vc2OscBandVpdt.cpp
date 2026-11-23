@@ -133,6 +133,16 @@ std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt199
     return v.bytes;
 }
 
+// v333: the events' positions as the vpdt holds them
+std::vector<int32_t> oscBandPositions(const std::vector<uint8_t>& vpdt, bool stereo) {
+    const uint32_t stride = stereo ? kStereoStride : kMonoStride;
+    uint32_t count = 0;
+    std::memcpy(&count, vpdt.data() + kCountAt, sizeof count);
+    std::vector<int32_t> p(count >> kCountShift);
+    for (uint32_t e = 0; e < p.size(); ++e) std::memcpy(&p[e], vpdt.data() + kFirstAt + stride * e + kPosAt, 4);
+    return p;
+}
+
 // On two times in three: its points within the wave, a loop at least 64 frames, its modes any
 XtLoop oscBandLoop(int frames, std::mt19937& rng) {
     XtLoop l;

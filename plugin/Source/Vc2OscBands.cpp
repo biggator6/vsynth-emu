@@ -4,9 +4,10 @@
 // object's words (their places below), the vpdt, the cached loop events and the bands read from the wave memory the
 // voice's parts give, what it takes outside the voice's: its crossings by the voice's walk with the band players' row
 // (index 16: the event jump 0x893cbdd0 and the cached one 0x893cbdf0, rom.2's 0x8950f6f0 and 0x8950f710, each on a
-// copy again) and the walk list's wrap at an end; then the words back.  Every address is rom.4's, every offset the
-// voice's but the words' places, rom.2's object's.  HARDWARE_FIRMWARE.md, "The VC-2's band players' renders".  Audio
-// thread.
+// copy again) and the walk list's wrap at an end; then the words back.  From v333 their seek, 0x893cd440, the start's
+// for index 16 (vc2OscSeekBands; their set-ups in Vc2OscBandSetUp.cpp).  Every address is rom.4's, every offset the
+// voice's but the words' places, rom.2's object's.  HARDWARE_FIRMWARE.md, "The VC-2's band players' renders", "The
+// VC-2's band players' set-ups and seek".  Audio thread.
 #include "Vc2OscPlayers.h"
 #include "Vc2OscWalk.h"
 #include "XtMbState.h"
@@ -204,14 +205,12 @@ void bandCached(Vc2OscVoice& v, Vc2OscParts& p, uint32_t cached) {
         s.loopJump(record);
     });
 }
-// [FW] the start's seek for index 16 (the table at 0x8993fc00), 0x893cd440, rom.2's 0x89510bf0, still out by address
+// [FW] the start's seek for index 16 (the table at 0x8993fc00), 0x893cd440, rom.2's 0x89510bf0, by the voice's seeks
+// (v333: its own, vc2OscSeekBands)
 void bandSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
     constexpr uint32_t kBandSeek = 0x893cd440;
     v.seekBy(kBandSeek, at, p);
 }
-// [FW] index 16's row: the two jumps (0x893c9350, 0x893c9364), the step's sign kept at a turn, the start's seek and jump
-// (0x8993fc00, 0x8993fc14)
-const Vc2WalkWay kBandWalk { bandJump, bandCached, true, bandSeek, bandJump };
 
 // What the block takes outside: the walk list's crossing on the voice's words (the state's words to the voice, the walk
 // with the band players' row and the next crossing there, 0x893c8f50 or 0x893c9140 with index 16 then 0x893c9380, the
@@ -222,8 +221,8 @@ public:
         : v_(v), p_(p), m_(m), rows_(rows) {}
     void cross(State& s, bool forward) override {
         bandStateTo(s, v_, rows_);
-        if (forward) vc2WalkForward(v_, p_, kBandWalk);
-        if (!forward) vc2WalkBackward(v_, p_, kBandWalk);
+        if (forward) vc2WalkForward(v_, p_, kVc2BandWalk);
+        if (!forward) vc2WalkBackward(v_, p_, kVc2BandWalk);
         vc2WalkCrossing(v_, p_);
         bandStateFrom(s, v_, m_, rows_);
     }
@@ -246,6 +245,22 @@ private:
     const BandRows& rows_;
 };
 } // namespace
+
+// [FW] index 16's row: the two jumps (0x893c9350, 0x893c9364), the step's sign kept at a turn, the start's seek and jump
+// (0x8993fc00, 0x8993fc14)
+const Vc2WalkWay kVc2BandWalk { bandJump, bandCached, true, bandSeek, bandJump };
+
+// [FW] 0x893cd440 (v333), rom.2's 0x89510bf0 on rom.4's object: mode 1's seek's code (vc2WalkSeek) with the band
+// players' row; then in samples each band's segments and records forward to the position (State::startBands: rom.4's
+// 0x893cbd60 and 0x893cbc60, rom.2's 0x8950f6a0 and 0x8950f5a0) on a copy of the object's words.  In samples rom.4
+// clears the position before its jump (0x893cd47e), which no word shows: the jump adds the event's position to it
+// (0x8950f722's), nothing reading it, and the seek then sets it.  rom.4 resets the beat (0x893cbfe0) before the bands,
+// which read and write nothing of it; the voice's seekBy resets it after
+void vc2OscSeekBands(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
+    vc2WalkSeek(v, p, at, kVc2BandWalk);
+    if ((v.u8(Vc2OscVoice::kObject) & kInSamples) == 0) return;
+    onBandCopy(v, p, [](State& s, const WaveBytes&) { s.startBands(s.pos); });
+}
 
 // [FW] 0x893cadc0, 0x893ca1f0: the beat's block, then the player's block at round to zero (the SH-4's), mono or stereo
 // by the object's byte 0

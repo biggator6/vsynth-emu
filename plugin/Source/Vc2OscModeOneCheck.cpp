@@ -76,14 +76,14 @@ std::string modeOneSetUp(OscSides& s, ModeOneCounts& n) {
 // two past the table's last, one time in eight 0x8000 up (the hold is unsigned), one in four with high bits besides,
 // which the seek drops
 struct SeekDraw {
-    const OscEventTable& t;
-    int32_t event;     // an event's position
-    uint32_t number;   // an event's number
+    std::span<const int32_t> positions;   // the events' (v333: a table's or a band wave's)
+    int32_t event;                        // an event's position
+    uint32_t number;                      // an event's number
     std::mt19937& rng;
 };
 using SeekWay = int32_t (*)(SeekDraw&);
 int32_t belowZero(SeekDraw& d) { return -(int32_t)(d.rng() % 4096); }
-int32_t pastTheLast(SeekDraw& d) { return d.t.positions.back() + (int32_t)(d.rng() % 4096); }
+int32_t pastTheLast(SeekDraw& d) { return d.positions.back() + (int32_t)(d.rng() % 4096); }
 int32_t onAnEvent(SeekDraw& d) { return d.event; }
 int32_t nearEvent(SeekDraw& d) { return d.event + (int32_t)(d.rng() % 1024) - 512; }
 int32_t topBit(SeekDraw& d) { return (int32_t)(0x8000u | d.number); }
@@ -94,11 +94,15 @@ constexpr std::array<SeekWay, 8> kSampleWays { belowZero, pastTheLast, onAnEvent
 constexpr std::array<SeekWay, 8> kEventWays { topBit,      highBits,    highBits,    plainNumber,
                                               plainNumber, plainNumber, plainNumber, plainNumber };
 
-int32_t seekWord(const Vc2OscVoice& o, const OscEventTable& t, std::mt19937& rng) {
-    SeekDraw d { t, t.positions[rng() % t.positions.size()], rng() % (uint32_t)(t.count + 2), rng };
-    const auto& ways = (o.u8(kFlags) & kInSamples) != 0 ? kSampleWays : kEventWays;
+} // namespace
+
+int32_t oscSeekWord(bool inSamples, std::span<const int32_t> positions, int count, std::mt19937& rng) {
+    SeekDraw d { positions, positions[rng() % positions.size()], rng() % (uint32_t)(count + 2), rng };
+    const auto& ways = inSamples ? kSampleWays : kEventWays;
     return ways[rng() % ways.size()](d);
 }
+
+namespace {
 
 // v329: the seek on both sides (0x893cc830 against the voice's own, its beat's reset with it), then the voice compared.
 // One time in four the last event's position (+0x20) past the event +0xe names: on the words the start leaves the
@@ -111,7 +115,8 @@ std::string seekOnBothSides(OscSides& s, std::mt19937& rng, ModeOneCounts& n) {
         o.setU32(kFinal, o.u32(kFinal) + 1 + rng() % 4096);
         oscWriteVoice(s, 0);
     }
-    const int32_t at = seekWord(o, s.shared.records.events, rng);
+    const OscEventTable& t = s.shared.records.events;
+    const int32_t at = oscSeekWord((o.u8(kFlags) & kInSamples) != 0, t.positions, t.count, rng);
     ++n.seeks;
     n.inSamples += (o.u8(kFlags) & kInSamples) != 0;
     return vc2BothOn(

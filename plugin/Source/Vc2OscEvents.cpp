@@ -77,6 +77,7 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     n = steerFactor(s.voices[(size_t)v], rng, n);
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
     Vc2OscVoice& seeking = s.voices[(size_t)v];   // v329: a seek pending re-seeks once the level has fallen
+    if (seeking.tail.seekPending != 0) oscSteerBandSeek(seeking, s.shared);   // v333: through the band players' seek
     if (seeking.kind() == kVariPhrase) s.n.variDrawn += oscSteerVariWords(seeking, s.shared.renders);   // v330
     oscSteerSeek(s, v, oscIsModeOne(seeking) && seeking.tail.seekPending != 0);
     ++s.n.updates;
@@ -90,6 +91,7 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
 }
 
 std::string onReseek(OscSides& s, std::mt19937&, int v) {
+    oscSteerBandSeek(s.voices[(size_t)v], s.shared);          // v333: by the band players' seek
     oscSteerSeek(s, v, oscIsModeOne(s.voices[(size_t)v]));   // v329: by mode 1's seek, with the bit or without
     return oscBothSides(s, kReseek, { oscVoiceAt(v) }, Answer::none, [&] {
         s.voices[(size_t)v].reseek(s.parts[(size_t)v]);
@@ -116,6 +118,7 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
         oscWriteVoice(s, v);
     }
     if (block[kKindWord] == kVariPhrase) s.n.variDrawn += oscSteerVariWords(s.voices[(size_t)v], s.shared.renders);
+    oscSteerBandBlock(block, s.shared);   // v333: a band player's set-up reads its records
     const bool byEvents = oscVariByEvents((uint8_t)block[kFlagsWord], block[kWaveWord]);   // v331
     if (block[kKindWord] == kVariPhrase && byEvents) {
         oscSteerVariTable(s.voices[(size_t)v], s.shared.records.events);

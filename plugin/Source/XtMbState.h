@@ -93,6 +93,7 @@ struct XtMbPlayer::State {
     void initRecords();             // 0x8950f6f0
     void restore(int r7, const uint8_t* slots, long slotBytes);   // 0x8950f722
     void startAt(int target);       // 0x89510bf0
+    void startBands(int target);    // v333: its bands' part, the VC-2's band seek's too (0x893cd440)
     void loopJump(const uint8_t* c);   // 0x8950f710, on a cached loop event's bytes (v332: by its bytes)
     void loopJump(int r) { loopJump(lrec[r]); }   // the cache's record r
     void crossings();               // 0x8950ccc0
@@ -165,4 +166,29 @@ inline void XtMbPlayer::State::cross(bool forward) {
 
 inline bool XtMbPlayer::State::wrapped(int r1, int r4, uint16_t to) {
     return outside != nullptr && outside->wrapped(*this, r1, r4, to);
+}
+
+// 0x89510bf0's bands, moved here from startAt in v333 as they stood: each band's segments and records forward to the
+// position, its read there, band 0's alone with byte 3's 0x80 (ENSEMBLE's); rom.4's band seek 0x893cd440 runs the same
+// code after its jump (Vc2OscBands.cpp)
+inline void XtMbPlayer::State::startBands(int target) {
+    // A seek to the wave's end on the last event (a Beat Keep's way back after the walk reached it) reads the last event's entry, whose
+    // segments and records run past the vpdt.  The XT reads RAM there and gets out of these loops; the port reads zeros there, so it
+    // stops at a step past the vpdt that moves nothing, from which it could never get out.  (Inside the vpdt a record may be empty.)
+    for (int k = 0; k < 6; ++k) {
+        Band& B = b[k];
+        while (target >= B.nextSeg && lastEvPos > B.nextSeg) {
+            const int was = B.nextSeg;
+            B.grainStart = B.nextSeg;
+            B.recEnd = B.nextSeg;
+            B.recPtr = B.nextRecs;
+            segment(B);
+            record(B);
+            if (B.nextSeg == was && (B.segList < 0 || B.segList >= (long)w.vpdtBytes)) { pastVpdt = true; break; }
+        }
+        while (target >= B.recEnd) { const int was = B.recEnd; record(B); if (B.recEnd == was && (B.recPtr < 0 || B.recPtr >= (long)w.vpdtBytes)) { pastVpdt = true; break; } }
+        B.readPos = B.startOff + target;
+        B.readFrac = 0;
+        if (flags3 & 0x80) break;
+    }
 }

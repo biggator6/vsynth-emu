@@ -1,7 +1,8 @@
 // The band players' waves and states for xt_vc2osc and xt_vc2tone (v332): a band wave built into the wave memory (its
 // parts Vc2OscBandVpdt.cpp's), the object's words as VariPhrase's note-on leaves them before a band player's set-up,
 // rom.4's own set-up on them, and the states it leaves, captured before any hook, which a render through a band player
-// is steered to (Vc2OscDraws.h says what each draws).  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+// is steered to; from v333 a band note-on's block given a captured wave's records, and a band re-seek's object a
+// captured state (Vc2OscDraws.h says what each draws).  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
 #if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2OscDraws.h"
 #include <algorithm>
@@ -55,16 +56,39 @@ uint16_t bandLastEvent(const OscBandWave& w, uint32_t first, bool ensemble, std:
     if (ensemble) return (uint16_t)(w.events - 1);
     return (uint16_t)(first + rng() % ((uint32_t)w.events - first));
 }
+
+// [FW] v333: VariPhrase's kind; the wave types whose start sets a band player up (BACKING 3, ENSEMBLE 5) and whose
+// re-seek is the band players' seek (3…5); a note-on block's flags byte (the voice's +0x138), the range's two ends and
+// the seek point (+0x13c, +0x140, +0x144)
+constexpr uint32_t kVariPhrase = 2, kEnsembleType = 5;
+constexpr std::array<uint32_t, 2> kSetUpTypes { 3, 5 };
+constexpr std::array<uint32_t, 3> kSeekTypes { 3, 4, 5 };
+constexpr uint32_t kBlockFlagsOf = 0x138, kFromOf = 0x13c, kToOf = 0x140, kSeekOf = 0x144;
+
+bool bandPlayer(uint32_t type, std::span<const uint32_t> types) {
+    return std::ranges::find(types, type) != types.end();
+}
+
+// The object one of the captured states of a player, from the band players' generator
+void takeBandState(Vc2OscVoice& o, OscShared& shared, bool ensemble) {
+    std::vector<const OscBandState*> mine;
+    for (const OscBandState& st : shared.bandStates) {
+        if (st.ensemble == ensemble) mine.push_back(&st);
+    }
+    const OscBandState& st = *mine[shared.bandRng() % mine.size()];
+    std::memcpy(o.own.data() + (Vc2OscVoice::kObject - Vc2OscVoice::kOwn), st.object.data(), st.object.size());
+}
 } // namespace
 
 OscBandWave oscDrawBandWave(Vc2Fw& fw, OscShared& shared, uint32_t at, uint32_t room, std::mt19937& rng) {
-    OscBandWave w { at, room, rng() % 2 == 0, false, 0, 2 + (int)(rng() % 7), at, 0, 0, 0, {} };
+    OscBandWave w { at, room, rng() % 2 == 0, false, 0, 2 + (int)(rng() % 7), at, 0, 0, 0, {}, {} };
     w.frames = 600 + (int)(rng() % 4200);
     std::vector<uint8_t> vpdt = oscBandVpdt(w.frames, w.events, w.stereo, rng);
     while (oscBandRoom(w.frames, w.stereo, (uint32_t)vpdt.size()) > room) {
         w.frames = w.frames * 3 / 4;
         vpdt = oscBandVpdt(w.frames, w.events, w.stereo, rng);
     }
+    w.positions = oscBandPositions(vpdt, w.stereo);
     std::vector<uint8_t> image(room, 0);
     std::memcpy(image.data(), vpdt.data(), vpdt.size());
     uint32_t next = aligned4((uint32_t)vpdt.size());
@@ -135,6 +159,7 @@ std::string oscCaptureBandStates(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt)
         OscBandWave w {};
         do w = oscDrawBandWave(fw, shared, kOscBandAt + half * kOscBandBytes / 2, kOscBandBytes / 2, rng);
         while (w.stereo != (half == 1));
+        shared.bandWaves.push_back(w);
         for (int n = 0; n < 2 * kNotes; ++n) {
             const bool ensemble = n >= kNotes;
             oscBandNote(o, w, voiceAt, ensemble, rng);
@@ -150,17 +175,52 @@ std::string oscCaptureBandStates(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt)
 
 long oscSteerBands(Vc2OscVoice& o, OscShared& shared) {
     if (!oscRendersBy(o, kOscBandRenders) || shared.bandStates.empty()) return 0;
-    const bool ensemble = o.tail.render == kOscBandRenders[1];
-    std::vector<const OscBandState*> mine;
-    for (const OscBandState& st : shared.bandStates) {
-        if (st.ensemble == ensemble) mine.push_back(&st);
-    }
+    takeBandState(o, shared, o.tail.render == kOscBandRenders[1]);
     std::mt19937& rng = shared.bandRng;
-    const OscBandState& st = *mine[rng() % mine.size()];
-    std::memcpy(o.own.data() + (Vc2OscVoice::kObject - Vc2OscVoice::kOwn), st.object.data(), st.object.size());
     o.setF32(kPitchAt, std::exp2(oscWithin(rng, -2.0f, 2.0f)));
     o.setF32(kWalkAt, bandWalk(rng));
     ++shared.bandSteers;
+    return 1;
+}
+
+void oscSteerBandBlock(std::span<uint32_t> block, OscShared& shared) {
+    const auto word = [block](uint32_t at) -> uint32_t& { return block[(at - Vc2OscVoice::kOwn) / 4]; };
+    const uint32_t type = word(Vc2OscVoice::kWave);
+    if (word(Vc2OscVoice::kKind) != kVariPhrase || !bandPlayer(type, kSetUpTypes) || shared.bandWaves.empty()) return;
+    std::mt19937& rng = shared.bandRng;
+    const OscBandWave& w = shared.bandWaves[rng() % shared.bandWaves.size()];
+    const bool ensemble = type == kEnsembleType;
+    word(kHeadOf) = w.vpdt;
+    for (int k = 0; k < kBands; ++k) word(kBandsOf + 4 * (uint32_t)k) = w.bands[(size_t)k];
+    word(kCachedOf) = w.cached;
+    uint32_t& flags = word(kBlockFlagsOf);   // its low byte
+    flags = (flags & ~(uint32_t)kStereo) | (w.stereo ? kStereo : 0u);
+    uint32_t from = 0, to = 0;
+    if ((flags & kInSamples) != 0) {
+        from = rng() % (uint32_t)(w.frames / 2);
+        to = from + 1 + rng() % ((uint32_t)w.frames - from);
+    } else {
+        from = rng() % (uint32_t)w.events;
+        to = bandLastEvent(w, from, ensemble, rng);
+    }
+    word(kFromOf) = from;
+    word(kToOf) = to;
+    word(kSeekOf) = rng() % 2 ? from : from + rng() % (to - from + 1);
+    ++shared.bandSetUps;
+}
+
+void oscSteerBandVoice(Vc2OscVoice& o, OscShared& shared) {
+    std::array<uint32_t, kOscBlockWords> block {};
+    std::memcpy(block.data(), o.own.data(), sizeof block);
+    oscSteerBandBlock(block, shared);
+    std::memcpy(o.own.data(), block.data(), sizeof block);
+}
+
+long oscSteerBandSeek(Vc2OscVoice& o, OscShared& shared) {
+    const uint32_t type = o.u32(Vc2OscVoice::kWave);
+    if (o.kind() != kVariPhrase || !bandPlayer(type, kSeekTypes) || shared.bandStates.empty()) return 0;
+    takeBandState(o, shared, type == kEnsembleType);
+    ++shared.bandSeeks;
     return 1;
 }
 #endif

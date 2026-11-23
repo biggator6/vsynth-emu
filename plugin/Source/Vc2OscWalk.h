@@ -42,11 +42,15 @@ struct Vc2WalkWay {
 // index 0: 0x893ca190, 0x893ca1a0; the start's 0x893cc830 (from v329 the voice's own, by Vc2OscVoice::seekBy) and
 // 0x893ca160 (its wrapper of 0x893ca190)
 extern const Vc2WalkWay kVc2ModeOneWalk;
+// v333 (Vc2OscBands.cpp, v332's row): index 16, the band players', 0x893cbdd0, 0x893cbdf0; the start's 0x893cd440 and
+// 0x893cbda0
+extern const Vc2WalkWay kVc2BandWalk;
 
-// one-off: six routines' declarations, alike only in taking the voice and its parts
+// one-off: seven routines' declarations, alike only in taking the voice and its parts
 void vc2WalkCrossing(Vc2OscVoice& v, Vc2OscParts& p);                          // 0x893c9380
 void vc2WalkForward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);    // 0x893c8f50
 void vc2WalkBackward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);   // 0x893c9140
 void vc2WalkStart(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);      // 0x893cc1a0 (v328, Vc2OscWalkStart.cpp)
 void vc2OscSeekModeOne(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);            // 0x893cc830 (v329, Vc2OscWalkStart.cpp)
+void vc2WalkSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at, const Vc2WalkWay& way);   // its code (v333, the same)
 int32_t vc2OscEventPosition(Vc2OscVoice& v, Vc2OscParts& p, uint32_t event);   // 0x893cc0d0's position (v331, the same)

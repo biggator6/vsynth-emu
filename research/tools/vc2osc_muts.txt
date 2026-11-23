@@ -1713,7 +1713,7 @@ su-stride-which|w.setByte(kStride, stereo ? l.stereo : l.mono);|w.setByte(kStrid
 su-frame-which|w.setByte(kFrame, stereo ? kStereoFrame : kMonoFrame);|w.setByte(kFrame, stereo ? kMonoFrame : kStereoFrame);|vc2oscmodeonestart
 su-frame-at|kStride = 0x8, kFrame = 0x9;|kStride = 0x8, kFrame = 0xa;|vc2oscmodeonestart
 su-start|    vc2WalkStart(v, p, kVc2ModeOneWalk);\n||vc2oscmodeonestart
-su-rates|    loopRates(w, shared);\n||vc2oscmodeonestart
+su-rates|    vc2OscLoopRates(v, p, shared);\n||vc2oscmodeonestart
 su-beat|    v.beatStart();\n}|}|vc2oscmodeonestart
 su-rate-one|w.setReal(kRate, 1.0f);|w.setReal(kRate, 0.5f);|vc2oscmodeonestart
 su-fwd|w.setReal(kFwdRate, vc2OscLoopRate(loop.rateFwd, shared, tenths));|w.setReal(kFwdRate, vc2OscLoopRate(loop.rateBwd, shared, tenths));|vc2oscmodeonestart
@@ -1742,12 +1742,12 @@ sk-hold-zero|std::min(std::max(at, 0), w.word(kFinal))|std::min(at, w.word(kFina
 sk-hold-final|std::min(std::max(at, 0), w.word(kFinal))|std::max(at, 0)|vc2oscwalkstart
 sk-no-find|        find(w, held);\n||vc2oscwalkstart
 sk-pos|        w.setWord(kPos, held);\n||vc2oscwalkstart
-sk-samples-jump|        kVc2ModeOneWalk.startJump(v, p);\n        w.setWord(kPos, held);|        w.setWord(kPos, held);|vc2oscwalkstart
+sk-samples-jump|        way.startJump(v, p);\n        w.setWord(kPos, held);|        w.setWord(kPos, held);|vc2oscwalkstart
 sk-event-index|        w.setHalf(kIndex, at);\n||vc2oscwalkstart
 sk-event-hold|        if (!(eventNumber(w, kLast) >= (uint16_t)at)) w.setHalf(kIndex, w.half(kLast));\n||vc2oscwalkstart
 sk-event-signed|if (!(eventNumber(w, kLast) >= (uint16_t)at))|if (!(w.half(kLast) >= (int16_t)at))|vc2oscwalkstart
 sk-event-to|w.setHalf(kIndex, w.half(kLast));|w.setHalf(kIndex, w.half(kLast) - 1);|vc2oscwalkstart
-sk-event-jump|w.setHalf(kIndex, w.half(kLast));\n        kVc2ModeOneWalk.startJump(v, p);|w.setHalf(kIndex, w.half(kLast));|vc2oscwalkstart
+sk-event-jump|w.setHalf(kIndex, w.half(kLast));\n        way.startJump(v, p);|w.setHalf(kIndex, w.half(kLast));|vc2oscwalkstart
 sk-beat-shift|kBeatPos = 0x64, kBeatShift = 5;|kBeatPos = 0x64, kBeatShift = 4;|vc2oscwalkstart
 sk-beat-at|kBeatPos = 0x64, kBeatShift = 5;|kBeatPos = 0x60, kBeatShift = 5;|vc2oscwalkstart
 sk-no-beat|    w.setWord(kBeatPos, (int32_t)((uint32_t)w.word(kPos) << kBeatShift));\n||vc2oscwalkstart
@@ -1774,18 +1774,18 @@ st-no-targets|    Vc2OscTargets(*this, parts, shared).writeInto(*this, kStartTar
 st-gain|{ 0x1dc, &Vc2OscTargets::gain },|{ 0x1d8, &Vc2OscTargets::gain },|vc2oscvari
 st-level|{ 0x1e0, &Vc2OscTargets::level } }|{ 0x1e0, &Vc2OscTargets::gain } }|vc2oscvari
 st-type|const uint32_t type = u32(kWave) - 1;|const uint32_t type = u32(kWave);|vc2oscvari
-st-solo-setup|{ 0x893cc2e0, 0x893cc630 }|{ 0x893cc2e4, 0x893cc630 }|vc2oscvari
-st-solo-seek|{ 0x893cc2e0, 0x893cc630 }|{ 0x893cc2e0, 0x893cd440 }|vc2oscvari
-st-backing-setup|{ 0x893cd1d0, 0x893cd440 }|{ 0x893cc8f0, 0x893cd440 }|vc2oscvari
-st-backing-seek|{ 0x893cd1d0, 0x893cd440 }|{ 0x893cd1d0, 0x893cc630 }|vc2oscvari
-st-ensemble-setup|{ 0x893cc8f0, 0x893cd440 }|{ 0x893cd1d0, 0x893cd440 }|vc2oscvari
-st-ensemble-seek|{ 0x893cc8f0, 0x893cd440 }|{ 0x893cc8f0, 0 }|vc2oscvari
-st-six-setup|{ 0x893cc310, 0x893cc630 }|{ 0x893cc2e0, 0x893cc630 }|vc2oscvari
-st-six-seek|{ 0x893cc310, 0x893cc630 }|{ 0x893cc310, 0 }|vc2oscvari
-st-eight-setup|{ 0x893ccff0, 0x893cd090 }|{ 0, 0x893cd090 }|vc2oscvari
-st-eight-seek|{ 0x893ccff0, 0x893cd090 }|{ 0x893ccff0, 0x893cd440 }|vc2oscvari
-st-two-none|{ 0x893cc2e0, 0x893cc630 }, { 0, 0 },|{ 0x893cc2e0, 0x893cc630 }, { 0x893cc2e0, 0x893cc630 },|vc2oscvari
-st-no-setup|    if (player.setUp != 0) parts.objectCall(player.setUp);\n||vc2oscvari
+# (v333: the rows' text with the own set-ups' field; the band players' set-up addresses, which an own set-up stands for,
+# no longer read: va-own-* plant their rows)
+st-solo-setup|{ 0x893cc2e0, 0x893cc630, OwnSetUp::none }|{ 0x893cc2e4, 0x893cc630, OwnSetUp::none }|vc2oscvari
+st-solo-seek|{ 0x893cc2e0, 0x893cc630, OwnSetUp::none }|{ 0x893cc2e0, 0x893cd440, OwnSetUp::none }|vc2oscvari
+st-backing-seek|{ 0x893cd1d0, 0x893cd440, OwnSetUp::backing }|{ 0x893cd1d0, 0x893cc630, OwnSetUp::backing }|vc2oscvari
+st-ensemble-seek|{ 0x893cc8f0, 0x893cd440, OwnSetUp::ensemble }|{ 0x893cc8f0, 0, OwnSetUp::ensemble }|vc2oscvari
+st-six-setup|{ 0x893cc310, 0x893cc630, OwnSetUp::none }|{ 0x893cc2e0, 0x893cc630, OwnSetUp::none }|vc2oscvari
+st-six-seek|{ 0x893cc310, 0x893cc630, OwnSetUp::none }|{ 0x893cc310, 0, OwnSetUp::none }|vc2oscvari
+st-eight-setup|{ 0x893ccff0, 0x893cd090, OwnSetUp::none }|{ 0, 0x893cd090, OwnSetUp::none }|vc2oscvari
+st-eight-seek|{ 0x893ccff0, 0x893cd090, OwnSetUp::none }|{ 0x893ccff0, 0x893cd440, OwnSetUp::none }|vc2oscvari
+st-two-none|OwnSetUp::none },\n                                                { 0, 0, OwnSetUp::none },|OwnSetUp::none },\n                                                { 0x893cc2e0, 0x893cc630, OwnSetUp::none },|vc2oscvari
+st-no-setup|    else if (player.setUp != 0) parts.objectCall(player.setUp);\n||vc2oscvari
 st-samples-bit|kInSamples = 0x80;|kInSamples = 0x40;|vc2oscvari
 st-samples-way|const bool inSamples = (u8(kFlags) & kInSamples) != 0;|const bool inSamples = (u8(kFlags) & kInSamples) == 0;|vc2oscvari
 st-not-moved|if (!moved \|\| player.seek == 0) return;|if (player.seek == 0) return;|vc2oscvari
@@ -1902,11 +1902,11 @@ bs-beat|    v.beatBlock(parts);\n||vc2oscbands
 bs-back|    std::fesetround(rounding);\n    bandStateTo(s, v, rows);\n|    std::fesetround(rounding);\n|vc2oscbands
 bs-outside|    s.outside = &outside;\n||vc2oscbands
 bx-to|        bandStateTo(s, v_, rows_);\n        if (forward)|        if (forward)|vc2oscbands
-bx-forward|if (forward) vc2WalkForward(v_, p_, kBandWalk);|if (forward) vc2WalkBackward(v_, p_, kBandWalk);|vc2oscbands
-bx-backward|if (!forward) vc2WalkBackward(v_, p_, kBandWalk);|if (!forward) vc2WalkForward(v_, p_, kBandWalk);|vc2oscbands
+bx-forward|if (forward) vc2WalkForward(v_, p_, kVc2BandWalk);|if (forward) vc2WalkBackward(v_, p_, kVc2BandWalk);|vc2oscbands
+bx-backward|if (!forward) vc2WalkBackward(v_, p_, kVc2BandWalk);|if (!forward) vc2WalkForward(v_, p_, kVc2BandWalk);|vc2oscbands
 bx-crossing|        vc2WalkCrossing(v_, p_);\n||vc2oscbands
 bx-from|        bandStateFrom(s, v_, m_, rows_);\n    }|    }|vc2oscbands
-bx-keeps|kBandWalk { bandJump, bandCached, true,|kBandWalk { bandJump, bandCached, false,|vc2oscbands
+bx-keeps|kVc2BandWalk { bandJump, bandCached, true,|kVc2BandWalk { bandJump, bandCached, false,|vc2oscbands
 bx-jump|[](State& s, const WaveBytes&) { s.initRecords(); }|[](State& s, const WaveBytes&) { s.eventSetup(); }|vc2oscbands
 bx-cached-at|copyOut(m, cached, record, sizeof record);|copyOut(m, cached + 4, record, sizeof record);|vc2oscbands
 bx-cached-jump|s.loopJump(record);|s.loopJump(0);|vc2oscbands
@@ -1927,3 +1927,90 @@ xb-loop-jump-pos|    std::memcpy(&p, c + 4, 4);\n    ev = e;|    std::memcpy(&p,
 or-backing|{ 0x893cadc0, bandsBacking }|{ 0x893cadc0, bandsEnsemble }|vc2osc
 or-ensemble|{ 0x893ca1f0, bandsEnsemble }|{ 0x893ca1f0, bandsBacking }|vc2osc
 or-backing-flag|{ vc2OscBands(v, out, p, false); }|{ vc2OscBands(v, out, p, true); }|vc2osc
+# v333: the band players' set-ups the voice's own (vc2oscbandsetup), their seek (vc2oscbands: the band row, the bands'
+# part; the seek's code in Vc2OscWalkStart.cpp is v329's sk- plants'), the voice's own seeks' row (vc2oscbeat),
+# VariPhrase's start's own set-ups (vc2oscvari) and the bands' tables (vc2osctables); rom.2's startAt's call of its
+# moved bands is tone_muts.txt's mb-start-bands.  Not planted, as no word shows them: the set-up's gains, which the walk
+# start's jump sets again for every band it reaches by the walk's sign (0x8950f722's), and byte 3's 0x40 kept, which
+# the beat's start clears (it keeps 0x81) before anything reads it
+us-table-from|kTableFrom = 0x0, kSamplesFrom|kTableFrom = 0x2c, kSamplesFrom|vc2oscbandsetup
+us-samples-from|kSamplesFrom = 0x4,|kSamplesFrom = 0x8,|vc2oscbandsetup
+us-cached-from|kCachedFrom = 0x2c;|kCachedFrom = 0x28;|vc2oscbandsetup
+us-alone-bit|kBandZeroAlone = 0x80;|kBandZeroAlone = 0x20;|vc2oscbandsetup
+us-alone-all|ensemble ? (uint8_t)(bits \| kBandZeroAlone) : bits|(uint8_t)(bits \| kBandZeroAlone)|vc2oscbandsetup
+us-alone-none|ensemble ? (uint8_t)(bits \| kBandZeroAlone) : bits|bits|vc2oscbandsetup
+us-ended|    w.setByte(kEnded, 0);\n||vc2oscbandsetup
+us-band0-data|(int32_t)vc2OscHeadWord(v, p, kSamplesFrom));|(int32_t)vc2OscHeadWord(v, p, kSamplesFrom + 4));|vc2oscbandsetup
+us-band0-tabled|    tabledWords(w, 0, gain);\n||vc2oscbandsetup
+us-tabled-fraction|w.setHalf(bandWordAt(k, kFractionShift), t.fractionShift[k]);|w.setHalf(bandWordAt(k, kFractionShift), t.stepShift[k]);|vc2oscbandsetup
+us-tabled-mask|w.setWord(bandWordAt(k, kMask), (int32_t)t.mask[k]);|w.setWord(bandWordAt(k, kMask), (int32_t)t.mask[0]);|vc2oscbandsetup
+us-tabled-step|w.setHalf(bandWordAt(k, kStepShift), t.stepShift[k]);|w.setHalf(bandWordAt(k, kStepShift), t.fractionShift[k]);|vc2oscbandsetup
+us-tabled-offset|(int32_t)t.startOffset[k]);|(int32_t)t.startOffset[k] + 16);|vc2oscbandsetup
+us-shifts-at|kFractionShift = 0xc, kStepShift = 0xe;|kFractionShift = 0xe, kStepShift = 0xc;|vc2oscbandsetup
+us-offset-at|kStartOffset = 0x30, kMask = 0x3c,|kStartOffset = 0x34, kMask = 0x3c,|vc2oscbandsetup
+us-mask-at|kMask = 0x3c, kGain|kMask = 0x38, kGain|vc2oscbandsetup
+us-gain-at|kGain = 0x40, kSmoothL|kGain = 0x44, kSmoothL|vc2oscbandsetup
+us-smooth-l|        w.setReal(bandWordAt(k, kSmoothL), 0.0f);\n||vc2oscbandsetup
+us-smooth-r|        w.setReal(bandWordAt(k, kSmoothR), 0.0f);\n||vc2oscbandsetup
+us-two-which|? kTwoStereo : kTwoMono;|? kTwoMono : kTwoStereo;|vc2oscbandsetup
+us-two-mono|kTwoMono = 4,|kTwoMono = 2,|vc2oscbandsetup
+us-two-stereo|kTwoStereo = 8;|kTwoStereo = 4;|vc2oscbandsetup
+us-backing-data|(int32_t)(vc2OscHeadWord(v, p, kSamplesFrom + 4 * k) - two)|(int32_t)(vc2OscHeadWord(v, p, kSamplesFrom + 4 * k))|vc2oscbandsetup
+us-backing-band|(int32_t)(vc2OscHeadWord(v, p, kSamplesFrom + 4 * k) - two)|(int32_t)(vc2OscHeadWord(v, p, kSamplesFrom + 4 * k - 4) - two)|vc2oscbandsetup
+us-backing-stride|bands.stride[k]);\n        w.setWord(bandWordAt(k, kShift), (int32_t)k - 1);|bands.stride[k - 1]);\n        w.setWord(bandWordAt(k, kShift), (int32_t)k - 1);|vc2oscbandsetup
+us-backing-shift|(int32_t)k - 1);|(int32_t)k);|vc2oscbandsetup
+us-backing-tabled|        tabledWords(w, k, gain);\n||vc2oscbandsetup
+us-ensemble-data|(int32_t)vc2OscHeadWord(v, p, kSamplesFrom + 4 * k));|(int32_t)vc2OscHeadWord(v, p, kSamplesFrom + 4 * k) - 4);|vc2oscbandsetup
+us-ensemble-shift|vc2OscTables().bands.frameShift[k]);|vc2OscTables().bands.frameShift[k] + 1);|vc2oscbandsetup
+us-ensemble-stride|bands.frameShift[k]);\n        w.setWord(bandWordAt(k, kListStride), (int32_t)vc2OscTables().bands.stride[k]);|bands.frameShift[k]);|vc2oscbandsetup
+us-which|    if (ensemble) ensembleBands(w, v, p);\n    else backingBands(w, v, p, gain);|    backingBands(w, v, p, gain);|vc2oscbandsetup
+us-tail-table|w.setWord(kTable, (int32_t)vc2OscHeadWord(v, p, kTableFrom));|w.setWord(kTable, (int32_t)vc2OscHeadWord(v, p, kCachedFrom));|vc2oscbandsetup
+us-tail-cached|w.setWord(kCached, (int32_t)vc2OscHeadWord(v, p, kCachedFrom));|w.setWord(kCached, (int32_t)vc2OscHeadWord(v, p, kTableFrom));|vc2oscbandsetup
+us-gain-rate|w.setReal(kGainRate, vc2OscTables().bands.gainRate);|w.setReal(kGainRate, 1.0f);|vc2oscbandsetup
+us-first|kFirstHalf = 14,|kFirstHalf = 8,|vc2oscbandsetup
+us-mono-stride|kMonoStride = 46,|kMonoStride = 10,|vc2oscbandsetup
+us-stereo-stride|kStereoStride = 88,|kStereoStride = 46,|vc2oscbandsetup
+us-mono-frame|kMonoFrame = 6,|kMonoFrame = 12,|vc2oscbandsetup
+us-stereo-frame|kStereoFrame = 12;|kStereoFrame = 6;|vc2oscbandsetup
+us-stride-which|w.setByte(kStride, stereo ? kStereoStride : kMonoStride);|w.setByte(kStride, stereo ? kMonoStride : kStereoStride);|vc2oscbandsetup
+us-frame-which|w.setByte(kFrame, stereo ? kStereoFrame : kMonoFrame);|w.setByte(kFrame, stereo ? kMonoFrame : kStereoFrame);|vc2oscbandsetup
+us-walk-start|    vc2WalkStart(v, p, kVc2BandWalk);\n||vc2oscbandsetup
+us-walk-row|vc2WalkStart(v, p, kVc2BandWalk);|vc2WalkStart(v, p, kVc2ModeOneWalk);|vc2oscbandsetup
+us-tree-right|(stereo ? 2u : 1u)|1u|vc2oscbandsetup
+us-tree-count|kTreeFloats = 50;|kTreeFloats = 48;|vc2oscbandsetup
+us-tree-left|kTreeAt { 0x51c, 0x6e4 }|kTreeAt { 0x520, 0x6e4 }|vc2oscbandsetup
+us-tree-right-at|kTreeAt { 0x51c, 0x6e4 }|kTreeAt { 0x51c, 0x6e8 }|vc2oscbandsetup
+us-rates|    vc2OscLoopRates(v, p, shared);\n||vc2oscbandsetup
+us-beat|    v.beatStart();\n||vc2oscbandsetup
+us-frames|    if (ensemble) ensembleFrames(w);\n||vc2oscbandsetup
+us-past-shift|kPastShift = 6;|kPastShift = 5;|vc2oscbandsetup
+us-values-l|kValuesAt { 0x10, 0x4c }|kValuesAt { 0x14, 0x4c }|vc2oscbandsetup
+us-values-r|kValuesAt { 0x10, 0x4c }|kValuesAt { 0x10, 0x48 }|vc2oscbandsetup
+us-phases-r|kPhasesAt { 0x40, 0x7c }|kPhasesAt { 0x40, 0x78 }|vc2oscbandsetup
+us-phases|            for (uint32_t i = 0; i < kPhases; ++i) w.setHalf(bandWordAt(k, kPhasesAt[c] + 2 * i), 0);\n||vc2oscbandsetup
+us-phases-count|kPhases = 6,|kPhases = 5,|vc2oscbandsetup
+us-values-count|kValues = 12,|kValues = 11,|vc2oscbandsetup
+us-step|next - now|now - next|vc2oscbandsetup
+us-next|w.memoryHalf(from + frameBytes)|w.memoryHalf(from + 2)|vc2oscbandsetup
+us-interleave|(j * channels + c)|(j + c * kValues)|vc2oscbandsetup
+us-value-now|w.setHalf(bandWordAt(k, kValuesAt[c] + 4 * j), now);|w.setHalf(bandWordAt(k, kValuesAt[c] + 4 * j), next);|vc2oscbandsetup
+us-frame-word|        w.setWord(bandWordAt(k, kFrameAt), frame);\n||vc2oscbandsetup
+us-frame-at|kFrameAt = 0xc,|kFrameAt = 0x8,|vc2oscbandsetup
+us-frame-shift|(w.word(bandWordAt(k, kShift)) + (int32_t)kPastShift)|((int32_t)kPastShift)|vc2oscbandsetup
+us-channels|(w.byte(kFlags) & kStereo) != 0 ? 2 : 1;|1;|vc2oscbandsetup
+bk-row|vc2WalkSeek(v, p, at, kVc2BandWalk);|vc2WalkSeek(v, p, at, kVc2ModeOneWalk);|vc2oscbands
+bk-samples|if ((v.u8(Vc2OscVoice::kObject) & kInSamples) == 0) return;|if ((v.u8(Vc2OscVoice::kObject) & kInSamples) != 0) return;|vc2oscbands
+bk-bands|    onBandCopy(v, p, [](State& s, const WaveBytes&) { s.startBands(s.pos); });\n||vc2oscbands
+bk-target|s.startBands(s.pos);|s.startBands(0);|vc2oscbands
+seek-own-bands-at|{ 0x893cd440, vc2OscSeekBands }|{ 0x893cd444, vc2OscSeekBands }|vc2oscbeat
+va-own-backing|{ 0x893cd1d0, 0x893cd440, OwnSetUp::backing }|{ 0x893cd1d0, 0x893cd440, OwnSetUp::ensemble }|vc2oscvari
+va-own-ensemble|{ 0x893cc8f0, 0x893cd440, OwnSetUp::ensemble }|{ 0x893cc8f0, 0x893cd440, OwnSetUp::backing }|vc2oscvari
+va-own-none|{ 0x893cd1d0, 0x893cd440, OwnSetUp::backing }|{ 0x893cd1d0, 0x893cd440, OwnSetUp::none }|vc2oscvari
+va-own-which|player.own == OwnSetUp::ensemble);|player.own == OwnSetUp::backing);|vc2oscvari
+tb-frame-shift|{ 0x895602f0, bytesOf(b.frameShift) },|{ 0x895602f2, bytesOf(b.frameShift) },|vc2osctables
+tb-fraction|{ 0x89560308, bytesOf(b.fractionShift) },|{ 0x89560314, bytesOf(b.fractionShift) },|vc2osctables
+tb-step|{ 0x89560314, bytesOf(b.stepShift) },|{ 0x89560308, bytesOf(b.stepShift) },|vc2osctables
+tb-offset|{ 0x89560320, bytesOf(b.startOffset) },|{ 0x89560324, bytesOf(b.startOffset) },|vc2osctables
+tb-mask|{ 0x89560338, bytesOf(b.mask) },|{ 0x8956033c, bytesOf(b.mask) },|vc2osctables
+tb-stride|{ 0x89560350, bytesOf(b.stride) },|{ 0x89560354, bytesOf(b.stride) },|vc2osctables
+tb-gain-rate|{ 0x893cd424, &t.bands.gainRate },|{ 0x893c8960, &t.bands.gainRate },|vc2osctables

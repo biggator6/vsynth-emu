@@ -127,12 +127,14 @@ inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c
 inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e8c };
 inline constexpr std::array<uint32_t, 1> kOscModeOneRenders { 0x893c9f60 };   // v327: mono and stereo alike
 inline constexpr std::array<uint32_t, 2> kOscBandRenders { 0x893cadc0, 0x893ca1f0 };   // v332: BACKING's, ENSEMBLE's
-// v332 (Vc2OscBandDraws.cpp): the band players' set-ups (BACKING's 0x893cd1d0, ENSEMBLE's 0x893cc8f0), out by address
-// until ported
+// v332 (Vc2OscBandDraws.cpp): the band players' set-ups (BACKING's 0x893cd1d0, ENSEMBLE's 0x893cc8f0), from v333 the
+// voice's own, and their seek (0x893cd440)
 inline constexpr std::array<uint32_t, 2> kOscBandSetUps { 0x893cd1d0, 0x893cc8f0 };
+inline constexpr uint32_t kOscBandSeek = 0x893cd440;
 // v332 (Vc2OscBandVpdt.cpp): a band wave's parts: its vpdt; its loop; its cached loop events; band k's frames, sized as
 // BACKING's; the room the vpdt, the cached events, two records and the bands take
 std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng);
+std::vector<int32_t> oscBandPositions(const std::vector<uint8_t>& vpdt, bool stereo);   // v333: its events' positions
 XtLoop oscBandLoop(int frames, std::mt19937& rng);
 void oscBandCachedEvents(uint8_t* to, const std::vector<uint8_t>& vpdt, bool stereo, const XtLoop& loop);
 uint32_t oscBandFrames(int k, int frames);
@@ -158,6 +160,15 @@ std::string oscCaptureBandStates(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt)
 // Before a render through a band player, the object one of the captured states of its player, the pitch 0.25…4 and the
 // walk ±0.1…2.5 drawn again; from the band players' generator.  1 if steered
 long oscSteerBands(Vc2OscVoice& o, OscShared& shared);
+// v333: a note-on's block of VariPhrase's of a band player's type (3, 5), whose start sets the player up from the
+// records: the records of one of the captured waves (the vpdt, the bands' data, the cached events; the header and loop
+// record as drawn), byte 0's stereo the wave's, the range in samples within its frames or by events within its events
+// (ENSEMBLE's last the wave's, as oscBandNote's), the seek point the range's start half the time; the voice's own
+// block words so before the kinds' note-on; and before a re-seek of VariPhrase's of a type the band players' seek has
+// (3, 4, 5), the object one of the captured states, 1 if steered.  From the band players' generator
+void oscSteerBandBlock(std::span<uint32_t> block, OscShared& shared);
+void oscSteerBandVoice(Vc2OscVoice& o, OscShared& shared);
+long oscSteerBandSeek(Vc2OscVoice& o, OscShared& shared);
 // Whether a voice's render is one of `renders` (its kind renders by +0xa44, and that names one); before a render, a
 // voice's words as the render needs them (`oscPlaysExtIn` and `oscSteerExtIn` until v323):
 // - through the EXT IN player (v322), its level (+0x1e0) and target (+0x1dc) within ±1 as a note gives them (the

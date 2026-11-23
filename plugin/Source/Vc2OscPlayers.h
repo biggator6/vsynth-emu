@@ -53,8 +53,15 @@ uint32_t vc2OscInRom4(uint32_t at);
 void vc2OscBands(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool ensemble);
 // v327 (Vc2OscModeOne.cpp): kind 1's mode 1's render, 0x893c9f60, mono or stereo by the object's byte 0, on the walk
 void vc2OscModeOne(Vc2OscVoice& v, float* out, Vc2OscParts& p);
-// v328 (Vc2OscModeOneStart.cpp): its set-up, 0x893cc760, which LITE's install runs for a wave of type 1
+// v328 (Vc2OscModeOneStart.cpp): its set-up, 0x893cc760, which LITE's install runs for a wave of type 1; and (v333) the
+// loops' rates it runs, 0x893ccf50, which the band players' set-ups run too
 void vc2OscModeOneSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+void vc2OscLoopRates(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+// v333 (Vc2OscBandSetUp.cpp): the band players' set-ups, BACKING's 0x893cd1d0 and ENSEMBLE's 0x893cc8f0, which
+// VariPhrase's start runs for a wave of type 3 or 5; and (Vc2OscBands.cpp) their seek, 0x893cd440, before the beat's
+// reset (Vc2OscBeat.cpp)
+void vc2OscBandSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared, bool ensemble);
+void vc2OscSeekBands(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

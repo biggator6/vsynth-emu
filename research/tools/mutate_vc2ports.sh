@@ -65,7 +65,7 @@ VC2TONE=(Vc2Tone Vc2ToneNoteOn Vc2ToneCheck Vc2ToneSides Vc2ToneFakes Vc2TonePor
          Vc2Kind6Core Vc2Kind6Tables Vc2OscDraws Vc2OscPartDraws Vc2OscRecords Vc2OscFakes Vc2OscPortParts
          Vc2VocoderOsc XtExtIn Vc2OscVariOffRender Vc2OscBeat Vc2OscHeads XtLitePlayer
          Vc2OscModeOne Vc2OscWalk Vc2OscWalkEvents Vc2OscWalkDraws Vc2OscWalkStart Vc2OscModeOneStart Vc2OscVari
-         Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt)
+         Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt Vc2OscBandSetUp)
 VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc2OscTargets Vc2PitchRamp
         Vc2PitchRampTick Vc2RampTables Vc2OscPlayers Vc2OscCheck Vc2OscEvents Vc2OscGetters Vc2OscFakes
         Vc2OscPortParts Vc2RampCheck Vc2OscRecords Vc2OscLite Vc2OscAnalog Vc2OscAnalogLa Vc2OscAnalogSub
@@ -73,7 +73,8 @@ VC2OSC=(Vc2OscVoice Vc2OscVoiceGet Vc2OscVoiceKinds Vc2OscTables Vc2OscNoteOn Vc
         Vc2Carrier Vc2CarrierTables Vc2Kind6 Vc2Kind6Core Vc2Kind6Tables Vc2Math Vc2OscVibrato Vc2OscVibratoCheck
         Vc2OscDraws Vc2OscPartDraws Vc2VocoderOsc XtExtIn Vc2OscBeat Vc2OscHeads XtLitePlayer
         Vc2OscModeOne Vc2OscWalk Vc2OscWalkEvents Vc2OscWalkDraws Vc2OscModeOneCheck Vc2OscWalkStart
-        Vc2OscModeOneStart Vc2OscVari Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt Vc2OscBandsCheck)
+        Vc2OscModeOneStart Vc2OscVari Vc2OscVariDraws Vc2OscBands Vc2OscBandDraws Vc2OscBandVpdt Vc2OscBandsCheck
+        Vc2OscBandSetUp)
 VC2TVA=(Vc2Tva Vc2TvaTables Vc2TvaCheck Vc2TvaEvents Vc2TvaFakes Vc2TvaDraws)
 VC2COSM=(Vc2CosmGrowl Vc2CosmTables Vc2Math Vc2CosmCheck Vc2CosmConvert Vc2CosmTvf Vc2Matrix Vc2MatrixTables
          Vc2CosmFrameCheck Vc2CosmConverters Vc2CosmFrameDraws Vc2CosmFilters Vc2CosmDynamics Vc2CosmDrive
@@ -193,6 +194,7 @@ VC2PORTS=(
     "vc2oscvari|Vc2OscVari.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscbands|Vc2OscBands.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2xtband|XtMultiBandPlayer.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscbandsetup|Vc2OscBandSetUp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscmodeonestart|Vc2OscModeOneStart.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"

@@ -38,6 +38,7 @@ struct ToneCounts {
     long headsBlocks = 0;                      // v326: and through LITE's heads'
     long liteSettings = 0, bothVari = 0;   // v324: LITE's settings on a type with a way, tones drawn two VariPhrases
     long modeOneSetUps = 0, modeOneTaken = 0;   // v328: mode 1's set-ups at an install, those through a take's head
+    long staleHeads = 0;   // v333: the earlier tone's mode 1 voices steered, their head on a voice since noted otherwise
     long settingsTaken = 0;                     // v328: and the LITE settings through a take's head
     long modeOneSeeks = 0, bandReseeks = 0;     // v329: the OSCs steered for mode 1's seek, VariPhrase's re-seeks
     long variDrawn = 0;                         // v330: VariPhrase's update's words drawn finite

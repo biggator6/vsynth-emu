@@ -30,7 +30,29 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893c6428, &t.variOffFade }, { 0x893c84a0, &t.liteUpdateFilter }, { 0x893c8650, &t.liteSettingsTwo32 },
         { 0x893c6e60, &t.headsSeekHalf }, { 0x893ca150, &t.modeOneFraction }, { 0x893ca154, &t.modeOneScale },
         { 0x893cc8c0, &t.modeOneSetUpWord }, { 0x893ccfd4, &t.modeOneTenths }, { 0x893c8960, &t.variStep },
+        { 0x893cd424, &t.bands.gainRate },
     });
+}
+
+// [FW] the band players' set-ups' tables (v333), six a band, each where the set-ups read it, byte for byte as the image
+// holds it (little-endian, as the host)
+template <class Word>
+std::span<uint8_t> bytesOf(std::array<Word, Vc2OscBandTables::kBands>& a) {
+    return { reinterpret_cast<uint8_t*>(a.data()), sizeof a };
+}
+
+void readBandTables(Sh4& image, Vc2OscBandTables& b) {
+    const std::array<std::pair<uint32_t, std::span<uint8_t>>, 6> tables { {
+        { 0x895602f0, bytesOf(b.frameShift) },
+        { 0x89560308, bytesOf(b.fractionShift) },
+        { 0x89560314, bytesOf(b.stepShift) },
+        { 0x89560320, bytesOf(b.startOffset) },
+        { 0x89560338, bytesOf(b.mask) },
+        { 0x89560350, bytesOf(b.stride) },
+    } };
+    for (const auto& [at, out] : tables) {
+        for (uint32_t i = 0; i < out.size(); ++i) out[i] = image.rd8(at + i);
+    }
 }
 // [FW] each word where its routine reads it; an address of 0 is a word the routine doesn't read, left 0
 void readWords(Sh4& image, std::span<const Vc2PoolWord> words) {
@@ -191,6 +213,7 @@ struct Read : Vc2OscTables {
         vc2ReadPool(image, shapeWords(analog.shape));
         readShapeWaves(image, analog.shape.waves);
         vc2ReadFloats(image, kShapeToneKf, analog.shape.toneKf.data());
+        readBandTables(image, bands);
         return true;
     }
 };

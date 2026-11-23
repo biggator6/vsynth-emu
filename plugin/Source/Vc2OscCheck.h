@@ -84,6 +84,7 @@ struct OscBandWave {
     int frames = 0, events = 0;
     uint32_t vpdt = 0, cached = 0, loop = 0, header = 0;
     std::array<uint32_t, 6> bands {};
+    std::vector<int32_t> positions {};   // v333: its events' (×16), which the band part's seeks are drawn about
 };
 // v332: an object as rom.4's set-up of a band player left it, BACKING's or ENSEMBLE's
 struct OscBandState {
@@ -95,6 +96,7 @@ uint32_t oscVoiceAt(int voice);
 // LFOs and the block's +0xe0 records
 uint32_t oscHeaderAt(int k);
 uint32_t oscLoopAt(int k);
+Vc2OscLoopRecord oscLoopFrom(const uint8_t* bytes);   // v333: one from its bytes, as a band wave holds its own
 uint32_t oscEnvelopeAt(int k);
 uint32_t oscLfoAt(int k);
 uint32_t oscPairAt(int k);
@@ -133,6 +135,9 @@ struct OscShared {
     std::mt19937 bandRng {};
     std::vector<OscBandState> bandStates {};
     long bandSteers = 0;   // the renders steered so
+    // v333: those two band waves, which a note-on's block of a band player is given; the note-ons and re-seeks steered
+    std::vector<OscBandWave> bandWaves {};
+    long bandSetUps = 0, bandSeeks = 0;
     Vc2MicRing ring {};
     std::array<float, Vc2Kind6::kBlock> unvoiced {};
     OscRecords records {};

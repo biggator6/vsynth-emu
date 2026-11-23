@@ -13,6 +13,17 @@ struct Vc2OscBounds {
     float most = 0, least = 0;
 };
 
+// The band players' set-ups' (v333): each band's words by its number 0…5 from six tables (0x895602f0…, rom.2's
+// 0x897edf78…, the same values with three words between the first two): ENSEMBLE's frames' shift, the fraction's and
+// the step's shifts, the read's start offset, the fraction's mask, the walk list's stride; and the gain's rate
+struct Vc2OscBandTables {
+    static constexpr int kBands = 6;
+    std::array<int16_t, kBands> frameShift {};
+    std::array<uint16_t, kBands> fractionShift {}, stepShift {};
+    std::array<uint32_t, kBands> startOffset {}, mask {}, stride {};
+    float gainRate = 0;   // 0x893cd424: 1/64, the object's +0x88
+};
+
 // A ratio's pool: the cents' bounds, 1/1200, the ratio's bounds
 struct Vc2OscTargetPool {
     Vc2OscBounds cents, ratio;
@@ -77,6 +88,7 @@ struct Vc2OscTables {
     float modeOneSetUpWord = 0;     // 0x893cc8c0: 1/64
     float modeOneTenths = 0;        // 0x893ccfd4: 12000
     float variStep = 0;             // 0x893c8960 (v330): VariPhrase's update's step to its targets, 0.7
+    Vc2OscBandTables bands;         // the band players' set-ups' (v333)
     Vc2OscAnalogPool analog;       // the analog note-on's (v242, Vc2OscAnalogPool.h)
     Vc2OscVibratoPool vibrato;      // the vibrato's (v267, Vc2OscVibrato.h)
 };

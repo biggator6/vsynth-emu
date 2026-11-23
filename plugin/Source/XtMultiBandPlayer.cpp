@@ -327,25 +327,7 @@ void XtMbPlayer::State::startAt(int target) {
     pos = 0;
     initRecords();
     pos = target;
-    // A seek to the wave's end on the last event (a Beat Keep's way back after the walk reached it) reads the last event's entry, whose
-    // segments and records run past the vpdt.  The XT reads RAM there and gets out of these loops; the port reads zeros there, so it
-    // stops at a step past the vpdt that moves nothing, from which it could never get out.  (Inside the vpdt a record may be empty.)
-    for (int k = 0; k < 6; ++k) {
-        Band& B = b[k];
-        while (target >= B.nextSeg && lastEvPos > B.nextSeg) {
-            const int was = B.nextSeg;
-            B.grainStart = B.nextSeg;
-            B.recEnd = B.nextSeg;
-            B.recPtr = B.nextRecs;
-            segment(B);
-            record(B);
-            if (B.nextSeg == was && (B.segList < 0 || B.segList >= (long)w.vpdtBytes)) { pastVpdt = true; break; }
-        }
-        while (target >= B.recEnd) { const int was = B.recEnd; record(B); if (B.recEnd == was && (B.recPtr < 0 || B.recPtr >= (long)w.vpdtBytes)) { pastVpdt = true; break; } }
-        B.readPos = B.startOff + target;
-        B.readFrac = 0;
-        if (flags3 & 0x80) break;
-    }
+    startBands(target);   // v333: XtMbState.h, the VC-2's band seek's too
 }
 
 // 0x8950f710: a cached loop event: its event current (0x8950c830), the

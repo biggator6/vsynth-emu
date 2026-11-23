@@ -62,6 +62,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscModeOneStart.cpp
     Source/Vc2OscVari.cpp
     Source/Vc2OscBands.cpp
+    Source/Vc2OscBandSetUp.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp

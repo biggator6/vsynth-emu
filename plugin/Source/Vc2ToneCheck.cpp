@@ -135,10 +135,12 @@ int main(int argc, char** argv) {
     std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's, %ld through "
                 "LITE's heads'; %ld OSCs' renders through the band players'\n", n.extInBlocks, n.variOffBlocks,
                 n.headsBlocks, shared.osc.bandSteers);   // v322, v323, v326, v332
+    std::printf("band players: %ld OSC blocks given a band wave, %ld re-seeks a set-up state\n", shared.osc.bandSetUps,
+                shared.osc.bandSeeks);   // v333
     std::printf("lite: %ld settings on a type with a way, %ld through an earlier tone's head; %ld inputs of two "
-                "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head), %ld OSCs steered for its "
-                "seek\n", n.liteSettings, n.settingsTaken, n.bothVari, n.modeOneSetUps, n.modeOneTaken,
-                n.modeOneSeeks);   // v324, v328, v329
+                "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head, %ld earlier voices' heads "
+                "stale), %ld OSCs steered for its seek\n", n.liteSettings, n.settingsTaken, n.bothVari,
+                n.modeOneSetUps, n.modeOneTaken, n.staleHeads, n.modeOneSeeks);   // v324, v328, v329, v333
     std::printf("vari: %ld words drawn finite before its update or note-on, %ld note-ons by events\n", n.variDrawn,
                 n.variByEvents);   // v330, v331
     std::printf("xt_vc2tone: %ld different\n", tally.different);
