@@ -12,6 +12,24 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parent.parent
+
+
+def changed_sources(rev):
+    """The names of plugin/Source's files that differ between rev and the working tree: a plant in one of them may no
+    longer mean what it did, and only running it again shows it (the runners' --changed)"""
+    diff = subprocess.run(['git', '-C', str(REPO), 'diff', '--name-only', rev, '--', 'plugin/Source'],
+                          capture_output=True, text=True, check=True).stdout.split()
+    return {os.path.basename(f) for f in diff}
+
+
+def changed_lines(listing, rev):
+    """The names of the plants whose line in the list is new, or not as it was in rev's copy of the list"""
+    then = subprocess.run(['git', '-C', str(REPO), 'show', f'{rev}:research/tools/{listing}'],
+                          capture_output=True, text=True)
+    old = set(then.stdout.split('\n')) if then.returncode == 0 else set()
+    now = (HERE / listing).read_text().split('\n')
+    return {re.split(r'(?<!\\)\|', line)[0] for line in now if line and not line.startswith('#') and line not in old}
 
 
 def _text(field):
