@@ -4024,6 +4024,86 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 25, continued (2026-11-23) — v503: the waves loaded by rom.4 itself
+
+- The coordinator turned the work around: from v502 on rom.4's own loaders run in the interpreter at load time, and
+  only what the player reads at run time is ported. The user chose the files: the disk image's index and bank past its
+  partition, and the link files through its FAT. v503's draft of the store's set-up by hand was dropped.
+- The research tools had run the bank, the parse and the start-up load before, but with the library answered by
+  hand (wave k for file k) and the allocator a bump. The link files' pass was the new part. It goes through rom.4's
+  folder listing, so the load needed the kernel's folder calls. rom.4's own Z: drive answers the same calls in its own
+  code, which settled the shapes of the entry and the stats.
+- A probe with every kernel address hooked to log found the calls the loaders make. The strict load hooks only those,
+  so a new one faults and is named. The first real run named the pool's lock, which the research tools had answered
+  wholesale.
+- The allocator turned out to be rom.4's own on a heap the image's header names. Running it moved the pool from the
+  research tools' 0x90000000 to 0x8dffffe8, which changes nothing the port reads: every pointer is in the pool.
+- The listing needs two static initializers a fresh interpreter skips. Dropping each of the 15 in the loaders'
+  modules in turn, and running all 382, showed those two and the bank's are all that matter.
+- The check reads the files without rom.4 to say what the load must leave. That way a wrong kernel answer shows,
+  where comparing the port with rom.4 on the same machine couldn't. Its first run found the port's wave memory
+  missing the sets' data, which the lookups by set index read.
+
+- v504 (after the user's new rules, "Yes, all five", merged in from vc2-mode): the load at the plugin's start. The
+  plugin had never opened the disk image; only the tests had. So the search beside rom.4 came first, then a holder of
+  the one load, like RomInUse's. The kit refused a function's static, so the holder is constinit, its thread held by
+  pointer. The first fresh runs found no rom.4: the test's earlier checks had kept a copy of rom.2 with nothing beside
+  it, so the children are given rom.2 by VSE_XT_ROM.
+
+### Session 25, continued (2026-11-23) — v502: the wave store's records
+
+- The coordinator widened the block to v500–v549 and kept the plugin's wiring out until the user decides where the
+  files come from. The question of hand-porting against running the loaders in the interpreter went to the user.
+- The store's set-up turned out to make a sampling record of 32 frames that succeeds, which calls four more routines
+  and a loop-events builder. So v502 is the records and chunks alone, and the set-up is v503.
+- The chunk classes are a table: a slot and a vtable each, a destructor that clears the slot and a moved method that
+  moves it. Only the data's class is longer: seven band pointers and a choice of two slots.
+- The records' check passed on its first run, so coverage came first. All the lines were reached. The branches left
+  are dead in a consistent list, or need a negative key, which no caller gives (v398's find assumes the same). Records
+  that find no room needed objects that fill the pool.
+- The kit asked for the pool's rig to be shared rather than copied (Vc2WavePoolRig.h), and for the per-call outcome
+  to be one function (`vc2CallOutcome`).
+
+### Session 25, continued (2026-11-23) — v501: the wave pool
+
+- The store's records and chunks are objects in a pool of rom.4's own, with a compaction that moves them and tells
+  each through its vtable. Every later loader writes into it, so it came next.
+- The check's first runs faulted in the compaction. It calls the vtable of every used block, and calloc's blocks had
+  none, as the check left their payload zeroed. Every block gets a vtable now.
+- Then four seeds differed, each in a compaction: rom.4 wrote a header's state past the pool's memory. The size law
+  can give the set-up's block up to 22 bytes more than the OS gave, and moving or filling the last block writes
+  there. The port's memory runs 24 bytes on.
+- Seed 2024 then ran rom.4 into a step limit: a realloc to the same size with a used block after it moves into an
+  exact fit and stops in rom.4's own `bra .`. The port can't follow a stop, so the check draws no realloc to the same
+  size.
+- Coverage showed the calls rom.4 answers with 0 on a pool with no memory, and the null pointers, weren't drawn. They
+  are now.
+- Seven of the 55 plants missed at first. Two are equivalent and went: the pool keeps its free count equal to its free
+  payloads, so the largest's floor at 0 and the compaction's recount change nothing. The other five needed draws noise
+  rarely makes: a request of exactly what's free, reallocs that fill a block exactly, and ties for the largest. An
+  instrumented copy of the check showed 4,500 largest calls with no tie, and only 317 with two free blocks at all,
+  before cases of one size on small pools were added.
+- The pool's check reached the kit's 300 lines; its draws went to a file of their own.
+
+### Session 25 (2026-11-23) — v500: the wave index, parsed
+
+- Started from the coordinator's brief: port what fills the wave store and the wave sets, as v500–v509. The earlier
+  runs of the start-up load (VC2_VOCAL_DESIGNER.md, "The sample bank, loaded", "The wave reader, run") had named most
+  of the routines. A scan for bsr and pool loads of each address found the rest. The map is in the shared notes
+  (v500-on-vc2-wave-loaders.md).
+- The chain is larger than the brief expected. The store has a compacting pool of its own, whose blocks have virtual
+  methods to fix their pointers when moved. Records and chunks have their own allocators, and the bank's wave reader
+  decodes RDAC and builds bands. The coordinator was told, with the question of where the plugin's index, bank and
+  link files come from.
+- The parse alone fills the sets, so it came first. Its harness is a new one, xt_vc2waves: the loaders run at boot,
+  outside the part, on files. Both sides' file calls are answered from equal lists of files and compared call by call.
+- The plant on the progress's step between sections was missed at first: the parse always ends by setting 100. The
+  XT's display reads the progress while a parse runs, so each file call now carries it. A record read before its
+  slot is refused needed sections that cross 500 more often.
+- The kit refused a progress member named `index` (shape law), three helper names taken elsewhere (`readWords`,
+  `place`, `vc2CallsDifference`) and a seven-parameter helper. One shell edit of the check went past the content laws
+  and was gone over again with Edit.
+
 ### Session 24, continued (2026-11-22) — v399: the wave sets
 
 - My notes had the sets' counts at 0xffff after C startup. rom.4's own .data copy says 0, and so do the image's

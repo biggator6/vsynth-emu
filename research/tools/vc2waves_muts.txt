@@ -1,0 +1,195 @@
+index-path|"D:\\VC-2 Wave.bin"|"D:\\VC-2 Wave.bim"|vc2waveindex
+index-magic|{ 'W', 'L', 'F', '0' }|{ 'W', 'L', 'F', '8' }|vc2waveindex
+index-missing|if (state.handle < 0) return kVc2IndexMissing;|if (state.handle < -1) return kVc2IndexMissing;|vc2waveindex
+index-progress-zero|    progress.parse = 0;\n|\n|vc2waveindex
+index-not-wlf-close|        files.close(state.handle);\n        return kVc2IndexNotWlf;|        return kVc2IndexNotWlf;|vc2waveindex
+index-not-wlf-value|        return kVc2IndexNotWlf;|        return kVc2IndexMissing;|vc2waveindex
+index-versions-at|kVersionsAt = 16|kVersionsAt = 17|vc2waveindex
+index-version-clear|    words.waveVersion.fill(0);\n|\n|vc2waveindex
+index-preset-clear|    words.presetVersion.fill(0);\n|\n|vc2waveindex
+index-version-chars|kVersionChars = 16;|kVersionChars = 15;|vc2waveindex
+index-sections-count|kSectionsCountAt = 8|kSectionsCountAt = 4|vc2waveindex
+index-sections-at|kSectionsAt = 0x40|kSectionsAt = 0x30|vc2waveindex
+index-section-stride|kSectionStride = 16|kSectionStride = 12|vc2waveindex
+index-on-test|if (vc2in::s16(section, kOnAt) != kOn) continue;|if (vc2in::s16(section, kOnAt) < kOn) continue;|vc2waveindex
+index-on-at|kOnAt = 2|kOnAt = 3|vc2waveindex
+index-place-at|kPlaceAt = 4;|kPlaceAt = 8;|vc2waveindex
+index-section-seek|        files.seek(state.handle, seekAt(state.sectionAt), kFromStart);\n        switch|        switch|vc2waveindex
+index-velocity-row|case 1: setSection(kVelocity,|case 1: setSection(kKey,|vc2waveindex
+index-alias-number|case 3: aliasSection|case 4: aliasSection|vc2waveindex
+index-other-step|        default: continue;|        default: break;|vc2waveindex
+index-step|kSectionStep = 33|kSectionStep = 34|vc2waveindex
+index-done|kParseDone = 100|kParseDone = 99|vc2waveindex
+index-close|    files.close(state.handle);\n    progress.parse = kParseDone;|    progress.parse = kParseDone;|vc2waveindex
+index-returns|    return kVc2IndexParsed;|    return 0;|vc2waveindex
+set-entries-half|    const uint16_t entries = fileHalf(header, kEntriesAt);\n    const uint32_t indexAt|    const uint32_t entries = fileWord(header, kEntriesAt);\n    const uint32_t indexAt|vc2waveindex
+set-index-at|state.sectionAt + fileWord(header, kIndexAt), entryBytes|fileWord(header, kIndexAt), entryBytes|vc2waveindex
+set-entry-bytes|entryBytes = fileWord(header, kEntrySizeAt);|entryBytes = kIndexEntry;|vc2waveindex
+set-entry-seek|seekAt(indexAt + (n - 1) * entryBytes)|seekAt(indexAt + n * entryBytes)|vc2waveindex
+set-record-at|seekAt(state.sectionAt + fileWord(entry, kRecordAt))|seekAt(fileWord(entry, kRecordAt))|vc2waveindex
+set-record-size|const uint32_t size = fileWord(entry, kRecordSizeAt);|const uint32_t size = fileWord(entry, kRecordAt);|vc2waveindex
+set-read-at|readIntoWords(files, state.handle, words, row.readAt, size);|readIntoWords(files, state.handle, words, row.readAt + 1, size);|vc2waveindex
+set-slot-first|        readIntoWords(files, state.handle, words, row.readAt, size);\n        if (!raiseCount(sets.counts.*row.count, n)) return;|        if (!raiseCount(sets.counts.*row.count, n)) return;\n        readIntoWords(files, state.handle, words, row.readAt, size);|vc2waveindex
+set-slot-clear|        std::fill_n(slot, row.slot, 0);\n||vc2waveindex
+set-table-start|[2 * (n - 1)] = row.dataAt + row.slot * (n - 1);|[2 * (n - 1)] = row.dataAt + row.slot * n;|vc2waveindex
+set-table-length|[2 * (n - 1) + 1] = row.slot;|[2 * (n - 1) + 1] = std::min(size, row.slot);|vc2waveindex
+set-copy-held|std::min(size, row.slot), slot);|std::min(size, row.slot - 1), slot);|vc2waveindex
+set-key-read|kVc2KeySlot, offsetof(Vc2WaveIndexWords, keyRead) };|kVc2KeySlot, offsetof(Vc2WaveIndexWords, velocityRead) };|vc2waveindex
+set-key-data|&Vc2WaveSetData::key, Vc2WaveSets::kKeyDataAt,|&Vc2WaveSetData::key, Vc2WaveSets::kVelocityDataAt,|vc2waveindex
+raise-bound|if (n > kVc2WaveSetEntries) return false;|if (n >= kVc2WaveSetEntries) return false;|vc2waveindex
+raise-always|    if (count < n) count = static_cast<uint16_t>(n);|    count = static_cast<uint16_t>(n);|vc2waveindex
+alias-seek|seekAt(state.sectionAt + fileWord(header, kIndexAt)), kFromStart);|seekAt(fileWord(header, kIndexAt)), kFromStart);|vc2waveindex
+alias-entries-half|    const uint16_t entries = fileHalf(header, kEntriesAt);\n    for (uint32_t n = 1; n <= entries; ++n) {\n        readIntoWords|    const uint32_t entries = fileWord(header, kEntriesAt);\n    for (uint32_t n = 1; n <= entries; ++n) {\n        readIntoWords|vc2waveindex
+alias-entry-size|                      fileWord(header, kEntrySizeAt));|                      36u);|vc2waveindex
+alias-read-at|readIntoWords(files, state.handle, words, offsetof(Vc2WaveIndexWords, aliasRead),|readIntoWords(files, state.handle, words, offsetof(Vc2WaveIndexWords, keyRead),|vc2waveindex
+alias-count|                      fileWord(header, kEntrySizeAt));\n        if (!raiseCount(sets.counts.alias, n)) return;|                      fileWord(header, kEntrySizeAt));\n        if (n > kVc2WaveSetEntries) return;|vc2waveindex
+alias-at|kAliasAt = 32, kAliasBytes = 4;|kAliasAt = 31, kAliasBytes = 4;|vc2waveindex
+alias-bytes|kAliasAt = 32, kAliasBytes = 4;|kAliasAt = 32, kAliasBytes = 3;|vc2waveindex
+words-end|std::min<size_t>(n, sizeof words - at)|std::min<size_t>(n, sizeof words - at - 1)|vc2waveindex
+data-velocity-at|return &data.velocity[at - kVelocityDataAt];|return &data.velocity[at - kVelocityDataAt + 1];|vc2wavesetsdata
+data-key-none|    if (at - kKeyDataAt < data.key.size()) return &data.key[at - kKeyDataAt];\n||vc2wavesetsdata
+data-key-end|if (at - kKeyDataAt < data.key.size())|if (at - kKeyDataAt <= data.key.size())|vc2wavesetsdata
+data-velocity-below|if (at - kVelocityDataAt < data.velocity.size())|if (at + 1 - kVelocityDataAt <= data.velocity.size())|vc2wavesetsdata
+pool-setup-less|kSetUpLess = 89|kSetUpLess = 88|vc2wavepool
+pool-unit-round|kUnitRound = 40|kUnitRound = 32|vc2wavepool
+pool-round-up|kRoundUp = 63;|kRoundUp = 64;|vc2wavepool
+pool-largest-least|kLargestLeast = 10;|kLargestLeast = 11;|vc2wavepool
+pool-overhang|kOverhang = 24;|kOverhang = 0;|vc2wavepool
+setup-free-old|        host.osFree(words.base);\n||vc2wavepool
+setup-negative|if (sw(bytes) <= 0 \|\||if (bytes == 0 \|\||vc2wavepool
+setup-gives|        return 0;\n    }\n    memory.assign|        return 1;\n    }\n    memory.assign|vc2wavepool
+setup-head-state|header(head, first, first, 0, kHead);|header(head, first, first, 0, kUsed);|vc2wavepool
+setup-rover|    words.rover = head;|    words.rover = first;|vc2wavepool
+setup-free|    words.free = word(first + kUnits) * kHeader;|    words.free = (word(first + kUnits) + 1) * kHeader;|vc2wavepool
+take-rover|    if (words.rover == next) words.rover = block;\n||vc2wavepool
+take-units|word(next + kUnits) + word(block + kUnits) + 1);\n    words.free += kHeader;|word(next + kUnits) + word(block + kUnits));\n    words.free += kHeader;|vc2wavepool
+take-free|word(next + kUnits) + word(block + kUnits) + 1);\n    words.free += kHeader;|word(next + kUnits) + word(block + kUnits) + 1);|vc2wavepool
+split-exact|        setWord(block + kState, kUsed);\n        return;|        setWord(block + kState, kFree);\n        return;|vc2wavepool
+split-rest-units|have - units - 1, kFree);|have - units, kFree);|vc2wavepool
+split-rover|    words.rover = rest;\n||vc2wavepool
+split-header|    words.free -= kHeader;\n    if (word(word(rest|    if (word(word(rest|vc2wavepool
+split-join|    if (word(word(rest + kNext) + kState) == kFree) takeNext(rest);\n||vc2wavepool
+release-prev-test|if (word(prev + kState) != kFree) {|if (word(prev + kState) == kHead) {|vc2wavepool
+release-rover-block|        words.rover = block;\n        return;|        return;|vc2wavepool
+release-both|words.free += 2 * kHeader;|words.free += kHeader;|vc2wavepool
+release-rover-prev|    words.rover = prev;\n}|}|vc2wavepool
+release-prev-units|setWord(prev + kUnits, word(block + kUnits) + word(prev + kUnits) + 1);|setWord(prev + kUnits, word(block + kUnits) + word(prev + kUnits));|vc2wavepool
+move-rest|header(after, to, word(to + kNext), rest - 1, kFree);|header(after, to, word(to + kNext), rest, kFree);|vc2wavepool
+move-told|host.moved(to, sw(to - from));|host.moved(to, sw(from - to));|vc2wavepool
+move-release|    release(from);\n}|    free(from + kHeader);\n}|vc2wavepool
+move-links|    setWord(to + kNext, next);\n    host.moved|    host.moved|vc2wavepool
+alloc-free-test|bytes > words.free|bytes >= words.free|vc2wavepool
+alloc-fit|if (word(block + kState) == kFree && sw(word(block + kUnits)) >= sw(units)) {\n            split|if (word(block + kState) == kFree && sw(word(block + kUnits)) > sw(units)) {\n            split|vc2wavepool
+alloc-count|words.free -= units * kHeader;\n            return block + kHeader;|words.free -= (units + 1) * kHeader;\n            return block + kHeader;|vc2wavepool
+calloc-zero|std::memset(bytesAt(payload), 0, bytes);|(void)0;|vc2wavepool
+calloc-size|const uint32_t bytes = count * size,|const uint32_t bytes = count + size,|vc2wavepool
+free-count|    words.free += word(block + kUnits) * kHeader;\n    release(block);|    release(block);|vc2wavepool
+free-null|    if (payload == 0) return;\n||vc2wavepool
+realloc-null|    if (payload == 0) return 0;\n    const uint32_t units = unitsOf(sw(bytes - 1)), block|    const uint32_t units = unitsOf(sw(bytes - 1)), block|vc2wavepool
+realloc-shrink|words.free += static_cast<uint32_t>(-grow) * kHeader;|words.free += static_cast<uint32_t>(-grow + 1) * kHeader;|vc2wavepool
+realloc-fits|const bool fits = sw(words.free) >= sw(need);|const bool fits = true;|vc2wavepool
+realloc-next-room|sw(word(next + kUnits) + 1) >= grow|sw(word(next + kUnits)) >= grow|vc2wavepool
+realloc-in-place|        split(block, units);\n        words.free -= need;\n        return payload;|        split(block, units);\n        return payload;|vc2wavepool
+realloc-move-join|            takeNext(to);\n||vc2wavepool
+realloc-move-fit|if (word(to + kState) == kFree && sw(word(to + kUnits)) >= sw(units)) {|if (word(to + kState) == kFree && sw(word(to + kUnits)) > sw(units)) {|vc2wavepool
+largest-strict|sw(word(block + kUnits)) > sw(most)) {|sw(word(block + kUnits)) >= sw(most)) {|vc2wavepool
+largest-state|    setWord(at + kState, kUsed);|    setWord(at + kState, kFree);|vc2wavepool
+compact-rover|    words.rover = words.base;\n}|}|vc2wavepool
+compact-rest|header(rest, block, after, units, kFree);|header(rest, block, after, units + 1, kFree);|vc2wavepool
+compact-told|host.moved(block, sw(block - next));|host.moved(next, sw(block - next));|vc2wavepool
+compact-join|            if (word(after + kState) == kFree) takeNext(rest);\n||vc2wavepool
+object-tag|setWord(payload - kHeader + kTag, tag);|setWord(payload - kHeader + kTag, tag + 1);|vc2wavepool
+object-alloc-size|return tagged(alloc(bytes + extra), extra);|return tagged(alloc(bytes), extra);|vc2wavepool
+object-realloc-size|realloc(object + kHeader, bytes + extra, host)|realloc(object + kHeader, bytes, host)|vc2wavepool
+object-largest-tag|return tagged(payload, bytes);|return tagged(payload, 0);|vc2wavepool
+object-free-null|if (object != 0) free(object + kHeader);|free(object + kHeader);|vc2wavepool
+pool-byte|    return o < memory.size() ? memory[o] : 0;|    return o < memory.size() ? static_cast<uint8_t>(memory[o] ^ 1) : 0;|vc2wavepool
+rec-base-vtable|kBaseVtable = 0x898ca8bc|kBaseVtable = 0x898ca8b8|vc2waverecords
+rec-record-vtable|kRecordVtable = 0x898ca8e0|kRecordVtable = 0x898ca8e4|vc2waverecords
+rec-data-vtable|kDataVtable = 0x898ca9b8|kDataVtable = 0x898ca9bc|vc2waverecords
+rec-plain-slot|{ 3, 0x2c, 0x898ca94c }|{ 3, 0x30, 0x898ca94c }|vc2waverecords
+rec-plain-vtable|{ 7, 0x3c, 0x898ca9dc }|{ 7, 0x3c, 0x898ca9d8 }|vc2waverecords
+rec-plain-six|{ 6, 0x40, 0x898caa00 }|{ 6, 0x3c, 0x898caa00 }|vc2waverecords
+insert-empty|        setWord(node + kNext, 0);\n        setWord(node + kPrev, 0);|        setWord(node + kNext, 0);|vc2waverecords
+insert-ring-prev|        setWord(node + kPrev, word(head + kPrev));|        setWord(node + kPrev, head);|vc2waverecords
+insert-ring-link|        setWord(word(head + kPrev) + kNext, node);\n||vc2waverecords
+insert-two|        setWord(head + kNext, node);\n        setWord(head + kPrev, node);\n    }|        setWord(head + kPrev, node);\n    }|vc2waverecords
+insert-head|    head = node;\n    setWord(node + kKey|    setWord(node + kKey|vc2waverecords
+insert-key|setWord(node + kKey, static_cast<uint32_t>(key));|setWord(node + kKey, static_cast<uint32_t>(key) + 128);|vc2waverecords
+unlink-alone|        head = 0;\n        return;|        return;|vc2waverecords
+unlink-head-key|    if (static_cast<int32_t>(word(head + kKey)) == key) head = prev;\n||vc2waverecords
+unlink-two|        setWord(prev + kNext, 0);\n        setWord(prev + kPrev, 0);\n        return;|        setWord(prev + kNext, 0);\n        return;|vc2waverecords
+unlink-ring|    setWord(word(node + kNext) + kPrev, prev);\n}|}|vc2waverecords
+destroy-data-slot|word(object + kWhichAt) == 0 ? kDataFirst : kDataSecond;|word(object + kWhichAt) == 0 ? kDataSecond : kDataFirst;|vc2waverecords
+destroy-plain|        setWord(word(object + kOwnerAt) + c->slot, 0);\n||vc2waverecords
+destroy-base|    setWord(object + kVtableAt, kBaseVtable);\n    pool_.freeObject(object);|    pool_.freeObject(object);|vc2waverecords
+destroy-unlink|        unlink(object + kNodeAt);|        (void)0;|vc2waverecords
+make-remove-first|    if (recordOf(key) != 0) remove(key);\n||vc2waverecords
+make-extra|static_cast<uint32_t>(type) + 1);|static_cast<uint32_t>(type));|vc2waverecords
+make-slots|for (uint32_t i = 0; i < kSlots; ++i) setWord(record + kSlotsAt + 4 * i, 0);|for (uint32_t i = 0; i < kSlots - 1; ++i) setWord(record + kSlotsAt + 4 * i, 0);|vc2waverecords
+make-bytes|kZeroedBytes = 6;|kZeroedBytes = 4;|vc2waverecords
+make-no-room|    if (record == 0) return kVc2RecordNoRoom;\n    setWord(record + kVtableAt|    if (record == 0) return kVc2RecordNone;\n    setWord(record + kVtableAt|vc2waverecords
+chunk-numbers|n - 1 >= kChunks|n - 1 > kChunks|vc2waverecords
+chunk-destroy-old|    if (const uint32_t old = word(record + slot); old != 0) destroy(old);\n||vc2waverecords
+chunk-plain-size|pool_.allocObject(kChunkBytes, extra)|pool_.allocObject(kChunkBytes, extra + 4)|vc2waverecords
+chunk-data-size|pool_.allocObject(kDataBytes, extra + kDataExtra)|pool_.allocObject(kDataBytes, extra + kDataExtra - 2)|vc2waverecords
+chunk-owner|        setWord(chunk + kOwnerAt, record);\n        setWord(record + slot, chunk);|        setWord(record + slot, chunk);|vc2waverecords
+chunk-no-room|    if (chunk == 0) return kVc2RecordNoRoom;|    if (chunk == 0) return kVc2ChunkNone;|vc2waverecords
+data-zero|    setWord(chunk + kDataZeroAt, 0);\n||vc2waverecords
+data-band0|setWord(chunk + kBandsAt, chunk + kDataBytes);|setWord(chunk + kBandsAt, chunk + kDataBytes + 4);|vc2waverecords
+data-bands|for (uint32_t i = 1; i < kBands; ++i) setWord|for (uint32_t i = 1; i < kBands - 1; ++i) setWord|vc2waverecords
+data-second|const bool second = word(record + kDataFirst) != 0;|const bool second = n == kSecondNumber;|vc2waverecords
+data-tail-even|((word(chunk + kDataTagAt) - kDataExtra) & ~1u)|(word(chunk + kDataTagAt) - kDataExtra)|vc2waverecords
+data-tail-size|kDataTail = 32,|kDataTail = 30,|vc2waverecords
+remove-none|    if (record == 0) return kVc2RecordNone;\n    for|    if (record == 0) return kVc2ChunkNone;\n    for|vc2waverecords
+remove-chunks|        if (const uint32_t chunk = word(record + kSlotsAt + 4 * i); chunk != 0) destroy(chunk);\n||vc2waverecords
+moved-owner|setWord(chunk + kOwnerAt, word(chunk + kOwnerAt) + static_cast<uint32_t>(by));|setWord(chunk + kOwnerAt, word(chunk + kOwnerAt));|vc2waverecords
+moved-head|    if (head == node - static_cast<uint32_t>(by)) head = node;\n||vc2waverecords
+moved-links|    setWord(prev + kNext, node);\n    setWord(next + kPrev, node);|    setWord(prev + kNext, node);|vc2waverecords
+moved-bands|for (uint32_t i = 0; i < kBands; ++i) addTo(|for (uint32_t i = 1; i < kBands; ++i) addTo(|vc2waverecords
+moved-data-slot|(word(block + kWhichAt) == 0 ? kDataFirst : kDataSecond));|(word(block + kWhichAt) == 0 ? kDataSecond : kDataFirst));|vc2waverecords
+moved-plain|        addTo(word(block + kOwnerAt) + c->slot);|        (void)c;|vc2waverecords
+moved-other|        os_.moved(block, by);|        (void)by;|vc2waverecords
+kernel-no-lock|    { 0x88008000, nullptr, 0 },                   // the OS's lock (0x893018b0: the store's pool's)\n||vc2wavekernel
+kernel-no-alloc-lock|    { 0x88008110, nullptr, 0 },                   // the allocator's lock (0x89301810)\n||vc2wavekernel
+kernel-no-compare|    { 0x880089e0, &Kernel::compare, 0 },          // (0x8933a7e0)\n|    { 0x880089e0, nullptr, 0 },\n|vc2wavekernel
+kernel-no-fstat|    { 0x88008f70, &Kernel::fstat, 0 },            // (0x89336c10)\n||vc2wavekernel
+kernel-open-mode|    if (c.r[5] != kReading) refused = "a write to " + path;|    if (c.r[5] == kReading) refused = "a write to " + path;|vc2wavekernel
+kernel-open-none|    keep(openFiles, nextFile, c, found, std::move(f), kNone);|    keep(openFiles, nextFile, c, found, std::move(f), 0);|vc2wavekernel
+kernel-read-stays|        file.at = (uint32_t)from + n;|        file.at = (uint32_t)from;|vc2wavekernel
+kernel-read-short|        const auto n = (uint32_t)std::min<size_t>(c.r[6], file.bytes.size() - from);|        const auto n = (uint32_t)std::min<size_t>(c.r[6] / 2, file.bytes.size() - from);|vc2wavekernel
+kernel-seek-offset|        file.at = from[std::min<uint32_t>(c.r[6], 3)] + (c.r[6] > 2 ? 0 : c.r[5]);|        file.at = from[std::min<uint32_t>(c.r[6], 3)] + (c.r[6] > 2 ? 0 : c.r[5] + 1);|vc2wavekernel
+kernel-fstat-size|        c.wr32(c.r[5] + kSizeAt, (uint32_t)file.bytes.size());|        c.wr32(c.r[5] + kSizeAt, (uint32_t)file.bytes.size() - 1);|vc2wavekernel
+kernel-mapped-place|            c.write(nextMapped, file.bytes.data(), file.bytes.size());|            c.write(nextMapped + 4, file.bytes.data(), file.bytes.size());|vc2wavekernel
+kernel-mapped-none|        c.ret(file.mapped);|        c.ret(0);|vc2wavekernel
+kernel-entry-place|        c.wr32(kEntryAt + kPlaceAt, f.at++);|        c.wr32(kEntryAt + kPlaceAt, ++f.at);|vc2wavekernel
+kernel-entry-name|        c.write(kEntryAt + kNameAt, name.c_str(), name.size() + 1);|        c.write(kEntryAt + kNameAt + 1, name.c_str(), name.size() + 1);|vc2wavekernel
+kernel-rewind|void Kernel::rewindFolder(Sh4& c) { placeAt(folders, c, 0); }|void Kernel::rewindFolder(Sh4& c) { placeAt(folders, c, 1); }|vc2wavekernel
+kernel-seekdir|void Kernel::seekFolder(Sh4& c) { placeAt(folders, c, c.r[5]); }|void Kernel::seekFolder(Sh4& c) { placeAt(folders, c, c.r[5] + 1); }|vc2wavekernel
+kernel-stat-attributes|        c.wr8(c.r[6] + kAttributesAt, e.attributes);|        c.wr8(c.r[6] + kAttributesAt, e.attributes \| 0x02);|vc2wavekernel
+kernel-file-name|    c.ret(c.r[4] + (uint32_t)(slash == std::string::npos ? 0 : slash + 1));|    c.ret(c.r[4] + (uint32_t)(slash == std::string::npos ? 0 : slash));|vc2wavekernel
+kernel-compare-case|        const int y = i < b.size() ? std::tolower((unsigned char)b[i]) : 0;|        const int y = i < b.size() ? std::toupper((unsigned char)b[i]) : 0;|vc2wavekernel
+kernel-compare-some|    c.ret((uint32_t)caseless(text(c, c.r[4], kPathMost), text(c, c.r[5], kPathMost), c.r[6]));|    c.ret((uint32_t)caseless(text(c, c.r[4], kPathMost), text(c, c.r[5], kPathMost), c.r[6] - 1));|vc2wavekernel
+boot-no-listings|    { "the folder listings' initializer", 0x893503a0, 0, Goes::any, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-nodes|    { "their nodes' heap's initializer", 0x89350860, 0, Goes::any, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-store|    { "the store's set-up", 0x89352520, 0, Goes::one, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-links|    { "the link files", 0x89349d00, 0, Goes::notNegative, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-load|    { "the start-up load", 0x8934d2d0, kLoadState, Goes::notNegative, kLoadSteps },\n||vc2waveboot
+boot-bank-object|0x89350970, 0x89e0f034,|0x89350970, 0x89e0f038,|vc2waveboot
+boot-load-steps|kLoadSteps = 3'000'000'000ull;|kLoadSteps = 300'000'000ull;|vc2waveboot
+boot-heap-short|    c.mapRam(first, last + 4 - first);|    c.mapRam(first, 0x1000000);|vc2waveboot
+boot-overhang|constexpr uint32_t kPoolOverhang = 24;|constexpr uint32_t kPoolOverhang = 16;|vc2waveboot
+boot-take-base|    c.read(out.pool.words.base, out.pool.memory.data(), out.pool.memory.size());|    c.read(out.pool.words.base + 4, out.pool.memory.data(), out.pool.memory.size());|vc2waveboot
+boot-take-key-data|        { Vc2WaveSets::kKeyDataAt, out.sets.data.key.data(), out.sets.data.key.size() },\n||vc2waveboot
+boot-take-store|        { Vc2WaveStore::kAt, &out.store.words, sizeof out.store.words },\n||vc2waveboot
+boot-memory-data|    return data ? *data : pool.byte(at);|    return pool.byte(at);|vc2waveboot
+boot-goes-store|    const bool goes[] = { true, (int32_t)r0 >= 0, r0 == 1 };|    const bool goes[] = { true, (int32_t)r0 >= 0, r0 == 0 };|vc2waveboot
+files-index-tag|constexpr std::string_view kLibrary = "WLF08", kVc2Index = "VC2W";|constexpr std::string_view kLibrary = "WLF08", kVc2Index = "VSYN";|vc2bootfiles
+files-index-end|            end = std::max<size_t>(end, (size_t)le32(&d[entry + 4]) + le32(&d[entry + 8]));|            end = std::max<size_t>(end, (size_t)le32(&d[entry + 4]));|vc2bootfiles
+files-bank-first|    return { d.begin() + (long)at, d.begin() + (long)(base + end) };|    return { d.begin() + (long)at + 1, d.begin() + (long)(base + end) };|vc2bootfiles
+files-bank-count|        count = 10 * count + (c - '0');|        count = 10 * count + (c - '1');|vc2bootfiles
+files-bank-short|    return { d.begin() + (long)at, d.begin() + (long)(base + end) };|    return { d.begin() + (long)at, d.begin() + (long)(base + end / 2) };|vc2bootfiles
+files-file-is-folder|    if (!onDrive(path, kDriveA, rest) \|\| !onA(rest, at, entry) \|\| entry.isDir) return false;|    if (!onDrive(path, kDriveA, rest) \|\| !onA(rest, at, entry) \|\| !entry.isDir) return false;|vc2bootfiles
+files-folder-attributes|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.name, e.shortName, e.attributes, e.size });|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.name, e.shortName, 0x12, e.size });|vc2bootfiles
+files-folder-short|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.name, e.shortName, e.attributes, e.size });|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.shortName, e.shortName, e.attributes, e.size });|vc2bootfiles
+files-index-past|      bank_(bankIn(disk.bytes(), disk.pastPartition())) {}|      bank_(bankIn(disk.bytes(), disk.pastPartition() + 0x4000000)) {}|vc2bootfiles

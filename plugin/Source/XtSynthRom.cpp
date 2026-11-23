@@ -135,6 +135,10 @@ public:
     constexpr RomInUse(const KnownImage& image, bool (*load)(const char*)) : image_(image), load_(load) {}
     bool take(const std::string& path, std::string* why);
     bool ready() const { return ready_.load(std::memory_order_acquire); }
+    std::string path() {
+        const std::lock_guard<std::mutex> hold(lock_);
+        return loaded_;
+    }
 
 private:
     const KnownImage& image_;             // the image it holds
@@ -181,3 +185,5 @@ bool xtSynthRomReady() { return g_vsynth.ready(); }
 bool xtSynthSetVc2Rom(const std::string& path, std::string* why) { return g_vc2.take(path, why); }
 
 bool xtSynthVc2RomReady() { return g_vc2.ready(); }
+
+std::string xtSynthVc2RomPath() { return g_vc2.path(); }

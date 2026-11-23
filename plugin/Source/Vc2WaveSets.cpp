@@ -92,6 +92,12 @@ bool aliasOf(Vc2WaveSets& s, uint32_t n, Alias& out) {
 }
 } // namespace
 
+const uint8_t* Vc2WaveSets::dataAt(uint32_t at) const {
+    if (at - kVelocityDataAt < data.velocity.size()) return &data.velocity[at - kVelocityDataAt];
+    if (at - kKeyDataAt < data.key.size()) return &data.key[at - kKeyDataAt];
+    return nullptr;
+}
+
 bool Vc2WaveSets::waveWords(uint16_t index, uint8_t* wave, uint8_t key, uint8_t velocity, const Vc2WaveStore& store,
                             const Vc2WaveMemory& m) {
     Split byVelocity, byKey;

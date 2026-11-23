@@ -761,6 +761,34 @@ version against rom.4's routines with what it calls hooked:
         by a set's index `0x8939cba0`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's wave sets"). Every
         routine PCM's start calls is the port's now; `Vc2Synth` must give the store, the sets and the wave memory, and
         the loaders that fill the store and the sets aren't ported.
+      - The wave loaders, v500–v509, a block of their own (the coordinator's, 2026-11-23; map in the shared notes'
+        v500-on-vc2-wave-loaders.md): the index's parse (v500), the store's pool, records and chunks, the library's
+        records of the Wave Numbers, the bank, its wave reader and the start-up load of the samples.
+        - The index's parse done (v500): `Vc2WaveIndex`, rom.4's `0x8934d120` and its three section readers, which
+          fill the sets' counts, tables and the velocity's and key's data (now in `Vc2WaveSets`, with `dataAt`)
+          through rom.4's file calls (`Vc2Files`); xt_vc2waves, a harness of its own (HARDWARE_FIRMWARE.md, "The
+          VC-2's wave index, parsed"). Left: the store's side and the samples; where the plugin gets its files is the
+          user's call.
+        - The store's pool done (v501): `Vc2WavePool`, rom.4's pool at `0x8997c51c` that the records and chunks live
+          in, its set-up, alloc, calloc, free, realloc, largest, compaction and the objects' wrappers, a moved
+          block's object told through `Vc2PoolHost`; xt_vc2waves' second part (HARDWARE_FIRMWARE.md, "The VC-2's wave
+          pool"). Left: the store's set-up, records and chunks (their classes' moved methods on the host), the
+          library's records, the bank, its wave reader and the start-up load.
+        - The store's records done (v502): `Vc2WaveRecords`, a record's and a chunk's making, a record's deletion with
+          every class's destructor, the lists' insert and unlink, every class's moved method as the pool's host;
+          xt_vc2waves' third part (HARDWARE_FIRMWARE.md, "The VC-2's wave store's records"). The block is v500–v549
+          now (the coordinator's, 2026-11-23). Left: the store's set-up with its sampling record (v503), the loader's
+          context, the Wave Number records, the bank, its wave reader and the start-up load.
+        - The waves loaded by rom.4 itself (v503): from here rom.4's own boot loaders run in the interpreter at load
+          time, and only what the player reads is ported (the coordinator's, 2026-11-23); the files the disk image's,
+          the user's choice ("Image, FAT links"). `Vc2WaveBoot` runs the boot's stages with the kernel answered from
+          `Vc2DiskBootFiles` and takes the store, the pool and the sets as `Vc2LoadedWaves`, the wave memory;
+          xt_vc2waves' fourth part (HARDWARE_FIRMWARE.md, "The VC-2's waves, loaded by rom.4 itself"). v500's parse
+          is the check's expectation, v501's pool the taken pool's container, v502's records unused.
+        - [x] The load at the plugin's start (v504): the disk image sought beside rom.4 once rom.4 is in (PluginRom.cpp),
+          the load once a process on a thread of its own, the waves published whole (`Vc2WavesInUse`); checked by
+          VSynthEmuRomTest (HARDWARE_FIRMWARE.md, "The VC-2's waves at the plugin's start"). Left: the player's reads
+          through it, when `Vc2Synth` comes into the sound (its `Vc2SetReads` given `vc2Waves()`).
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

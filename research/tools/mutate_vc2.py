@@ -54,7 +54,11 @@
 # vc2setcommon: the part's conversion sets, the notes' Matrix objects, v280, and C's common, v281), through
 # xt_vc2sets, [cases] its cases (40).  --patch: vc2patch_muts.txt, in Vc2PatchStore.cpp, Vc2PatchFile.cpp and
 # XtPatchStore.cpp's reads (PORT=vc2patch, vc2patchfile, vc2patchxt: rom.4's patch store and its .p02 reader, v450),
-# through xt_vc2patch, [cases] its random stores beside the disk image's 128 patches (4).  One line
+# through xt_vc2patch, [cases] its random stores beside the disk image's 128 patches (4).  --waves: vc2waves_muts.txt,
+# in Vc2WaveIndex.cpp, Vc2WaveSets.cpp's reads by address, Vc2WavePool.cpp and Vc2WaveRecords.cpp (PORT=vc2waveindex,
+# vc2wavesetsdata, vc2wavepool, vc2waverecords: the wave loaders, v500 on) and rom.4's own load, Vc2WaveBoot.cpp,
+# Vc2WaveBootKernel.cpp and Vc2BootFiles.cpp (vc2waveboot, vc2wavekernel, vc2bootfiles, v503), through xt_vc2waves,
+# [cases] its drawn cases beside the disk image's index (40).  One line
 # each, as mutlist.run_plants says.  The lists: name|old|new[|port[|seed]], with \n and \| escaped.
 # --changed <rev> after the list's switch (2026-11-23, the user's "Yes, all five"): only the plants whose planted file
 # (mutate_vc2ports.sh's VC2PORTS) differs between rev and the working tree, or whose line in the list is new or edited
@@ -119,6 +123,8 @@ HARNESSES = {
     '--settings': (mutlist.Harness('mutate_vc2', 'xt_vc2settings', 'vc2settings_muts.txt', ('vc2settings', '2024'),
                                    'XT_VC2SETTINGS_STOP'), '40'),
     '--patch': (mutlist.Harness('mutate_vc2', 'xt_vc2patch', 'vc2patch_muts.txt', ('vc2patch', '2024')), '4'),
+    '--waves': (mutlist.Harness('mutate_vc2', 'xt_vc2waves', 'vc2waves_muts.txt', ('vc2waveindex', '2024'),
+                                'XT_VC2WAVES_STOP'), '40'),
     '--cosm': (mutlist.Harness('mutate_vc2', 'xt_vc2cosm', 'vc2cosm_muts.txt', ('vc2growl', '2024'), 'XT_VC2COSM_STOP'),
                '40'),
     '--libm': (mutlist.Harness('mutate_vc2', 'xt_vc2libm', 'vc2libm_muts.txt', ('vc2libm', '2024'), 'XT_VC2LIBM_STOP'),

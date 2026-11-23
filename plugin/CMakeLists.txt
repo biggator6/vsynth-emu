@@ -212,7 +212,7 @@ vse_add_test(VSynthEmuTest Tests/PluginTest.cpp)   # the XT path end to end
 vse_add_test(VSynthEmuTeardownTest Tests/TeardownTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # closed mid-encode
 vse_add_test(VSynthEmuWaveFileTest Tests/WaveFileTest.cpp)     # a wave whose header claims more than its data holds
 vse_add_test(VSynthEmuRestoreTest Tests/RestoreTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)   # reopened, parts gone
-vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp)   # another image while one plays
+vse_add_test(VSynthEmuRomTest Tests/RomTest.cpp Tests/RomWavesTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp)   # another image while one plays; the VC-2's waves at the start (v504)
 # The harnesses' switches set in the plugin's environment, which it doesn't read
 vse_add_test(VSynthEmuSwitchTest Tests/SwitchTest.cpp Tests/TestMain.cpp Tests/TestNote.cpp Tests/TestWave.cpp)
 # A firmware routine that loops, on each way the plugin runs one: it gives up within its step limit

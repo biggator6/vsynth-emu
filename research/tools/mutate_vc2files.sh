@@ -58,8 +58,9 @@ VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
 # xt_vc2synth's (v314): every VC-2 port the plugin's build lists but rom.4's parameter tables and the patch store and
-# .p02 reader that read with them (v450), then the rom.2 ports they lean on, the shared compares and the check
-NOT_SYN=" Vc2Params Vc2PatchStore Vc2PatchFile "
+# .p02 reader that read with them (v450), and rom.4's own load of the waves and its files (v503), which runs at the
+# start, not in the part; then the rom.2 ports they lean on, the shared compares and the check
+NOT_SYN=" Vc2Params Vc2PatchStore Vc2PatchFile Vc2BootFiles Vc2WaveBoot Vc2WaveBootKernel Vc2WavesInUse "
 VC2SYNTH=()
 while read -r f; do
     [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")
@@ -86,3 +87,7 @@ VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSetting
     Vc2PartVoicesTables Vc2TimeTrip Vc2TimeTripCheck Vc2PartChannel Vc2PartChannelCheck Vc2MidiDispatch
     Vc2MidiDispatchCheck Vc2NotesTask Vc2NotesTaskCheck)
 VC2PATCH=(Vc2PatchStore Vc2PatchFile Vc2PatchStoreCheck Vc2PatchFileCheck Vc2Params XtFxValueText)
+# xt_vc2waves' (v500): the wave loaders and the sets and store they fill; (v503) rom.4's own load and its files
+VC2WAVES=(Vc2WavesCheck Vc2WaveIndexCheck Vc2WaveIndex Vc2WaveSets Vc2WaveStore Vc2PartSettingsWords Vc2WavePool
+          Vc2WavePoolCheck Vc2WavePoolDraws Vc2WaveRecords Vc2WaveRecordsCheck Vc2WaveBoot Vc2WaveBootKernel
+          Vc2BootFiles Vc2WaveBootCheck Vc2WaveLookupCheck)

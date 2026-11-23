@@ -4601,6 +4601,401 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's waves at the plugin's start (2026-11-23, v504) {#vc2-waves-at-start}
+
+v503's load now runs at the plugin's start, once a process, beside rom.4's tables. That keeps the user's rule that
+both images load at the start, so switching modes is seamless (2026-11-14).
+
+**The search** (PluginRom.cpp, `seekWaves`). Once rom.4 is in and no disk image is taken, the plugin looks for
+`V-SynthXTDiskImage.bin.0.bin`:
+- beside rom.4, where the firmware update's unpacker leaves it;
+- then where rom.2 and rom.4 are sought: beside the plugin, the plugin's own folder, and a setting a choice by hand
+  would keep (`vc2DiskImagePath`), which nothing offers yet.
+It runs wherever rom.4 comes in: the early search before the parameters, the search after rom.2 opens, and rom.4
+chosen by hand. A file there that isn't a disk image with the VC-2's files is passed over, and the VC-2 then has no
+waves, quietly, as the V-Synth plays without rom.4.
+
+**The load** (`Vc2WavesInUse`). One object, `constinit` as XtSynthRom.cpp's images are:
+- It takes a disk image on the thread that offers it: the 65 MB read and the index and bank found in it, about
+  0.1 s.
+- It runs `vc2LoadWaves` on a thread of its own, about 2 s, so the start isn't held up.
+- It publishes the waves whole through an atomic pointer, `vc2Waves()`. `vc2WavesStatus()` says "no disk image
+  taken", "loading from …", "loaded from …" or why the load failed.
+- Once the load ends, the disk image and its files are let go. The waves keep the pool's 32 MB and the sets'
+  0.7 MB. A test process that loads them peaks at 314 MB resident, against 280 MB for one that ends just after
+  taking the disk image.
+- At the process's end, or a plugin's unloading, its destructor raises the load's stop flag (`Sh4StopScope`) and
+  waits for the thread. A process ending as the load runs takes 0.16 s, against 2.47 s for one that waits for it.
+
+Nothing reads the waves yet: `Vc2Synth`, which PCM's start reads them through, isn't in the sound.
+
+**The check** (VSynthEmuRomTest, `RomWavesTest.cpp`):
+- the start takes the disk image beside rom.4, the load ends, and its status names that disk image;
+- what it loaded is rom.4's own load of the same files, byte for byte: the store's words, the pool's words and
+  memory, and the sets' counts, tables, buffers and data;
+- a fresh run that ends as the load runs ends more than a second sooner than one that waits for it;
+- a fresh run with rom.4 alone in its folder takes no disk image (the `--alone` child).
+29 checks hold. Plants (`mutate_panel.py`, kind `rom-image`): eight `waves-` names, beside the 37 `rom-` and `rom4-`
+names a change to PluginRom.cpp or XtSynthRom.cpp runs.
+
+### The VC-2's waves, loaded by rom.4 itself (2026-11-23, v503) {#vc2-waves-loaded}
+
+From v503 the VC-2's waves come from rom.4's own boot loaders, run in the interpreter at load time. Only what the
+player reads at run time is ported by hand. That is the user's standing rule for load-time firmware (2026-10-28,
+as `xtFw*` and v450's `vc2PatchRead`), which the coordinator applied here (2026-11-23). The files come from the disk
+image beside rom.4, the user's choice of 2026-11-23 ("Image, FAT links"): the index and the sample bank from past
+its partition, and the 58 link files `A:\Internal.vc2\Wave\*.w02` through its FAT, as rom.4's own boot reads them.
+`Vc2WaveBoot` (plugin/Source) is the load, and `Vc2DiskBootFiles` gives it the disk image's files. Every address is
+rom.4's.
+
+**The boot's stages** (`0x8933eea0`, in its order):
+- the store's set-up (`0x89352520` → `0x89353ac0`: 32 MB for the pool, the sampling record);
+- the sample bank (`0x89350970` on `0x89e0f034`);
+- the index's state and parse (`0x8934ce70`, `0x8934d120`, v500's);
+- the project's path (`0x89342cb0`): it reads `C:\VC-2 Project.ini`, or else takes `A:\Internal.vc2\`;
+- the Wave folder's link files (`0x89349d00`). It lists `<project>Wave\` through rom.4's folder listing
+  (`0x8934ea50`, which keeps only `.w02`, sorted by name). Each `NNN name.w02` goes to the link reader
+  (`0x89347f40`), which makes a library record of key 2999 + NNN naming the wave the file's `link` chunk names;
+- the user waves (`0x89349ef0`: `.wav`, `.aif`, `.vpw` in the same folder, none on the disk image);
+- the start-up load (`0x8934d2a0`, `0x8934d2d0`): every sample the library's waves use, through the bank's wave reader.
+
+The boot's other stages are left out: the patch lists, the sampling object and its mode tests (`0x8930f200`,
+`0x8930f1e0`, `0x8931a000`…`0x89319a20`, `0x89359a20`, `0x89359e60`, `0x89341e90`). Where they run with their
+kernel calls given 0 (three fault without their own initializers), the memory the loaders leave is the same.
+
+**What runs before.** A fresh interpreter runs none of rom.4's 382 static initializers (the table at
+`0x898c59c4`, 12 bytes a row). The loaders need three. Without the folder listings' objects (`0x893503a0`) or their
+nodes' heap (`0x89350860`) the link pass faults, so the load runs those two and the bank's (`0x89350af0`). Dropping
+any other row of the 15 in the loaders' modules leaves the memory byte for byte the same. Running all 382 first
+leaves it the same too, which xt_vc2waves runs each time.
+
+**The heap.** rom.4's allocator (`0x89300770`, `calloc` `0x89300910`, `free` `0x89300840`) is rom.4's own, on the
+heap its image's header names: `0x8cc80000` to `0x8ffffffc` (its words `0x89300038`, `0x8930003c`). The research
+tools had answered it with a bump allocator. The load maps that heap and runs rom.4's own, and the 32 MB pool lands
+at `0x8dffffe8`. Nothing in the pool points outside it but one word of a chunk's data.
+
+**The kernel.** The kernel isn't in rom.4. Every call into it goes through a stub to an address at `0x88000000`…,
+and `Vc2WaveBootKernel.cpp` answers those addresses in one table. An address it doesn't answer faults the load,
+which names the address. Each answer is read from rom.4's own use of the call, and where rom.4 has its own Z: drive
+(`0x8933c4e0`, `0x8933c5d0`, `0x8933cad0`, …), from what that answers:
+
+| Kernel entry | rom.4's stub | What it is, as answered |
+|---|---|---|
+| `0x88008000`, `0x88008010` | `0x893018b0`, `0x893018c0` | the OS's lock and unlock (the pool's): 0 |
+| `0x88008110`, `0x88008120` | `0x89301810`, `0x89301820` | the allocator's lock and unlock: 0 |
+| `0x88008550` | `0x894da150` | the boot's key test: 0, the normal boot, which reads the `.ini` |
+| `0x88008a90` | `0x8933a890` | the display's text: 0 |
+| `0x880089b0`, `0x880089f0` | `0x8933a7b0`, `0x8933a7f0` | names compared over a length, without case |
+| `0x880089e0` | `0x8933a7e0` | names compared, without case |
+| `0x88008c90` | `0x89338c60` | a path's file name: the part past its last `\` |
+| `0x88008cf0`, `0x88008d00`, `0x88008d10`, `0x88008d20`, `0x88008da0` | `0x89338e50`…`0x89339040` | the drive's queries: 1, 0, 1, 1, 0, as the Z: drive answers |
+| `0x88008f00`, `0x88008f10` | `0x893369c0`, `0x893369f0` | a folder opened (a handle, 0 for none) and closed |
+| `0x88008f20` | `0x89336a40` | a folder's next entry, or 0 at its end |
+| `0x88008f30`, `0x88008f40` | `0x89336a90`, `0x89336ae0` | a folder rewound, and set to an entry's place |
+| `0x88008dd0` | `0x89339120` | an entry's stat by its place: +0 its size, +8 its FAT attributes |
+| `0x88008f80`, `0x88008fa0` | `0x89336c60`, `0x89336ca0` | a file opened (a handle, −1 for none) and closed |
+| `0x88008fb0`, `0x88008fe0` | `0x89336cf0`, `0x89336db0` | read (the count read) and seek (0) |
+| `0x88008f70` | `0x89336c10` | a file's stat: +0 its size |
+| `0x88008fc0` | `0x89336d60` | where a file's bytes are as memory: the bank's, mapped from `0x90000000` |
+
+A folder's entry: +0 its place (what seek and the stat take), +8 its name's length, +10 its name, +0x10a its 8.3
+name. rom.4's filter for link files skips names starting with `.` and entries with attributes 0x0e. It keeps
+folders, and keeps files whose extension is `w02` (`0x89350250`). `XtDiskImage` gives each entry's 8.3 name and
+attributes from v503.
+
+Not known, and chosen so the load is the same either way:
+- the string compares' case (the 58 names differ in their first three digits);
+- what a seek gives back (the loaders don't test it);
+- the drive's queries but by the Z: drive's answers;
+- `.` and `..`, which a FAT folder holds and rom.4's filter drops.
+
+A file opened in any mode but reading is refused and named. The loaders write only when the Wave folder is missing:
+the maker `0x8934db30` writes a link file per wave.
+
+**What the port takes** (`Vc2WaveBoot::take`, `Vc2LoadedWaves`):
+- the store's words (`0x8997c52c`);
+- the pool's words (`0x8997c51c`), and its memory from its base, the 32 MB and 24 bytes past them;
+- the sets' counts, tables, buffers and the velocity's and key's data (v399, v500).
+
+`Vc2LoadedWaves` is itself the wave memory a wave is read from by address: the sets' data where their streams lie,
+the pool elsewhere. It is what `Vc2SetReads::waveMemory()` must give, as PCM's start reads both through one memory.
+
+**The disk image's load:** 610,810,245 steps, about 2 s.
+- The sets: 58 waves, 43 maps, 192 samples.
+- The library: 58 records, one per link file.
+- 251 records in all: the sampling record, the 58 library records and the 192 samples. 193 data chunks
+  (the sampling record's and the samples').
+
+**The check** is xt_vc2waves' fourth part (`Vc2WaveBootCheck.cpp`, `Vc2WaveLookupCheck.cpp`). The load must run
+every stage. What it leaves must be what the files say, read without rom.4:
+- the sets as v500's port parses the same index;
+- each link file's library record naming the wave its `link` chunk names, and named by its first 12 characters
+  (a record's name is at most 12 characters from +0x58);
+- each of the index's 192 samples loaded, its `vpsc`, `vpno`, `vplp` and `vpdt` byte for byte as its stream in the
+  bank has them (a chunk's data 28 bytes in, its length at +0x10), and named by its file's first 12 characters.
+
+What the port takes must be rom.4's memory byte for byte, by the check's own addresses. The load is then run again
+after all 382 initializers, with two decoys in the Wave folder: a link file naming wave 1 as Wave Number 90 but a
+`.w03`, and a `.wa2`. Working compares leave both out, so that load must leave the same memory. A Wave Number past
+128 isn't a decoy: the link pass passes it over whatever the filter says. Then the port's lookups on what was taken
+against rom.4's own on the same machine:
+- `0x89351840` and `0x893520a0` for every key below 0x200, 2999…3199 and the sampling record's;
+- `0x8939cd30` for every Wave Number below 0x200;
+- `0x8939cba0` for every set index up to two past the count, at every key and every velocity, then [cases] drawn ones;
+- each call's answer, the words it writes and the sets' buffers.
+
+That is 17,598 lookups, and 0 different at seeds 2024, 7, 31337 and 99. The first run found the port's memory
+missing the sets' data. The lookups by set index read their streams through the wave memory, so `Vc2LoadedWaves`
+reads both.
+
+`mutate_vc2.py --waves`: 195 plants, none missed, no errors; 43 of them v503's, in the load (`vc2waveboot`), its
+kernel (`vc2wavekernel`) and its files (`vc2bootfiles`). Nine were dropped as equivalent on this data:
+- the drive's two queries the loaders don't act on here;
+- a seek from where a file is, which no loader asks for;
+- an entry's name length and the bytes past its names;
+- an entry's stat size;
+- the sets' buffers, which no loader writes;
+- the bank's initializer, which clears what C startup's .bss already has;
+- an empty step in a path, which only a doubled or leading `\` makes.
+Three more were missed at first and are caught now:
+- a path's file name taken one character early, once the check read the records' names;
+- a compare that always matches, and one a character short, once the decoys went in.
+`--sets` as before: 1019, none missed.
+
+**v500–v502 now.**
+- v500's parse is the check's expectation of the sets; the plugin doesn't run it.
+- v501's pool holds the taken pool (its words and memory, a `Vc2WaveMemory`); its allocator isn't used.
+- v502's records (`Vc2WaveRecords`) aren't used by the load or the plugin.
+They stay as committed, each checked against rom.4 as before.
+
+### The VC-2's wave store's records (2026-11-23, v502) {#vc2-wave-records}
+
+What the loaders build in the wave store (v398) and its pool (v501): records and their chunks, made, deleted and
+moved. Ported bit for bit as `Vc2WaveRecords` (Vc2WaveRecords.cpp) and checked in xt_vc2waves' third part, with
+rom.4's own routines running there. Every address is rom.4's.
+
+**A record** is an 88-byte pool object, with these words:
+- +0x10 the extra bytes it was made with (its type + 1) and +0x14 its vtable (`0x898ca8e0`);
+- its node at +0x18, on the store's list of its key mod 128: the previous node, the next and the key;
+- its chunks' slots +0x24…+0x4c, by chunk number: 1 +0x24, 2 +0x28, 3 +0x2c, 4 +0x30, 5 +0x34, 8 +0x38, 7 +0x3c,
+  6 +0x40, 10 +0x44, 11 +0x48, 12 +0x4c (v398's getter reads the same);
+- bytes +0x50 and +0x51, halfwords +0x52 (the busy flag v398 tests) and +0x54, all 0 when made.
+
+**A chunk** is a pool object of 28 bytes and its extra: its class's vtable at +0x14, its record at +0x18, its data
+after. Nine plain classes, one a number (1…7, 10, 12; vtables `0x898ca904`…`0x898caa48`). The data's class
+(`0x898ca9b8`, chunks 8 and 11) is 64 bytes before its data and asks 32 more:
+- seven band pointers from +0x1c, the first its data, the rest 0;
+- +0x38 which slot it hangs in: 0 the record's +0x38, 1 its +0x48;
+- +0x3c a word 0, and 32 bytes zeroed after the extra (`0x89353790`).
+
+**The routines:**
+- Making a record `0x89353b40(store, key, type)`: the store's record of the key (by the store's key, v398's find)
+  deleted first, then the object, its slots and bytes cleared, and its node put at the head of its list (`0x893533d0`:
+  alone, or before the head in its ring, and made the head). 1, or −1 with no room.
+- Making a chunk `0x89353ef0(store, key, n, extra)`: −5 with no record, for n outside 1…12, or 9. The slot's old chunk
+  is destroyed first. A data chunk asked as 8 or 11 hangs in +0x48 only when +0x38 holds one, and in +0x38 otherwise. 1,
+  or −1 with no room.
+- Deleting a record `0x89354490(store, key)`: each chunk's destructor in slot order, then the record's. −3 with no
+  record. A destructor (given 3) clears the record's slot, or unlinks the record's node (`0x89353460`), writes the base
+  vtable `0x898ca8bc` and frees the object.
+- The unlink: a node alone leaves its list empty. In a ring, the list's head becomes the node's previous when the
+  head's key is the node's. A ring of two leaves the other alone, with links of 0.
+- The moved methods, which the pool's compaction and realloc call:
+  - a record's (`0x89353540`) moves its chunks' record pointers and its list's head and neighbours' links to it;
+  - a plain chunk's moves its slot in the record;
+  - the data's moves its seven band pointers and its slot.
+  The port's `moved` finds the class by the object's vtable. An object of no class of the store's goes on to the OS's
+  host.
+
+**Not reached.** Keys are never negative, as v398 found: the lists' test for a negative key mod 128 isn't drawn.
+Neither are the branches a consistent list never takes: a node with a previous node but no next, or a listed record
+whose list has no head.
+
+**The check.** Each case sets a pool of 8 to 64 KB up on both sides (`0x89350c10`), under a store with no records and
+its key −1. Then up to 120 calls are drawn, after each of which the check compares the answer, the store's words, the
+pool's words and its whole memory, and both sides' logs:
+- a record made: twelve keys, three to each of the lists 0, 1 and 56, and a type 0…40;
+- a chunk made: its number 1…12 mostly, now and then 0, 9 or 13; its extra mostly under 100, now and then more than
+  the pool holds;
+- a record deleted, and the pool compacted;
+- an object of the check's own alloc'd or freed: its vtable logs its moves on both sides and its payload is noise. A
+  sixth of them take nearly all that's free, so a record or chunk then finds no room;
+- the store's key set, −1 three times in four.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, 4,800 calls a seed.
+- Every line of Vc2WaveRecords.cpp is reached. The branches left are those above.
+- `mutate_vc2.py --waves`: 47 new plants for the records, and one for the pool's read by address (which v398's find
+  now reads records through). All were caught on the first run. The whole list, 152, all caught.
+
+### The VC-2's wave pool (2026-11-23, v501) {#vc2-wave-pool}
+
+The memory the wave store's records and chunks live in: rom.4's pool at `0x8997c51c`. The store's set-up
+(`0x89353ac0`) gives it 32 MB from the OS's allocator. Ported bit for bit as `Vc2WavePool` (Vc2WavePool.cpp) and
+checked in xt_vc2waves' second part, with rom.4's own routines running there. Every address is rom.4's.
+
+**Its words.** Four at `0x8997c51c` (.bss): the memory's address, the block a search starts from (the rover), the
+memory's size, and the bytes counted free.
+
+**A block.** A 24-byte header, then its payload: the previous block, the next, the state (0 free, 1 used, 2 the
+ring's head) and the payload's size in 24-byte units. The blocks form a ring through the head, which has no payload.
+A request of n bytes takes ((n − 1) / 40 · 40 + 63) / 24 units, the division by 40 toward zero.
+
+**An object** in the pool starts at its block's header. Its +0x10 is a word its wrapper gives and its +0x14 its
+vtable. The vtable's entry at +0x18 is the object's place (a word added to the block) and, at +0x20, the routine the
+pool calls when it moves the block, with how far it moved. The record's is `0x89353540` (v502 on).
+
+**The routines:**
+- Set-up `0x89350c10(pool, bytes)`: frees the old memory, then asks the OS for `bytes` (`0x89300770`). It makes the
+  head and one free block of (bytes − 89) by the size law, and gives 1, or 0 when it has no memory.
+- Alloc `0x89350cd0`: the first free block from the rover with room. That block is split (`0x89351430`): a block of
+  exactly the size is only marked used; otherwise a free remainder follows it, joined to a free block after, and
+  becomes the rover. 0 for none, for 0 bytes or for more than is free.
+- Calloc `0x89350de0`: an alloc of count × size, zeroed.
+- Free `0x89350e40`: the block's payload counted free, and the block released (`0x893514f0`): joined to a free block
+  before it and one after, the rover the block that remains.
+- Realloc `0x89350e90`: a smaller size splits the block where it is. A larger one takes a free next block when it has
+  room, else moves to the first free block with room (`0x89351590`: the block copied, its object told, the old one
+  released), else gives 0.
+- The largest free block `0x89351090`, used whole, from 10 units: its size said, the bytes free less that (not below
+  0), the rover left.
+- The compaction `0x89351120`: each used block after a free one slides down into it, its object told, the free space
+  joined after it. At the end the bytes free are the last block's, if it is free, and the rover is the head.
+- The objects' wrappers: alloc `0x89351690(bytes, extra)` (the object's +0x10 the extra), the largest
+  `0x893516c0` (+0x10 its size), free `0x893516e0` and realloc `0x893517c0`.
+- The OS's lock around each (`0x893018b0`, `0x893018c0`) isn't ported. Neither is the `bra .` rom.4 stops in on a ring
+  it finds broken (a block smaller than asked to split, a used block where a free one must be).
+
+**rom.4's own stop.** One call on a whole ring reaches that stop: a realloc to the same size, when the next block is
+used. The search finds a free block of exactly that size, and the move leaves no remainder. The used block after it
+is where realloc expects a free one, and rom.4 stops. Seed 2024 found it, as a step limit. The port goes on, and the
+check draws a size up instead. That is the move's only case of no remainder: any other realloc that moves has grown.
+
+**Past the memory's end.** The size law can give the set-up's block up to 22 bytes more than the OS gave. rom.4 then
+writes on past its memory when it moves or fills the last block: the check found it, a compaction writing a header's
+state there. The port's memory runs 24 bytes on, zeroed.
+
+**The check.** Each case sets a pool up and makes up to 160 drawn calls on it:
+- alloc, an object's alloc, calloc, the largest (as a payload or an object), free (either way), realloc (either way),
+  the compaction, and now and then a set-up again; each by weight, with now and then a null pointer;
+- pools of 2 to 64 KB, now and then 0, too large for the OS to give, or negative, and then a few calls on the pool
+  with no memory;
+- sizes up to an eighth or a sixty-fourth of the pool, now and then 0 or past what is free; the extra bytes 0…40; a
+  realloc's size never the block's own.
+
+The OS's allocator gives both sides the same memory, zeroed, and both sides' calls to it are logged. Every block a
+call gives gets noise for its payload (calloc's stays zeroed) and one of two vtables at +0x14, on both sides. The
+vtables' methods (the object 0 or 0x30 bytes in) log where they were called and how far. After each call the check
+compares the answer, the pool's words, its whole memory and both logs.
+
+The draws, besides:
+- A realloc a fourth of the time to a size that fills a block exactly: the block and its free next joined (half of
+  those), or a free block elsewhere larger than it, when the size law can ask for that many units. Half the time on
+  the newest block, whose free remainder the last split left as the rover.
+- A fourth of the requests one of three sizes (48, 200, 1000 bytes), and now and then exactly what is free.
+- A case in four asks for 1000 bytes nearly always, on a pool of 2 to 8 KB, with allocs, frees and the largest alone:
+  the pool fills and holes of one size build up, which the largest must choose among (the first from the rover).
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, about 6,000 calls a seed.
+- Every line of Vc2WavePool.cpp's routines is reached. The branches left are the port's own (an address outside its
+  memory) and four of rom.4's that no whole pool takes: the move with no remainder (only after the same-size realloc
+  above), alloc's test of the rover for 0 (free bytes imply a set-up pool), the largest's floor at 0 and the
+  compaction's test of the head (the pool keeps its free count equal to its free payloads, and its head is always
+  the head).
+- `mutate_vc2.py --waves`: 55 new plants for the pool, with the 52 of v500, 105 after two found equivalent: the
+  largest's floor at 0 and the compaction's recount of the free bytes, as the count is already that. Five missed at
+  first, each caught by a draw above: a request of exactly what's free, the fills (two), the rover a realloc
+  inherits, and the ties.
+
+### The VC-2's wave index, parsed (2026-11-23, v500) {#vc2-wave-index}
+
+What fills the wave sets (v399): rom.4's parse of "D:\VC-2 Wave.bin" at boot, `0x8934d120`. Ported bit for bit as
+`Vc2WaveIndex` (Vc2WaveIndex.cpp). It is checked by a harness of its own, xt_vc2waves, with rom.4's own parse running
+there. Every address is rom.4's.
+
+**Where it runs.** The boot (`0x8933eea0`) runs in stages. It loads the sample bank, then sets the parse's state, two
+words on its own stack (`0x8934ce70`: the handle −1, the section's place 0), and parses. The store's set-up, the
+project's link files and the start-up load of the samples come after (the notes' map, v501 on). Nothing else writes
+the sets' counts or tables. The 21 other places that load their addresses make streams from them or read them, such
+as the wave list's scroller at `0x89504860`.
+
+**The file calls.** The parse goes through four of the OS's calls: open `0x89336c60(path, 0)` (a handle, negative when
+the file isn't there), read `0x89336cf0(handle, into, n)` (how many it read), seek `0x89336db0(handle, offset,
+whence)` and close `0x89336ca0`. The port makes the same calls in the same order, through `Vc2Files`. Whatever answers
+them gives both sides the same bytes. Every offset and count is the file's, little-endian.
+
+**The parse:**
+- The progress halfword at `0x899344e4` (.data, 0 after C startup) goes to 0, and the index opens. No file gives −60.
+- 12 bytes are read. Their first four must be `WLF0` (a `memcmp`), or the file is closed and the parse gives −90.
+- Two version strings follow: 16 bytes from offset 16 into `0x8997af30` and `0x8997af41`, each cleared to 17 zeros first.
+- For each of the header's +8 sections, the 12 bytes of its entry at 0x40 + 16i are read. An entry whose second
+  halfword isn't 1 is passed over. Otherwise its +4 becomes the state's section place, the file seeks there, and the
+  entry's number picks a reader: 1 the waves, the velocity's set (`0x8934ce90`); 2 the maps, the key's
+  (`0x8934cf40`); 3 the samples, the alias's (`0x8934d050`). Any other number is passed over. The progress gains 33
+  after each section read.
+- The index is closed, the progress set to 100, and the parse gives 1.
+
+**The velocity's and key's sections** (one code but for the set). The section's header is 12 bytes: the count (its low
+halfword), where its index lies in the section, and an index entry's size. For each record n from 1:
+- seek to its index entry and read its 8 bytes: the record's place in the section and its size;
+- seek to the record and read the whole size into the set's buffer in the reader's words (`0x8997af52`, the velocity's
+  0x210 bytes; `0x8997b162`, the key's 0x310);
+- the set's slot (`0x89327bc0`, `0x89327c50`): past entry 500 the section ends. Otherwise the count rises to n if it is
+  below, the slot is zeroed (0x210 bytes at `0x89d65e38` + 0x210(n − 1); 0x310 at `0x89da6578` + 0x310(n − 1)), and
+  the table's entry becomes the slot and its size;
+- a stream on the entry (`0x8934ce10`, its bound always met, as the count has just reached n), and the record written
+  into it (`0x89327b80`): as much as the slot holds.
+
+The record is read before the slot is refused, so a section of 501 leaves record 501 in the buffer. A record larger
+than its buffer runs on into the next buffers. The port's read stops at the reader's words' end (`0x8997b498`), where
+rom.4's would go on into the start-up load's state; no real record comes near it.
+
+**The alias's section.** Its header is the same. The file seeks to the section's index, and each entry is read in
+turn into the alias's buffer (`0x8997b472`, 0x26 bytes). Its four bytes after the 32-byte path become the alias's
+table entry n (`0x89327ce0` raises the count, refusing past 500), written through a stream on the entry itself.
+
+**The sets' data.** `Vc2WaveSets` holds the two data regions now (`Vc2WaveSetData`, 264,000 and 392,000 bytes), and
+`dataAt` gives a byte of them by rom.4's address. That is what the coming `Vc2Synth`'s wave memory reads the streams
+through. The progress halfwords (`Vc2WaveLoadProgress`) are the parse's, the start-up load's (`0x899344e6`) and the
+link files' maker's (`0x899344e8`).
+
+**The disk image's index.** It gives 58 waves, 43 maps and 192 samples, as `wlflib.py` reads it.
+
+**The check.** It is a harness of its own, xt_vc2waves, as the loaders run at boot, outside the part. rom.4's file
+calls are hooked to a list of files, and the port's go to an equal list. Each side's calls are logged and compared:
+their arguments, their answers, and the progress as each call is made (the XT's display reads it while a parse runs;
+the steps between sections show nowhere else). After each parse the check compares:
+- the return and the parse's state;
+- the progress, the reader's words, the counts, the tables and both data regions, byte for byte;
+- every stream the parse made, read back through `dataAt`, and the bytes just outside the data.
+
+The parses:
+- First, the disk image's index on the sets as C startup leaves them.
+- Then 40 cases of drawn indexes, one to three parses each, the sets carried from one parse to the next. A case
+  starts from C startup's sets or from noise.
+
+The draws:
+- Up to four sections. The number is 1…3 mostly, now and then 0, 4 or 0xffff; the second halfword is 1 mostly.
+- A set's section has 1…40 records mostly. Now and then it has none, or 498…505, across the table's 500. The count's
+  upper halfword is noise a time in eight. Index entries are 8 bytes mostly.
+- A record is the slot's size half the time, any less mostly otherwise, and now and then long enough to run on to the
+  reader's words' end.
+- An alias's entries are 36 bytes mostly (32…38). Their types are 0, 1, 3, 5 or any, and their links 0 or about the
+  count.
+- Now and then the file ends inside its last record, a magic byte is wrong, or there is no file.
+
+Not drawn: a read onto rom.4's stack that the file cuts short (a header, an index entry or a section's entry). It
+leaves the stack's own words.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, 76 to 87 parses a seed, a few not there or not WLF0 at each.
+- Every line, region and branch of Vc2WaveIndex.cpp is reached, and every one of `dataAt`'s.
+- `mutate_vc2.py --waves`: 52 plants, all caught. Two missed at first:
+  - The progress's step between sections: the parse always ends at 100. The file calls now carry the progress.
+  - The record read before its slot is refused: sections that cross 500 were too rare. A twelfth of them do now.
+- `mutate_vc2.py --sets`, the whole list, after the sets' change: 1019 plants, none missed, no errors.
+
 ### The VC-2's wave sets (2026-11-22, v399) {#vc2-wave-sets}
 
 What PCM's start calls when the store holds no record of its Wave Number loaded but gives a set's index: `0x8939cba0`
