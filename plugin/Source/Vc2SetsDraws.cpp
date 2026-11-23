@@ -115,6 +115,19 @@ void setsSumsDrawn(Vc2Fw& fw, std::mt19937& rng, bool all) {
     }
 }
 
+// The clock (v282's, the envelopes' part's; v391, the OSC blocks' too): internal or outside; half the time its words
+// give a tempo at or either side of the holds' thresholds, or between them, else over a wide span (where both holds
+// show); never 0 below
+void setsClockDrawn(Vc2Fw& fw, std::mt19937& rng) {
+    const auto targets = std::to_array<uint32_t>({ 199, 200, 201, 2499, 2500, 2501, 20 + rng() % 2400 });
+    const uint32_t tempo = setsOneOf(targets, rng);
+    const bool aimed = rng() % 2;
+    fw.cpu.wr8(kSetsClockAt + 0x40, rng() % 2 ? 0 : rng() % 2 ? 1 : (uint8_t)rng());
+    fw.cpu.wr32(kSetsClockAt + 0x10, aimed ? tempo : rng() % 100000);
+    fw.cpu.wr32(kSetsClockAt + 0x14, aimed ? 30000 : 1 + rng() % 30000);
+    fw.cpu.wr16(kSetsClockAt + 0x48, (uint16_t)(aimed ? 150000 / tempo : 1 + rng() % 65535));
+}
+
 void setsSay(const char* format, std::span<const long> values) {
     const std::string_view said(format);
     const std::string_view mark = "%ld";

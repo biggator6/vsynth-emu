@@ -27,7 +27,8 @@ protected:
 
 class LowerPanel : public juce::Component {
 public:
-    explicit LowerPanel(Controls::State& state);
+    // Made from a mode's path (v453: the VC-2's for a zone; the V-Synth's by default)
+    explicit LowerPanel(Controls::State& state, const Blocks::Path& path = Blocks::kPath);
     enum class View { selected, details, envelopes, lfos };
 
     std::function<void(int block)> onSelect;   // a click on an overview's tile: an index into Blocks::kPath
@@ -66,6 +67,7 @@ private:
     std::array<BlockViews, Blocks::kCount> blocks_;
     EnvelopesOverview allEnvelopes_;
     LfosOverview allLfos_;
+    Blocks::Path path_;
     int selected_ = Blocks::kFirstSelected;
     void showNow();
     juce::Rectangle<int> viewArea() const;

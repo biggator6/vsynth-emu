@@ -11,6 +11,11 @@ struct Vc2OscCentsLine {
     float top = 0, offset = 0, slope = 0;
 };
 
+// A pitch10's cents' divisor and hold, each its routine's own pool words (LITE's and VariPhrase's words', v396)
+struct Vc2OscCentsHold {
+    float tenth = 0, most = 0, least = 0;
+};
+
 struct Vc2OscConvertTables {
     float perTenth = 0;                  // 0x8939d07c: 10, the cents' tenths
     float centsMost = 0, centsLeast = 0;  // 0x8939d084, 0x8939d310: ±6000
@@ -39,6 +44,32 @@ struct Vc2OscConvertTables {
     // 0x89541f34: the level curve, by an index −128…+255 (the calibration's Level byte is read signed: below 0 the
     // words before it; the Sub Level byte unsigned: past 127 the words after it)
     std::array<uint16_t, 384> level {};
+    // EXTIN's converter's (v393): its gain's divisor (0x8939edf8, 6), its velocity factor's (0x8939edec, 32768) and its
+    // depths' (0x8939edc4, 63); the formant law 0x8939c490's 0.2 (0x8939c59c), 1200 (0x8939c560), 12000 (0x8939c56c)
+    // and 63 (0x8939c568), its low hold `sumLeast`'s, and its rows: 11 of four pairs of a key and an offset, from rom.4's
+    // .data at 0x8993d0c8
+    float extinGainScale = 0, extinVelocityScale = 0, extinDepthTop = 0;
+    float formantStep = 0, formantCents = 0, formantMost = 0, formantDepth = 0;
+    std::array<std::array<int32_t, 8>, 11> formantRows {};
+    // PCM's converter's (v394): its depths' 63 (0x8939e4b4), velocity scale (0x8939e4dc, 32768) and gain divisor
+    // (0x8939e8d8, 6); the envelope and LFO Time depths' curve, its lines' knee 60 (0x8939e724), −120 (0x8939e728), 3
+    // (0x8939e72c), −60 (0x8939e730), −2 (0x8939e734), −3 (0x8939e738) and 20 (0x8939e73c); the Time law 0x8939c310's
+    // −63 (0x8939c570), 60 (0x8939c574), −60 (0x8939c578), 20 (0x8939c57c), −3 (0x8939c580), −5 (0x8939c584), 3
+    // (0x8939c588), 5 (0x8939c58c), 127 (0x8939c590), its 1200, 63 and 12000 the formant law's words; and the Formant
+    // law 0x8939c410's low hold, −12000 (0x8939c594)
+    float pcmDepthTop = 0, pcmVelocityScale = 0, pcmGainScale = 0;
+    float depthKnee = 0, depthOffset = 0, depthPer = 0, depthKneeLow = 0, depthSlopeLow = 0, depthPerLow = 0;
+    float depthScale = 0;
+    float timeLeast = 0, timeKnee = 0, timeKneeLow = 0, timeScale = 0, timeFromLow = 0, timeLeastOut = 0;
+    float timeFrom = 0, timeMostOut = 0, timeBeam = 0, pcmFormantLeast = 0;
+    // LITE's words' (v395, 0x8939efa0): the cents' tenths, 10 (0x8939f2dc), and their hold, 6000 (0x8939f2e0) and −6000
+    // (0x8939f2e4)
+    Vc2OscCentsHold lite {};
+    // VariPhrase's words' (v396, 0x8939f2a0): three sets of a tenth and a hold (10, 6000, −6000), one for each way to the
+    // cents: against A4 (0x8939f8d0, 0x8939f8d8, 0x8939f8dc), against the root on a type 1 (0x8939f8d0, 0x8939f8d8,
+    // 0x8939fb78) and on the others (0x8939fb7c, 0x8939fb80, 0x8939fb78); the level's scale, 32768 (0x8939fb88)
+    Vc2OscCentsHold variA4 {}, variRoot {}, variRootOther {};
+    float variLevel = 0;
 };
 
 [[nodiscard]] bool vc2LoadOscConvert(const char* path);

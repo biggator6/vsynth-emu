@@ -35,10 +35,10 @@ std::array<LowerPanel::Column, 3> LowerPanel::BlockViews::columns() const {
     return { envelopes, shape, reaching };
 }
 
-LowerPanel::LowerPanel(Controls::State& state)
-    : allEnvelopes_(state), allLfos_(state) {
+LowerPanel::LowerPanel(Controls::State& state, const Blocks::Path& path)
+    : allEnvelopes_(state, path), allLfos_(state, path), path_(path) {
     for (int block = 0; block < Blocks::kCount; ++block) {
-        const Blocks::Block& b = Blocks::kPath[(size_t)block];
+        const Blocks::Block& b = path_[(size_t)block];
         BlockViews& v = blocks_[(size_t)block];
         if (Blocks::envelopesOf(b) > 0) v.env = std::make_unique<EnvelopeView>(state, b);
         if (Blocks::kindOf(b).lfo != nullptr) v.lfo = std::make_unique<LfoView>(state, b);
@@ -78,7 +78,7 @@ void LowerPanel::showView(View v) {
 
 // What is shown: the selected block's views for SELECTED or DETAILS, or an overview; everything else hidden
 void LowerPanel::showNow() {
-    name_.setText(Blocks::blockName(Blocks::kPath[(size_t)selected_]), juce::dontSendNotification);
+    name_.setText(Blocks::blockName(path_[(size_t)selected_]), juce::dontSendNotification);
     const View v = view();
     for (int block = 0; block < Blocks::kCount; ++block) {
         BlockViews& b = blocks_[(size_t)block];

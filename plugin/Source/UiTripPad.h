@@ -6,11 +6,15 @@
 // counts the angle); a release sends 0 and 0, lifting the finger, unless Hold keeps it where it is.  An assign set to
 // OFF (0, or 32) leaves the pad nothing to send, and the pad says so.
 #include "PluginProcessor.h"
+#include <functional>
 #include <optional>
 
 class TripPad : public juce::Component {
 public:
-    explicit TripPad(VSynthEmuProcessor& p) : processor_(p) {}
+    // The controllers it sends, X then Y, 0 for none: by default the V-Synth's Time Trip Assign X and Y; a mode's own
+    // (v453: the VC-2's, the pair its Pad Mode names, d-10)
+    using Assigns = std::function<juce::Point<int>()>;
+    explicit TripPad(VSynthEmuProcessor& p, Assigns assigns = {}) : processor_(p), assigns_(std::move(assigns)) {}
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
@@ -26,6 +30,7 @@ public:
 
 private:
     VSynthEmuProcessor& processor_;
+    Assigns assigns_;
     std::optional<juce::Point<int>> finger_;
     bool hold_ = false, down_ = false;
     int assigned(int assign) const;               // the controller an assign names, 0 for none

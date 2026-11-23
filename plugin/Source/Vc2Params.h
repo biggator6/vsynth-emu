@@ -17,6 +17,9 @@ const XtParamDesc* vc2ParamDesc(int id);
 const XtTypedDesc* vc2TypedDesc(int id);
 // As the screens show it: up to a mark for the manual's footnotes, its spaces round it gone; empty past the table
 std::string vc2ParamName(int id);
+// The ID's values' string as rom.4 holds it, which its routine formats a value by: names split by a 1, a range's ends by
+// a 2, the unit after a 3 (the editor's controls' kind and text, v453: UiVc2Text.cpp).  Empty before the tables are in.
+std::string vc2ValueString(int id);
 // A value's text by rom.4's routine, as XtFxValueText gives rom.2's: the routine's format, and the ID's unit after a bare
 // number.  `value` within the ID's range, as the store's read gives it.  The routine has no format for many of the
 // VC-2's own IDs and faults on a few values; those read as their number (VC2_VOCAL_DESIGNER.md, "rom.4's values as

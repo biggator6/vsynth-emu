@@ -10,6 +10,12 @@ constexpr int kMark = 2, kSpace = 4;   // the chosen one's underline; the space 
 Tabs::Tabs(juce::StringArray names, Style style)
     : style_(std::move(style)), names_(std::move(names)) {}
 
+void Tabs::setNames(juce::StringArray names) {
+    names_ = std::move(names);
+    chosen_ = juce::jlimit(0, juce::jmax(0, names_.size() - 1), chosen_);
+    repaint();
+}
+
 void Tabs::choose(int tab) {
     const int now = juce::jlimit(0, juce::jmax(0, names_.size() - 1), tab);
     if (now == chosen_) return;

@@ -9,6 +9,7 @@
 #include "UiWatch.h"
 #include "XtSynthZones.h"
 #include <array>
+#include <functional>
 #include <memory>
 
 // The keys and the zones' ranges on them
@@ -20,7 +21,7 @@ public:
 
 class ZoneCell : public juce::Component {
 public:
-    ZoneCell(Controls::State& state, int zone);
+    ZoneCell(Controls::State& state, int zone, const juce::String& upperId);
     Bar& upper() { return upper_; }
     void show(const XtZoneKeys& keys, const juce::String& plays);   // its keys and what it plays, drawn under the bar
     void paint(juce::Graphics&) override;
@@ -34,7 +35,15 @@ private:
 
 class ZonesPage : public juce::Component, private juce::Value::Listener {
 public:
+    // A mode's page (v453): each zone's Range Upper, the session's property a patch's zones come in by, and what a zone
+    // plays, from what the processor says of the patch's zones; the V-Synth's by default, the VC-2's (UiVc2Pages.cpp)
+    struct Mode {
+        std::function<juce::String(int zone)> upperId;
+        juce::Identifier property;
+        std::function<juce::String(VSynthEmuProcessor&, int zone)> plays;
+    };
     explicit ZonesPage(VSynthEmuProcessor& p);
+    ZonesPage(VSynthEmuProcessor& p, Mode mode);
     ~ZonesPage() override;
     ZonesPage(const ZonesPage&) = delete;
     ZonesPage& operator=(const ZonesPage&) = delete;
@@ -43,12 +52,12 @@ public:
 
 private:
     VSynthEmuProcessor& processor_;
+    Mode mode_;
     std::unique_ptr<Card> keysCard_, zonesCard_;
     ZoneKeys* keys_ = nullptr;
     std::array<std::unique_ptr<ZoneCell>, kXtZones> cells_;
     juce::Value plays_;   // the processor's "zonePlays", to hear a patch's zones come in
     Watch splits_;        // the sixteen Range Uppers
     void refresh();
-    static juce::String playsOf(const juce::StringArray& plays, int zone);
     void valueChanged(juce::Value&) override { refresh(); }
 };

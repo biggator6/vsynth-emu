@@ -3994,3 +3994,79 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - `PluginProcessor.h` had to shrink before it could take the patch's members: the per-OSC file buffer went to a header of its own, moved as it stood. The kit refused the new header at first because the old copy was still in place; the order is take out, then write.
 - The processor's accessor was first `vc2Store()`, the very name of the store layout's free function, which a member would have shadowed inside the class. It is `vc2PatchStore()`.
 - The test first left the VC-2's system parameters out, as no patch holds them, so a load that wrote them would have passed. It moves them to their tops before the loads now and asks that they stay.
+
+### Session 24 (2026-11-22) — v390: the sets' COSM inputs
+
+- Started from another session's brief: C's two children left by v314, the OSC blocks' and the COSM inputs', in v390–v399 beside step 4.3's v329 on. The COSM inputs came first, as everything they call was ported (v235…v241).
+- The first run differed in 3 of 40 cases. An input's own +0 and +1, drawn as any bytes, placed the update's read past the 16 parts' rows, into the noise other parts had left there. A converter then read the gain table past its end, where rom.4 reads on and the port gives 0. The check draws rows past the parts' now.
+- The constructor multiplies the kind's and the index's whole words, the update their bytes. A word reads 21,504 bytes a step of 256 past its byte, which is the size of the 16 parts' rows, so only a word past 255 can tell the two apart. The rows drawn past the parts' are where it reads.
+- My first plant run said every name was "not in vc2sets_muts.txt". zsh passed the unquoted list as one argument. The names go through a bash script now.
+- The port's shared routines run rom.4's own in the interpreter and leave r0 changed, which the check reads as rom.4's answer. v285 kept the registers inline for its curve; one class keeps them for all four now (SetKeptShared).
+
+### Session 24, continued (2026-11-22) — v391: the sets' OSC blocks
+
+- The OSC blocks call more than the brief named: the dispatch, three kinds' starts, the converter frame with the vibrato's words, and the PCM and EXTIN converters, none ported. The dispatch, the starts, the frame and the analog's and VOCODER's converters are in v391; PCM's start and the PCM and EXTIN converters stay rom.4's own through Vc2SetReads.
+- The step counts' table is part 0's 64 bytes, with the update queue after it: the check keeps 16 parts' worth of its own copy, as a part past 0 counts into whatever follows.
+- To stop my plant run I ran pkill -f with a pattern every session's runs match. The two running sessions were told; neither had a run going then.
+
+### Session 24, continued (2026-11-22) — v392, v393: Alias Cancel, EXTIN's converter
+
+- The git guard refuses amends, so v391's missed Alias Cancel plant got a version of its own (v392); the converters start at v393.
+- EXTIN's converter equalled rom.4 on its first run, but four of its plants were missed: with the record's bytes as noise, the formant held at ±1 almost always. The Harm Formant's IDs gave the ranges to draw them in.
+- Its formant law's third span takes its distance from the second key, not the third. It is ported as rom.4 has it.
+
+### Session 24, continued (2026-11-22) — v394, v395: PCM's converter, LITE's words
+
+- PCM's converter writes none of the pitch words v251's head writes (key, cents, pitch10s). LITE's words, which it calls for a wave of type 0, write them, with the cents taken against the wave's root key rather than A4.
+- LITE's words read the part's trip object through the part table at 0x8993d040, which is 0xffffffff after C startup. The check aims it at trip objects of its own; anything that runs rom.4's code with the table unset faults there.
+- A shell edit of a source file goes past the content laws. Three such edits were made again with Edit, and one name they had let through twice was renamed.
+- VariPhrase's words (v396) form the same pitch words as LITE's, about a centre key that EVENT can move. v251's key sum took its centre from a constant; it takes it as a parameter now, and LITE's words stopped running v251's whole head on a copy for theirs.
+- EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
+- The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
+
+### Session 24, continued (2026-11-22) — v399: the wave sets
+
+- My notes had the sets' counts at 0xffff after C startup. rom.4's own .data copy says 0, and so do the image's
+  sections; the notes were wrong.
+- The first draws found a record by a set only 4 times in 1080: the sets' numbers and counts rarely lined up, and few
+  of the store's records carried a set's number. Numbers 1…32 against counts 16…48, and half the records keyed by one,
+  gave about 60.
+- Seed 99 found a second read at address 0. By a set's index the vpno's count is read with no test, so a record with
+  no vpno takes it from address 4, and the events read past the 4 KB page mapped there. The page is 132 KB now.
+- The alias's second bound test can't fail: the link it tests is already below the number, which passed the same
+  bound. Coverage showed it, and it isn't ported.
+- The kit refused a table entry type made 500 times (shape law; its manifest lives in the main checkout, which this
+  worktree doesn't write), so the two stream tables hold their entries as word pairs.
+- Five plants missed at first. Two became equivalent once the sets were ported: the index's cut to a halfword and its
+  test for 0. Two others were PCM start's key (its centre, LEGATO's key): while 0x8939cba0 was hooked, the call's log
+  showed the key, but now only a key set's match does, and noise bounds almost never move it by a few keys. Bounds that
+  rise in small steps, as splits do, and 128 store records in place of 64 caught both. The last needed a stream whose
+  last entry alone matched.
+
+### Session 24, continued (2026-11-22) — v398: the wave store
+
+- The coordinator merged vc2-mode into this branch and ran the merge's checks while I mapped the store, read-only. The
+  port started from the merge commit.
+- rom.2's twin of the store's loaded test is hooked in xt_tone as "loaded", and xt_tone fills rom.2's chunks by the same
+  numbers. That named the chunks the store's words take: the vpsc, vpno, vplp, vpdt, the data block and the loop
+  events.
+- The first run faulted in VariPhrase's words at address 0x0c. A record with no vpno leaves the wave's events' table
+  at 0, and STEP or EVENT then read from it. On the XT that is area 0. The check maps a page of noise there, as
+  XtFxControl maps one.
+- Three helper names (`waveWord`, `asWord`, `blockOf`) were already taken elsewhere, and the kit refused each. The
+  store now writes through the settings readers' stores and reads through vc2in's.
+
+### Session 24, continued (2026-11-22) — v397: PCM's start
+
+- PCM's start was the last of the OSC blocks' routines rom.4 ran for the port; what it calls is the wave store's lookups, which the check answers from drawn words on both sides. Vc2Synth will have to give them from the wave memory.
+- Its only branch the draws missed at first was LEGATO with the make's legato byte clear: every draw of that byte was noise.
+
+### Session 24 (2026-11-22) — v453: the VC-2 mode's pages
+
+- The worktree was cut from master, not vc2-mode; the coordinating session had it fast-forwarded to 650bf26 before any work.
+- The design left the mode switch's form open, so I asked (d-15) before building it; the user took the session setting.
+- D's parts were the V-Synth's tables in code. Copying them for the VC-2 was refused by the kit, rightly, so each part now takes a mode's tables (a Block's `Model`, a panel's or a page's `Mode`), the V-Synth's by default. Each step was built and the V-Synth's editor test run before any VC-2 page existed: 2602 checks, the same 183 states and 29,379 placements.
+- The first full run said Vocoder Sw wasn't a switch and Tempo read 1200. The cause was the test, not the tables: its processor was made before rom.4 was in, so the VC-2's parameters were stand-ins. The test brings rom.4 in first, as the VC-2 parameter test does, and the editor now treats a stand-in as a plain knob rather than reading rom.4's strings against the stand-in's range.
+- My test's parse of a host ID looked for "c2" in the whole head, and "vc2" has one: every COSM 1 control seemed to move COSM 2's. It reads the head after the prefix now.
+- The patch EQ's Q from its string would have been 0.5, 2.0, 3.5…: even steps fit 0.5~8.0 over six values. rom.2's routine on its EQ Mid 1 Q gives 0.5, 0.7, 1.0, 2.0, 4.0, 8.0, and rom.4's driver puts the patch EQ in those mid bands, so the editor asks rom.2's routine for both bands' Freq and Q.
+- Pad Mode's box beside Pad Hold cut TIME-TRIP at every size; it has a row of its own.

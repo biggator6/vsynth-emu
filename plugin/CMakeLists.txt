@@ -97,6 +97,7 @@ target_sources(VSynthEmu PRIVATE
     Source/UiCard.cpp
     Source/UiPages.cpp
     Source/UiMsm.cpp
+    Source/UiBars.cpp
     Source/UiMatrix.cpp
     Source/UiModPage.cpp
     Source/UiArpPattern.cpp
@@ -168,6 +169,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtBuildId.cpp
 )
 include(Vc2Sources.cmake)   # the VC-2 mode's ports, rom.4's (v251: moved out of this list as they stood)
+include(Vc2UiSources.cmake)   # the VC-2 mode's pages in the editor (v453)
 
 # ─── Which build this is ─────────────────────────────────────────────────────
 # Worked out at every build, not at configure, so it can't go stale.  It rewrites the file only when the id changes.
@@ -227,7 +229,7 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
-             Tests/TestMain.cpp Tests/TestWave.cpp)
+             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
 # against XtSynth given the input by the law, the Effects off and on
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)

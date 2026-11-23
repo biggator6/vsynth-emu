@@ -1,15 +1,20 @@
-// D's header (UiHeader.h; UI step 1)
+// D's header (UiHeader.h; UI step 1; the modes, v453)
 #include "UiHeader.h"
 #include "PluginParamIds.h"
+#include "PluginVc2Params.h"
+#include "UiControls.h"
 #include "UiLook.h"
 #include "UiParts.h"
+#include "UiVc2Mic.h"
 #include "XtBuildId.h"
 
 namespace {
 // Where each part sits, left to right, in the drawing's units (UI_DESIGN.md, "The window")
 constexpr int kLeft = 16, kModeX = 176, kModeW = 64, kPatchW = 400, kPatchH = 32, kBrowseW = 76, kPatchTagW = 56;
 constexpr int kTempoX = 812, kTempoLabelW = 46, kTempoW = 56, kEffectsW = 84, kRomStateW = 96, kRomW = 60;
-constexpr int kButtonH = 26, kNoteH = 11;
+constexpr int kButtonH = 26, kNoteH = 11, kMicW = 84, kMicGap = 8;
+constexpr int kModeGroup = 2002;   // the V-SYNTH/VC-2 pair's radio group
+constexpr int kVc2Tempo = 0x13a;   // [FW] the VC-2's Patch Tempo
 constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
 }
 
@@ -24,31 +29,50 @@ Header::Header(VSynthEmuProcessor& p)
     Look::setTextLook(tempo_, Look::mono(11.0f), Look::text);
     Look::setTextLook(romState_, Look::sans(11.0f), Look::label, juce::Justification::centredRight);
     romState_.setMinimumHorizontalScale(0.5f);
-    synthMode_.setToggleState(true, juce::dontSendNotification);
-    vc2Mode_.setEnabled(false);
-    vc2Mode_.setTooltip("The VC-2 mode isn't in yet");
+    for (auto [button, mode] : { std::pair { &synthMode_, PluginMode::vsynth }, { &vc2Mode_, PluginMode::vc2 } }) {
+        button->setRadioGroupId(kModeGroup);
+        button->onClick = [this, m = mode] { if (onMode) onMode(m); };
+    }
+    vc2Mode_.setTooltip("The VC-2 mode's pages; it plays nothing yet, until the VC-2 synth is in (step 4.3)");
     browse_.onClick = [this] { choosePatch(); };
     rom_.onClick = [this] { chooseRom(); };
+    mic_.onClick = [this] { if (onMic) onMic(); };
+    addChildComponent(mic_);
     const std::initializer_list<juce::Component*> parts = { &build_, &patchName_, &tempo_, &romState_, &synthMode_,
                                                             &vc2Mode_, &browse_, &rom_, &effects_ };
     for (juce::Component* c : parts) addAndMakeVisible(c);
+    setMode(PluginMode::vsynth);
+}
+
+void Header::setMode(PluginMode mode) {
+    mode_ = mode;
+    synthMode_.setToggleState(mode == PluginMode::vsynth, juce::dontSendNotification);
+    vc2Mode_.setToggleState(mode == PluginMode::vc2, juce::dontSendNotification);
+    mic_.setVisible(mode == PluginMode::vc2);
+    resized();
     refresh();
 }
 
 void Header::refresh() {
-    const juce::String name = processor_.getPatchName();
+    const bool vc2 = mode_ == PluginMode::vc2;
+    const juce::String name = vc2 ? processor_.vc2PatchName() : processor_.getPatchName();
     Look::showText(patchName_, name.isNotEmpty() ? name : juce::String("No patch loaded"),
                    name.isNotEmpty() ? Look::text : Look::muted);
     // What the patch asks for that isn't here (its waves, an OSC's external input), under its name, or nothing
-    const juce::String note = processor_.getPatchNote();
+    const juce::String note = vc2 ? juce::String() : processor_.getPatchNote();
     patchNote_.setText(note.isNotEmpty() ? "not here: " + note : juce::String(), juce::dontSendNotification);
     if (note.isNotEmpty() != noted_) {
         noted_ = note.isNotEmpty();
         patchNote_.setVisible(noted_);
         resized();
     }
-    tempo_.setText(processor_.apvts.getParameter("patchTempo")->getCurrentValueAsText(), juce::dontSendNotification);
+    const juce::String tempoId = vc2 ? vc2HostParamId(kVc2Tempo, 0, 0) : juce::String("patchTempo");
+    tempo_.setText(Controls::currentText(processor_.apvts, tempoId), juce::dontSendNotification);
     Look::showText(romState_, processor_.getStatusText(), processor_.hasRom() ? Look::ready : Look::warning);
+    if (!vc2) return;
+    const bool heard = Vc2Mic::heard(processor_);   // the MIC chip: the vocoder heard as far as the editor sees, or why not
+    mic_.setColour(juce::TextButton::textColourOffId, heard ? Look::ready : Look::warning);
+    mic_.setTooltip(Vc2Mic::status(processor_));
 }
 
 void Header::resized() {
@@ -57,6 +81,11 @@ void Header::resized() {
     synthMode_.setBounds(kModeX, mid - 12, kModeW, 24);
     vc2Mode_.setBounds(kModeX + kModeW, mid - 12, kModeW, 24);
     patchBox_ = { (getWidth() - kPatchW) / 2, mid - kPatchH / 2, kPatchW, kPatchH };
+    if (mode_ == PluginMode::vc2) {   // the MIC chip at the patch box's right, the box narrower by it
+        auto whole = patchBox_;
+        mic_.setBounds(whole.removeFromRight(kMicW).withSizeKeepingCentre(kMicW, kButtonH));
+        patchBox_ = whole.withTrimmedRight(kMicGap);
+    }
     auto box = patchBox_.reduced(4, 0);
     browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));
     box.removeFromLeft(kPatchTagW);
@@ -84,11 +113,14 @@ void Header::paint(juce::Graphics& g) {
                  { Look::sans(11.0f), Look::label, juce::Justification::centredRight });
 }
 
+// A patch of the mode's own: a .p00 for the V-Synth, a .p02 for the VC-2 (loadVc2Patch, v452)
 void Header::choosePatch() {
-    chooser_ = std::make_unique<juce::FileChooser>("Load a V-Synth patch", processor_.lastPatchFolder(), "*.p00");
-    chooser_->launchAsync(kOpen, [this](const juce::FileChooser& fc) {
+    const bool vc2 = mode_ == PluginMode::vc2;
+    chooser_ = std::make_unique<juce::FileChooser>(vc2 ? "Load a VC-2 patch" : "Load a V-Synth patch",
+                                                   processor_.lastPatchFolder(), vc2 ? "*.p02" : "*.p00");
+    chooser_->launchAsync(kOpen, [this, vc2](const juce::FileChooser& fc) {
         const juce::File file = fc.getResult();
-        if (file.existsAsFile()) processor_.loadPatch(file);
+        if (file.existsAsFile()) vc2 ? (void)processor_.loadVc2Patch(file) : (void)processor_.loadPatch(file);
         refresh();
     });
 }

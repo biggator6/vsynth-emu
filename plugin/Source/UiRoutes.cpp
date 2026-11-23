@@ -35,17 +35,18 @@ RoutesView::RoutesView(Controls::State& state, const Blocks::Block& b)
     refresh();
 }
 
+// The Matrix's rows, by its Controls' names as their parameters say them (the block's mode's Matrix, v453)
 void RoutesView::makeRoutes() {
     for (const auto& bar : matrix_) removeChildComponent(bar.get());
     matrix_.clear();
-    const juce::StringArray sources = VSynthEmuProcessor::matrixSourceNames();
-    const juce::StringArray dests = VSynthEmuProcessor::matrixDestNames();
     for (int control = 0; control < Matrix::kControls; ++control) {
-        const juce::String source = sources[choiceOf(state_, Matrix::sourceId(control))];
+        const juce::String source =
+            Controls::currentText(state_, Blocks::matrixParam(block_, control, Blocks::kMatrixSource));
         for (int dest = 0; dest < Matrix::kDests; ++dest) {
-            const juce::String to = dests[choiceOf(state_, Matrix::destId(control, dest))];
+            const juce::String to =
+                Controls::currentText(state_, Blocks::matrixParam(block_, control, Matrix::destField(dest)));
             if (!Blocks::reaches(block_, to)) continue;
-            const juce::String sens = Matrix::sensId(control, dest);
+            const juce::String sens = Blocks::matrixParam(block_, control, Matrix::sensField(dest));
             matrix_.push_back(std::make_unique<Bar>(state_, sens, source + kArrow + to, Look::mod));
             addAndMakeVisible(*matrix_.back());
         }
@@ -55,8 +56,9 @@ void RoutesView::makeRoutes() {
 void RoutesView::refresh() {
     juce::String now;
     for (int control = 0; control < Matrix::kControls; ++control) {
-        now << choiceOf(state_, Matrix::sourceId(control));
-        for (int dest = 0; dest < Matrix::kDests; ++dest) now << ',' << choiceOf(state_, Matrix::destId(control, dest));
+        now << choiceOf(state_, Blocks::matrixParam(block_, control, Blocks::kMatrixSource));
+        for (int dest = 0; dest < Matrix::kDests; ++dest)
+            now << ',' << choiceOf(state_, Blocks::matrixParam(block_, control, Matrix::destField(dest)));
         now << '|';
     }
     if (now == made_) return;

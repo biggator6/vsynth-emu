@@ -16,8 +16,6 @@ constexpr uint32_t kHead = 0x124f80;              // [FW] the block's +0x0c and 
 constexpr int32_t kLongest = 12000;               // [FW] the time curve's most
 constexpr int32_t kNoteFrom = 128, kTop = 127;    // [FW] a value from 128 on is a note value; a sum's most
 constexpr int32_t kCentreKey = 60, kCentreVelocity = 64, kTicksTimes = 24;
-constexpr int32_t kInternalScale = 30000, kOutsideScale = 150000;   // [FW] the clock's tempo
-constexpr int32_t kSlowest = 200, kFastest = 2500, kSlowHeld = 20, kFastHeld = 250;   // [FW] its hold, as rom.4's
 constexpr int32_t kDepthScale = 256000;           // [FW] a depth's, before the division by 6400
 constexpr int32_t kMagic = 0x51eb851f;            // [FW] rom.4's reciprocal of 6400, by its shift
 constexpr int kMagicShift = 11, kVelocityShift = 8;
@@ -108,14 +106,6 @@ float decayTime(const Vc2EnvelopeWords& w, uint32_t type, Vc2SetReads& reads) {
     const uint32_t time = type == 0 ? quarterTime(value) : curveTime(value, w.velocity, w.decaySens, w.factor);
     return xtf::flt(static_cast<int32_t>(time));
 }
-
-// The clock's tempo, held as rom.4 holds it: the library's signed division, below 200 to 20, above 2500 to 250
-uint16_t tempoOf(const Vc2SetClock& c) {
-    const int32_t t = c.external == 0
-                          ? static_cast<int32_t>(kInternalScale * static_cast<uint32_t>(c.numerator)) / c.denominator
-                          : kOutsideScale / static_cast<int32_t>(c.period);
-    return static_cast<uint16_t>(t < kSlowest ? kSlowHeld : t > kFastest ? kFastHeld : t);
-}
 } // namespace
 
 void Vc2SetEnvelopes::blockOf(Vc2EnvelopeWords& w, uint32_t* block, Vc2SetReads& reads) {
@@ -145,7 +135,7 @@ void Vc2SetEnvelopes::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2Se
     w.matrix = c.matrix;
     w.releaseVelocity = kCentreVelocity;
     vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::envelopeOf, c.call, reads);
-    w.tempo = tempoOf(reads.clock());
+    w.tempo = vc2SetTempo(reads.clock());
     blockOf(w, block, reads);
 }
 

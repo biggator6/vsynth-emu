@@ -19,8 +19,11 @@ juce::String lineName(uint8_t line) {
 }
 
 ArpPatternView::ArpPatternView(VSynthEmuProcessor& p)
-    : processor_(p), end_(p.apvts, { "arpEndPoint" }, [this] { repaint(); }) {
-    pattern_.referTo(p.apvts.state.getPropertyAsValue("arpPattern", nullptr));
+    : ArpPatternView(p, { [&p] { return p.arpPattern(); }, "arpPattern", "arpEndPoint" }) {}
+
+ArpPatternView::ArpPatternView(VSynthEmuProcessor& p, Source source)
+    : source_(std::move(source)), end_(p.apvts, { source_.endPointId }, [this] { repaint(); }) {
+    pattern_.referTo(p.apvts.state.getPropertyAsValue(source_.property, nullptr));
     pattern_.addListener(this);
 }
 
@@ -31,7 +34,7 @@ ArpPatternView::~ArpPatternView() {
 // The lines' names down the left; each line's cells across, a played step's cell filled by its velocity, a tie joining
 // it to the step before; the steps past the End Point faint; and a line saying so when no step plays
 void ArpPatternView::paint(juce::Graphics& g) {
-    const XtArpPattern pattern = processor_.arpPattern();
+    const XtArpPattern pattern = source_.pattern();
     auto r = getLocalBounds();
     Ui::fillRounded(g, r.toFloat(), Look::field, 6.0f);
     r.reduce(6, 6);

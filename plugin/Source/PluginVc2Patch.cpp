@@ -1,7 +1,9 @@
 // A VC-2 patch on the processor: see PluginVc2Patch.h (v452).  Its check is VSynthEmuArpPluginTest's VC-2 patch part
 // (Vc2PatchPluginTest.cpp).
 #include "PluginVc2Patch.h"
+#include "PluginArp.h"
 #include "PluginParamIds.h"
+#include "XtArpeggioPatch.h"
 #include "PluginProcessor.h"
 #include "Vc2Params.h"
 #include "Vc2PatchFile.h"
@@ -11,8 +13,15 @@ namespace {
 
 constexpr int kStoreFirst = 0x120;   // [FW] the store's first ID, Patch Name 1; the system's are below it
 const juce::Identifier kStoreKey { "vc2Store" }, kNameKey { "vc2PatchName" };
+constexpr int kArpState = 0x4b4, kArpNote = 0x4b5, kArpStep1 = 0x4b7;   // [FW] a line's Control Switch, Number, Step 1
 
 } // namespace
+
+XtArpPattern vc2ArpPattern(const std::vector<uint8_t>& store) {
+    if (store.size() < (size_t)kVc2StoreBytes) return xtArpDefaultPattern();
+    const auto read = [&store](int id, int line) { return xtStoreValue(vc2Store(), store, id, line); };
+    return xtArpPatternRead(read, kArpState, kArpNote, kArpStep1);
+}
 
 std::optional<int> vc2PatchValue(const std::vector<uint8_t>& store, const Vc2HostParam& p) {
     if (p.id < kStoreFirst) return std::nullopt;

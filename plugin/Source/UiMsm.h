@@ -2,6 +2,7 @@
 // The Multi Step Modulator on the MODULATION page (research/UI_DESIGN.md, "The pages"; UI step 4): its switch and Key
 // Sync, a tab for each track, and the chosen track.  A track is made for each by index (msmTrackFwId): its eight
 // settings as a ControlGrid, and its 16 steps as upright bars to drag, those past its End Point dimmed.
+#include "UiBars.h"
 #include "UiControlGrid.h"
 #include "UiTabs.h"
 #include "UiWatch.h"
@@ -13,15 +14,13 @@ class MsmTrack : public juce::Component {
 public:
     MsmTrack(Controls::State& state, int track);
     static constexpr int kSettings = 8, kSteps = 16;
-    int made() const { return settings_.made() + (int)steps_.size(); }   // 24 with every ID found
+    int made() const { return settings_.made() + steps_.made(); }   // 24 with every ID found
     void resized() override;
 
 private:
     ControlGrid settings_;
-    std::vector<std::unique_ptr<juce::Slider>> steps_;
-    std::vector<std::unique_ptr<Controls::State::SliderAttachment>> stepAtts_;
-    std::vector<std::unique_ptr<juce::Label>> numbers_;
-    Watch end_;   // the End Point, past which the steps are dimmed
+    UprightBars steps_;   // each its number under it (UiBars.h, v453)
+    Watch end_;           // the End Point, past which the steps are dimmed
     void dimPast();
 };
 

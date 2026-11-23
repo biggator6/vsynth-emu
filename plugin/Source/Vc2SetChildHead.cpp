@@ -5,6 +5,8 @@
 namespace {
 constexpr uint32_t kKind = 0, kIndex = 1, kKey = 2, kPartWords = 6;   // [FW] the objects' bytes
 constexpr uint32_t kKindKey = 1;                                      // [FW] the kind-only children's voice bytes
+constexpr int32_t kInternalScale = 30000, kOutsideScale = 150000;   // [FW] the clock's tempo
+constexpr int32_t kSlowest = 200, kFastest = 2500, kSlowHeld = 20, kFastHeld = 250;   // [FW] its hold, as rom.4's
 } // namespace
 
 int32_t vc2ByMagic(int32_t n, int32_t magic, int shift) {
@@ -40,6 +42,18 @@ void vc2ChildVoice(uint8_t* at, const Vc2SetCall& call, Vc2SetReads& reads) {
     at[1] = v.byte43;
 }
 
-void vc2ChildPart(uint8_t* object, Vc2ChildWords of, const Vc2SetCall& call, Vc2SetReads& reads) {
+template <size_t N>
+void vc2ChildPart(uint8_t* object, Vc2IndexWords<N> of, const Vc2SetCall& call, Vc2SetReads& reads) {
     vc2PartWords(object, (reads.*of)(vc2CallsPart(call, reads), object[kKind], object[kIndex]));
+}
+
+// The counts the children read so: the envelopes' and LFOs' five, the COSM inputs' 21 (v390)
+template void vc2ChildPart<5>(uint8_t*, Vc2IndexWords<5>, const Vc2SetCall&, Vc2SetReads&);
+template void vc2ChildPart<21>(uint8_t*, Vc2IndexWords<21>, const Vc2SetCall&, Vc2SetReads&);
+
+uint16_t vc2SetTempo(const Vc2SetClock& c) {
+    const int32_t t = c.external == 0
+                          ? static_cast<int32_t>(kInternalScale * static_cast<uint32_t>(c.numerator)) / c.denominator
+                          : kOutsideScale / static_cast<int32_t>(c.period);
+    return static_cast<uint16_t>(t < kSlowest ? kSlowHeld : t > kFastest ? kFastHeld : t);
 }

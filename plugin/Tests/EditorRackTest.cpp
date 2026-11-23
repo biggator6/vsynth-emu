@@ -8,6 +8,7 @@ namespace {
 
 // Which instance a parameter is, by the processor's own prefixes: the longest one it starts with
 int instanceOf(const juce::String& id, const Owner& own) {
+    if (own.instance) return own.instance(id);
     int best = -1, length = -1;
     for (int i = 0; i < own.count; ++i) {
         const juce::String pre = own.prefix(i);
@@ -17,12 +18,6 @@ int instanceOf(const juce::String& id, const Owner& own) {
         }
     }
     return best;
-}
-
-int visibleKnobs(juce::Component& panel) {
-    int n = 0;
-    for (Knob* k : LayoutCheck::allOf<Knob>(panel)) n += k->isVisible() ? 1 : 0;
-    return n;
 }
 
 // What one instance's panel is checked against: how its Type is set, how many knobs each face's table gives, and
@@ -65,6 +60,12 @@ void tripColumn(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     column.follow(0);
 }
 
+}
+
+int visibleKnobs(juce::Component& panel) {
+    int n = 0;
+    for (Knob* k : LayoutCheck::allOf<Knob>(panel)) n += k->isVisible() ? 1 : 0;
+    return n;
 }
 
 Owner ownerOf(const Blocks::Block& b) {

@@ -34,10 +34,10 @@ private:
 
 class EnvelopesOverview : public Overview {
 public:
-    explicit EnvelopesOverview(Controls::State& state);
+    EnvelopesOverview(Controls::State& state, const Blocks::Path& path);
 };
 
 class LfosOverview : public Overview {
 public:
-    explicit LfosOverview(Controls::State& state);
+    LfosOverview(Controls::State& state, const Blocks::Path& path);
 };

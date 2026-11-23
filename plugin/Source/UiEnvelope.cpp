@@ -74,8 +74,7 @@ void EnvCurve::paint(juce::Graphics& g) {
         g.drawVerticalLine(juce::roundToInt(a.getX() + a.getWidth() * (float)i / kQuarters), a.getY(), a.getBottom());
     juce::Path fill = shape();
     fill.lineTo(a.getBottomLeft());
-    g.setColour(Look::accent.withAlpha(0.12f));
-    g.fillPath(fill);
+    Ui::fillPath(g, fill, Look::accent.withAlpha(0.12f));
     Ui::stroke(g, shape(), Look::accent, juce::PathStrokeType(editable_ ? 2.0f : 1.5f));
     if (!editable_) return;
     for (int i = 0; i < kPoints; ++i) {
