@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's wave index, parsed v500 (2026-11-23, from vc2-mode 230b302; HARDWARE_FIRMWARE.md, "The VC-2's wave index,
+  parsed"): the first of the wave loaders, a block of their own (v500–v509). rom.4's boot parse of "D:\VC-2 Wave.bin",
+  0x8934d120, Vc2WaveIndex: the WLF0 header, the two versions, each section by its number (the waves into the
+  velocity's set, the maps into the key's, the samples' four bytes into the alias's), the slots zeroed and their
+  streams written, the counts raised, the progress. Its file calls go through Vc2Files, in rom.4's order. Vc2WaveSets
+  holds the velocity's and key's data now, with dataAt, a byte by rom.4's address. A harness of its own, xt_vc2waves
+  (fcheck; mutate_vc2.py --waves): the disk image's index (58 waves, 43 maps, 192 samples) and 40 cases of drawn
+  ones, 0 different at seeds 2024, 7, 31337 and 99. Not in the sound yet; where the plugin gets the index is the
+  user's call.
+
 The VC-2's wave sets v399 (2026-11-22, after v398; HARDWARE_FIRMWARE.md, "The VC-2's wave sets"): rom.4's three
   sets a set's index is looked up in, Vc2WaveSets (counts, tables of 500 and buffers word for word): the velocity's
   and the key's, one routine over a row (a stream of the wave memory read into the buffer, the first of 128 entries by

@@ -1,0 +1,52 @@
+index-path|"D:\\VC-2 Wave.bin"|"D:\\VC-2 Wave.bim"|vc2waveindex
+index-magic|{ 'W', 'L', 'F', '0' }|{ 'W', 'L', 'F', '8' }|vc2waveindex
+index-missing|if (state.handle < 0) return kVc2IndexMissing;|if (state.handle < -1) return kVc2IndexMissing;|vc2waveindex
+index-progress-zero|    progress.parse = 0;\n|\n|vc2waveindex
+index-not-wlf-close|        files.close(state.handle);\n        return kVc2IndexNotWlf;|        return kVc2IndexNotWlf;|vc2waveindex
+index-not-wlf-value|        return kVc2IndexNotWlf;|        return kVc2IndexMissing;|vc2waveindex
+index-versions-at|kVersionsAt = 16|kVersionsAt = 17|vc2waveindex
+index-version-clear|    words.waveVersion.fill(0);\n|\n|vc2waveindex
+index-preset-clear|    words.presetVersion.fill(0);\n|\n|vc2waveindex
+index-version-chars|kVersionChars = 16;|kVersionChars = 15;|vc2waveindex
+index-sections-count|kSectionsCountAt = 8|kSectionsCountAt = 4|vc2waveindex
+index-sections-at|kSectionsAt = 0x40|kSectionsAt = 0x30|vc2waveindex
+index-section-stride|kSectionStride = 16|kSectionStride = 12|vc2waveindex
+index-on-test|if (vc2in::s16(section, kOnAt) != kOn) continue;|if (vc2in::s16(section, kOnAt) < kOn) continue;|vc2waveindex
+index-on-at|kOnAt = 2|kOnAt = 3|vc2waveindex
+index-place-at|kPlaceAt = 4;|kPlaceAt = 8;|vc2waveindex
+index-section-seek|        files.seek(state.handle, seekAt(state.sectionAt), kFromStart);\n        switch|        switch|vc2waveindex
+index-velocity-row|case 1: setSection(kVelocity,|case 1: setSection(kKey,|vc2waveindex
+index-alias-number|case 3: aliasSection|case 4: aliasSection|vc2waveindex
+index-other-step|        default: continue;|        default: break;|vc2waveindex
+index-step|kSectionStep = 33|kSectionStep = 34|vc2waveindex
+index-done|kParseDone = 100|kParseDone = 99|vc2waveindex
+index-close|    files.close(state.handle);\n    progress.parse = kParseDone;|    progress.parse = kParseDone;|vc2waveindex
+index-returns|    return kVc2IndexParsed;|    return 0;|vc2waveindex
+set-entries-half|    const uint16_t entries = fileHalf(header, kEntriesAt);\n    const uint32_t indexAt|    const uint32_t entries = fileWord(header, kEntriesAt);\n    const uint32_t indexAt|vc2waveindex
+set-index-at|state.sectionAt + fileWord(header, kIndexAt), entryBytes|fileWord(header, kIndexAt), entryBytes|vc2waveindex
+set-entry-bytes|entryBytes = fileWord(header, kEntrySizeAt);|entryBytes = kIndexEntry;|vc2waveindex
+set-entry-seek|seekAt(indexAt + (n - 1) * entryBytes)|seekAt(indexAt + n * entryBytes)|vc2waveindex
+set-record-at|seekAt(state.sectionAt + fileWord(entry, kRecordAt))|seekAt(fileWord(entry, kRecordAt))|vc2waveindex
+set-record-size|const uint32_t size = fileWord(entry, kRecordSizeAt);|const uint32_t size = fileWord(entry, kRecordAt);|vc2waveindex
+set-read-at|readIntoWords(files, state.handle, words, row.readAt, size);|readIntoWords(files, state.handle, words, row.readAt + 1, size);|vc2waveindex
+set-slot-first|        readIntoWords(files, state.handle, words, row.readAt, size);\n        if (!raiseCount(sets.counts.*row.count, n)) return;|        if (!raiseCount(sets.counts.*row.count, n)) return;\n        readIntoWords(files, state.handle, words, row.readAt, size);|vc2waveindex
+set-slot-clear|        std::fill_n(slot, row.slot, 0);\n||vc2waveindex
+set-table-start|[2 * (n - 1)] = row.dataAt + row.slot * (n - 1);|[2 * (n - 1)] = row.dataAt + row.slot * n;|vc2waveindex
+set-table-length|[2 * (n - 1) + 1] = row.slot;|[2 * (n - 1) + 1] = std::min(size, row.slot);|vc2waveindex
+set-copy-held|std::min(size, row.slot), slot);|std::min(size, row.slot - 1), slot);|vc2waveindex
+set-key-read|kVc2KeySlot, offsetof(Vc2WaveIndexWords, keyRead) };|kVc2KeySlot, offsetof(Vc2WaveIndexWords, velocityRead) };|vc2waveindex
+set-key-data|&Vc2WaveSetData::key, Vc2WaveSets::kKeyDataAt,|&Vc2WaveSetData::key, Vc2WaveSets::kVelocityDataAt,|vc2waveindex
+raise-bound|if (n > kVc2WaveSetEntries) return false;|if (n >= kVc2WaveSetEntries) return false;|vc2waveindex
+raise-always|    if (count < n) count = static_cast<uint16_t>(n);|    count = static_cast<uint16_t>(n);|vc2waveindex
+alias-seek|seekAt(state.sectionAt + fileWord(header, kIndexAt)), kFromStart);|seekAt(fileWord(header, kIndexAt)), kFromStart);|vc2waveindex
+alias-entries-half|    const uint16_t entries = fileHalf(header, kEntriesAt);\n    for (uint32_t n = 1; n <= entries; ++n) {\n        readIntoWords|    const uint32_t entries = fileWord(header, kEntriesAt);\n    for (uint32_t n = 1; n <= entries; ++n) {\n        readIntoWords|vc2waveindex
+alias-entry-size|                      fileWord(header, kEntrySizeAt));|                      36u);|vc2waveindex
+alias-read-at|readIntoWords(files, state.handle, words, offsetof(Vc2WaveIndexWords, aliasRead),|readIntoWords(files, state.handle, words, offsetof(Vc2WaveIndexWords, keyRead),|vc2waveindex
+alias-count|                      fileWord(header, kEntrySizeAt));\n        if (!raiseCount(sets.counts.alias, n)) return;|                      fileWord(header, kEntrySizeAt));\n        if (n > kVc2WaveSetEntries) return;|vc2waveindex
+alias-at|kAliasAt = 32, kAliasBytes = 4;|kAliasAt = 31, kAliasBytes = 4;|vc2waveindex
+alias-bytes|kAliasAt = 32, kAliasBytes = 4;|kAliasAt = 32, kAliasBytes = 3;|vc2waveindex
+words-end|std::min<size_t>(n, sizeof words - at)|std::min<size_t>(n, sizeof words - at - 1)|vc2waveindex
+data-velocity-at|return &data.velocity[at - kVelocityDataAt];|return &data.velocity[at - kVelocityDataAt + 1];|vc2wavesetsdata
+data-key-none|    if (at - kKeyDataAt < data.key.size()) return &data.key[at - kKeyDataAt];\n||vc2wavesetsdata
+data-key-end|if (at - kKeyDataAt < data.key.size())|if (at - kKeyDataAt <= data.key.size())|vc2wavesetsdata
+data-velocity-below|if (at - kVelocityDataAt < data.velocity.size())|if (at + 1 - kVelocityDataAt <= data.velocity.size())|vc2wavesetsdata

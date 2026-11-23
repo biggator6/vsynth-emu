@@ -890,6 +890,10 @@ reads: 1439592 values in every block, bits and value, over 128 patches and 40 ra
 typed reads: 880992 typed values in every zone, over 128 patches and 40 random, 0 different
 files: 149 read, 128 of them the disk image's, the rest made otherwise, 0 different
 xt_vc2patch: 0 different
+== xt_vc2waves
+the disk image's index: 58 waves, 43 maps, 192 samples
+index: 80 parses (the disk image's index, then 40 cases of drawn ones; 72 parsed, 2 not there, 6 not WLF0), 0 different
+xt_vc2waves: 0 different
 == xt_tone msm
 tone, msm: 200 cases, 338 notes, 218645 blocks, 5472 of the MSM's tone updates, 132630834 checks
 tone, msm: 0 different

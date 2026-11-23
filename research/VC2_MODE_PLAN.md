@@ -761,6 +761,14 @@ version against rom.4's routines with what it calls hooked:
         by a set's index `0x8939cba0`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's wave sets"). Every
         routine PCM's start calls is the port's now; `Vc2Synth` must give the store, the sets and the wave memory, and
         the loaders that fill the store and the sets aren't ported.
+      - The wave loaders, v500–v509, a block of their own (the coordinator's, 2026-11-23; map in the shared notes'
+        v500-on-vc2-wave-loaders.md): the index's parse (v500), the store's pool, records and chunks, the library's
+        records of the Wave Numbers, the bank, its wave reader and the start-up load of the samples.
+        - The index's parse done (v500): `Vc2WaveIndex`, rom.4's `0x8934d120` and its three section readers, which
+          fill the sets' counts, tables and the velocity's and key's data (now in `Vc2WaveSets`, with `dataAt`)
+          through rom.4's file calls (`Vc2Files`); xt_vc2waves, a harness of its own (HARDWARE_FIRMWARE.md, "The
+          VC-2's wave index, parsed"). Left: the store's side and the samples; where the plugin gets its files is the
+          user's call.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

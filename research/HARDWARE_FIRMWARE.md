@@ -3912,6 +3912,94 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's wave index, parsed (2026-11-23, v500) {#vc2-wave-index}
+
+What fills the wave sets (v399): rom.4's parse of "D:\VC-2 Wave.bin" at boot, `0x8934d120`. Ported bit for bit as
+`Vc2WaveIndex` (Vc2WaveIndex.cpp). It is checked by a harness of its own, xt_vc2waves, with rom.4's own parse running
+there. Every address is rom.4's.
+
+**Where it runs.** The boot (`0x8933eea0`) runs in stages. It loads the sample bank, then sets the parse's state, two
+words on its own stack (`0x8934ce70`: the handle −1, the section's place 0), and parses. The store's set-up, the
+project's link files and the start-up load of the samples come after (the notes' map, v501 on). Nothing else writes
+the sets' counts or tables. The 21 other places that load their addresses make streams from them or read them, such
+as the wave list's scroller at `0x89504860`.
+
+**The file calls.** The parse goes through four of the OS's calls: open `0x89336c60(path, 0)` (a handle, negative when
+the file isn't there), read `0x89336cf0(handle, into, n)` (how many it read), seek `0x89336db0(handle, offset,
+whence)` and close `0x89336ca0`. The port makes the same calls in the same order, through `Vc2Files`. Whatever answers
+them gives both sides the same bytes. Every offset and count is the file's, little-endian.
+
+**The parse:**
+- The progress halfword at `0x899344e4` (.data, 0 after C startup) goes to 0, and the index opens. No file gives −60.
+- 12 bytes are read. Their first four must be `WLF0` (a `memcmp`), or the file is closed and the parse gives −90.
+- Two version strings follow: 16 bytes from offset 16 into `0x8997af30` and `0x8997af41`, each cleared to 17 zeros first.
+- For each of the header's +8 sections, the 12 bytes of its entry at 0x40 + 16i are read. An entry whose second
+  halfword isn't 1 is passed over. Otherwise its +4 becomes the state's section place, the file seeks there, and the
+  entry's number picks a reader: 1 the waves, the velocity's set (`0x8934ce90`); 2 the maps, the key's
+  (`0x8934cf40`); 3 the samples, the alias's (`0x8934d050`). Any other number is passed over. The progress gains 33
+  after each section read.
+- The index is closed, the progress set to 100, and the parse gives 1.
+
+**The velocity's and key's sections** (one code but for the set). The section's header is 12 bytes: the count (its low
+halfword), where its index lies in the section, and an index entry's size. For each record n from 1:
+- seek to its index entry and read its 8 bytes: the record's place in the section and its size;
+- seek to the record and read the whole size into the set's buffer in the reader's words (`0x8997af52`, the velocity's
+  0x210 bytes; `0x8997b162`, the key's 0x310);
+- the set's slot (`0x89327bc0`, `0x89327c50`): past entry 500 the section ends. Otherwise the count rises to n if it is
+  below, the slot is zeroed (0x210 bytes at `0x89d65e38` + 0x210(n − 1); 0x310 at `0x89da6578` + 0x310(n − 1)), and
+  the table's entry becomes the slot and its size;
+- a stream on the entry (`0x8934ce10`, its bound always met, as the count has just reached n), and the record written
+  into it (`0x89327b80`): as much as the slot holds.
+
+The record is read before the slot is refused, so a section of 501 leaves record 501 in the buffer. A record larger
+than its buffer runs on into the next buffers. The port's read stops at the reader's words' end (`0x8997b498`), where
+rom.4's would go on into the start-up load's state; no real record comes near it.
+
+**The alias's section.** Its header is the same. The file seeks to the section's index, and each entry is read in
+turn into the alias's buffer (`0x8997b472`, 0x26 bytes). Its four bytes after the 32-byte path become the alias's
+table entry n (`0x89327ce0` raises the count, refusing past 500), written through a stream on the entry itself.
+
+**The sets' data.** `Vc2WaveSets` holds the two data regions now (`Vc2WaveSetData`, 264,000 and 392,000 bytes), and
+`dataAt` gives a byte of them by rom.4's address. That is what the coming `Vc2Synth`'s wave memory reads the streams
+through. The progress halfwords (`Vc2WaveLoadProgress`) are the parse's, the start-up load's (`0x899344e6`) and the
+link files' maker's (`0x899344e8`).
+
+**The disk image's index.** It gives 58 waves, 43 maps and 192 samples, as `wlflib.py` reads it.
+
+**The check.** It is a harness of its own, xt_vc2waves, as the loaders run at boot, outside the part. rom.4's file
+calls are hooked to a list of files, and the port's go to an equal list. Each side's calls are logged and compared:
+their arguments, their answers, and the progress as each call is made (the XT's display reads it while a parse runs;
+the steps between sections show nowhere else). After each parse the check compares:
+- the return and the parse's state;
+- the progress, the reader's words, the counts, the tables and both data regions, byte for byte;
+- every stream the parse made, read back through `dataAt`, and the bytes just outside the data.
+
+The parses:
+- First, the disk image's index on the sets as C startup leaves them.
+- Then 40 cases of drawn indexes, one to three parses each, the sets carried from one parse to the next. A case
+  starts from C startup's sets or from noise.
+
+The draws:
+- Up to four sections. The number is 1…3 mostly, now and then 0, 4 or 0xffff; the second halfword is 1 mostly.
+- A set's section has 1…40 records mostly. Now and then it has none, or 498…505, across the table's 500. The count's
+  upper halfword is noise a time in eight. Index entries are 8 bytes mostly.
+- A record is the slot's size half the time, any less mostly otherwise, and now and then long enough to run on to the
+  reader's words' end.
+- An alias's entries are 36 bytes mostly (32…38). Their types are 0, 1, 3, 5 or any, and their links 0 or about the
+  count.
+- Now and then the file ends inside its last record, a magic byte is wrong, or there is no file.
+
+Not drawn: a read onto rom.4's stack that the file cuts short (a header, an index entry or a section's entry). It
+leaves the stack's own words.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99, 76 to 87 parses a seed, a few not there or not WLF0 at each.
+- Every line, region and branch of Vc2WaveIndex.cpp is reached, and every one of `dataAt`'s.
+- `mutate_vc2.py --waves`: 52 plants, all caught. Two missed at first:
+  - The progress's step between sections: the parse always ends at 100. The file calls now carry the progress.
+  - The record read before its slot is refused: sections that cross 500 were too rare. A twelfth of them do now.
+- `mutate_vc2.py --sets`, the whole list, after the sets' change: 1019 plants, none missed, no errors.
+
 ### The VC-2's wave sets (2026-11-22, v399) {#vc2-wave-sets}
 
 What PCM's start calls when the store holds no record of its Wave Number loaded but gives a set's index: `0x8939cba0`

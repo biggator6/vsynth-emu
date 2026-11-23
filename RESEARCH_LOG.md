@@ -4024,6 +4024,25 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 25 (2026-11-23) — v500: the wave index, parsed
+
+- Started from the coordinator's brief: port what fills the wave store and the wave sets, as v500–v509. The earlier
+  runs of the start-up load (VC2_VOCAL_DESIGNER.md, "The sample bank, loaded", "The wave reader, run") had named most
+  of the routines. A scan for bsr and pool loads of each address found the rest. The map is in the shared notes
+  (v500-on-vc2-wave-loaders.md).
+- The chain is larger than the brief expected. The store has a compacting pool of its own, whose blocks have virtual
+  methods to fix their pointers when moved. Records and chunks have their own allocators, and the bank's wave reader
+  decodes RDAC and builds bands. The coordinator was told, with the question of where the plugin's index, bank and
+  link files come from.
+- The parse alone fills the sets, so it came first. Its harness is a new one, xt_vc2waves: the loaders run at boot,
+  outside the part, on files. Both sides' file calls are answered from equal lists of files and compared call by call.
+- The plant on the progress's step between sections was missed at first: the parse always ends by setting 100. The
+  XT's display reads the progress while a parse runs, so each file call now carries it. A record read before its
+  slot is refused needed sections that cross 500 more often.
+- The kit refused a progress member named `index` (shape law), three helper names taken elsewhere (`readWords`,
+  `place`, `vc2CallsDifference`) and a seven-parameter helper. One shell edit of the check went past the content laws
+  and was gone over again with Edit.
+
 ### Session 24, continued (2026-11-22) — v399: the wave sets
 
 - My notes had the sets' counts at 0xffff after C startup. rom.4's own .data copy says 0, and so do the image's

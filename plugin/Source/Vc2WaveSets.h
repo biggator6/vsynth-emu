@@ -8,11 +8,13 @@
 // (0x89394d10, its stream 0x89394af0 its table's own entry): an entry's type and the number of the record it names, its
 // own or its link's when the linked entry's type is 1.  0x8939cba0 then fills the wave's words of the store's record of
 // that number as 0x8939cd30 does, its +4…+7 from the sets.  A count past its table's 500 is held to 500, where rom.4
-// would read on into the next table (the sets' loader, not ported, keeps them within).  Bit for bit: xt_vc2sets' eighth
-// part.  HARDWARE_FIRMWARE.md, "The VC-2's wave sets".  The notes' task.
+// would read on into the next table (the sets' loader, the index's parse, keeps them within: Vc2WaveIndex, v500, which
+// fills the counts, the tables and the data).  Bit for bit: xt_vc2sets' eighth part.  HARDWARE_FIRMWARE.md, "The
+// VC-2's wave sets".  The notes' task.
 #include "Vc2WaveStore.h"
 #include <array>
 #include <cstdint>
+#include <vector>
 
 // [FW] the counts at 0x8993448c (.data, 0 after C startup): the velocity's set's, the key's and the alias's
 struct Vc2WaveSetCounts {
@@ -40,12 +42,24 @@ struct Vc2WaveSetBuffers {
 };
 static_assert(sizeof(Vc2WaveSetBuffers) == 0x524, "rom.4's layout, the sets' buffers");
 
+// [FW] the velocity's and the key's data (.bss, v500): a slot an entry, 0x210 and 0x310 bytes, which the index's parse
+// (Vc2WaveIndex) fills and points the entry's stream at
+inline constexpr uint32_t kVc2VelocitySlot = 0x210, kVc2KeySlot = 0x310;
+struct Vc2WaveSetData {
+    std::vector<uint8_t> velocity = std::vector<uint8_t>(kVc2WaveSetEntries * kVc2VelocitySlot);
+    std::vector<uint8_t> key = std::vector<uint8_t>(kVc2WaveSetEntries * kVc2KeySlot);
+};
+
 class Vc2WaveSets {
 public:
     static constexpr uint32_t kCountsAt = 0x8993448c, kTablesAt = 0x89973084, kBuffersAt = 0x89989754;
+    static constexpr uint32_t kVelocityDataAt = 0x89d65e38, kKeyDataAt = 0x89da6578;
     Vc2WaveSetCounts counts {};
     Vc2WaveSetTables tables {};
     Vc2WaveSetBuffers buffers {};
+    Vc2WaveSetData data {};
+    // The data's byte at rom.4's address `at`, for the wave memory that reads the streams; none outside the data
+    const uint8_t* dataAt(uint32_t at) const;
     // 0x8939cba0: the wave's words (the OSC input's +0xa0…, `wave`) by a set's index, the key and the velocity, from
     // the store's record the sets name; whether found
     bool waveWords(uint16_t index, uint8_t* wave, uint8_t key, uint8_t velocity, const Vc2WaveStore& store,
