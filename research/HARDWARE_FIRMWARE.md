@@ -1642,11 +1642,16 @@ Results:
   (about half type 6's, half stereo, three in four in samples), ran about 3,250 seeks and 76,800 blocks (about 3,100
   crossing an event or a loop); the voice part steered about 580 SOLO renders, 700 note-ons and 180 re-seeks,
   xt_vc2tone about 2,700 OSC blocks of SOLO's types.
-- Coverage under xt_vc2osc at 40 cases: `Vc2OscSoloFrame.cpp`, `Vc2OscSoloSetUp.cpp`'s lines, `Vc2OscWalkStart.cpp` and
-  `Vc2OscBandSetUp.cpp` whole; unreached, the formant's floor (about 2⁻²¹), the repeat cost's lower line (the grain
-  parameters hold the anchor step at 16 or more, so it never runs), the seek's segment that starts at the last event
-  (no segment starts there), and the coefficient's and cutoff's caps and the anchor's record reaching the range's end,
-  which need pitches above 4 or rarer states.
+- Coverage under xt_vc2osc at 40 cases: `Vc2OscSolo.cpp`, `Vc2OscSoloFrame.cpp`, `Vc2OscWalkStart.cpp` and
+  `Vc2OscBandSetUp.cpp` whole, `Vc2OscSoloSetUp.cpp`'s lines whole; unreached, the formant's floor (about 2⁻²¹), the
+  repeat cost's lower line (the grain parameters hold the anchor step at 16 or more, so it never runs) and the seek's
+  segment that starts at the last event (no segment starts there). The coefficient's and cutoff's caps and the period's
+  floor are reached since SOLO's waves hold brief segments (one in four, records of 4…19 samples).
+- Planted errors: the changed plants (`mutate_vc2.py --osc --changed c6ea59a`) 875 planted, 0 missed, 0 errors, about
+  290 of them SOLO's new ones and v333's band set-up plants re-aimed at `vc2WalkSetUp`; 10 SOLO plants dropped with
+  a note in vc2osc_muts.txt (each on a state no draw reaches: a comparison's edge where two positions meet exactly, a
+  record ending at the range's end, the seek's segment at the last event, the cost's lower line, a store its segment's
+  read writes again). The tone list's changed plants: none. No rom.2 port changed.
 
 ### The VC-2's band players' set-ups and seek (2026-11-23, v333) {#vc2-osc-band-setups}
 

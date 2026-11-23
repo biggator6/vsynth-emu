@@ -346,7 +346,8 @@ The VC-2's SOLO v334 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v333'
   (vc2WalkSetUp). The checks no longer hook SOLO: xt_vc2osc has a SOLO part, the band players' captures and steers are
   the players' (SOLO's waves in their own room, from their own generator), and a SOLO note-on is given a real wave's
   header and a tone's ranges, as its set-up takes FTRC of the rate. 0 different at seeds 2024, 7 and 31337. Not in the
-  sound yet.
+  sound yet. Committed in two: ee08ad9 ("v334 WIP", the port and the checks) and v334 on it (the brief segments,
+  the baseline, the results).
 
 The VC-2's band players' set-ups and seek v333 (2026-11-23, on claude/vc2-part-4-3 after v332; HARDWARE_FIRMWARE.md,
   "The VC-2's band players' set-ups and seek"): step 4.3's sixty-first version. BACKING's set-up 0x893cd1d0 and

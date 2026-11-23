@@ -59,10 +59,12 @@ std::vector<int32_t> bandPositions(int frames, int more, bool last, std::mt19937
 }
 
 // A record's length: 16…215 samples × 2^min(k, 4); v334's SOLO one in 16 in two entries (0xffff on more) and one in
-// 16 of 4…15 samples, under the grain parameters' floor of 10
-int32_t recordLength(const OscVpdtLayout& l, int k, std::mt19937& rng) {
+// 16 of 4…15 samples, under the grain parameters' floor of 10; in a short segment (`brief`) each 4…19 samples, where
+// a high pitch takes the cutoff and the filter's coefficient to their caps
+int32_t recordLength(const OscVpdtLayout& l, int k, bool brief, std::mt19937& rng) {
     const int32_t length = kSixteen * (16 + (int32_t)(rng() % 200)) << std::min(k, 4);
     if (!l.soloRecords) return length;
+    if (brief) return kSixteen * (4 + (int32_t)(rng() % 16));
     const uint32_t pick = rng() % 16;
     if (pick == 0) return length + kOnward;
     return pick == 1 ? kSixteen * (4 + (int32_t)(rng() % 12)) : length;
@@ -81,8 +83,9 @@ std::vector<OscBandSegment> bandSegments(BandBytes& v, const OscVpdtLayout& l, i
     for (size_t i = 0; i < starts.size(); ++i) {
         const int32_t end = i + 1 < starts.size() ? starts[i + 1] : kSixteen * (frames + kOscBandTail);
         OscBandSegment s { starts[i], entries + kEntryBytes * (uint32_t)i, {} };
+        const bool brief = l.soloRecords && rng() % 4 == 0;   // v334: SOLO's one segment in four
         for (int32_t at = s.start; at < end;) {
-            const int32_t length = recordLength(l, k, rng);
+            const int32_t length = recordLength(l, k, brief, rng);
             s.records.push_back({ at, length, v.grow(length > kOnward ? 2 * kRecordBytes : kRecordBytes) });
             at += length;
         }
