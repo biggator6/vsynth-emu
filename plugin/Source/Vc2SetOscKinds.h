@@ -7,7 +7,8 @@
 // × 300, and its level by 0x8939c260), then by the type the analog's converter 0x8939cf70 (v251's, v256's), the
 // VOCODER's 0x8939db00 (v251's, v222's), PCM's 0x8939e300 or EXTIN's 0x8939e9e0.  PCM's start and the PCM and EXTIN
 // converters were rom.4's own until v397, v394 and v393 (PCM's converter's two calls by the wave's type v395 and v396);
-// PCM's start calls the wave store's routines through Vc2SetReads::waveStore.  The tables Vc2SetEnvelopeTables' and
+// PCM's start looks its wave up in the wave store (Vc2WaveStore, v398; through Vc2SetReads::waveStore from v397), the
+// words by a set's index 0x8939cba0 still rom.4's (Vc2SetReads::waveBySet).  The tables Vc2SetEnvelopeTables' and
 // Vc2OscConvertTables'.  Bit for bit: xt_vc2sets' eighth part.  HARDWARE_FIRMWARE.md, "The VC-2 part's sets' OSC
 // blocks", "The VC-2's PCM start".  The notes' task.
 #include <cstdint>

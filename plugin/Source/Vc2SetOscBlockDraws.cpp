@@ -14,6 +14,7 @@ constexpr uint32_t kAliasCancelAt = 9;   // [FW] the systems' Alias Cancel (+0x1
 constexpr uint32_t kExtinSystemAt = 3, kExtinHeaderAt = 0x1e;   // [FW] the bytes EXTIN's converter reads (v393)
 constexpr int kOscSums = 4, kLfoSums = 5;
 constexpr uint32_t kWaveTypeAt = 0xa7;   // [FW] the input's wave type, PCM's start's (v394)
+constexpr uint32_t kWaveNumberAt = 0x3c;   // [FW] the record's Wave Number (the input's +0x44), PCM's start's (v398)
 // [FW] v395: the input's words LITE's words read: the key, Pitch KF, the coarse and fine tunes; the wave's root key and
 // its offset, length and last word; the record's start sample; and the switches it tests
 constexpr uint32_t kLiteKeyAt = 3, kLitePitchKfAt = 0x0e, kLiteCoarseAt = 0x88, kLiteFineAt = 0x90;
@@ -26,6 +27,12 @@ constexpr uint32_t kVariModeAt = 0x62, kVariFlagAt = 0xa0, kVariWordAt = 0xac, k
 constexpr uint32_t kVariTableAt = 0xc4, kVariStepAt = 0x104, kEventCentreAt = 4, kVariEvent = 3;
 constexpr uint32_t kVariRecordTypeAt = 9, kVariPcm = 1, kVariCentre = 60, kVariPeriod = 12;   // [FW] the record's type
 constexpr uint32_t kVariPastHalf = 0x8001;   // an events' count whose period is just past a signed halfword
+
+// A value's bytes into an input at `at`
+template <class T>
+void putAt(uint8_t* b, uint32_t at, T v) {
+    std::memcpy(b + at, &v, sizeof v);
+}
 
 void bytesDrawn(uint8_t* b, uint32_t n, std::mt19937& rng) {
     for (uint32_t i = 0; i < n; ++i) b[i] = (uint8_t)rng();
@@ -66,6 +73,7 @@ void recordDrawn(uint8_t* r, std::mt19937& rng) {
     if (rng() % 2) std::memset(r + 0x12, 0, 2);
     if (rng() % 4) settingDrawn(r, rng, kHarmFormant);
     if (rng() % 4) settingDrawn(r, rng, kPcmTime);
+    if (rng() % 2) putAt(r, kWaveNumberAt, oscStoreNumber(rng));   // v398: a Wave Number about the store's half the time
 }
 
 // A part's header: noise, mono and the portamento's byte mostly 0 or 1, the key's offset and coarse tune small, the
@@ -77,12 +85,6 @@ void headerDrawn(uint8_t* h, std::mt19937& rng) {
     h[0] = (uint8_t)(rng() % 4 ? (int)(rng() % 97) - 48 : (int)rng());
     h[1] = (uint8_t)(rng() % 4 ? (int)(rng() % 97) - 48 : (int)rng());
     if (rng() % 2) h[kExtinHeaderAt] = 0;   // v393: EXTIN's own words, which this byte set skips
-}
-
-// A value's bytes into an input at `at`
-template <class T>
-void putAt(uint8_t* b, uint32_t at, T v) {
-    std::memcpy(b + at, &v, sizeof v);
 }
 
 // A word a routine tests whole: as drawn half the time, else 0 or, half of those, a word whose low byte alone is 0 (a
@@ -238,45 +240,16 @@ void oscSameRecordsDrawn(Vc2Fw& fw, std::span<const Vc2SetOscInput> inputs, std:
     }
 }
 
-namespace {
-// v397: the store's answers: whether it holds the number 0 or 1 (now and then any word); the words' routines nonzero
-// three times in four; an index 0 a time in four, else 1…512, now and then any word (its halfword is tested)
-uint32_t holdsAnswer(std::mt19937& rng) { return rng() % 8 ? rng() % 2 : rng(); }
-uint32_t wordsAnswer(std::mt19937& rng) { return rng() % 8 ? (rng() % 4 ? 1u : 0u) : rng(); }
-uint32_t indexAnswer(std::mt19937& rng) { return rng() % 4 == 0 ? 0u : rng() % 8 ? 1u + rng() % 512 : rng(); }
-
-struct StoreWay {
-    uint32_t routine;
-    bool fills;
-    uint32_t (*answer)(std::mt19937&);
-};
-constexpr StoreWay kStoreWays[] = { { kOscStoreRoutines[0], false, holdsAnswer },
-                                    { kOscStoreRoutines[1], true, wordsAnswer },
-                                    { kOscStoreRoutines[2], false, indexAnswer },
-                                    { kOscStoreRoutines[3], true, wordsAnswer } };
-
-const StoreWay& storeWayOf(uint32_t routine) {
-    for (const StoreWay& w : kStoreWays)
-        if (w.routine == routine) return w;
-    return kStoreWays[0];
-}
-
-// The wave's words a store's routine fills: noise, but the type one of its six mostly, the events' table aimed in its
-// region and their count small, as an input's draws keep them for the converter after
-void waveWordsDrawn(uint8_t* wave, std::mt19937& rng) {
+// v397: 0x8939cba0's answer nonzero three times in four (now and then any word); the wave's words it fills noise, but
+// the type one of its six mostly, the events' table aimed in its region and their count small, as an input's draws
+// keep them for the converter after
+uint32_t oscBySetAnswered(uint8_t* wave, std::mt19937& rng) {
+    const uint32_t answer = rng() % 8 ? (rng() % 4 ? 1u : 0u) : rng();
+    if (answer == 0) return answer;
     bytesDrawn(wave, kOscWaveBytes, rng);
     wave[kWaveTypeAt - kVariFlagAt] = (uint8_t)(rng() % 4 ? rng() % 6 : rng());
     putAt(wave, kVariTableAt - kVariFlagAt, kOscEventsAt + (uint32_t)(rng() % kOscEventsAims));
     putAt(wave, kVariEventsAt - kVariFlagAt, (uint16_t)(rng() % 25));
-}
-} // namespace
-
-bool oscStoreFills(uint32_t routine) { return storeWayOf(routine).fills; }
-
-uint32_t oscStoreAnswered(uint32_t routine, uint8_t* wave, std::mt19937& rng) {
-    const StoreWay& way = storeWayOf(routine);
-    const uint32_t answer = way.answer(rng);
-    if (answer != 0 && way.fills) waveWordsDrawn(wave, rng);
     return answer;
 }
 #endif

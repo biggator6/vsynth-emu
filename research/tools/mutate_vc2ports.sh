@@ -183,6 +183,7 @@ VC2PORTS=(
     "vc2oscpcmlite|Vc2OscPcmLite.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2oscpcmvari|Vc2OscPcmVari.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setoscconv|Vc2OscConvert.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2wavestore|Vc2WaveStore.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setoscconvtables|Vc2OscConvertTables.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2settings|Vc2PartSettings.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"
     "vc2settingstables|Vc2PartSettingsTables.cpp|XT_VC2SETTINGS_MAIN|vc2settings_obj|VC2SETTINGS"

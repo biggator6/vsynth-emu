@@ -749,6 +749,13 @@ version against rom.4's routines with what it calls hooked:
         through `Vc2SetReads::waveStore`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's PCM start"). Every
         routine the OSC blocks call is the port's now but the wave store's, which `Vc2Synth` must give (the wave
         memory's lookups, a port of their own).
+      - The wave store's lookups (v398): `Vc2WaveStore`, rom.4's store at `0x8997c52c` (its key and 128 lists) with
+        the find `0x89353130`, whether a record is loaded `0x89351840`, a set's index `0x893520a0` and the wave's words
+        `0x8939cd30` with the getters it calls, on the wave memory by rom.4's address (`Vc2WaveMemory`, through
+        `Vc2SetReads::waveMemory`, which VariPhrase's words read their events from too); xt_vc2sets' eighth part
+        (HARDWARE_FIRMWARE.md, "The VC-2's wave store"). Left: the words by a set's index `0x8939cba0` and its three
+        sets (v399). `Vc2Synth` must give the store and the memory; the store's set-up and insert, which its loader
+        runs, aren't ported.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

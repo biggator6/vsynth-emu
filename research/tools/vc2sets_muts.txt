@@ -835,8 +835,8 @@ vari-bit7|kBit7 = 0x80;|kBit7 = 0x40;|vc2oscpcmvari
 vari-half-signed|static_cast<uint16_t>(s16(input, at))|static_cast<uint16_t>(u8(input, at))|vc2oscpcmvari
 vari-bit-of|b = on ? static_cast<uint8_t>(b \| bit)|b = !on ? static_cast<uint8_t>(b \| bit)|vc2oscpcmvari
 vari-events-table|u32(input, kTableAt) + kEntriesAt|u32(input, kTableAt)|vc2oscpcmvari
-vari-events-first|const uint16_t from = reads.waveHalf(table + 2 * first);|const uint16_t from = reads.waveHalf(table + first);|vc2oscpcmvari
-vari-events-last|reads.waveHalf(table + 2 * last)|reads.waveHalf(table + 2 * first)|vc2oscpcmvari
+vari-events-first|const uint16_t from = memory.half(table + 2 * first);|const uint16_t from = memory.half(table + first);|vc2oscpcmvari
+vari-events-last|memory.half(table + 2 * last)|memory.half(table + 2 * first)|vc2oscpcmvari
 vari-events-from|    storeHalf(block, kFromAt, from);\n|\n|vc2oscpcmvari
 vari-event-none|    if (count == 0) return 0;\n|    if (count == 0) return 1;\n|vc2oscpcmvari
 vari-event-low|    if (key < kCentre) within = (within + period) % period;\n|\n|vc2oscpcmvari
@@ -905,10 +905,6 @@ vari-pool-level|{ 0x8939fb88, &t.variLevel }|{ 0x8939fb7c, &t.variLevel }|vc2set
 vari-ways-lite|    vc2OscPcmLite(bytesOf(in), reads.tripMoving(in.part), block);\n|\n|vc2setosckinds
 # PCM's start (vc2setosckinds, Vc2SetOscKinds.cpp; its tempo's divisor, vc2setenvtables, v397), not planted: the Wave
 # Number read unsigned (cut to a halfword after), its tempo's divisor for EXTIN's (both 10; its address is planted).
-pstart-holds-at|kStoreHolds = 0x89351840,|kStoreHolds = 0x893520a0,|vc2setosckinds
-pstart-words-at|kStoreWords = 0x8939cd30,|kStoreWords = 0x8939cba0,|vc2setosckinds
-pstart-index-at|kStoreIndex = 0x893520a0;|kStoreIndex = 0x89351840;|vc2setosckinds
-pstart-index-words-at|kStoreIndexWords = 0x8939cba0;|kStoreIndexWords = 0x8939cd30;|vc2setosckinds
 pstart-mode-at|kPcmModeAt = 0x62,|kPcmModeAt = 0x63,|vc2setosckinds
 pstart-kf-at|kPcmKfAt = 0x0e,|kPcmKfAt = 0x0c,|vc2setosckinds
 pstart-number-at|kPcmNumberAt = 0x44,|kPcmNumberAt = 0x46,|vc2setosckinds
@@ -922,9 +918,9 @@ pstart-kinds-last|kPcmKinds { 1, 2, 0, 2, 0, 2 }|kPcmKinds { 1, 2, 0, 2, 0, 0 }|
 pstart-kinds-past|type < kPcmKinds.size() ? kPcmKinds[type] : 0|kPcmKinds[type % kPcmKinds.size()]|vc2setosckinds
 pstart-found|block[0] = found && type|block[0] = true && type|vc2setosckinds
 pstart-number-less|vc2in::s16(input, kPcmNumberAt) - 1 + kStoreBase|vc2in::s16(input, kPcmNumberAt) + kStoreBase|vc2setosckinds
-pstart-holds-test|{ number, 0, 0 }, wave) != 0)\n|{ number, 0, 0 }, wave) == 0)\n|vc2setosckinds
-pstart-words-number|reads.waveStore(kStoreWords, { u16(input, kPcmNumberAt), 0, 0 }, wave)|reads.waveStore(kStoreWords, { number, 0, 0 }, wave)|vc2setosckinds
-pstart-words-answer|        return reads.waveStore(kStoreWords, { u16(input, kPcmNumberAt), 0, 0 }, wave) != 0;|        return true;|vc2setosckinds
+pstart-holds-test|if (store.loadedRecord(number, memory) != 0) return|if (store.loadedRecord(number, memory) == 0) return|vc2setosckinds
+pstart-words-number|vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory)|vc2WaveWords(store, number, wave, memory)|vc2setosckinds
+pstart-words-answer|return vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);|return !vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);|vc2setosckinds
 pstart-index-short|const auto index = static_cast<uint16_t>(|const auto index = static_cast<uint32_t>(|vc2setosckinds
 pstart-index-zero|return index != 0 && reads|return true && reads|vc2setosckinds
 pstart-index-key|{ index, key, in.velocity }|{ index, in.key, in.velocity }|vc2setosckinds
@@ -937,3 +933,78 @@ pstart-key-kf|vc2OscFollowedKey(legato ? in.legatoKey : in.key, in.coarse, kf, k
 pstart-key-coarse|vc2OscFollowedKey(legato ? in.legatoKey : in.key, in.coarse, kf, kPcmCentre)|vc2OscFollowedKey(legato ? in.legatoKey : in.key, 0, kf, kPcmCentre)|vc2setosckinds
 pstart-type-after|    const bool found = pcmWaveFound(in, key, reads);\n    const uint8_t type = input[kWaveTypeAt];|    const uint8_t type = input[kWaveTypeAt];\n    const bool found = pcmWaveFound(in, key, reads);|vc2setosckinds
 pstart-tenth-pool|{ 0x8939e29c, &pcmTenth }|{ 0x8939e724, &pcmTenth }|vc2setenvtables
+pstart-loaded-key|store.loadedRecord(number, memory)|store.loadedRecord(u16(input, kPcmNumberAt), memory)|vc2setosckinds
+pstart-index-number|store.setIndex(number, memory)|store.setIndex(u16(input, kPcmNumberAt), memory)|vc2setosckinds
+# The wave store (vc2wavestore, Vc2WaveStore.cpp, v398).
+store-node-at|kNodeAt = 0x18,|kNodeAt = 0x14,|vc2wavestore
+store-next-at|kNextAt = 4,|kNextAt = 0,|vc2wavestore
+store-key-at|kKeyAt = 8,|kKeyAt = 12,|vc2wavestore
+store-lists|kBuckets = 128;|kBuckets = 64;|vc2wavestore
+store-vpsc-at|kVpscAt = 0x28,|kVpscAt = 0x2c,|vc2wavestore
+store-data-at|kDataAt = 0x38,|kDataAt = 0x3c,|vc2wavestore
+store-set-at|kSetAt = 0x4c,|kSetAt = 0x48,|vc2wavestore
+store-busy-at|kBusyAt = 0x52;|kBusyAt = 0x50;|vc2wavestore
+store-block-data|kBlockData = 28;|kBlockData = 32;|vc2wavestore
+store-frames-at|kFramesAt = 0x20;|kFramesAt = 0x1c;|vc2wavestore
+store-no-record|kNoRecord = -1,|kNoRecord = 0,|vc2wavestore
+store-no-set|kNoSet = -2;|kNoSet = -1;|vc2wavestore
+store-base|kNumberBase = 3000;|kNumberBase = 3001;|vc2wavestore
+store-velocity-level-at|kVelocityLevelAt = 4,|kVelocityLevelAt = 9,|vc2wavestore
+store-root-offset-at|kRootOffsetAt = 5,|kRootOffsetAt = 9,|vc2wavestore
+store-key-level-at|kKeyLevelAt = 6,|kKeyLevelAt = 9,|vc2wavestore
+store-type-at|kTypeAt = 7,|kTypeAt = 9,|vc2wavestore
+store-root-at|kRootAt = 8;|kRootAt = 9;|vc2wavestore
+store-stereo-at|kStereoAt = 0xc,|kStereoAt = 0x48,|vc2wavestore
+store-switch-at|kLoopSwitchAt = 0x10,|kLoopSwitchAt = 0x11,|vc2wavestore
+store-zero-half-at|kZeroHalfAt = 0x12,|kZeroHalfAt = 0x16,|vc2wavestore
+store-events-at|kEventsAt = 0x14,|kEventsAt = 0x16,|vc2wavestore
+store-zero-at|kZeroAt = 0x18;|kZeroAt = 0x48;|vc2wavestore
+store-frames-word-at|kFramesWordAt = 0x1c,|kFramesWordAt = 0x48,|vc2wavestore
+store-chunks-at|kChunksAt = 0x20,|kChunksAt = 0x24,|vc2wavestore
+store-kept-at|kKeptAt = 0x4c,|kKeptAt = 0x50,|vc2wavestore
+store-kept|kKept = 3,|kKept = 2,|vc2wavestore
+store-data-words-at|kDataWordsAt = 0x30;|kDataWordsAt = 0x34;|vc2wavestore
+store-vpsc-type|kVpscTypeAt = 1,|kVpscTypeAt = 0,|vc2wavestore
+store-vpsc-stereo|kVpscStereoAt = 2,|kVpscStereoAt = 3,|vc2wavestore
+store-vpsc-root|kVpscRootAt = 0xa,|kVpscRootAt = 0xb,|vc2wavestore
+store-vpno-count|kVpnoCountAt = 4,|kVpnoCountAt = 8,|vc2wavestore
+store-vplp-switch|kVplpSwitchAt = 0x1a;|kVplpSwitchAt = 0x1b;|vc2wavestore
+store-no-vpno|kNoVpno = 2;|kNoVpno = 0;|vc2wavestore
+store-level-top|kLevelTop = 127;|kLevelTop = 126;|vc2wavestore
+store-chunks-vpdt|{ 0x2c, 0x34 }|{ 0x2c, 0x30 }|vc2wavestore
+store-chunks-vplp|{ 0x54, 0x30 }|{ 0x54, 0x34 }|vc2wavestore
+store-chunks-loop-events|{ 0x58, 0x44 }|{ 0x58, 0x40 }|vc2wavestore
+store-data-words-second|{ 0, 2, 3, 4, 5, 6 }|{ 0, 1, 3, 4, 5, 6 }|vc2wavestore
+store-data-words-last|{ 0, 2, 3, 4, 5, 6 }|{ 0, 2, 3, 4, 5, 7 }|vc2wavestore
+store-chunk-none|return block == 0 ? 0 : block + kBlockData;|return block + kBlockData;|vc2wavestore
+store-data-step|kBlockData + 4 * i);|kBlockData + 2 * i);|vc2wavestore
+store-data-direct|m.word(m.word(record + kDataAt) + kBlockData + 4 * i)|m.word(record + kDataAt + kBlockData + 4 * i)|vc2wavestore
+store-half-order|byte(at) \| byte(at + 1) << 8|byte(at) << 8 \| byte(at + 1)|vc2wavestore
+store-word-order|half(at) \| static_cast<uint32_t>(half(at + 2)) << 16|static_cast<uint32_t>(half(at)) << 16 \| half(at + 2)|vc2wavestore
+store-own-key-zero|words.key >= 0 ?|words.key > 0 ?|vc2wavestore
+store-own-key-unread|words.key >= 0 ? static_cast<uint32_t>(words.key) : key|key|vc2wavestore
+store-list-own-key|words.heads[k % kBuckets]|words.heads[key % kBuckets]|vc2wavestore
+store-match-own-key|m.word(node + kKeyAt) == k)|m.word(node + kKeyAt) == key)|vc2wavestore
+store-node-less|return node - kNodeAt;|return node;|vc2wavestore
+store-ring-end|        if (node == head) break;\n|\n|vc2wavestore
+store-alone-link|for (uint32_t node = head; node != 0;)|for (uint32_t node = head;;)|vc2wavestore
+store-loaded-set|if (record == 0 \|\| m.word(record + kSetAt) != 0) return 0;|if (record == 0) return 0;|vc2wavestore
+store-loaded-busy|return m.half(record + kBusyAt) == 0 ? record : 0;|return record;|vc2wavestore
+store-loaded-busy-word|m.half(record + kBusyAt) == 0|m.word(record + kBusyAt) == 0|vc2wavestore
+store-index-set-read|static_cast<int32_t>(m.word(set + kBlockData))|static_cast<int32_t>(m.word(set))|vc2wavestore
+store-index-none|return set == 0 ? kNoSet :|return set == 0 ? kNoRecord :|vc2wavestore
+store-words-zero|    if (number == 0) return false;\n|\n|vc2wavestore
+store-words-found-first|    put32(wave + kFoundAt, 1);\n    const uint32_t record = store.loadedRecord(static_cast<uint16_t>(number - 1 + kNumberBase), m);\n    if (record == 0) return false;|    const uint32_t record = store.loadedRecord(static_cast<uint16_t>(number - 1 + kNumberBase), m);\n    if (record == 0) return false;\n    put32(wave + kFoundAt, 1);|vc2wavestore
+store-words-key|number - 1 + kNumberBase|number + kNumberBase|vc2wavestore
+store-words-not-loaded|    if (record == 0) return false;\n    for|    if (record == 0) return true;\n    for|vc2wavestore
+store-words-kept|    std::memmove(wave + kChunksAt, wave + kKeptAt, sizeof(uint32_t) * kKept);\n|\n|vc2wavestore
+store-root-offset-zero|wave[kRootOffsetAt] = 0;|wave[kRootOffsetAt] = kLevelTop;|vc2wavestore
+store-stereo-byte|put32(wave + kStereoAt, m.byte(vpsc + kVpscStereoAt));|wave[kStereoAt] = m.byte(vpsc + kVpscStereoAt);|vc2wavestore
+store-zero-half-gone|    put16(wave + kZeroHalfAt, 0);\n|\n|vc2wavestore
+store-events-untested|vpno == 0 ? kNoVpno : m.word(vpno + kVpnoCountAt)|m.word(vpno + kVpnoCountAt)|vc2wavestore
+store-events-word|put16(wave + kEventsAt,|put32(wave + kEventsAt,|vc2wavestore
+store-zero-gone|    put32(wave + kZeroAt, 0);\n|\n|vc2wavestore
+store-frames-from-data|m.word(m.word(record + kVpscAt) + kFramesAt)|m.word(vpsc + kFramesAt)|vc2wavestore
+store-switch-of-vpno|m.byte(vc2in::u32(wave, kChunksAt + 8) + kVplpSwitchAt)|m.byte(vc2in::u32(wave, kChunksAt + 4) + kVplpSwitchAt)|vc2wavestore
+store-vpno-of-vplp|vpno = vc2in::u32(wave, kChunksAt + 4)|vpno = vc2in::u32(wave, kChunksAt + 8)|vc2wavestore
+store-words-answer|    return true;\n}|    return false;\n}|vc2wavestore

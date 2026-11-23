@@ -3912,6 +3912,82 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's wave store (2026-11-22, v398) {#vc2-wave-store}
+
+The store PCM's start (v397) looks a wave up in. It is rom.4's .bss at `0x8997c52c` and keeps a record for each wave
+it has loaded. Ported bit for bit as `Vc2WaveStore` (Vc2WaveStore.cpp), checked in xt_vc2sets' eighth part with rom.4's
+own lookups running there. Every address is rom.4's. The store, its words and their names:
+- **Its words.** At +0 a key that every lookup takes in place of its own while it isn't negative. Then 128 lists from
+  +4, one for each value of a key mod 128, each a node's address or 0. Zero after C startup, like all of .bss.
+- **A record.** Its node is at +0x18: the next node's address at the node's +4 and its key at the node's +8. A list
+  is one node with a link of 0, or a ring of nodes back to its head. The find `0x89353130` walks the list of its key
+  mod 128 to the first node of that key and gives the node. Each lookup takes the node less 24, the record.
+- **The chunks.** `0x89351ad0(key, n)` gives a chunk's block by number, one of 1…12, from a switch at `0x89351b20`:
+  1 at +0x24, 2 +0x28, 3 +0x2c, 4 +0x30, 5 +0x34, 6 +0x40, 7 +0x3c, 8 +0x38, 9 none, 10 +0x44, 11 +0x48, 12 +0x4c. It
+  gives the block's address plus 28, and 64 more for 8 and 11; 0 for no block or a number outside 1…12. rom.2's twin
+  (`0x8949e850`) numbers its chunks the same way, and xt_tone fills them so: 2 the header, in the vpsc's layout; 3 the
+  vpno; 4 the loop record, the vplp's; 5 the vpdt; 10 the cached loop events. The 28 bytes are a block's header, so the
+  result is the chunk's data.
+- **The getters.** `0x89351ff0(key, i)` gives word i of the block at +0x38 (chunk 8's, the `data`'s), from its
+  data. `0x89351a10(key)` gives the vpsc's frames, its block's +0x20 (the data's word 1), and 0 when +0x52 is set.
+- **Loaded and sets.** `0x89351840(key)` (rom.2's `0x8949e5c0`, "loaded" in xt_tone's hook) says whether the record
+  holds its wave loaded: it has no block at +0x4c (chunk 12, a set's) and its halfword +0x52 is clear. `0x893520a0`
+  gives the set's index, the first word of +0x4c's data: −1 for no record, −2 for no set. PCM's start takes it as a
+  halfword.
+
+**The wave's words** (`0x8939cd30` on a Wave Number and the input's +0xa0, `vc2WaveWords`). A number of 0 gives 0 and
+writes nothing. Otherwise it writes 1 at +0, and takes the key as the number less 1 plus 3000, as a halfword. If the
+store doesn't hold that key loaded, it gives 0. If it does, it fills the words in this order and gives 1:
+- +0x2c the vpdt's data, +0x4c…+0x58 the vpsc's, vpno's, vplp's and loop events' data, and +0x30…+0x44 the data
+  block's words 0, 2, 3, 4, 5 and 6.
+- +0x20…+0x28 copies of +0x4c…+0x54.
+- 127, 0 and 127 at +4, +5 and +6: the level curve's two and the root's offset, which 0x8939cba0 takes from its sets.
+- From the vpsc's data: +7 its byte 1 (the type), +8 its byte 0xa (the root key), and the word +0xc its byte 2
+  (stereo).
+- +0x12 a halfword 0, and +0x14 the vpno's count (its data's +4, read by the unaligned reader `0x89300dd0`, as a
+  halfword), or 2 with no vpno.
+- +0x18 a word 0, +0x1c the frames (`0x89351a10`), and +0x10 the vplp's data's +0x1a (the loop switch).
+
+Each getter finds the record again under the same key, which the loaded test has just found, so the port reads that
+record. Their fields and branches that no caller here reaches aren't ported: 0x89351ad0's other numbers, and the frames'
+own +0x52 test. Nor is the store's set-up or its insert (`0x893531c0`), which the wave loader runs. The keys are never
+negative: a halfword, or the store's own key while it isn't negative. So the find's branch for a negative key is dead
+here.
+
+**The wave memory.** The port reads the records, nodes and blocks through `Vc2WaveMemory`, a byte by rom.4's address,
+with a halfword and a word little-endian as rom.4's loads and its unaligned readers give them. `Vc2SetReads` gives it
+(`waveMemory`) with the store (`waveStore`). VariPhrase's words (v396) read their events through it too, where they
+had `Vc2SetReads::waveHalf`. A wave the store has no vpno for leaves its events' table at 0. VariPhrase's words then
+read under STEP or EVENT from address 0x0c: area 0 on the XT, whatever lies there. The interpreter faults there unless
+the check maps that page.
+
+**The check.** rom.4's own `0x89351840`, `0x893520a0` and `0x8939cd30` run, both inside PCM's start and alone as
+events of their own: a key or Wave Number about the store's, the words' into an OSC block's +0xa0. Only `0x8939cba0` is
+still hooked, as in v397 (`oscBySetAnswered`). The draws (`Vc2SetOscStoreDraws.cpp`), at a case's start and one event
+in 32:
+- 64 records in Vc2Fw's RAM, keyed by Wave Numbers 0…40 and, a time in four, 128 or 256 up, so lists form, and lists
+  of a node alone (link 0 or itself) or rings.
+- Their blocks from four runs: vpscs (the type one of six mostly, stereo 0 or 1, the frames 0 now and then), vplps
+  (the loop switch), data, and sets' (the index small mostly). The vpno's data lies in the events' region, its count
+  small half the time, and is absent half the time. A set's block is there half the time, and +0x52 is clear three
+  times in four.
+- The store's own key not negative one event in eight: a record's key, any halfword, or 0.
+- The store's words go into the port's copy, written into rom.4's memory with the OSC blocks before each event and
+  compared after. Everything else goes into rom.4's memory, which the port reads.
+- A page of noise at address 0.
+- An OSC record's Wave Number is drawn about the store's keys half the time.
+- The port's reads are bounded at 65,536 a use, so a planted error's endless walk ends the run.
+
+Not drawn: a ring that doesn't come back to its head, and a vpsc, vplp or data block of 0. On a loaded record rom.4
+reads each of those blocks without a test and faults.
+
+The results:
+- 0 different at seeds 2024, 7, 31337 and 99. Every line and branch of Vc2WaveStore.cpp, Vc2SetOscKinds.cpp and
+  Vc2OscPcmVari.cpp is reached.
+- `mutate_vc2.py --sets`: 73 new plants for the store, two new for PCM's start's lookups, and the five of PCM's start
+  and VariPhrase's events re-pointed onto the calls that replaced theirs, with the rest of those two groups, 107, all
+  caught. Four of PCM's start's went with the addresses it no longer calls. The whole list, 968, all caught.
+
 ### The VC-2's PCM start (2026-11-22, v397) {#vc2-pcm-start}
 
 The start of OSC Type 1, PCM's, `0x8939e120` in the dispatch `0x8939fb40`'s switch. Ported bit for bit as

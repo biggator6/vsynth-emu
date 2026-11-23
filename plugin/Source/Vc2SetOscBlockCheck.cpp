@@ -66,34 +66,44 @@ Vc2MatrixGroups SetPortParts::oscGroups(uint32_t, uint32_t osc) {
 
 float SetPortParts::pitchSource() { return std::bit_cast<float>(fw_.cpu.rd32(kOscSourceAt)); }
 
-uint32_t SetPortParts::waveStore(uint32_t routine, std::array<uint32_t, 3> args, uint8_t* wave) {
-    logged(kSetOscKind, routine, { args[0], args[1], args[2] });
-    return oscStoreAnswered(routine, wave, answers_);
+uint32_t SetPortParts::waveBySet(std::array<uint32_t, 3> args, uint8_t* wave) {
+    logged(kSetOscKind, kOscBySetAt, { args[0], args[1], args[2] });
+    return oscBySetAnswered(wave, answers_);
 }
 
 uint32_t SetPortParts::tripMoving(uint8_t part) {
     return fw_.cpu.rd32(fw_.cpu.rd32(kOscPartTableAt + 4u * part) + kOscTripMovingAt);
 }
 
-uint16_t SetPortParts::waveHalf(uint32_t at) {
-    return static_cast<uint16_t>(fw_.cpu.rd8(at) | fw_.cpu.rd8(at + 1) << 8);
+const Vc2WaveMemory& SetPortParts::waveMemory() {
+    memory_.reads = 0;
+    return memory_;
+}
+
+uint8_t SetPortParts::FwMemory::byte(uint32_t at) const {
+    constexpr long kBound = 65536;
+    if (++reads > kBound) throw std::runtime_error("the wave memory: past 65,536 reads in one use");
+    return fw_.cpu.rd8(at);
 }
 
 namespace {
-struct OscCounts : SetChildCounts<9> {
+// The events' counts, the store's three alone each with how many found a record (loaded, a set's index, the words)
+struct OscCounts : SetChildCounts<15> {
     static constexpr const char* kPool = "the OSC blocks";
     static constexpr const char* kSaid = "OSC blocks: %ld events: %ld placements, %ld constructors, %ld ends, %ld "
                                          "conversions, %ld updates, %ld copies, %ld refreshes, %ld dispatches, %ld "
-                                         "converters (%ld calls of the wave store)\n";
+                                         "converters, the store's %ld loaded (%ld yes), %ld indices (%ld a set's), %ld "
+                                         "words (%ld found) (%ld calls of 0x8939cba0)\n";
 };
 
-// The sides, the pool's regions its seed and the step counts besides (the port's in its parts)
+// The sides, the pool's regions its seed, the step counts and the wave store's words besides (the port's in its parts)
 struct OscSides : SetChildSides<Blocks, OscCounts> {
     using SetChildSides::SetChildSides;
-    std::array<Vc2Region, 3> region(const char* what) const {
+    std::array<Vc2Region, 4> region(const char* what) const {
         return { Vc2Region { Blocks::kAt, &port.items, sizeof port.items, what },
                  Vc2Region { Blocks::kSeedAt, &port.seed, sizeof port.seed, "the seed" },
-                 Vc2Region { kOscStepsAt, &s.parts.oscSteps, sizeof s.parts.oscSteps, "the step counts" } };
+                 Vc2Region { kOscStepsAt, &s.parts.oscSteps, sizeof s.parts.oscSteps, "the step counts" },
+                 Vc2Region { Vc2WaveStore::kAt, &s.parts.store.words, sizeof s.parts.store.words, "the store" } };
     }
 };
 using OscEvent = std::string (*)(OscSides&, std::mt19937&);
@@ -127,6 +137,48 @@ void oscDraw(OscSides& x, std::mt19937& rng, bool all) {
     if (all || rng() % 8 == 0)
         for (uint16_t& step : x.s.parts.oscSteps) step = (uint16_t)(rng() % 4 ? rng() % 8 : rng());
     if (all || rng() % 8 == 0) x.port.seed.value = (uint16_t)rng();
+    oscStoreDrawn(x.s.fw, x.s.parts.store, rng, all);   // v398
+}
+
+// v398: the store's routines alone, on a key or a Wave Number about the store's (now and then any, or 0), the words'
+// into an OSC block's wave words (+0xa0); each answer, and how many found a record, counted
+constexpr uint32_t kWaveAt = 0xa0;   // [FW] the input's wave words
+
+uint32_t storeKey(std::mt19937& rng) {
+    constexpr uint32_t kBase = 3000 - 1;   // [FW] a Wave Number's key: less 1, plus 3000
+    return (uint16_t)(rng() % 8 ? oscStoreNumber(rng) + kBase : rng());
+}
+
+uint32_t storeNumber(std::mt19937& rng) {
+    const auto numbers = std::to_array<uint32_t>({ oscStoreNumber(rng), 0, (uint16_t)rng() });
+    return numbers[rng() % 8 ? 0 : 1 + rng() % 2];
+}
+
+uint32_t loadedMine(OscSides& x, uint32_t, uint32_t key) {
+    return x.s.parts.store.loadedRecord(key, x.s.parts.waveMemory()) != 0 ? 1 : 0;
+}
+
+uint32_t indexMine(OscSides& x, uint32_t, uint32_t key) {
+    return (uint32_t)x.s.parts.store.setIndex(key, x.s.parts.waveMemory());
+}
+
+uint32_t wordsMine(OscSides& x, uint32_t object, uint32_t number) {
+    uint8_t* wave = reinterpret_cast<uint8_t*>(&x.port.at(object)) + kWaveAt;
+    return vc2WaveWords(x.s.parts.store, (uint16_t)number, wave, x.s.parts.waveMemory()) ? 1 : 0;
+}
+
+bool answered(uint32_t answer) { return answer != 0; }
+bool indexed(uint32_t answer) { return (int32_t)answer != -1 && (int32_t)answer != -2; }   // [FW] none, no set
+
+template <uint32_t Routine, size_t Counted, auto Drawn, auto Mine, auto Found>
+std::string storeAlone(OscSides& x, std::mt19937& rng) {
+    ++x.n.byEvent[Counted];
+    const uint32_t object = x.any(rng), arg = Drawn(rng);
+    uint32_t answer = 0;
+    const std::string what = setsChildOnBoth(x.s, x.region(OscCounts::kPool), { Routine, "the store's", vc2R0 },
+                                             { arg, object + kWaveAt }, [&] { return answer = Mine(x, object, arg); });
+    if (Found(answer)) ++x.n.byEvent[Counted + 1];
+    return what;
 }
 
 // The dispatch or the converter alone, on an input and a block
@@ -150,22 +202,23 @@ const OscEvent kEvents[] = {
     setsRefreshEvent<OscSides, &Blocks::refresh, 0x893a0150, 6>,
     oscAlone<vc2SetOscStart, 0x8939fb40, 7>,
     oscAlone<vc2SetOscConvert, 0x8939fbd0, 8>,
+    storeAlone<0x89351840, 9, storeKey, loadedMine, answered>,
+    storeAlone<0x893520a0, 11, storeKey, indexMine, indexed>,
+    storeAlone<0x8939cd30, 13, storeNumber, wordsMine, answered>,
 };
 
-// The wave store's routine on rom.4's side (v397): logged with the arguments the port gives (the number or index; the
-// last routine's key and velocity too), answered, and the wave's words at r5 filled, from the same answers as the port's
-void storeHooked(SetSides& s, uint32_t at, Sh4& c) {
-    const bool byIndex = at == kOscStoreRoutines.back();
-    s.rom.push_back({ kSetOscKind, at, { c.r[4], byIndex ? c.r[6] : 0, byIndex ? c.r[7] : 0 } });
+// The words by a set's index on rom.4's side (v397): logged with the arguments the port gives (the index, the key and
+// velocity), answered, and the wave's words at r5 filled, from the same answers as the port's
+void bySetHooked(SetSides& s, Sh4& c) {
+    s.rom.push_back({ kSetOscKind, kOscBySetAt, { c.r[4], c.r[6], c.r[7] } });
     std::array<uint8_t, kOscWaveBytes> wave {};
-    const bool fills = oscStoreFills(at);
-    if (fills) c.read(c.r[5], wave.data(), wave.size());
-    const uint32_t answer = oscStoreAnswered(at, wave.data(), s.romAnswers);
-    if (fills) c.write(c.r[5], wave.data(), wave.size());
+    c.read(c.r[5], wave.data(), wave.size());
+    const uint32_t answer = oscBySetAnswered(wave.data(), s.romAnswers);
+    c.write(c.r[5], wave.data(), wave.size());
     c.ret(answer);
 }
 
-// rom.4's side: the getters a place each, the pitch source its ratio, the wave store's routines as the port's parts
+// rom.4's side: the getters a place each, the pitch source its ratio, the words by a set's index as the port's parts
 void hookOsc(SetSides& s) {
     for (uint32_t k = 0; k < 4; ++k)
         s.fw.cpu.hook(kGetters[k], [k](Sh4& c) { c.ret(kOscGroupsAt + kOscGroupBytes * k); });
@@ -173,7 +226,7 @@ void hookOsc(SetSides& s) {
         c.fb[0][0] = c.rd32(kOscSourceAt);
         c.pc = c.pr;
     });
-    for (const uint32_t at : kOscStoreRoutines) s.fw.cpu.hook(at, [&s, at](Sh4& c) { storeHooked(s, at, c); });
+    s.fw.cpu.hook(kOscBySetAt, [&s](Sh4& c) { bySetHooked(s, c); });
 }
 } // namespace
 

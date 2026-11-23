@@ -7,6 +7,7 @@
 #include "Vc2CheckMain.h"
 #include "Vc2RomShared.h"
 #include "Vc2Sets.h"
+#include "Vc2WaveStore.h"   // v398
 #include <cstring>
 #include <span>
 #include <type_traits>
@@ -135,12 +136,27 @@ public:
     int32_t matrixBend(uint32_t matrix) override;
     Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
     float pitchSource() override;
-    uint32_t waveStore(uint32_t routine, std::array<uint32_t, 3> args, uint8_t* wave) override;   // v397: as hooked
+    // v398: the store the port's own (`store`, written into rom.4's memory with the blocks before each event), the
+    // memory rom.4's, where the draws put the records, blocks and events' tables (v396's events' halfwords too), at most
+    // 65,536 bytes read a use (a bound a planted error's endless walk meets); 0x8939cba0 as hooked (v397)
+    const Vc2WaveStore& waveStore() override { return store; }
+    const Vc2WaveMemory& waveMemory() override;
+    uint32_t waveBySet(std::array<uint32_t, 3> args, uint8_t* wave) override;
     uint32_t tripMoving(uint8_t part) override;   // v395: through rom.4's part table, as the draws aim it
-    uint16_t waveHalf(uint32_t at) override;      // v396: rom.4's memory, where the draws put the events' tables
     std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes
+    Vc2WaveStore store {};
 
 private:
+    // rom.4's memory as the store's, its reads counted since the last use
+    class FwMemory final : public Vc2WaveMemory {
+    public:
+        explicit FwMemory(Vc2Fw& fw) : fw_(fw) {}
+        uint8_t byte(uint32_t at) const override;
+        mutable long reads = 0;
+
+    private:
+        Vc2Fw& fw_;
+    };
     void logged(int32_t kind, uint32_t routine, std::array<uint32_t, 8> args);
     // N bytes of rom.4's memory at `at` (v391)
     template <size_t N>
@@ -162,6 +178,7 @@ private:
     RomShared shared_;
     SetKeptShared kept_;
     std::array<int16_t, 64> group_ {};   // a reader's answer, as the hooked readers give it from kSetsSumsAt
+    FwMemory memory_ { fw_ };
 };
 
 // Every byte of `t` drawn

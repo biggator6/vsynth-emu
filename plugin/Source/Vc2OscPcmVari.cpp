@@ -4,6 +4,7 @@
 #include "Vc2OscPcmVari.h"
 #include "Vc2InputReads.h"
 #include "Vc2OscPcmLite.h"
+#include "Vc2WaveStore.h"   // v398: the wave memory
 #include "XtFloat.h"
 #include <bit>
 #include <cstring>
@@ -52,9 +53,10 @@ void bitOf(uint8_t& b, uint8_t bit, bool on) {
 // Two events' entries of the wave's table into +0xe8 and +0xec, and the first again into +0xf0
 void eventsFrom(const uint8_t* input, uint32_t first, uint32_t last, Vc2SetReads& reads, uint32_t* block) {
     const uint32_t table = u32(input, kTableAt) + kEntriesAt;
-    const uint16_t from = reads.waveHalf(table + 2 * first);
+    const Vc2WaveMemory& memory = reads.waveMemory();
+    const uint16_t from = memory.half(table + 2 * first);
     storeHalf(block, kFirstAt, from);
-    storeHalf(block, kLastAt, reads.waveHalf(table + 2 * last));
+    storeHalf(block, kLastAt, memory.half(table + 2 * last));
     storeHalf(block, kFromAt, from);
 }
 

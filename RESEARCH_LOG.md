@@ -4024,6 +4024,19 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 24, continued (2026-11-22) — v398: the wave store
+
+- The coordinator merged vc2-mode into this branch and ran the merge's checks while I mapped the store, read-only. The
+  port started from the merge commit.
+- rom.2's twin of the store's loaded test is hooked in xt_tone as "loaded", and xt_tone fills rom.2's chunks by the same
+  numbers. That named the chunks the store's words take: the vpsc, vpno, vplp, vpdt, the data block and the loop
+  events.
+- The first run faulted in VariPhrase's words at address 0x0c. A record with no vpno leaves the wave's events' table
+  at 0, and STEP or EVENT then read from it. On the XT that is area 0. The check maps a page of noise there, as
+  XtFxControl maps one.
+- Three helper names (`waveWord`, `asWord`, `blockOf`) were already taken elsewhere, and the kit refused each. The
+  store now writes through the settings readers' stores and reads through vc2in's.
+
 ### Session 24, continued (2026-11-22) — v397: PCM's start
 
 - PCM's start was the last of the OSC blocks' routines rom.4 ran for the port; what it calls is the wave store's lookups, which the check answers from drawn words on both sides. Vc2Synth will have to give them from the wave memory.
