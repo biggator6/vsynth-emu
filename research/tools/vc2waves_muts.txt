@@ -150,3 +150,46 @@ moved-bands|for (uint32_t i = 0; i < kBands; ++i) addTo(|for (uint32_t i = 1; i 
 moved-data-slot|(word(block + kWhichAt) == 0 ? kDataFirst : kDataSecond));|(word(block + kWhichAt) == 0 ? kDataSecond : kDataFirst));|vc2waverecords
 moved-plain|        addTo(word(block + kOwnerAt) + c->slot);|        (void)c;|vc2waverecords
 moved-other|        os_.moved(block, by);|        (void)by;|vc2waverecords
+kernel-no-lock|    { 0x88008000, nullptr, 0 },                   // the OS's lock (0x893018b0: the store's pool's)\n||vc2wavekernel
+kernel-no-alloc-lock|    { 0x88008110, nullptr, 0 },                   // the allocator's lock (0x89301810)\n||vc2wavekernel
+kernel-no-compare|    { 0x880089e0, &Kernel::compare, 0 },          // (0x8933a7e0)\n|    { 0x880089e0, nullptr, 0 },\n|vc2wavekernel
+kernel-no-fstat|    { 0x88008f70, &Kernel::fstat, 0 },            // (0x89336c10)\n||vc2wavekernel
+kernel-open-mode|    if (c.r[5] != kReading) refused = "a write to " + path;|    if (c.r[5] == kReading) refused = "a write to " + path;|vc2wavekernel
+kernel-open-none|    keep(openFiles, nextFile, c, found, std::move(f), kNone);|    keep(openFiles, nextFile, c, found, std::move(f), 0);|vc2wavekernel
+kernel-read-stays|        file.at = (uint32_t)from + n;|        file.at = (uint32_t)from;|vc2wavekernel
+kernel-read-short|        const auto n = (uint32_t)std::min<size_t>(c.r[6], file.bytes.size() - from);|        const auto n = (uint32_t)std::min<size_t>(c.r[6] / 2, file.bytes.size() - from);|vc2wavekernel
+kernel-seek-offset|        file.at = from[std::min<uint32_t>(c.r[6], 3)] + (c.r[6] > 2 ? 0 : c.r[5]);|        file.at = from[std::min<uint32_t>(c.r[6], 3)] + (c.r[6] > 2 ? 0 : c.r[5] + 1);|vc2wavekernel
+kernel-fstat-size|        c.wr32(c.r[5] + kSizeAt, (uint32_t)file.bytes.size());|        c.wr32(c.r[5] + kSizeAt, (uint32_t)file.bytes.size() - 1);|vc2wavekernel
+kernel-mapped-place|            c.write(nextMapped, file.bytes.data(), file.bytes.size());|            c.write(nextMapped + 4, file.bytes.data(), file.bytes.size());|vc2wavekernel
+kernel-mapped-none|        c.ret(file.mapped);|        c.ret(0);|vc2wavekernel
+kernel-entry-place|        c.wr32(kEntryAt + kPlaceAt, f.at++);|        c.wr32(kEntryAt + kPlaceAt, ++f.at);|vc2wavekernel
+kernel-entry-name|        c.write(kEntryAt + kNameAt, name.c_str(), name.size() + 1);|        c.write(kEntryAt + kNameAt + 1, name.c_str(), name.size() + 1);|vc2wavekernel
+kernel-rewind|void Kernel::rewindFolder(Sh4& c) { placeAt(folders, c, 0); }|void Kernel::rewindFolder(Sh4& c) { placeAt(folders, c, 1); }|vc2wavekernel
+kernel-seekdir|void Kernel::seekFolder(Sh4& c) { placeAt(folders, c, c.r[5]); }|void Kernel::seekFolder(Sh4& c) { placeAt(folders, c, c.r[5] + 1); }|vc2wavekernel
+kernel-stat-attributes|        c.wr8(c.r[6] + kAttributesAt, e.attributes);|        c.wr8(c.r[6] + kAttributesAt, e.attributes \| 0x02);|vc2wavekernel
+kernel-file-name|    c.ret(c.r[4] + (uint32_t)(slash == std::string::npos ? 0 : slash + 1));|    c.ret(c.r[4] + (uint32_t)(slash == std::string::npos ? 0 : slash));|vc2wavekernel
+kernel-compare-case|        const int y = i < b.size() ? std::tolower((unsigned char)b[i]) : 0;|        const int y = i < b.size() ? std::toupper((unsigned char)b[i]) : 0;|vc2wavekernel
+kernel-compare-some|    c.ret((uint32_t)caseless(text(c, c.r[4], kPathMost), text(c, c.r[5], kPathMost), c.r[6]));|    c.ret((uint32_t)caseless(text(c, c.r[4], kPathMost), text(c, c.r[5], kPathMost), c.r[6] - 1));|vc2wavekernel
+boot-no-listings|    { "the folder listings' initializer", 0x893503a0, 0, Goes::any, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-nodes|    { "their nodes' heap's initializer", 0x89350860, 0, Goes::any, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-store|    { "the store's set-up", 0x89352520, 0, Goes::one, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-links|    { "the link files", 0x89349d00, 0, Goes::notNegative, xtfw::kCallSteps },\n||vc2waveboot
+boot-no-load|    { "the start-up load", 0x8934d2d0, kLoadState, Goes::notNegative, kLoadSteps },\n||vc2waveboot
+boot-bank-object|0x89350970, 0x89e0f034,|0x89350970, 0x89e0f038,|vc2waveboot
+boot-load-steps|kLoadSteps = 3'000'000'000ull;|kLoadSteps = 300'000'000ull;|vc2waveboot
+boot-heap-short|    c.mapRam(first, last + 4 - first);|    c.mapRam(first, 0x1000000);|vc2waveboot
+boot-overhang|constexpr uint32_t kPoolOverhang = 24;|constexpr uint32_t kPoolOverhang = 16;|vc2waveboot
+boot-take-base|    c.read(out.pool.words.base, out.pool.memory.data(), out.pool.memory.size());|    c.read(out.pool.words.base + 4, out.pool.memory.data(), out.pool.memory.size());|vc2waveboot
+boot-take-key-data|        { Vc2WaveSets::kKeyDataAt, out.sets.data.key.data(), out.sets.data.key.size() },\n||vc2waveboot
+boot-take-store|        { Vc2WaveStore::kAt, &out.store.words, sizeof out.store.words },\n||vc2waveboot
+boot-memory-data|    return data ? *data : pool.byte(at);|    return pool.byte(at);|vc2waveboot
+boot-goes-store|    const bool goes[] = { true, (int32_t)r0 >= 0, r0 == 1 };|    const bool goes[] = { true, (int32_t)r0 >= 0, r0 == 0 };|vc2waveboot
+files-index-tag|constexpr std::string_view kLibrary = "WLF08", kVc2Index = "VC2W";|constexpr std::string_view kLibrary = "WLF08", kVc2Index = "VSYN";|vc2bootfiles
+files-index-end|            end = std::max<size_t>(end, (size_t)le32(&d[entry + 4]) + le32(&d[entry + 8]));|            end = std::max<size_t>(end, (size_t)le32(&d[entry + 4]));|vc2bootfiles
+files-bank-first|    return { d.begin() + (long)at, d.begin() + (long)(base + end) };|    return { d.begin() + (long)at + 1, d.begin() + (long)(base + end) };|vc2bootfiles
+files-bank-count|        count = 10 * count + (c - '0');|        count = 10 * count + (c - '1');|vc2bootfiles
+files-bank-short|    return { d.begin() + (long)at, d.begin() + (long)(base + end) };|    return { d.begin() + (long)at, d.begin() + (long)(base + end / 2) };|vc2bootfiles
+files-file-is-folder|    if (!onDrive(path, kDriveA, rest) \|\| !onA(rest, at, entry) \|\| entry.isDir) return false;|    if (!onDrive(path, kDriveA, rest) \|\| !onA(rest, at, entry) \|\| !entry.isDir) return false;|vc2bootfiles
+files-folder-attributes|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.name, e.shortName, e.attributes, e.size });|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.name, e.shortName, 0x12, e.size });|vc2bootfiles
+files-folder-short|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.name, e.shortName, e.attributes, e.size });|    for (const XtDiskImage::Entry& e : disk_.list(at)) out.push_back({ e.shortName, e.shortName, e.attributes, e.size });|vc2bootfiles
+files-index-past|      bank_(bankIn(disk.bytes(), disk.pastPartition())) {}|      bank_(bankIn(disk.bytes(), disk.pastPartition() + 0x4000000)) {}|vc2bootfiles

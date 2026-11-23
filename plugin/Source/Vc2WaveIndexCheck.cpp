@@ -183,7 +183,7 @@ std::string memoryDifference(Vc2Fw& fw, const PortSide& p) {
         { Vc2WaveSets::kKeyDataAt, data.key.data(), data.key.size(), "the key's data" },
     };
     for (const auto& [at, mine, bytes, what] : regions)
-        if (std::string d = vc2BytesDifference(fw, at, mine, bytes, what); !d.empty()) return d;
+        if (std::string d = vc2BytesDifference(fw.cpu, at, mine, bytes, what); !d.empty()) return d;
     return streamsDifference(fw, p.sets);
 }
 

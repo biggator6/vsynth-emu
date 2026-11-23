@@ -5,6 +5,7 @@
 // (Vc2WaveIndexCheck.cpp).  XT_VC2WAVES_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2Files.h"
+#include "Vc2WaveBoot.h"
 #include "Vc2WavePoolRig.h"   // the pool's rig, which the pool's and the records' parts share (v502)
 #include <functional>
 #include <string>
@@ -52,12 +53,13 @@ private:
 void vc2HookFiles(Vc2Fw& fw, Vc2FileList& files);
 // The first call that differs between the port's log and rom.4's, as text; empty when none does
 std::string vc2FileCallsDifference(const std::vector<Vc2FileCall>& mine, const std::vector<Vc2FileCall>& theirs);
-// A call made on both sides, as text: that rom.4's faulted (not `ok`), that the answers differ (the port's, rom.4's),
-// or else what `memory()` finds different; empty when nothing does
-std::string vc2CallOutcome(Vc2Fw& fw, bool ok, std::pair<int64_t, int64_t> answers,
+// A call made on both sides, as text: that rom.4's faulted (not `ok`, on its machine `c`), that the answers differ
+// (the port's, rom.4's), or else what `memory()` finds different; empty when nothing does
+std::string vc2CallOutcome(Sh4& c, bool ok, std::pair<int64_t, int64_t> answers,
                            const std::function<std::string()>& memory);
-// The first byte of `bytes` at `at` in rom.4's memory that differs from the port's `mine`, as text; empty when none does
-std::string vc2BytesDifference(Vc2Fw& fw, uint32_t at, const void* mine, size_t bytes, const char* what);
+// The first byte of `bytes` at `at` in rom.4's memory (its machine's, `c`) that differs from the port's `mine`, as
+// text; empty when none does
+std::string vc2BytesDifference(Sh4& c, uint32_t at, const void* mine, size_t bytes, const char* what);
 
 // A part's tally: what it ran, and the cases that differ, the first said under XT_VC2WAVES_FIRST and the run stopped
 // there under XT_VC2WAVES_STOP
@@ -76,6 +78,12 @@ long vc2WaveIndexPart(Vc2Fw& fw, const Vc2Run& run, const std::vector<uint8_t>& 
 long vc2WavePoolPart(Vc2Fw& fw, const Vc2Run& run);
 // The store's records and chunks (v502, Vc2WaveRecordsCheck.cpp): `run.cases` cases of up to 120 drawn calls on a store
 long vc2WaveRecordsPart(Vc2Fw& fw, const Vc2Run& run);
+// The waves loaded by rom.4 itself (v503, Vc2WaveBootCheck.cpp): Vc2WaveBoot on `files`, what it left against them and
+// against rom.4's memory, the lookups, and the load again after every static initializer
+long vc2WaveBootPart(const std::string& rom4, const Vc2Run& run, const Vc2DiskBootFiles& files);
+// The port's lookups on `w`, what the load on `c` left, against rom.4's on `c` (Vc2WaveLookupCheck.cpp), each call an
+// outcome in `tally`; how many calls
+long vc2WaveLookups(Sh4& c, Vc2LoadedWaves& w, const Vc2Run& run, Vc2WavesTally& tally);
 // Its draws (Vc2WavePoolDraws.cpp): a request's size (up to an eighth or a sixty-fourth of the pool; a fourth of the
 // time one of three sizes, so free blocks tie for the largest; now and then 0, exactly what's free, or past it); a
 // pool's (2 KB to the most the check's OS gives, now and then 0, more, or negative); and a realloc's that fills

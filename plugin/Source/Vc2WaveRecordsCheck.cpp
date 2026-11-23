@@ -139,7 +139,7 @@ std::string recordsDifference(Vc2Fw& fw, const StoreSides& s, const Vc2PoolLogs&
         { s.pool.words.base, s.pool.memory.data(), s.pool.memory.size(), "the pool's memory" },
     };
     for (const auto& [at, ours, bytes, what] : regions)
-        if (std::string d = vc2BytesDifference(fw, at, ours, bytes, what); !d.empty()) return d;
+        if (std::string d = vc2BytesDifference(fw.cpu, at, ours, bytes, what); !d.empty()) return d;
     if (mine.moved != theirs.moved) return "the check's objects' moves";
     return mine.os == theirs.os ? "" : "the OS's calls";
 }
@@ -161,10 +161,10 @@ std::string storeCase(Vc2Fw& fw, std::mt19937& rng, long& calls) {
     const Answer setUp = romAnswer(fw, kPoolSetUp, { kPoolAt, bytes });
     pool.setUp(bytes, records);
     const auto memory = [&] { return recordsDifference(fw, s, theirs, os.logs); };
-    std::string d = vc2CallOutcome(fw, setUp.ok, { 0, 0 }, memory);
+    std::string d = vc2CallOutcome(fw.cpu, setUp.ok, { 0, 0 }, memory);
     for (int k = 0; k < kSteps && d.empty(); ++k, ++calls) {
         const auto [a, name] = drawnStoreCall(s);
-        d = vc2CallOutcome(fw, a.ok, { a.mine, a.theirs }, memory);
+        d = vc2CallOutcome(fw.cpu, a.ok, { a.mine, a.theirs }, memory);
         if (!d.empty()) d = "call " + std::to_string(k) + ", " + name + ": " + d;
     }
     return d;

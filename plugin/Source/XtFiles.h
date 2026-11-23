@@ -122,7 +122,15 @@ int xtPatchZones(const std::vector<uint8_t>& store);
 // XtDiskImage.cpp.
 class XtDiskImage {
 public:
-    struct Entry { std::string name; bool isDir = false; uint32_t cluster = 0, size = 0; };
+    // An entry's long name (its 8.3 name when it has none), and (v503) its 8.3 name and FAT attributes as the
+    // directory entry holds them, which rom.4's kernel calls give (Vc2WaveBoot)
+    struct Entry {
+        std::string name;
+        bool isDir = false;
+        uint32_t cluster = 0, size = 0;
+        std::string shortName;
+        uint8_t attributes = 0;
+    };
     // False for a file that isn't a FAT16 image, or a damaged one: clusters of no sectors, a root past its end.
     bool open(const std::string& path);
     const std::vector<uint8_t>& bytes() const { return d; }
@@ -131,6 +139,8 @@ public:
     std::vector<uint8_t> read(const Entry& file) const;
     // Where the preset waves start in bytes(): every "vpfl" past the partition.
     std::vector<size_t> presetWaves() const;
+    // Where the partition ends in bytes(): the XT's preset area follows (v503)
+    size_t pastPartition() const { return partitionEnd; }
 private:
     std::vector<uint8_t> d;
     size_t fat = 0, root = 0, data = 0, partitionEnd = 0;

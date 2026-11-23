@@ -779,6 +779,13 @@ version against rom.4's routines with what it calls hooked:
           xt_vc2waves' third part (HARDWARE_FIRMWARE.md, "The VC-2's wave store's records"). The block is v500–v549
           now (the coordinator's, 2026-11-23). Left: the store's set-up with its sampling record (v503), the loader's
           context, the Wave Number records, the bank, its wave reader and the start-up load.
+        - The waves loaded by rom.4 itself (v503): from here rom.4's own boot loaders run in the interpreter at load
+          time, and only what the player reads is ported (the coordinator's, 2026-11-23); the files the disk image's,
+          the user's choice ("Image, FAT links"). `Vc2WaveBoot` runs the boot's stages with the kernel answered from
+          `Vc2DiskBootFiles` and takes the store, the pool and the sets as `Vc2LoadedWaves`, the wave memory;
+          xt_vc2waves' fourth part (HARDWARE_FIRMWARE.md, "The VC-2's waves, loaded by rom.4 itself"). v500's parse
+          is the check's expectation, v501's pool the taken pool's container, v502's records unused. Left: the load at
+          the plugin's start (v504), then the player's reads through it.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

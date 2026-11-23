@@ -178,11 +178,12 @@ std::pair<Call, const char*> drawnCall(Sides& s) {
 }
 
 std::string poolDifference(Vc2Fw& fw, const Vc2WavePool& pool, const Logs& theirs, const Logs& mine) {
-    if (std::string d = vc2BytesDifference(fw, Vc2WavePool::kAt, &pool.words, sizeof pool.words, "the pool's words");
+    Sh4& c = fw.cpu;
+    if (std::string d = vc2BytesDifference(c, Vc2WavePool::kAt, &pool.words, sizeof pool.words, "the pool's words");
         !d.empty())
         return d;
     if (!pool.memory.empty())
-        if (std::string d = vc2BytesDifference(fw, pool.words.base, pool.memory.data(), pool.memory.size(), "memory");
+        if (std::string d = vc2BytesDifference(c, pool.words.base, pool.memory.data(), pool.memory.size(), "memory");
             !d.empty())
             return d;
     if (mine.moved != theirs.moved) return "the moved objects' calls";
@@ -226,7 +227,7 @@ long vc2WavePoolPart(Vc2Fw& fw, const Vc2Run& run) {
         int bare = 0;   // calls on a pool with no memory, a few at most
         for (int k = 0; k < kSteps && d.empty() && (pool.words.base != 0 || bare++ < kBareSteps); ++k, ++calls) {
             const auto [call, name] = drawnCall(s);
-            d = vc2CallOutcome(fw, call.ok, { call.mine, call.theirs },
+            d = vc2CallOutcome(fw.cpu, call.ok, { call.mine, call.theirs },
                                [&] { return poolDifference(fw, pool, theirs, host.logs); });
             if (d.empty() && call.block) dress(s, call.block, call.noisy);
             if (!d.empty()) d = "call " + std::to_string(k) + ", " + name + ": " + d;

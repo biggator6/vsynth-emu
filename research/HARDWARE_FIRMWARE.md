@@ -3912,6 +3912,136 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's waves, loaded by rom.4 itself (2026-11-23, v503) {#vc2-waves-loaded}
+
+From v503 the VC-2's waves come from rom.4's own boot loaders, run in the interpreter at load time. Only what the
+player reads at run time is ported by hand. That is the user's standing rule for load-time firmware (2026-10-28,
+as `xtFw*` and v450's `vc2PatchRead`), which the coordinator applied here (2026-11-23). The files come from the disk
+image beside rom.4, the user's choice of 2026-11-23 ("Image, FAT links"): the index and the sample bank from past
+its partition, and the 58 link files `A:\Internal.vc2\Wave\*.w02` through its FAT, as rom.4's own boot reads them.
+`Vc2WaveBoot` (plugin/Source) is the load, and `Vc2DiskBootFiles` gives it the disk image's files. Every address is
+rom.4's.
+
+**The boot's stages** (`0x8933eea0`, in its order):
+- the store's set-up (`0x89352520` → `0x89353ac0`: 32 MB for the pool, the sampling record);
+- the sample bank (`0x89350970` on `0x89e0f034`);
+- the index's state and parse (`0x8934ce70`, `0x8934d120`, v500's);
+- the project's path (`0x89342cb0`): it reads `C:\VC-2 Project.ini`, or else takes `A:\Internal.vc2\`;
+- the Wave folder's link files (`0x89349d00`). It lists `<project>Wave\` through rom.4's folder listing
+  (`0x8934ea50`, which keeps only `.w02`, sorted by name). Each `NNN name.w02` goes to the link reader
+  (`0x89347f40`), which makes a library record of key 2999 + NNN naming the wave the file's `link` chunk names;
+- the user waves (`0x89349ef0`: `.wav`, `.aif`, `.vpw` in the same folder, none on the disk image);
+- the start-up load (`0x8934d2a0`, `0x8934d2d0`): every sample the library's waves use, through the bank's wave reader.
+
+The boot's other stages are left out: the patch lists, the sampling object and its mode tests (`0x8930f200`,
+`0x8930f1e0`, `0x8931a000`…`0x89319a20`, `0x89359a20`, `0x89359e60`, `0x89341e90`). Where they run with their
+kernel calls given 0 (three fault without their own initializers), the memory the loaders leave is the same.
+
+**What runs before.** A fresh interpreter runs none of rom.4's 382 static initializers (the table at
+`0x898c59c4`, 12 bytes a row). The loaders need three. Without the folder listings' objects (`0x893503a0`) or their
+nodes' heap (`0x89350860`) the link pass faults, so the load runs those two and the bank's (`0x89350af0`). Dropping
+any other row of the 15 in the loaders' modules leaves the memory byte for byte the same. Running all 382 first
+leaves it the same too, which xt_vc2waves runs each time.
+
+**The heap.** rom.4's allocator (`0x89300770`, `calloc` `0x89300910`, `free` `0x89300840`) is rom.4's own, on the
+heap its image's header names: `0x8cc80000` to `0x8ffffffc` (its words `0x89300038`, `0x8930003c`). The research
+tools had answered it with a bump allocator. The load maps that heap and runs rom.4's own, and the 32 MB pool lands
+at `0x8dffffe8`. Nothing in the pool points outside it but one word of a chunk's data.
+
+**The kernel.** The kernel isn't in rom.4. Every call into it goes through a stub to an address at `0x88000000`…,
+and `Vc2WaveBootKernel.cpp` answers those addresses in one table. An address it doesn't answer faults the load,
+which names the address. Each answer is read from rom.4's own use of the call, and where rom.4 has its own Z: drive
+(`0x8933c4e0`, `0x8933c5d0`, `0x8933cad0`, …), from what that answers:
+
+| Kernel entry | rom.4's stub | What it is, as answered |
+|---|---|---|
+| `0x88008000`, `0x88008010` | `0x893018b0`, `0x893018c0` | the OS's lock and unlock (the pool's): 0 |
+| `0x88008110`, `0x88008120` | `0x89301810`, `0x89301820` | the allocator's lock and unlock: 0 |
+| `0x88008550` | `0x894da150` | the boot's key test: 0, the normal boot, which reads the `.ini` |
+| `0x88008a90` | `0x8933a890` | the display's text: 0 |
+| `0x880089b0`, `0x880089f0` | `0x8933a7b0`, `0x8933a7f0` | names compared over a length, without case |
+| `0x880089e0` | `0x8933a7e0` | names compared, without case |
+| `0x88008c90` | `0x89338c60` | a path's file name: the part past its last `\` |
+| `0x88008cf0`, `0x88008d00`, `0x88008d10`, `0x88008d20`, `0x88008da0` | `0x89338e50`…`0x89339040` | the drive's queries: 1, 0, 1, 1, 0, as the Z: drive answers |
+| `0x88008f00`, `0x88008f10` | `0x893369c0`, `0x893369f0` | a folder opened (a handle, 0 for none) and closed |
+| `0x88008f20` | `0x89336a40` | a folder's next entry, or 0 at its end |
+| `0x88008f30`, `0x88008f40` | `0x89336a90`, `0x89336ae0` | a folder rewound, and set to an entry's place |
+| `0x88008dd0` | `0x89339120` | an entry's stat by its place: +0 its size, +8 its FAT attributes |
+| `0x88008f80`, `0x88008fa0` | `0x89336c60`, `0x89336ca0` | a file opened (a handle, −1 for none) and closed |
+| `0x88008fb0`, `0x88008fe0` | `0x89336cf0`, `0x89336db0` | read (the count read) and seek (0) |
+| `0x88008f70` | `0x89336c10` | a file's stat: +0 its size |
+| `0x88008fc0` | `0x89336d60` | where a file's bytes are as memory: the bank's, mapped from `0x90000000` |
+
+A folder's entry: +0 its place (what seek and the stat take), +8 its name's length, +10 its name, +0x10a its 8.3
+name. rom.4's filter for link files skips names starting with `.` and entries with attributes 0x0e. It keeps
+folders, and keeps files whose extension is `w02` (`0x89350250`). `XtDiskImage` gives each entry's 8.3 name and
+attributes from v503.
+
+Not known, and chosen so the load is the same either way:
+- the string compares' case (the 58 names differ in their first three digits);
+- what a seek gives back (the loaders don't test it);
+- the drive's queries but by the Z: drive's answers;
+- `.` and `..`, which a FAT folder holds and rom.4's filter drops.
+
+A file opened in any mode but reading is refused and named. The loaders write only when the Wave folder is missing:
+the maker `0x8934db30` writes a link file per wave.
+
+**What the port takes** (`Vc2WaveBoot::take`, `Vc2LoadedWaves`):
+- the store's words (`0x8997c52c`);
+- the pool's words (`0x8997c51c`), and its memory from its base, the 32 MB and 24 bytes past them;
+- the sets' counts, tables, buffers and the velocity's and key's data (v399, v500).
+
+`Vc2LoadedWaves` is itself the wave memory a wave is read from by address: the sets' data where their streams lie,
+the pool elsewhere. It is what `Vc2SetReads::waveMemory()` must give, as PCM's start reads both through one memory.
+
+**The disk image's load:** 610,810,245 steps, about 2 s.
+- The sets: 58 waves, 43 maps, 192 samples.
+- The library: 58 records, one per link file.
+- 251 records in all: the sampling record, the 58 library records and the 192 samples. 193 data chunks
+  (the sampling record's and the samples').
+
+**The check** is xt_vc2waves' fourth part (`Vc2WaveBootCheck.cpp`, `Vc2WaveLookupCheck.cpp`). The load must run
+every stage. What it leaves must be what the files say, read without rom.4:
+- the sets as v500's port parses the same index;
+- each link file's library record naming the wave its `link` chunk names, and named by its first 12 characters
+  (a record's name is at most 12 characters from +0x58);
+- each of the index's 192 samples loaded, its `vpsc`, `vpno`, `vplp` and `vpdt` byte for byte as its stream in the
+  bank has them (a chunk's data 28 bytes in, its length at +0x10), and named by its file's first 12 characters.
+
+What the port takes must be rom.4's memory byte for byte, by the check's own addresses. The load is then run again
+after all 382 initializers, with two decoys in the Wave folder: a link file naming wave 1 as Wave Number 90 but a
+`.w03`, and a `.wa2`. Working compares leave both out, so that load must leave the same memory. A Wave Number past
+128 isn't a decoy: the link pass passes it over whatever the filter says. Then the port's lookups on what was taken
+against rom.4's own on the same machine:
+- `0x89351840` and `0x893520a0` for every key below 0x200, 2999…3199 and the sampling record's;
+- `0x8939cd30` for every Wave Number below 0x200;
+- `0x8939cba0` for every set index up to two past the count, at every key and every velocity, then [cases] drawn ones;
+- each call's answer, the words it writes and the sets' buffers.
+
+That is 17,598 lookups, and 0 different at seeds 2024, 7, 31337 and 99. The first run found the port's memory
+missing the sets' data. The lookups by set index read their streams through the wave memory, so `Vc2LoadedWaves`
+reads both.
+
+`mutate_vc2.py --waves`: 195 plants, none missed, no errors; 43 of them v503's, in the load (`vc2waveboot`), its
+kernel (`vc2wavekernel`) and its files (`vc2bootfiles`). Nine were dropped as equivalent on this data:
+- the drive's two queries the loaders don't act on here;
+- a seek from where a file is, which no loader asks for;
+- an entry's name length and the bytes past its names;
+- an entry's stat size;
+- the sets' buffers, which no loader writes;
+- the bank's initializer, which clears what C startup's .bss already has;
+- an empty step in a path, which only a doubled or leading `\` makes.
+Three more were missed at first and are caught now:
+- a path's file name taken one character early, once the check read the records' names;
+- a compare that always matches, and one a character short, once the decoys went in.
+`--sets` as before: 1019, none missed.
+
+**v500–v502 now.**
+- v500's parse is the check's expectation of the sets; the plugin doesn't run it.
+- v501's pool holds the taken pool (its words and memory, a `Vc2WaveMemory`); its allocator isn't used.
+- v502's records (`Vc2WaveRecords`) aren't used by the load or the plugin.
+They stay as committed, each checked against rom.4 as before.
+
 ### The VC-2's wave store's records (2026-11-23, v502) {#vc2-wave-records}
 
 What the loaders build in the wave store (v398) and its pool (v501): records and their chunks, made, deleted and

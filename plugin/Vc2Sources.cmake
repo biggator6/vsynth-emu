@@ -131,6 +131,9 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2WaveIndex.cpp
     Source/Vc2WavePool.cpp
     Source/Vc2WaveRecords.cpp
+    Source/Vc2BootFiles.cpp
+    Source/Vc2WaveBoot.cpp
+    Source/Vc2WaveBootKernel.cpp
     Source/Vc2PartSettings.cpp
     Source/Vc2PartSettingsTables.cpp
     Source/Vc2PartSettingsWords.cpp

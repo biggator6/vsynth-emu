@@ -4024,6 +4024,26 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 25, continued (2026-11-23) — v503: the waves loaded by rom.4 itself
+
+- The coordinator turned the work around: from v502 on rom.4's own loaders run in the interpreter at load time, and
+  only what the player reads at run time is ported. The user chose the files: the disk image's index and bank past its
+  partition, and the link files through its FAT. v503's draft of the store's set-up by hand was dropped.
+- The research tools had run the bank, the parse and the start-up load before, but with the library answered by
+  hand (wave k for file k) and the allocator a bump. The link files' pass was the new part. It goes through rom.4's
+  folder listing, so the load needed the kernel's folder calls. rom.4's own Z: drive answers the same calls in its own
+  code, which settled the shapes of the entry and the stats.
+- A probe with every kernel address hooked to log found the calls the loaders make. The strict load hooks only those,
+  so a new one faults and is named. The first real run named the pool's lock, which the research tools had answered
+  wholesale.
+- The allocator turned out to be rom.4's own on a heap the image's header names. Running it moved the pool from the
+  research tools' 0x90000000 to 0x8dffffe8, which changes nothing the port reads: every pointer is in the pool.
+- The listing needs two static initializers a fresh interpreter skips. Dropping each of the 15 in the loaders'
+  modules in turn, and running all 382, showed those two and the bank's are all that matter.
+- The check reads the files without rom.4 to say what the load must leave. That way a wrong kernel answer shows,
+  where comparing the port with rom.4 on the same machine couldn't. Its first run found the port's wave memory
+  missing the sets' data, which the lookups by set index read.
+
 ### Session 25, continued (2026-11-23) — v502: the wave store's records
 
 - The coordinator widened the block to v500–v549 and kept the plugin's wiring out until the user decides where the

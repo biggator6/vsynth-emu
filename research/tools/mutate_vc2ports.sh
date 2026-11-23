@@ -37,7 +37,8 @@
 # v450), the .p02's reader (vc2patchfile) and the store's reads both images share (vc2patchxt, XtPatchStore.cpp) under
 # xt_vc2patch; the wave index's parse (vc2waveindex, v500) and the sets' data read by address (vc2wavesetsdata,
 # Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its records and chunks (vc2waverecords, v502) under
-# xt_vc2waves.
+# xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's answers (vc2wavekernel) and its files
+# (vc2bootfiles) under its fourth part.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -217,6 +218,9 @@ VC2PORTS=(
     "vc2wavesetsdata|Vc2WaveSets.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
     "vc2wavepool|Vc2WavePool.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
     "vc2waverecords|Vc2WaveRecords.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
+    "vc2waveboot|Vc2WaveBoot.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
+    "vc2wavekernel|Vc2WaveBootKernel.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
+    "vc2bootfiles|Vc2BootFiles.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
 )
 
 # vc2Port <port>: mutate.sh's IMAGE, ARGS and F for the port, and its check's other files kept (harnessParts); a port

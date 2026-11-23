@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's waves, loaded by rom.4 itself v503 (2026-11-23, after v502; HARDWARE_FIRMWARE.md, "The VC-2's waves,
+  loaded by rom.4 itself"): from v503 rom.4's own boot loaders run in the interpreter at load time, and only what the
+  player reads is ported (the coordinator's, 2026-11-23, by the user's rule of 2026-10-28). The files are the disk
+  image's (the user's choice, "Image, FAT links"): the index and bank past its partition, the link files through its
+  FAT (Vc2DiskBootFiles). Vc2WaveBoot runs the boot's stages (the store's set-up, the bank, the index, the project's
+  path, the Wave folder's link files, the user waves, the start-up load) after the three static initializers they
+  need, on rom.4's own allocator and heap, with the kernel answered in one table (Vc2WaveBootKernel.cpp: files,
+  folders, string compares, locks, the display, the drive's queries); an entry it doesn't answer faults the load,
+  naming it. It takes the store, the pool and the sets as Vc2LoadedWaves, itself the wave memory. The disk image's:
+  610.8 million steps, about 2 s; 58 waves, 43 maps, 192 samples, 58 library records. xt_vc2waves' fourth part: the
+  load against the files read without rom.4, what it takes against rom.4's memory, 17,598 lookups against rom.4's,
+  and the load again after all 382 initializers with two decoys in the Wave folder; 0 different at seeds 2024, 7,
+  31337 and 99. --waves 195 plants, none missed (43 v503's, nine equivalent dropped); --sets 1019, none missed.
+  XtDiskImage's entries carry their 8.3 names and attributes. Not wired into the plugin yet (v504).
+
 The VC-2's wave store's records v502 (2026-11-23, after v501; HARDWARE_FIRMWARE.md, "The VC-2's wave store's
   records"): what the loaders build in the store and its pool, Vc2WaveRecords: a record made (0x89353b40), a chunk made
   (0x89353ef0: nine plain classes and the data's, which hangs in one of two slots), a record deleted with every class's

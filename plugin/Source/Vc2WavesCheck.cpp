@@ -1,13 +1,13 @@
 // xt_vc2waves <rom.4> [cases] [seed] (v500): the VC-2's wave loaders against rom.4's own routines in the interpreter,
 // their file calls answered alike on both sides from the same files: the index's parse (Vc2WaveIndexCheck.cpp) on the
-// disk image's "VC-2 Wave.bin" and drawn ones; the store's pool (Vc2WavePoolCheck.cpp, v501) on drawn calls.  A line a part, its first difference under it with XT_VC2WAVES_FIRST.
-// XT_VC2WAVES_MAIN only.
+// disk image's "VC-2 Wave.bin" and drawn ones; the store's pool (Vc2WavePoolCheck.cpp, v501) and records
+// (Vc2WaveRecordsCheck.cpp, v502) on drawn calls; and (v503, Vc2WaveBootCheck.cpp) rom.4's own boot load from the disk
+// image, Vc2WaveBoot, and the port's lookups on what it left against rom.4's.  A line a part, its first difference
+// under it with XT_VC2WAVES_FIRST.  XT_VC2WAVES_MAIN only.
 #ifdef XT_VC2WAVES_MAIN
 #include "Vc2WavesCheck.h"
-#include "XtFiles.h"
+#include "Vc2BootFiles.h"
 #include <algorithm>
-
-using xtfile::le32;
 
 namespace {
 constexpr uint32_t kOpen = 0x89336c60, kRead = 0x89336cf0, kSeek = 0x89336db0, kClose = 0x89336ca0;   // [FW]
@@ -15,8 +15,6 @@ constexpr size_t kPathMost = 256;
 constexpr uint32_t kReadMost = 1u << 24;   // a read the check answers: none of its files is longer
 constexpr int32_t kNoFile = -1;
 constexpr const char* kDiskImage = "V-SynthXTDiskImage.bin.0.bin";
-constexpr std::string_view kLibrary = "WLF08", kVc2Index = "VC2W";   // the VC-2's index's first version names VC2W
-constexpr size_t kVersionAt = 0x10, kVersionChars = 16, kSectionsCountAt = 8, kSectionsAt = 0x40, kSectionBytes = 16;
 
 std::string pathAt(Sh4& c, uint32_t at) {
     std::string s;
@@ -28,27 +26,6 @@ std::string pathAt(Sh4& c, uint32_t at) {
     return s;
 }
 
-// The disk image beside rom.4: its VC-2 index, a WLF08 library whose first version names VC2W, from its header to the
-// end of its last section (as wlflib.py reads it); empty when there is none
-std::vector<uint8_t> indexOnDisk(const std::string& rom) {
-    const auto slash = rom.find_last_of('/');
-    XtDiskImage disk;
-    if (!disk.open((slash == std::string::npos ? std::string() : rom.substr(0, slash + 1)) + kDiskImage)) return {};
-    const std::vector<uint8_t>& d = disk.bytes();
-    const std::string_view all(reinterpret_cast<const char*>(d.data()), d.size());
-    for (size_t at = all.find(kLibrary); at != std::string_view::npos; at = all.find(kLibrary, at + 1)) {
-        if (at + kSectionsAt > d.size()) break;
-        if (all.substr(at + kVersionAt, kVersionChars).find(kVc2Index) == std::string_view::npos) continue;
-        size_t end = kSectionsAt;
-        for (uint32_t s = 0; s < le32(&d[at + kSectionsCountAt]); ++s) {
-            const size_t entry = at + kSectionsAt + kSectionBytes * s;
-            end = std::max<size_t>(end, le32(&d[entry + 4]) + le32(&d[entry + 8]));
-        }
-        const auto from = d.begin() + static_cast<long>(at);
-        return { from, from + static_cast<long>(std::min(end, d.size() - at)) };
-    }
-    return {};
-}
 } // namespace
 
 Vc2FileList::File* Vc2FileList::of(int32_t handle) {
@@ -122,17 +99,17 @@ std::string vc2FileCallsDifference(const std::vector<Vc2FileCall>& mine, const s
            + say(b, theirs.end());
 }
 
-std::string vc2CallOutcome(Vc2Fw& fw, bool ok, std::pair<int64_t, int64_t> answers,
+std::string vc2CallOutcome(Sh4& c, bool ok, std::pair<int64_t, int64_t> answers,
                            const std::function<std::string()>& memory) {
-    if (!ok) return "a call faults: " + fw.cpu.error();
+    if (!ok) return "a call faults: " + c.error();
     if (answers.first != answers.second)
         return "a call gives " + std::to_string(answers.first) + ", rom.4's " + std::to_string(answers.second);
     return memory();
 }
 
-std::string vc2BytesDifference(Vc2Fw& fw, uint32_t at, const void* mine, size_t bytes, const char* what) {
+std::string vc2BytesDifference(Sh4& c, uint32_t at, const void* mine, size_t bytes, const char* what) {
     std::vector<uint8_t> theirs(bytes);
-    fw.cpu.read(at, theirs.data(), bytes);
+    c.read(at, theirs.data(), bytes);
     const auto* ours = static_cast<const uint8_t*>(mine);
     for (size_t i = 0; i < bytes; ++i)
         if (theirs[i] != ours[i]) {
@@ -159,9 +136,15 @@ int main(int argc, char** argv) {
     Vc2Fw fw;
     const auto run = vc2Start(argc, argv, fw, "xt_vc2waves", [](const char*) { return true; });
     if (!run) return 2;
-    const std::vector<uint8_t> index = indexOnDisk(argv[1]);
+    // The disk image beside rom.4, its VC-2 index and the rest of what the loaders read (Vc2DiskBootFiles, v503)
+    const std::string rom = argv[1];
+    XtDiskImage disk;
+    disk.open(rom.substr(0, rom.find_last_of('/') + 1) + kDiskImage);
+    const Vc2DiskBootFiles files(disk);
+    const std::vector<uint8_t>& index = files.index();
     if (index.empty()) std::printf("xt_vc2waves: no disk image beside rom.4, or no VC-2 index in it\n");
-    const long different = vc2WaveIndexPart(fw, *run, index) + vc2WavePoolPart(fw, *run) + vc2WaveRecordsPart(fw, *run);
+    long different = vc2WaveIndexPart(fw, *run, index) + vc2WavePoolPart(fw, *run) + vc2WaveRecordsPart(fw, *run);
+    if (!index.empty()) different += vc2WaveBootPart(rom, *run, files);
     std::printf("xt_vc2waves: %ld different\n", different);
     return different || index.empty() ? 1 : 0;
 }

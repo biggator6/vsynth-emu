@@ -78,18 +78,18 @@ std::vector<XtDiskImage::Entry> XtDiskImage::entries(const std::vector<uint8_t>&
             continue;
         }
         if (!(x[11] & 8)) {
-            std::string name = longName;
-            if (name.empty()) {
-                for (int k = 0; k < 8 && x[k] != ' '; ++k)
-                    name += (char)x[k];
-                if (x[8] != ' ') {
-                    name += '.';
-                    for (int k = 8; k < 11 && x[k] != ' '; ++k)
-                        name += (char)x[k];
-                }
+            std::string shortName;
+            for (int k = 0; k < 8 && x[k] != ' '; ++k)
+                shortName += (char)x[k];
+            if (x[8] != ' ') {
+                shortName += '.';
+                for (int k = 8; k < 11 && x[k] != ' '; ++k)
+                    shortName += (char)x[k];
             }
+            const std::string name = longName.empty() ? shortName : longName;
             if (name != "." && name != "..")
-                out.push_back({ name, (x[11] & 0x10) != 0, (uint32_t)(x[26] | x[27] << 8), le32(x + 28) });
+                out.push_back({ name, (x[11] & 0x10) != 0, (uint32_t)(x[26] | x[27] << 8), le32(x + 28), shortName,
+                                x[11] });
         }
         longName.clear();
     }
