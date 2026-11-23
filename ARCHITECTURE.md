@@ -394,7 +394,7 @@ and effects from it and loads its waves from the project's `Wave` folder.
 - COSM TVF (v61) and Dynamic TVF (v64): the converters, start values,
   targets and updates, the follower and the twelve filter kernels equal the
   firmware (`xt_cosm`). All sixteen COSM types since v78, and their stereo
-  routines since v104, the same way (CLAUDE.md, "Porting a COSM type").
+  routines since v104, the same way (research/FIRMWARE_FACTS.md, "Porting a COSM type").
 - Reverse and held playback (v52), against the firmware's own players run
   in the SH-4 interpreter (`xt_fw solocmp` / `bandcmp`). BACKING and
   ENSEMBLE are bit-exact forward, backward, held and through walk changes.

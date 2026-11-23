@@ -33,7 +33,7 @@ constexpr Converter kConverters[] = {
     {0x894dd690, 0x915, 11}, {0x894dd870, 0x920, 8},  {0x894dda40, 0x928, 10}, {0x894ddc50, 0x932, 3},
     {0x894ddd20, 0x935, 5},  {0x894ddde0, 0x93a, 7},  {0x894ddf80, 0x941, 9},  {0x894de110, 0x94a, 11},
 };
-// [FW] the second descriptor bank: 8 bytes an ID from 0x55d, {centre, default, min, max} (CLAUDE.md, "Firmware facts")
+// [FW] the second descriptor bank: 8 bytes an ID from 0x55d, {centre, default, min, max} (research/FIRMWARE_FACTS.md)
 constexpr uint32_t kDescriptors2 = 0x897a56d8, kFirstId2 = 0x55d;
 constexpr Twin::Pair kNoteOn{0x894edf70, 0x893aa0e0}, kUpdate{0x894ee6a0, 0x893aa7d0};   // [FW]
 constexpr Twin::Pair kSlots{0x894ec2b0, 0x893a8560}, kNewBlock{0x894ee4a0, 0x893aa5d0};   // [FW]
