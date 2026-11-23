@@ -243,6 +243,7 @@ void oscSteerRenders(Vc2OscVoice& o, OscShared& shared) {
     if (oscRendersBy(o, kOscVariOffRenders)) oscDrawVariOffWords(o, rng, kOscWaveAt);   // v323
     if (oscRendersBy(o, kOscHeadsRenders)) oscDrawHeadsWords(o, rng, kOscWaveAt);       // v326
     if (oscRendersBy(o, kOscModeOneRenders)) oscDrawModeOneWords(o, rng, shared.records, kOscWaveAt);   // v327
+    oscSteerBands(o, shared);                                                                           // v332
     if (!oscRendersBy(o, kOscExtInRenders)) return;
     for (uint32_t at : { kLevelAt, kTargetAt }) {
         if (!(std::fabs(o.f32(at)) <= 1.0f)) o.setF32(at, vc2Unit(rng));
@@ -259,12 +260,14 @@ bool oscSteerLiteSettings(Vc2OscVoice& o, std::span<uint32_t> settings, uint32_t
     for (uint32_t at : kSwitches) {
         if (rng() % 2) settings[kTypeWord + at / 4] = rng() % 2;
     }
+    oscSteerLiteAsk(o, settings.subspan(kTypeWord));   // v332: lite-set-ask-at had been one case's chance
     return settings[kTypeWord] < kTypes;
 }
 
 void oscDrawWave(Vc2Fw& fw, OscShared& shared) {
-    oscDrawHalfwords(shared.wave, shared.renders);
-    fw.cpu.write(kOscWaveAt, shared.wave.data(), shared.wave.size() * sizeof(int16_t));
+    const std::span<int16_t> wave(shared.wave.data(), kOscWaveHalfwords);   // v332: the band waves above it stay
+    oscDrawHalfwords(wave, shared.renders);
+    fw.cpu.write(kOscWaveAt, wave.data(), wave.size_bytes());
     oscDrawEventTable(fw, shared);   // v327
 }
 

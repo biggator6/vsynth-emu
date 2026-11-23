@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's band players' renders v332 (2026-11-22, on claude/vc2-part-4-3 after v331; HARDWARE_FIRMWARE.md, "The
+  VC-2's band players' renders"): step 4.3's sixtieth version. BACKING's 0x893cadc0 and ENSEMBLE's 0x893ca1f0 are the
+  voice's own (Vc2OscBands.cpp): rom.4's beat block, then XtMbPlayer's block on a copy of the object's words, mapped
+  word by word, its vpdt, cached loop events and bands read from the wave memory; its crossings by the voice's walk with
+  the band row (index 16) and the walk list's wrap at an end (byte 0's 0x08), which the rom.2 port had left out, the
+  VC-2's. XtMultiBandPlayer.cpp split first: its state into XtMbState.h, the step at blockImpl's head with it,
+  blockImpl public, the crossing through State::cross (rom.2's own when nothing is outside). xt_vc2osc's band part
+  runs rom.4's own set-up on drawn band waves, then blocks through the renders on both sides; the voice part and
+  xt_vc2tone steer a band render to a state rom.4's set-ups left before the hooks. 0 different at seeds 2024, 7 and
+  31337. Not in the sound yet.
+
 The VC-2's VariPhrase event lookup v331 (2026-11-22, on claude/vc2-part-4-3 after v330; HARDWARE_FIRMWARE.md, "The
   VC-2's VariPhrase event lookup"): step 4.3's fifty-ninth version. VariPhrase's note-on's range by events reads the
   event lookup 0x893cc0d0 as the voice's own (v328's lookup, vc2OscEventPosition), so Vc2OscParts::eventPosition and

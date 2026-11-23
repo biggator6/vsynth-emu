@@ -1546,6 +1546,116 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's band players' renders (2026-11-22, v332) {#vc2-osc-band-renders}
+
+Step 4.3's sixtieth version, the third piece of item 11's fifth part. BACKING's render `0x893cadc0` and ENSEMBLE's
+`0x893ca1f0` are the voice's own (`vc2OscBands`, `Vc2OscBands.cpp`, two rows of `kOwnRenders`).
+
+**What rom.4's renders are.** rom.2's `0x8950e6e0` and `0x8950db10`, the object's words four bytes up from +0x94, as
+`vc2run band` found (VC2_VOCAL_DESIGNER.md, "The VariPhrase players and key assign in rom.4"). Each runs, in order:
+- the beat's block `0x893c89a0` (v326's `Vc2OscVoice::beatBlock`), whose tail leaves the walk step at +0x34;
+- band 0 (`0x893cae40`): the next crossing, the rate, Vari off's step (`0x893cbef0`), the walk list (`0x893caf40`
+  forward, `0x893cafd0` back) and the band's reads;
+- bands 1…5 (`0x893cb190`), or ENSEMBLE's oscillator bands, then the tree and the output, which writes its 64 floats
+  (it doesn't add to them).
+
+The walk list's crossing is the players' shared walk, v327's: `0x893c8f50` or `0x893c9140` with index 16, then
+`0x893c9380` (`vc2WalkForward`, `vc2WalkBackward`, `vc2WalkCrossing`). Index 16's row (the tables `0x893c9350`,
+`0x893c9364`, `0x8993fc00` and `0x8993fc14`), `kBandWalk`:
+- the event jump `0x893cbdd0`, rom.2's `0x8950f6f0` (the current event's records);
+- the cached one `0x893cbdf0`, rom.2's `0x8950f710`;
+- the step's sign kept at a turn;
+- the start's seek `0x893cd440` (still out by address) and its jump `0x893cbda0`, a wrapper of `0x893cbdd0`.
+
+**The port.** XtMbPlayer's block runs on a copy of the object's words, then the words go back. The copy's map is
+`Vc2OscBands.cpp`'s:
+- the player's words, BACKING's band words (every band 0's too) and ENSEMBLE's bands 1…5's. Those two layouts lie on the
+  same bytes;
+- each band's three addresses (its segment list's next entry, the next segment's records, the next record): the vpdt's
+  address plus the port's offset;
+- the vpdt (+0x10), the cached loop events (+0x6c) and each band's data (+0x00), read from the wave memory the voice's
+  parts give (`Vc2OscSamples`, whose bytes are the vpdt's and the records' too).
+
+The walk step is the beat block's (`State::stepGiven`). The crossing is taken outside the state (`XtMbOutside`): the
+state's words go to the voice, the voice's walk runs with the band row, and the words come back. The two jumps each run
+on a copy again, in BACKING's layout, which ENSEMBLE's bands 1…5 lie under as rom.4 writes them. The tables are rom.2's
+(XtMbPlayer's), as the VC-2's COSM adapters take XtCosm's. rom.4's own renders, reading rom.4's, are the check.
+
+**XtMbPlayer split first.** `XtMultiBandPlayer.cpp` (1,480 lines) could take no added line:
+- the state's two structs moved into `XtMbState.h` as they stood, and the step at `blockImpl`'s head with them
+  (`stepFromWalk`);
+- the vpdt can be read before its start (`XtMbWave::vpdtBefore`, 0 for a file's wave);
+- `blockImpl` is public, and the loop jump takes a record's bytes;
+- the walk list's crossing goes through `State::cross`, rom.2's own when nothing is outside.
+
+rom.2's paths are as they were: fcheck as the baseline and `mutate_tone.py --changed`.
+
+**Found.**
+- **The walk list's wrap.** At an end, with byte 0's 0x08 set and its 0x80 clear, the walk wraps: the position past the
+  end counted from the far event (the range's first going forward, its last going back), that event's records, then the
+  next crossing. That is rom.2's `0x8950e87e` and `0x8950e916`, and rom.4's `0x893caf5e` and `0x893caff6`. The rom.2 port
+  had left it out ("the voice flags 0x8"), as nothing in rom.2's XtSynth sets the bit. The VC-2's wrap is the outside's
+  (`VoiceOutside::wrapped`), on the state's own routines. VariPhrase's converter clears 0x08 on its default path, so
+  whether a VC-2 path sets it is the wiring's question.
+- **A range past the wave's last event.** rom.4's set-up leaves the range's last event (+0x16) as it is. A backward wrap
+  then reads an event's entry past the table, its slots whatever follows, and faults on what they point at.
+- **ENSEMBLE below 0.** With the loops on, a backward walk below the backward loop's start finds that point as its next
+  crossing at once, and One Way's jump takes the position below 0. ENSEMBLE reads its frames' index unsigned, so it reads
+  100…200 MB past its bands. BACKING's reads shift arithmetically, so they land just before its data.
+- **Short records.** A record shorter than a read's step turns the backward repeat into the position's wrap to near 2^31
+  that CLAUDE.md records (`0x8950f50a`). rom.4's reads then leave its memory.
+
+**The checks.** xt_vc2osc has a band part (`Vc2OscBandsCheck.cpp`), run before any hook:
+- **A band wave each case** (`Vc2OscBandDraws.cpp`, `Vc2OscBandVpdt.cpp`), mono or stereo, at kOscBandAt:
+  - its vpdt, laid out as the players read it: 2…8 events, the first at 0 and the last at the end, their kinds mostly
+    none and now and then 1, 2, 3 or 9;
+  - in each band, 1…3 segments and a last one never reached, their records 16…215 samples × 2^min(k, 4): a read's step
+    at the pitch's most is half the shortest. The records past the wave's end always repeat (their budget bits all
+    set), as a walk that stops there leaves the bands repeating;
+  - its cached loop events by `xtMbLoopEvents` (a loop two times in three), a loop record, and six bands of noise.
+- **Three notes a case.** Each takes the object's words as VariPhrase's note-on leaves them (`oscBandNote`). rom.4's own
+  set-up (`0x893cd1d0` or `0x893cc8f0`, not yet ported) then runs on rom.4's memory, and its words go to the port's voice.
+  Then 8 runs of 8 blocks through the voice's own render, with these moved before each run: the pitch, the walk, the
+  gain's target, byte 0's loops, Vari off, wrap and range in samples, byte 2, and the beat's clocks and steps. After each
+  block, the output and every word of both voices are compared.
+- **Not drawn:** Vari off under Tempo Sync or Time Trip (the walk's step under the beat goes up to 32 times, past a
+  record), ENSEMBLE with the loops on, and a range past the last event. These are the Found's 2 and 3: BACKING runs the
+  same loops' code. Nor a record past 0xffff, continued in a second length: that is the record readers' own code
+  (`record`, `recordPrev`, `restore`), rom.2's, which xt_tone runs on waves that have them, and the copy's map
+  doesn't touch it.
+
+The voice part and xt_vc2tone now run rom.4's band renders, not hooks:
+- before one, the object is one of 16 states rom.4's set-ups left on two fixed band waves (mono and stereo, in
+  kOscBandAt's two halves), captured before the hooks (`oscCaptureBandStates`). The pitch and walk are drawn again
+  (`oscSteerBands`, from a generator of its own);
+- the voice part makes the render word a band player's half the time its render pick is none;
+- the wave memory (`OscShared::wave`) holds the band waves above Vari off's, whose draw writes its own part alone.
+  `OscPortParts::boundFloat` reads it (the beat's loop events, the walk's cached ones);
+- both checks load XtMbPlayer's tables from the rom.2 beside rom.4.
+
+The band renders in the voice part moved the states later events see, and one older plant caught by chance went
+missed in the first whole run: `lite-set-ask-at` (LITE's settings reading the seek's ask a word off). It has a reach of
+its own now, from no generator so that no draw moves: with the ask drawn 0, the object held and the hold's switch
+clear, where the ask alone decides (`oscSteerLiteAsk`, `Vc2OscVariDraws.cpp`).
+
+Results:
+- 0 different at seeds 2024 (40 cases), 7 and 31337 (400) in both checks. At 400 the band part compared 76,800 blocks
+  (about 3,200 crossing an event or a loop, 13,000–14,000 with the wrap on, 25,000 under Vari off). The voice part ran
+  1,188 and 1,247 renders through the band players, xt_vc2tone 1,162 and 995.
+- at 400 cases in xt_vc2osc, `Vc2OscBands.cpp` is reached but for the band row's start seek (the set-up's, next) and
+  the bounds no drawn state leaves; in XtMbPlayer's block, but for its own crossings (the walk's here), the seek, the
+  step from the walk's float, Vari off under the beat and the records' 0xffff (all as above).
+- `mutate_vc2.py --osc`: 105 new plants on the map, the addresses, the memory, the crossing, the row's jumps, the wrap
+  and the renders' rows, and the 6 heads' whose text or reach moved, all caught. Three went for showing nothing: the
+  loops' rates' two rows (only rom.2's own crossings read them, so the map dropped them) and the vpdt read before its
+  start (no wave reaches there, so it went too). The whole `--osc` (1,826) and `--tone` (757) lists are caught, after
+  the reach above. `mutate_tone.py --changed`: 56 plants in XtMultiBandPlayer.cpp, caught.
+- fcheck's baseline updated (count lines and the new `bands:` line only); verify.sh passes.
+
+**Next.** The band players' set-ups, BACKING's `0x893cd1d0` and ENSEMBLE's `0x893cc8f0`, with their seek
+`0x893cd440`, which the set-up's start calls (rom.2's `0x89510bf0`, the state's `startAt`); then SOLO and the
+period-jump player.
+
 ### The VC-2's VariPhrase event lookup (2026-11-22, v331) {#vc2-osc-vari-lookup}
 
 Step 4.3's fifty-ninth version, the second piece of item 11's fifth part. VariPhrase's note-on (`0x893af420`) reads its

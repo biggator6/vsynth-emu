@@ -38,4 +38,12 @@ void oscHoldVariBlockEvents(std::span<uint32_t> block, const OscEventTable& t) {
         word = heldEvent(word, t);
     }
 }
+
+void oscSteerLiteAsk(Vc2OscVoice& o, std::span<uint32_t> given) {
+    constexpr uint32_t kHoldFrom = 0x3c, kAskSeek = 0x40;   // [FW] the settings' words, from their +0xb0
+    constexpr uint8_t kHeld = 0x04;                          // [FW] the object's byte 0
+    if (given[kAskSeek / 4] != 0) return;
+    o.setU8(Vc2OscVoice::kObject, o.u8(Vc2OscVoice::kObject) | kHeld);
+    given[kHoldFrom / 4] = 0;
+}
 #endif

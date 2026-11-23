@@ -8,11 +8,14 @@
 #include "Vc2OscPlayers.h"
 #include "XtLitePlayer.h"
 
-namespace {
 // [FW] a word's place in rom.2's object in the voice: rom.4's object at +0x15c, four bytes up from +0x94 (rom.4's
-// word inserted there)
-constexpr uint32_t kInsertAt = 0x94, kInsert = 4;
-uint32_t inRom4(uint32_t at) { return Vc2OscVoice::kObject + at + (at >= kInsertAt ? kInsert : 0); }
+// word inserted there); from v332 the band players' too (Vc2OscBands.cpp)
+uint32_t vc2OscInRom4(uint32_t at) {
+    constexpr uint32_t kInsertAt = 0x94, kInsert = 4;
+    return Vc2OscVoice::kObject + at + (at >= kInsertAt ? kInsert : 0);
+}
+
+namespace {
 // [FW] the samples' address (the object's +0xf4, rom.2's +0xf0); a frame's bytes, mono and stereo; the right channel's
 // halfword in a stereo frame
 constexpr uint32_t kSamplesAt = 0x250, kMonoFrame = 2, kStereoFrame = 4, kRightAt = 2;
@@ -26,11 +29,11 @@ void vc2OscHeads(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool stereo) {
     const int32_t word = v.beatBlock(parts);
     XtLitePlayer player;
     player.setUpright(true);
-    vc2OscWordsFrom(v, &player, XtLitePlayer::words(), inRom4);
+    vc2OscWordsFrom(v, &player, XtLitePlayer::words(), vc2OscInRom4);
     const Vc2OscSamples wave = parts.waveSamples();
     const uint32_t first = v.u32(kSamplesAt);
     const uint32_t frame = stereo ? kStereoFrame : kMonoFrame;
     player.setSamples(channel(wave, first, frame), stereo ? channel(wave, first + kRightAt, frame) : XtLiteSamples {});
     player.walkBlock(out, word);
-    vc2OscWordsTo(v, &player, XtLitePlayer::words(), inRom4);
+    vc2OscWordsTo(v, &player, XtLitePlayer::words(), vc2OscInRom4);
 }

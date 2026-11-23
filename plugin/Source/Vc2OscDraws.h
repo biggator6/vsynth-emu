@@ -8,6 +8,7 @@
 // XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
 #include "Vc2CheckRig.h"
 #include "Vc2OscCheck.h"
+#include "XtLoop.h"
 #include <span>
 #include <string>
 
@@ -125,6 +126,38 @@ inline constexpr std::array<uint32_t, 2> kOscExtInRenders { 0x893c62e0, 0x893c61
 inline constexpr std::array<uint32_t, 2> kOscVariOffRenders { 0x893c63c0, 0x893c66e0 };
 inline constexpr std::array<uint32_t, 2> kOscHeadsRenders { 0x893c6e80, 0x893c6e8c };
 inline constexpr std::array<uint32_t, 1> kOscModeOneRenders { 0x893c9f60 };   // v327: mono and stereo alike
+inline constexpr std::array<uint32_t, 2> kOscBandRenders { 0x893cadc0, 0x893ca1f0 };   // v332: BACKING's, ENSEMBLE's
+// v332 (Vc2OscBandDraws.cpp): the band players' set-ups (BACKING's 0x893cd1d0, ENSEMBLE's 0x893cc8f0), out by address
+// until ported
+inline constexpr std::array<uint32_t, 2> kOscBandSetUps { 0x893cd1d0, 0x893cc8f0 };
+// v332 (Vc2OscBandVpdt.cpp): a band wave's parts: its vpdt; its loop; its cached loop events; band k's frames, sized as
+// BACKING's; the room the vpdt, the cached events, two records and the bands take
+std::vector<uint8_t> oscBandVpdt(int frames, int events, bool stereo, std::mt19937& rng);
+XtLoop oscBandLoop(int frames, std::mt19937& rng);
+void oscBandCachedEvents(uint8_t* to, const std::vector<uint8_t>& vpdt, bool stereo, const XtLoop& loop);
+uint32_t oscBandFrames(int k, int frames);
+uint32_t oscBandRoom(int frames, bool stereo, uint32_t vpdtBytes);
+inline constexpr uint32_t kOscBandRecordRoom = 0x40, kOscBandCachedBytes = 4 * 0xb4;   // [FW] 4 × kXtMbLoopEventBytes
+inline constexpr int kOscBandTail = 64;
+// A band wave built at `at` in `room` bytes of the wave memory, into rom.4's memory and the port's parts' both: its
+// vpdt (2…5 events, the first at 0 and the last at the end, each band 1…3 segments of records 8…207 samples, their
+// repeat budgets any), its cached loop events (xtMbLoopEvents's, a loop on two times in three) and loop record, and
+// six bands of noise sized as BACKING's (ENSEMBLE's are smaller), mono or stereo; from `rng`
+OscBandWave oscDrawBandWave(Vc2Fw& fw, OscShared& shared, uint32_t at, uint32_t room, std::mt19937& rng);
+// The object's words as VariPhrase's note-on leaves them before a band player's set-up, on `w`: the head at the voice's
+// own +0x108 (`voiceAt`) and its records, byte 0 (stereo by the wave, the range in samples three times in four, the
+// loops, Vari off, Tempo Sync, Time Trip, the wrap), byte 2 (the events' ways), byte 3 any, the range by events and in
+// samples, the tempos, the pitch, the walk and the gain's two; the rest of the object 0
+void oscBandNote(Vc2OscVoice& o, const OscBandWave& w, uint32_t voiceAt, bool ensemble, std::mt19937& rng);
+// rom.4's own set-up of a band player on the object `o` holds, in its memory at `voiceAt`, and its words back into `o`;
+// what faults.  Only before the hooks, which take the set-ups by their addresses
+std::string oscBandSetUp(Vc2Fw& fw, Vc2OscVoice& o, uint32_t voiceAt, bool ensemble);
+// Before any hook: the run's two band waves (mono and stereo) in kOscBandAt's two halves, and on each, four notes of
+// each player set up by rom.4 at `voiceAt`, their objects into the shared states
+std::string oscCaptureBandStates(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt);
+// Before a render through a band player, the object one of the captured states of its player, the pitch 0.25…4 and the
+// walk ±0.1…2.5 drawn again; from the band players' generator.  1 if steered
+long oscSteerBands(Vc2OscVoice& o, OscShared& shared);
 // Whether a voice's render is one of `renders` (its kind renders by +0xa44, and that names one); before a render, a
 // voice's words as the render needs them (`oscPlaysExtIn` and `oscSteerExtIn` until v323):
 // - through the EXT IN player (v322), its level (+0x1e0) and target (+0x1dc) within ±1 as a note gives them (the
@@ -169,6 +202,9 @@ bool oscVariByEvents(uint8_t flags, uint32_t type);
 void oscSteerVariTable(Vc2OscVoice& o, const OscEventTable& t);
 void oscHoldVariEvents(Vc2OscVoice& o, const OscEventTable& t);
 void oscHoldVariBlockEvents(std::span<uint32_t> block, const OscEventTable& t);
+// v332 (the same file): LITE's settings with the seek's ask clear (`given` from the settings' +0xb0) given a held
+// object and the hold's switch clear, where the ask alone decides; from no generator, so no draw moves
+void oscSteerLiteAsk(Vc2OscVoice& o, std::span<uint32_t> given);
 // v323: a case's wave, from the renders' generator, into rom.4's memory at kOscWaveAt and the port's parts' both
 void oscDrawWave(Vc2Fw& fw, OscShared& shared);
 // v327 (Vc2OscWalkDraws.cpp), at the wave's draw: a case's events' table at kOscEventsAt, 4…12 events of a stride of

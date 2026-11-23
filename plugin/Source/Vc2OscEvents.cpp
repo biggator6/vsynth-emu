@@ -207,6 +207,10 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
         s.voices[(size_t)v].tail.render = (pick == 0 ? kOscVariOffRenders : kOscHeadsRenders)[s.shared.renders() % 2];
     }
     if (pick == 2) s.voices[(size_t)v].tail.render = kOscModeOneRenders[0];
+    // v332: else, half the time from the band players' generator, BACKING's or ENSEMBLE's, which VariPhrase's install
+    // writes for its types 3 and 5
+    if (pick == 3 && s.shared.bandRng() % 2) s.voices[(size_t)v].tail.render = kOscBandRenders[s.shared.bandRng() % 2];
+    s.n.bandBlocks += oscRendersBy(s.voices[(size_t)v], kOscBandRenders);
     s.n.extInBlocks += oscRendersBy(s.voices[(size_t)v], kOscExtInRenders);       // v322
     s.n.variOffBlocks += oscRendersBy(s.voices[(size_t)v], kOscVariOffRenders);   // v323
     s.n.headsBlocks += oscRendersBy(s.voices[(size_t)v], kOscHeadsRenders);       // v326

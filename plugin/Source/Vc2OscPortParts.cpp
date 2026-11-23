@@ -31,6 +31,12 @@ float OscPortParts::boundFloat(uint32_t part, uint32_t offset) {
     if (in - Vc2OscVoice::kOwn <= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) return self_.f32(in);
     const OscEventTable& events = s_.records.events;   // v327: mode 1's events' table, as rom.4's memory holds it
     if (events.holds(part + offset)) return std::bit_cast<float>(events.wordAt(part + offset));
+    const uint32_t inWave = part + offset - kOscWaveAt;   // v332: the wave memory, the band players' records in it
+    if (inWave <= s_.wave.size() * sizeof(int16_t) - sizeof(float)) {
+        float word = 0.0f;
+        std::memcpy(&word, reinterpret_cast<const uint8_t*>(s_.wave.data()) + inWave, sizeof word);
+        return word;
+    }
     const auto word = s_.records.bound.find(part + offset);
     return word == s_.records.bound.end() ? 0.0f : word->second;
 }

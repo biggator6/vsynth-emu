@@ -16,6 +16,7 @@
 #include "Vc2CarrierTables.h"
 #include "Vc2CheckRom2.h"
 #include "Vc2Kind6Tables.h"
+#include "Vc2OscDraws.h"
 #include "Vc2OscTables.h"
 #include "Vc2RampTables.h"
 #include "Vc2ToneMixTables.h"
@@ -24,6 +25,7 @@
 #include "XtCosm.h"
 #include "XtEnvelope.h"
 #include "XtLfo.h"
+#include "XtMultiBandPlayer.h"
 #include <algorithm>
 
 namespace {
@@ -70,7 +72,8 @@ bool toneLoadTables(const char* path) {
     const std::string rom2 = vc2Rom2Of(path);
     return vc2LoadToneMix(path) && vc2LoadTva(path) && vc2LoadCosm(path) && vc2LoadOsc(path) && vc2LoadRamp(path)
            && vc2LoadCarrier(path) && vc2LoadKind6(path) && xtEnvLoadTables(rom2.c_str())
-           && xtLfoLoadTables(rom2.c_str()) && xtCosmLoadTables(rom2.c_str());
+           && xtLfoLoadTables(rom2.c_str()) && xtCosmLoadTables(rom2.c_str())
+           && xtMbLoadTables(rom2.c_str());   // v332: the band players'
 }
 } // namespace
 
@@ -94,8 +97,10 @@ int main(int argc, char** argv) {
     std::vector<ToneCall> rom;
     std::vector<OscCall> oscRom;
     ToneSides s { fw, pool, shared, parts, owner, rom, oscRom };
+    shared.osc.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' states, before the hooks
+    std::string start = oscCaptureBandStates(fw, shared.osc, oscVoiceAt(0));
     toneInstallRom(fw, rom, shared.fade, shared.osc.draws, oscRom);
-    std::string start = toneOscSetUp(s);   // v319: the records' exp2 octaves, the carriers' rate and kind 6's globals
+    if (start.empty()) start = toneOscSetUp(s);   // v319: the records' exp2 octaves, the carriers' rate, kind 6's globals
     if (start.empty()) start = toneDifference(s, -1);
     Vc2Tally tally { "XT_VC2TONE_FIRST", "XT_VC2TONE_STOP" };
     vc2RunCases(*run, tally, start, s.n.events, [&](std::mt19937& rng, bool) { return vc2ToneCase(s, rng); });
@@ -128,7 +133,8 @@ int main(int argc, char** argv) {
                 n.oscSteadied, n.oscSettings, n.micBlocks, c[kRenderBy], c[kSeek], n.bandReseeks,
                 c[kObjectCall]);   // v331: no event lookups
     std::printf("own renders: %ld renders with an OSC through the EXT IN player's, %ld through Vari off's, %ld through "
-                "LITE's heads'\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks);   // v322, v323, v326
+                "LITE's heads'; %ld OSCs' renders through the band players'\n", n.extInBlocks, n.variOffBlocks,
+                n.headsBlocks, shared.osc.bandSteers);   // v322, v323, v326, v332
     std::printf("lite: %ld settings on a type with a way, %ld through an earlier tone's head; %ld inputs of two "
                 "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head), %ld OSCs steered for its "
                 "seek\n", n.liteSettings, n.settingsTaken, n.bothVari, n.modeOneSetUps, n.modeOneTaken,

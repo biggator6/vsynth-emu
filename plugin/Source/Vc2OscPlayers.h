@@ -46,6 +46,11 @@ void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> w
 void vc2OscWordsTo(Vc2OscVoice& v, const void* port, std::span<const XtWord> words, Vc2OscPlace place);
 // v326 (Vc2OscHeads.cpp): LITE's heads' renders, 0x893c6e80 and 0x893c6e8c, on XtLitePlayer
 void vc2OscHeads(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool stereo);
+// v332 (Vc2OscHeads.cpp from v326): a word's place in the voice by its place in rom.2's object, rom.4's object at
+// +0x15c with its word inserted at +0x94, LITE's heads' and the band players' place
+uint32_t vc2OscInRom4(uint32_t at);
+// v332 (Vc2OscBands.cpp): the band players' renders, BACKING's 0x893cadc0 and ENSEMBLE's 0x893ca1f0, on XtMbPlayer
+void vc2OscBands(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool ensemble);
 // v327 (Vc2OscModeOne.cpp): kind 1's mode 1's render, 0x893c9f60, mono or stereo by the object's byte 0, on the walk
 void vc2OscModeOne(Vc2OscVoice& v, float* out, Vc2OscParts& p);
 // v328 (Vc2OscModeOneStart.cpp): its set-up, 0x893cc760, which LITE's install runs for a wave of type 1

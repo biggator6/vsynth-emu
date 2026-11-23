@@ -59,18 +59,16 @@ struct OscHook {
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
 // renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
-// update, players' start and settings (v330) and its note-on's event lookup (v331): rom.4's own run, and the routines
-// they call hooked, each by its address
+// update, players' start and settings (v330) and its note-on's event lookup (v331), and the band players' renders
+// (v332): rom.4's own run, and the routines they call hooked, each by its address
 const OscHook kHooks[] = {
     // v330: VariPhrase's players' set-ups its start runs on the object, by the wave's type
     { 0x893cc2e0, kObjectCall, objectRoutine, none }, { 0x893cd1d0, kObjectCall, objectRoutine, none },
     { 0x893cc8f0, kObjectCall, objectRoutine, none }, { 0x893cc310, kObjectCall, objectRoutine, none },
     { 0x893ccff0, kObjectCall, objectRoutine, none },
-    // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's, BACKING's, ENSEMBLE's, the
-    // period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327)
-    { 0x893c9450, kRenderBy, renderBy, rendered },
-    { 0x893cadc0, kRenderBy, renderBy, rendered }, { 0x893ca1f0, kRenderBy, renderBy, rendered },
-    { 0x893ca8b0, kRenderBy, renderBy, rendered },
+    // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's and the period-jump player's; Vari off's
+    // two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327, BACKING's and ENSEMBLE's from v332)
+    { 0x893c9450, kRenderBy, renderBy, rendered }, { 0x893ca8b0, kRenderBy, renderBy, rendered },
     // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
     // install adds (0x893c3e60's)
     { 0x893c3890, kRenderBy, renderBy, rendered }, { 0x893c3580, kRenderBy, renderBy, rendered },

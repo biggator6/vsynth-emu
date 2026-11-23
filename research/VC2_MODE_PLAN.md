@@ -1031,6 +1031,14 @@ version against rom.4's routines with what it calls hooked:
          lookup, `vc2OscEventPosition`), so `Vc2OscParts::eventPosition` is gone and the lookup's hook with it
          (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase event lookup"). Next: the band seeks, which call the players'
          own routines, with each player.
+       - The band players' renders (v332): BACKING's `0x893cadc0` and ENSEMBLE's `0x893ca1f0` the voice's own
+         (`Vc2OscBands.cpp`): rom.4's beat block, then XtMbPlayer's block on a copy of the object's words (the state
+         moved into `XtMbState.h`, its words' places the VC-2's map), its crossings by the voice's walk with the band
+         row (index 16) and its wrap at an end the VC-2's (HARDWARE_FIRMWARE.md, "The VC-2's band players' renders").
+         Found: the walk list's wrap under byte 0's 0x08, which the rom.2 port had left out; a range past the last
+         event, which rom.4's set-up leaves for the wrap to read past the table; ENSEMBLE below 0 after a backward One
+         Way from below the loop, its frames' index read unsigned. Next: the band players' set-ups (`0x893cd1d0`,
+         `0x893cc8f0`) and their seek `0x893cd440`, then SOLO and the period-jump player.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

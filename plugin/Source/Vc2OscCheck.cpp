@@ -14,6 +14,8 @@
 #include "Vc2OscSides.h"
 #include "Vc2RampTables.h"
 #include "Vc2OscTables.h"
+#include "Vc2CheckRom2.h"
+#include "XtMultiBandPlayer.h"
 #include <bit>
 #include <cmath>
 
@@ -156,6 +158,13 @@ const char* const kVibratoNames[kOscVoices] = { "voice 0's vibrato", "voice 1's 
 const char* const kOwnNames[kOscVoices] = { "voice 0's own words", "voice 1's own words" };
 const char* const kRampNames[kOscVoices] = { "voice 0's ramps", "voice 1's ramps" };
 const char* const kTailNames[kOscVoices] = { "voice 0's tail", "voice 1's tail" };
+
+// rom.4's tables, and from v332 the band players' rom.2's, from the rom.2 beside it (XtMbPlayer's, as xt_vc2cosm takes
+// XtCosm's)
+bool oscLoadTables(const char* path) {
+    return vc2LoadAll<vc2LoadOsc, vc2LoadRamp, vc2LoadCarrier, vc2LoadKind6>(path)
+        && xtMbLoadTables(vc2Rom2Of(path).c_str());
+}
 } // namespace
 
 void oscWriteVoice(OscSides& s, int v) {
@@ -183,8 +192,7 @@ std::string oscDifference(OscSides& s) {
 
 int main(int argc, char** argv) {
     Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc",
-                              vc2LoadAll<vc2LoadOsc, vc2LoadRamp, vc2LoadCarrier, vc2LoadKind6>);
+    const auto run = vc2Start(argc, argv, fw, "xt_vc2osc", oscLoadTables);
     if (!run) return 1;
     std::array<Vc2OscVoice, kOscVoices> voices {};
     OscShared shared;
@@ -199,9 +207,12 @@ int main(int argc, char** argv) {
     oscRampPart(fw, romShared, *run, tally);
     oscVariOffPart(fw, *run, tally);
     oscVibratoPart(fw, *run, tally);
+    shared.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' generator of its own
+    oscBandPart(s, *run, tally);
+    const std::string bands = oscCaptureBandStates(fw, shared, oscVoiceAt(0));   // v332: before the hooks
     oscInstallRom(fw, shared.draws, rom, oscVoiceNumber);
     oscModeOnePart(s, *run, tally);   // v327
-    const std::string setUp = oscKindsSetUp(s);
+    const std::string setUp = bands.empty() ? oscKindsSetUp(s) : bands;
     vc2RunCases(*run, tally, setUp, s.n.events, [&](std::mt19937& rng, bool) { return oscVoiceCase(s, rng); });
     const OscCounts& n = s.n;
     std::printf("osc: %d cases, %ld events, %ld note-ons (%ld with a sample, %ld without), %ld updates, %ld renders, "
@@ -214,8 +225,8 @@ int main(int argc, char** argv) {
                 "finite, %ld note-ons by events\n", n.seeks, n.objectCalls, n.gliding, n.variDrawn,
                 n.variByEvents);   // v330; v331: no event lookups, VariPhrase's by events
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
-                "heads', %ld through mode 1's\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks,
-                n.modeOneBlocks);   // v322, v323, v326, v327
+                "heads', %ld through mode 1's, %ld through the band players'\n", n.extInBlocks, n.variOffBlocks,
+                n.headsBlocks, n.modeOneBlocks, n.bandBlocks);   // v322, v323, v326, v327, v332
     std::printf("mode 1's set-ups: %ld (%ld with the range in samples); %ld events steered for its seek\n",
                 n.modeOneSetUps, n.setUpsInSamples, n.modeOneSeeks);   // v328, v329
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324

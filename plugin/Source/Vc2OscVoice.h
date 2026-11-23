@@ -96,7 +96,8 @@ public:
     // v322: the effect chip's frames as the part reads them ([0x8993eadc], the part mixer's too: a block's 32 of 8
     // words), which the EXT IN player plays
     virtual const int32_t* inputFrames() = 0;
-    // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read
+    // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read; from
+    // v332 the band players' too, their vpdt, cached loop events and bands in it (its bytes, Vc2OscBands.cpp)
     virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
     // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0); a
