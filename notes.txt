@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's waves at the plugin's start v504 (2026-11-23, after v503 and vc2-mode's merge; HARDWARE_FIRMWARE.md,
+  "The VC-2's waves at the plugin's start"): v503's load once a process, beside rom.4's tables. PluginRom.cpp seeks
+  V-SynthXTDiskImage.bin.0.bin once rom.4 is in, beside rom.4 first; Vc2WavesInUse takes it (read, its VC-2 index and
+  bank found) and loads the waves on a thread of its own, about 2 s, published whole by an atomic pointer with a
+  status; a process's end stops the load and waits, 0.16 s against 2.47 s. VSynthEmuRomTest: what the start loaded is
+  rom.4's own load of the same files byte for byte, the stop, no disk image taken with rom.4 alone; 29 checks hold.
+  Nothing reads the waves yet (Vc2Synth isn't in the sound).
+
 The VC-2's waves, loaded by rom.4 itself v503 (2026-11-23, after v502; HARDWARE_FIRMWARE.md, "The VC-2's waves,
   loaded by rom.4 itself"): from v503 rom.4's own boot loaders run in the interpreter at load time, and only what the
   player reads is ported (the coordinator's, 2026-11-23, by the user's rule of 2026-10-28). The files are the disk

@@ -48,6 +48,8 @@ bool xtSynthRomReady();
 // it yet; the VC-2 mode's own (step 3 on) will.
 bool xtSynthSetVc2Rom(const std::string& path, std::string* why = nullptr);
 bool xtSynthVc2RomReady();
+// The file rom.4's tables came from, empty before (v504: rom.4's own load of the VC-2's waves runs on it)
+std::string xtSynthVc2RomPath();
 
 // Encodes planar float channels at `sampleRate`.  type: 1 SOLO, 3 BACKING,
 // 5 ENSEMBLE; depth: Encode Depth 0..127 (multi-band attack detection).

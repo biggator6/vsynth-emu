@@ -784,8 +784,11 @@ version against rom.4's routines with what it calls hooked:
           the user's choice ("Image, FAT links"). `Vc2WaveBoot` runs the boot's stages with the kernel answered from
           `Vc2DiskBootFiles` and takes the store, the pool and the sets as `Vc2LoadedWaves`, the wave memory;
           xt_vc2waves' fourth part (HARDWARE_FIRMWARE.md, "The VC-2's waves, loaded by rom.4 itself"). v500's parse
-          is the check's expectation, v501's pool the taken pool's container, v502's records unused. Left: the load at
-          the plugin's start (v504), then the player's reads through it.
+          is the check's expectation, v501's pool the taken pool's container, v502's records unused.
+        - [x] The load at the plugin's start (v504): the disk image sought beside rom.4 once rom.4 is in (PluginRom.cpp),
+          the load once a process on a thread of its own, the waves published whole (`Vc2WavesInUse`); checked by
+          VSynthEmuRomTest (HARDWARE_FIRMWARE.md, "The VC-2's waves at the plugin's start"). Left: the player's reads
+          through it, when `Vc2Synth` comes into the sound (its `Vc2SetReads` given `vc2Waves()`).
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

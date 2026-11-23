@@ -71,6 +71,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but rom.4's parameter tables, and
 # the patch store and .p02 reader (v450) that read with them, and rom.4's own load of the waves (v503)
 NOT_SYN=" Vc2Params.cpp Vc2PatchStore.cpp Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp "
+NOT_SYN+=" Vc2WavesInUse.cpp "
 VSYN=()
 while read -r f; do
   [[ "$NOT_SYN" == *" $f "* ]] || VSYN+=("$f")

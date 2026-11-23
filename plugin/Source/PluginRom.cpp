@@ -3,6 +3,7 @@
 #include "PluginProcessor.h"
 #include "PluginAppFolder.h"
 #include "PluginVc2Params.h"
+#include "Vc2WavesInUse.h"
 
 #include <cstdlib>
 
@@ -13,6 +14,10 @@ static const char* const kRomName = "V-SynthXT.rom.2.bin";
 static const char* const kVc2RomName = "V-SynthXT.rom.4.bin";
 static const char* const kRomKey  = "romPath";
 static const char* const kVc2RomKey = "vc2RomPath";
+// The update's disk image, where the unpacker leaves it beside rom.4 (v504), and the setting a choice of it by hand
+// would keep, which nothing offers yet
+static const char* const kDiskImageName = "V-SynthXTDiskImage.bin.0.bin";
+static const char* const kDiskImageKey = "vc2DiskImagePath";
 
 // Where a new instance looks for an image, after what it names first: beside the plugin, never in its bundle, where an
 // added file breaks the signature; the plugin's own folder; the image last chosen by hand, which is how an AU, a VST3 and
@@ -49,15 +54,31 @@ void VSynthEmuProcessor::findRom() {
     setStatus("No ROM: choose V-SynthXT.rom.2.bin, or put it next to the plugin");
 }
 
-// rom.4 beside each rom.2 named, where the unpacker leaves both, then rom.4's own places, unless it's in.  Quiet: a file
-// there that isn't the VC-2's image is passed over, and the V-Synth plays as it did without one.
+// The disk image the VC-2's waves load from (v504), once rom.4 is in and none is taken: beside rom.4, where the unpacker
+// leaves both, then the places.  Taken, rom.4's own load of the waves runs on it on a thread of its own
+// (Vc2WavesInUse.h), so the start isn't held up.  Quiet: a file there that isn't a disk image with the VC-2's files is
+// passed over, and the VC-2 has no waves.
+static void seekWaves() {
+    if (!xtSynthVc2RomReady() || vc2WavesTaken()) return;
+    const std::string rom4 = xtSynthVc2RomPath();
+    juce::StringArray cand(juce::File(juce::String::fromUTF8(rom4.c_str())).getSiblingFile(kDiskImageName)
+                               .getFullPathName());
+    addPlaces(cand, kDiskImageName, kDiskImageKey);
+    firstTaken(cand, [&rom4](const juce::File& f) { return vc2TakeWaves(f.getFullPathName().toStdString(), rom4); });
+}
+
+// rom.4 beside each rom.2 named, where the unpacker leaves both, then rom.4's own places, unless it's in; then the
+// disk image its waves load from.  Quiet: a file there that isn't the VC-2's image is passed over, and the V-Synth
+// plays as it did without one.
 static void seekVc2(const juce::StringArray& roms) {
-    if (xtSynthVc2RomReady()) return;
-    juce::StringArray cand;
-    for (const auto& r : roms)
-        if (r.isNotEmpty()) cand.add(juce::File(r).getSiblingFile(kVc2RomName).getFullPathName());
-    addPlaces(cand, kVc2RomName, kVc2RomKey);
-    firstTaken(cand, takeVc2);
+    if (!xtSynthVc2RomReady()) {
+        juce::StringArray cand;
+        for (const auto& r : roms)
+            if (r.isNotEmpty()) cand.add(juce::File(r).getSiblingFile(kVc2RomName).getFullPathName());
+        addPlaces(cand, kVc2RomName, kVc2RomKey);
+        firstTaken(cand, takeVc2);
+    }
+    seekWaves();
 }
 
 // Before the parameters are made (createParameterLayout, v451), so the VC-2's are rom.4's: beside each place rom.2 is
@@ -95,5 +116,6 @@ bool VSynthEmuProcessor::setVc2RomFile(const juce::File& file) {
         return false;
     }
     keepSetting(kVc2RomKey, file.getFullPathName());
+    seekWaves();
     return true;
 }

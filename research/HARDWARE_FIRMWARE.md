@@ -3912,6 +3912,43 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The VC-2's waves at the plugin's start (2026-11-23, v504) {#vc2-waves-at-start}
+
+v503's load now runs at the plugin's start, once a process, beside rom.4's tables. That keeps the user's rule that
+both images load at the start, so switching modes is seamless (2026-11-14).
+
+**The search** (PluginRom.cpp, `seekWaves`). Once rom.4 is in and no disk image is taken, the plugin looks for
+`V-SynthXTDiskImage.bin.0.bin`:
+- beside rom.4, where the firmware update's unpacker leaves it;
+- then where rom.2 and rom.4 are sought: beside the plugin, the plugin's own folder, and a setting a choice by hand
+  would keep (`vc2DiskImagePath`), which nothing offers yet.
+It runs wherever rom.4 comes in: the early search before the parameters, the search after rom.2 opens, and rom.4
+chosen by hand. A file there that isn't a disk image with the VC-2's files is passed over, and the VC-2 then has no
+waves, quietly, as the V-Synth plays without rom.4.
+
+**The load** (`Vc2WavesInUse`). One object, `constinit` as XtSynthRom.cpp's images are:
+- It takes a disk image on the thread that offers it: the 65 MB read and the index and bank found in it, about
+  0.1 s.
+- It runs `vc2LoadWaves` on a thread of its own, about 2 s, so the start isn't held up.
+- It publishes the waves whole through an atomic pointer, `vc2Waves()`. `vc2WavesStatus()` says "no disk image
+  taken", "loading from …", "loaded from …" or why the load failed.
+- Once the load ends, the disk image and its files are let go. The waves keep the pool's 32 MB and the sets'
+  0.7 MB. A test process that loads them peaks at 314 MB resident, against 280 MB for one that ends just after
+  taking the disk image.
+- At the process's end, or a plugin's unloading, its destructor raises the load's stop flag (`Sh4StopScope`) and
+  waits for the thread. A process ending as the load runs takes 0.16 s, against 2.47 s for one that waits for it.
+
+Nothing reads the waves yet: `Vc2Synth`, which PCM's start reads them through, isn't in the sound.
+
+**The check** (VSynthEmuRomTest, `RomWavesTest.cpp`):
+- the start takes the disk image beside rom.4, the load ends, and its status names that disk image;
+- what it loaded is rom.4's own load of the same files, byte for byte: the store's words, the pool's words and
+  memory, and the sets' counts, tables, buffers and data;
+- a fresh run that ends as the load runs ends more than a second sooner than one that waits for it;
+- a fresh run with rom.4 alone in its folder takes no disk image (the `--alone` child).
+29 checks hold. Plants (`mutate_panel.py`, kind `rom-image`): eight `waves-` names, beside the 37 `rom-` and `rom4-`
+names a change to PluginRom.cpp or XtSynthRom.cpp runs.
+
 ### The VC-2's waves, loaded by rom.4 itself (2026-11-23, v503) {#vc2-waves-loaded}
 
 From v503 the VC-2's waves come from rom.4's own boot loaders, run in the interpreter at load time. Only what the

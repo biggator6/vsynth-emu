@@ -4,6 +4,7 @@
 // as the image it is, with nothing read into the tables again.  The other image here is the ROM with one entry of the
 // envelopes' time table a millisecond longer: a different image that loads, whose difference a note can hear.
 // Run: VSynthEmuRomTest <rom.2.bin>.  Exit 0 if every check holds.
+#include "RomWavesTest.h"
 #include "TestChecks.h"
 #include "TestControls.h"
 #include "TestMain.h"
@@ -34,6 +35,7 @@
 #include "../Source/Vc2PatchFile.h"
 #include "../Source/Vc2Unvoiced.h"
 #include "../Source/Vc2VocoderTables.h"
+#include "../Source/Vc2WavesInUse.h"
 #include "../Source/XtFirmware.h"
 #include <cstdint>
 #include <cstdio>
@@ -128,6 +130,8 @@ void vc2Alone(TestChecks& check, const juce::File& rom) {
     there.deleteFile();
     check(said.contains("rom.2 no, rom.4 yes, its tables in"),
           "rom.4 should be found at a start with no rom.2: \"" + said.trim().toStdString() + "\"");
+    check(said.contains("waves: no disk image taken"),
+          "with no disk image beside rom.4, none should be taken (v504): \"" + said.trim().toStdString() + "\"");
 }
 
 int romTest(const juce::File& rom, const juce::File& work) {
@@ -156,6 +160,7 @@ int romTest(const juce::File& rom, const juce::File& work) {
     check(attackNote() == before, "a note should sound as before another instance was given another image");
     twoImages(check, rom, work, inUse);
     check(attackNote() == before, "a note should sound as before the other images were offered");
+    wavesAtStart(check, rom);
     return check.summary();
 }
 
@@ -165,9 +170,11 @@ int main(int argc, char** argv) {
     if (argc == 3 && juce::String(argv[2]) == "--alone") {   // the child, in the parent's app folder (vc2Alone)
         juce::ScopedJuceInitialiser_GUI init;
         VSynthEmuProcessor p;
-        std::printf("rom.2 %s, rom.4 %s, its tables %s\n", p.hasRom() ? "yes" : "no", p.hasVc2Rom() ? "yes" : "no",
-                    vc2TablesIn() ? "in" : "out");
+        std::printf("rom.2 %s, rom.4 %s, its tables %s, waves: %s\n", p.hasRom() ? "yes" : "no",
+                    p.hasVc2Rom() ? "yes" : "no", vc2TablesIn() ? "in" : "out", vc2WavesStatus().c_str());
         return 0;
     }
+    if (argc == 3)
+        if (const int said = wavesChild(argv[2]); said >= 0) return said;   // RomWavesTest.cpp's fresh runs
     return testMain(argc, argv, "rom", romTest);
 }

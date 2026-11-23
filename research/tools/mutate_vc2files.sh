@@ -54,7 +54,7 @@ VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck
 # xt_vc2synth's (v314): every VC-2 port the plugin's build lists but rom.4's parameter tables and the patch store and
 # .p02 reader that read with them (v450), and rom.4's own load of the waves and its files (v503), which runs at the
 # start, not in the part; then the rom.2 ports they lean on, the shared compares and the check
-NOT_SYN=" Vc2Params Vc2PatchStore Vc2PatchFile Vc2BootFiles Vc2WaveBoot Vc2WaveBootKernel "
+NOT_SYN=" Vc2Params Vc2PatchStore Vc2PatchFile Vc2BootFiles Vc2WaveBoot Vc2WaveBootKernel Vc2WavesInUse "
 VC2SYNTH=()
 while read -r f; do
     [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")

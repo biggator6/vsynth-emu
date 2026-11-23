@@ -4044,6 +4044,12 @@ Round-2 recordings.  First build-out after that: real-time granular port
   where comparing the port with rom.4 on the same machine couldn't. Its first run found the port's wave memory
   missing the sets' data, which the lookups by set index read.
 
+- v504 (after the user's new rules, "Yes, all five", merged in from vc2-mode): the load at the plugin's start. The
+  plugin had never opened the disk image; only the tests had. So the search beside rom.4 came first, then a holder of
+  the one load, like RomInUse's. The kit refused a function's static, so the holder is constinit, its thread held by
+  pointer. The first fresh runs found no rom.4: the test's earlier checks had kept a copy of rom.2 with nothing beside
+  it, so the children are given rom.2 by VSE_XT_ROM.
+
 ### Session 25, continued (2026-11-23) — v502: the wave store's records
 
 - The coordinator widened the block to v500–v549 and kept the plugin's wiring out until the user decides where the
