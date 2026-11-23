@@ -41,20 +41,9 @@ struct OscHook {
 // renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
 // update, players' start and settings (v330) and its note-on's event lookup (v331), the band players' renders (v332),
 // set-ups and seek (v333), SOLO's render, set-ups and seek (v334) and the period-jump player's (v335), VariPhrase's
-// players all: rom.4's own run, and the routines they call hooked, each by its address
+// players all, and the analog's 19 renders (v337): rom.4's own run, and the routines they call hooked, each by its
+// address; the check's own renders, which a render word drawn names
 const OscHook kHooks[] = {
-    // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
-    // install adds (0x893c3e60's)
-    { 0x893c3890, kRenderBy, renderBy, rendered }, { 0x893c3580, kRenderBy, renderBy, rendered },
-    { 0x893c5680, kRenderBy, renderBy, rendered }, { 0x893c5500, kRenderBy, renderBy, rendered },
-    { 0x893c5f20, kRenderBy, renderBy, rendered }, { 0x893c5260, kRenderBy, renderBy, rendered },
-    { 0x893c5a90, kRenderBy, renderBy, rendered }, { 0x893c5810, kRenderBy, renderBy, rendered },
-    { 0x893c2230, kRenderBy, renderBy, rendered }, { 0x893c4fa0, kRenderBy, renderBy, rendered },
-    { 0x893c4c50, kRenderBy, renderBy, rendered }, { 0x893c5990, kRenderBy, renderBy, rendered },
-    { 0x893c5dc0, kRenderBy, renderBy, rendered }, { 0x893c60e0, kRenderBy, renderBy, rendered },
-    { 0x893c53c0, kRenderBy, renderBy, rendered }, { 0x893c5c90, kRenderBy, renderBy, rendered },
-    { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
-    { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
 };
 

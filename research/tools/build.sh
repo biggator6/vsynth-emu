@@ -70,7 +70,7 @@ while read -r f; do
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake)
 [ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2SynthCheck.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
    XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
-   $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) $( [ -f Vc2OscAnalogRender.cpp ] && echo XtAnalog.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2synth" &
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
@@ -204,7 +204,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
       Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2OscDraws.cpp Vc2OscPartDraws.cpp Vc2OscRecords.cpp Vc2OscFakes.cpp \
       Vc2OscPortParts.cpp Vc2VocoderOsc.cpp XtExtIn.cpp Vc2OscVariOffRender.cpp ) \
    $( [ -f Vc2OscBeat.cpp ] && echo Vc2OscBeat.cpp XtMultiBandPlayer.cpp ) \
-   $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp ) \
+   $( [ -f Vc2OscHeads.cpp ] && echo Vc2OscHeads.cpp XtLitePlayer.cpp Vc2OscAnalogRender.cpp XtAnalog.cpp ) \
    $( [ -f Vc2OscModeOne.cpp ] && echo Vc2OscModeOne.cpp Vc2OscWalk.cpp Vc2OscWalkEvents.cpp Vc2OscWalkDraws.cpp ) \
    $( [ -f Vc2OscWalkStart.cpp ] && echo Vc2OscWalkStart.cpp Vc2OscModeOneStart.cpp ) \
    $( [ -f Vc2OscVari.cpp ] && echo Vc2OscVari.cpp ) \
@@ -212,7 +212,7 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscBands.cpp ] && echo Vc2OscBands.cpp Vc2OscBandDraws.cpp Vc2OscBandVpdt.cpp ) \
    $( [ -f Vc2OscBandSetUp.cpp ] && echo Vc2OscBandSetUp.cpp ) \
    $( [ -f Vc2OscSolo.cpp ] && echo Vc2OscSolo.cpp Vc2OscSoloFrame.cpp Vc2OscSoloRecords.cpp Vc2OscSoloSetUp.cpp \
-      Vc2OscPlayerSteers.cpp ) \
+      Vc2OscPlayerSteers.cpp Vc2OscAnalogRenderDraws.cpp ) \
    $( [ -f Vc2OscJump.cpp ] && echo Vc2OscRecordBlock.cpp Vc2OscFrameSteps.cpp Vc2OscJump.cpp Vc2OscJumpRecords.cpp ) \
    $( [ -f Vc2ToneTvaCheck.cpp ] && echo Vc2Tva.cpp Vc2TvaTables.cpp Vc2TvaDraws.cpp Vc2ToneTvaCheck.cpp ) \
    $( [ -f Vc2ToneCosmCheck.cpp ] && echo Vc2CosmObject.cpp Vc2CosmPools.cpp Vc2CosmNoteOn.cpp Vc2CosmAdapters.cpp \
@@ -241,11 +241,11 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
    $( [ -f Vc2OscJump.cpp ] && echo Vc2OscRecordBlock.cpp Vc2OscFrameSteps.cpp Vc2OscJump.cpp Vc2OscJumpRecords.cpp ) \
    $( [ -f Vc2OscAnalog.cpp ] && echo Vc2OscAnalog.cpp Vc2OscAnalogLa.cpp ) \
    $( [ -f Vc2OscAnalogSub.cpp ] && echo Vc2OscAnalogSub.cpp ) \
-   $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp ) \
-   $( [ -f Vc2OscAnalogUpdate.cpp ] && echo Vc2OscAnalogUpdate.cpp ) \
+   $( [ -f Vc2OscAnalogShape.cpp ] && echo Vc2OscAnalogShape.cpp Vc2OscAnalogDraws.cpp Vc2OscAnalogRenderDraws.cpp ) \
+   $( [ -f Vc2OscAnalogUpdate.cpp ] && echo Vc2OscAnalogUpdate.cpp Vc2OscAnalogRender.cpp XtAnalog.cpp ) \
    $( [ -f Vc2OscVariOffRender.cpp ] && echo Vc2OscVariOffRender.cpp Vc2VariOffCheck.cpp ) \
    $( [ -f Vc2OscKindsCheck.cpp ] && echo Vc2OscKindsCheck.cpp Vc2Carrier.cpp Vc2CarrierTables.cpp Vc2Kind6.cpp \
-   Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2Math.cpp Vc2VocoderOsc.cpp XtExtIn.cpp ) \
+   Vc2Kind6Core.cpp Vc2Kind6Tables.cpp Vc2Math.cpp Vc2VocoderOsc.cpp XtExtIn.cpp XtCosm.cpp XtOsc.cpp XtEnvelope.cpp ) \
    $( [ -f Vc2OscVibrato.cpp ] && echo Vc2OscVibrato.cpp Vc2OscVibratoCheck.cpp ) \
    $( [ -f Vc2OscModeOneCheck.cpp ] && echo Vc2OscModeOneCheck.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2osc" &

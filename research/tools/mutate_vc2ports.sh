@@ -128,6 +128,8 @@ VC2PORTS=(
     "vc2oscframesteps|Vc2OscFrameSteps.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscjump|Vc2OscJump.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscjumprecords|Vc2OscJumpRecords.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscanalogrender|Vc2OscAnalogRender.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtanalog|XtAnalog.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscmodeonestart|Vc2OscModeOneStart.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"

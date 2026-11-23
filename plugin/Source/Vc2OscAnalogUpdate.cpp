@@ -16,15 +16,6 @@ using namespace Vc2OscAnalog;
 
 namespace {
 constexpr uint32_t kLaFirst = 9, kLaCodes = 2;   // [FW] 0x893c2d1a: codes 9 and 10 take LA's targets (0x893c31d0)
-// [FW] the installs' render routines by code, the sub oscillator off (0x893c2b6c's cases) and on (0x893c3e8c's), by
-// rom.4's address; past 10 the first installs none, the second NOISE's (code 8, its float too)
-constexpr std::array<uint32_t, kVc2AnalogCodes> kRenders { 0x893c3890, 0x893c3580, 0x893c5680, 0x893c5500, 0x893c5f20,
-                                                           0x893c5260, 0x893c5a90, 0x893c5810, 0x893c2230, 0x893c4fa0,
-                                                           0x893c4c50 };
-constexpr std::array<uint32_t, kVc2AnalogCodes> kSubRenders { 0x893c3890, 0x893c3580, 0x893c5990, 0x893c5dc0,
-                                                              0x893c60e0, 0x893c53c0, 0x893c5c90, 0x893c4ac0,
-                                                              0x893c2230, 0x893c50d0, 0x893c4db0 };
-constexpr uint32_t kSubPast = 8;
 // [FW] 0x893c3460: the settings' words it copies onto the block, by their offset past the settings' +0xb0, which is the
 // block's code (+0x104): Fat, its envelope's and LFO's depths, the Pulse Width and its two, the Slope, the sub level,
 // the Tone and its keyfollow's value

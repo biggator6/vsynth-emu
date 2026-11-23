@@ -4101,3 +4101,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - v336 was to split XtAnalog.cpp, but a split moves its 334 over-long lines and its 2053-line check into files the
   guards judge, as with PluginEditor. The analog's renders run on XtAnalogOsc by a word table instead, which needs
   only XtAnalog.h opened: that header was split, the .cpp left whole.
+- v337: the analog's 19 renders were rom.2's code, so they run on XtAnalogOsc; the surprise was downstream. Real
+  analog output past full scale sent FM's delay index out of the mix's rings (a crash), which on the XT reads the rings
+  beside it, and drawn words gave analog states no XT has (NaNs whose sign xtf and the interpreter carry differently);
+  the check keeps an analog render's words an XT's, or gives the block the check's render.

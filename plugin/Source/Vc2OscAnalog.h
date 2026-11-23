@@ -8,8 +8,27 @@
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"
 #include "Vc2OscVoice.h"
+#include <optional>
 
 namespace Vc2OscAnalog {
+// [FW] the installs' render routines by code, the sub oscillator off (0x893c2b6c's cases) and on (0x893c3e8c's), by
+// rom.4's address; past 10 the first installs none, the second NOISE's (code 8, its float too).  v248's, here from v337
+// for the renders' own lookup (Vc2OscAnalogRender.cpp)
+inline constexpr std::array<uint32_t, kVc2AnalogCodes> kRenders { 0x893c3890, 0x893c3580, 0x893c5680, 0x893c5500,
+                                                                  0x893c5f20, 0x893c5260, 0x893c5a90, 0x893c5810,
+                                                                  0x893c2230, 0x893c4fa0, 0x893c4c50 };
+inline constexpr std::array<uint32_t, kVc2AnalogCodes> kSubRenders { 0x893c3890, 0x893c3580, 0x893c5990, 0x893c5dc0,
+                                                                     0x893c60e0, 0x893c53c0, 0x893c5c90, 0x893c4ac0,
+                                                                     0x893c2230, 0x893c50d0, 0x893c4db0 };
+inline constexpr uint32_t kSubPast = 8;
+// v337: a render routine's waveform code and sub oscillator's switch, as an install picked it: the first table's by
+// its code (the sub's HQ-SAW, HQ-SQUARE and NOISE are those), else the second's with the switch on; none for another
+struct Vc2AnalogRoutine {
+    int code = 0;
+    bool sub = false;
+};
+std::optional<Vc2AnalogRoutine> routineAt(uint32_t at);
+
 // [FW] the block's words it reads: the waveform's code, Impact, the Slope, the sub oscillator's switch (a float, 1 on),
 // the LA Tone and its keyfollow's value; Fat and the Pulse Width, each with its envelope's and LFO's depths (the
 // tail's envelopes 1 and 2, LFOs 5 and 6)

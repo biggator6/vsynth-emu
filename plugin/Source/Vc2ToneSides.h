@@ -29,6 +29,7 @@ struct ToneCounts {
     long starts = 0, started = 0, listMoves = 0, leaves = 0;   // the part's lists: starts, tones started, moves, leaves
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
+    long mixPastFull = 0;                                  // v337: a delay's OSC 2 drawn past full scale
     std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
     // v319: the OSC voices' note-ons by kind, the settings that reached a voice, the mic's blocks before kind 6's renders,
     // and the calls they made beyond the tone, by xt_vc2osc's kinds of call

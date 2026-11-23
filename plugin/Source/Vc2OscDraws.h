@@ -244,6 +244,7 @@ long oscSteerSoloVoice(Vc2OscVoice& o, OscShared& shared);
 // From the renders' generator, the shared draws' (`renders`, and from v327 the records' events' table)
 bool oscRendersBy(const Vc2OscVoice& o, std::span<const uint32_t> renders);
 void oscSteerRenders(Vc2OscVoice& o, OscShared& shared);
+void oscSteerAnalogRender(Vc2OscVoice& o, OscShared& shared);   // v337: the analog's (Vc2OscAnalogRenderDraws.cpp)
 // v327: the beat's block's words, as LITE's heads' and mode 1's draws give them (oscDrawHeadsWords' lines, moved): the
 // walk ±0.1…3, the factor and its integral 0…2, the beat's position about the loop events', Tempo Sync and Time Trip
 // off three times in four, byte 3 any byte half the time

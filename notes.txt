@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2's analog renders v337 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v336's 31c5019;
+  HARDWARE_FIRMWARE.md, "The VC-2's analog renders"): step 4.3's sixty-fifth version. The analog OSC's 19 renders
+  (0x893c2230…0x893c60e0) the voice's own: rom.2's code with the object's words four bytes up from +0x94 and HQ's
+  tables through rom.4's pointers 0x8993fbf8/fc (rom.2's byte for byte), so XtAnalogOsc runs on the voice's words
+  through a friend's word table (XtAnalogWords.h), the routine by its address (Vc2OscAnalog::routineAt over the
+  installs' tables, moved to Vc2OscAnalog.h), HQ's tables given through its block's frame (XtAnalogHq.h; XtAnalog.cpp
+  changed in place, no line added), rom.4's read into Vc2OscAnalogPool::hq. Found and fixed: FM's delay lines read
+  beside a ring when OSC 2 passes full scale (an analog OSC's Impact): Vc2ToneMixRings one array, A's then B's end to
+  end as rom.4's, a read beside a ring in the rings around it, 0 past them (the port's index had left its arrays: a
+  crash in xt_vc2tone, and in the plugin's audio thread once the analog sounded). The checks: the 19 hooks gone, the
+  analog's render words steered to an XT's (oscSteerAnalogRender, its own generator), the mix's delays given an OSC 2
+  past full scale. Both checks 0 different at 2024/7/31337 (about 400 blocks through the 19 at 400 cases, every line
+  of the 19 reached); the changed plants 365 and 80, mutate_tone.py's 11 and rom4-no-osc, 0 missed (two re-aimed);
+  fcheck's baseline updated (count lines and the analog lines); verify.sh green.
+
 XtAnalog.h's split v336 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v335's 7a63925; HARDWARE_FIRMWARE.md,
   "XtAnalog.h's split"): step 4.3's sixty-fourth version, a move. XtAnalog.h (438 lines) split by part so the
   analog's renders can open XtAnalogOsc to the voice's words: the MOD section and the tone's render order into

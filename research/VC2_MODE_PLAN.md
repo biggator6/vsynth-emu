@@ -1002,7 +1002,8 @@ version against rom.4's routines with what it calls hooked:
           given rom.4's object layout (the insert at +0x94): BACKING `0x893cadc0` and ENSEMBLE `0x893ca1f0` on
           `XtMbPlayer`, SOLO `0x893c9450` on `XtSoloVoice` (Robot Voice rom.4's own, open), the period-jump player
           `0x893ca8b0`.
-       6. The analog OSC's 19 renders, its installs' (`0x893c2ad0`, `0x893c3e60`), against rom.2's `XtAnalog`.
+       6. done (v248's installs, v337's renders): the analog OSC's 19 renders, its installs' (`0x893c2ad0`,
+          `0x893c3e60`), against rom.2's `XtAnalog`.
        Then Vc2Synth's 24 hosts, what is left beyond the tone (the OS's clock, the wave's records, the mic ring, the
        unvoiced decision, the input stage's peak, the chip's words) the part's.
        - Kinds 5's and 6's updates (v321): `0x893afff0` by v222's `vc2Kind5Update` on the voice's own words, the
@@ -1111,6 +1112,13 @@ version against rom.4's routines with what it calls hooked:
        - XtAnalog.h's split (v336): the MOD and the tone's render order into `XtToneMod.h`, the knobs and the block
          into `XtAnalogBlock.h`, so `XtAnalogOsc` can open its state to the analog's renders by a word table
          (HARDWARE_FIRMWARE.md, "XtAnalog.h's split"); XtAnalog.cpp left whole. Next: the 19 renders on it.
+       - The analog OSC's 19 renders (v337), item 6's renders: rom.2's code four bytes up from +0x94 and HQ's tables
+         through rom.4's own pointers (rom.2's byte for byte), so rom.2's `XtAnalogOsc` on the object's words
+         (`XtAnalogWords`, `Vc2OscAnalogRender.cpp`), HQ's tables from rom.4 (`Vc2OscAnalogPool::hq`); their hooks gone
+         (HARDWARE_FIRMWARE.md, "The VC-2's analog renders"). Found: FM's delay lines read beside a ring when OSC 2
+         passes full scale, as an analog OSC's Impact takes it, into the rings around it (rom.4's A and B rings end to
+         end): `Vc2ToneMixRings` one array, a read beside a ring as rom.4's (the port's had left its array). Item 6's
+         installs were v248's, so item 6 is done. Next: Vc2Synth's 24 hosts.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

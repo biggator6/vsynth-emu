@@ -7,6 +7,16 @@
 #include <algorithm>
 #include <cmath>
 
+Vc2ToneMixRings::Ring& Vc2ToneMixRings::a(uint32_t address) { return rings_[(address - kAAt) / kBytes]; }
+Vc2ToneMixRings::Ring& Vc2ToneMixRings::b(uint32_t address) { return rings_[kTones + (address - kBAt) / kBytes]; }
+
+// v337: by its place among all 48, A's then B's end to end as rom.4 lays them; past them 0
+float Vc2ToneMixRings::at(const Ring& ring, int i) const {
+    const long n = (long)(&ring - rings_.data()) * kSamples + i;
+    if (n < 0 || n >= (long)rings_.size() * kSamples) return 0.0f;
+    return rings_[(size_t)(n / kSamples)][(size_t)(n % kSamples)];
+}
+
 namespace {
 using namespace xtf;
 constexpr int kFrames = 32, kSamples = 2 * kFrames;
@@ -55,14 +65,15 @@ void ringProduct(MixBlock& m) {
 }
 
 // one-off: XtAnalog's lineTap has this shape on a line of signed bytes scaled by 1/127; this one reads floats as they stand
-// A delay line read `delay` samples behind `position`, between its two nearest samples
-float delayedSample(const Vc2ToneMixRings::Ring& ring, int position, float delay) {
+// A delay line read `delay` samples behind `position`, between its two nearest samples, each brought back once by the
+// line's length: from v337 where that leaves it, in the line or beside it (Vc2ToneMixRings::at)
+float delayedSample(const Vc2ToneMixRings& rings, const Vc2ToneMixRings::Ring& ring, int position, float delay) {
     const int whole = ftrc(delay);
     const float part = sub(delay, flt(whole));
     int near = position - whole, far = near - 1;
     if (near < 0) near += Vc2ToneMixRings::kSamples;
     if (far < 0) far += Vc2ToneMixRings::kSamples;
-    return add(mul(ring[(size_t)near], sub(1.0f, part)), mul(ring[(size_t)far], part));
+    return add(mul(rings.at(ring, near), sub(1.0f, part)), mul(rings.at(ring, far), part));
 }
 
 int nextPosition(int position) { return position + 1 >= Vc2ToneMixRings::kSamples ? 0 : position + 1; }
@@ -76,7 +87,7 @@ void delayMono(MixBlock& m) {
         position = nextPosition(position);
         ring[(size_t)position] = m.a[s];
         const float delay = div(mul(mul(add(m.b[s], t.fullScale), g[0]), t.delaySpan), t.fullScale);
-        const float wet = add(mul(m.a[s], g[1]), delayedSample(ring, position, delay));
+        const float wet = add(mul(m.a[s], g[1]), delayedSample(m.rings, ring, position, delay));
         m.out[s] = m.out[s + 1] = mul(wet, g[2]);
     });
     m.w.position = position;
@@ -93,7 +104,7 @@ void delayStereo(MixBlock& m) {
         for (int c = 0; c < 2; ++c) (*rings[c])[(size_t)position] = m.a[s + c];
         for (int c = 0; c < 2; ++c) {
             const float delay = div(mul(add(m.b[s + c], t.fullScale), depth), t.fullScale);
-            const float wet = add(mul(m.a[s + c], g[1]), delayedSample(*rings[c], position, delay));
+            const float wet = add(mul(m.a[s + c], g[1]), delayedSample(m.rings, *rings[c], position, delay));
             m.out[s + c] = mul(wet, g[2]);
         }
     });

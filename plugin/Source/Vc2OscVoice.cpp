@@ -212,7 +212,10 @@ uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
         case Vc2OscRender::byRender:   // v322, v323: the voice's own renders, any other by its address
             if (!renderOwn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);
             return 0;
-        case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
+        case Vc2OscRender::byAnalog: {   // v337: the analog's renders the voice's own, any other by its address
+            const std::optional<uint32_t> mask = renderAnalog(tail.renderAnalog, out);
+            return mask ? *mask : parts.renderBy(tail.renderAnalog, out, tail.sync);
+        }
         case Vc2OscRender::carrier: carrier.render(out); return 0;                                  // 0x893ebfa0
         case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;   // 0x893ec730
     }

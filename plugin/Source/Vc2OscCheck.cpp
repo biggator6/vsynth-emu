@@ -205,6 +205,7 @@ int main(int argc, char** argv) {
     shared.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' generator of its own
     shared.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
     shared.jumpRng.seed((uint32_t)run->seed * 7 + 5);   // v335: the period-jump player's
+    shared.analogRng.seed((uint32_t)run->seed * 11 + 7);   // v337: the analog's renders'
     for (OscFamily f : { OscFamily::band, OscFamily::solo, OscFamily::jump }) oscPlayersPart(s, *run, tally, f);
     const std::string bands = oscCaptureBandStates(fw, shared, oscVoiceAt(0));   // v332: before the hooks
     oscInstallRom(fw, shared.draws, rom, oscVoiceNumber);
@@ -233,6 +234,9 @@ int main(int argc, char** argv) {
     std::printf("mode 1's set-ups: %ld (%ld with the range in samples); %ld events steered for its seek\n",
                 n.modeOneSetUps, n.setUpsInSamples, n.modeOneSeeks);   // v328, v329
     std::printf("lite: %ld updates and %ld settings on a type with a way\n", n.liteUpdates, n.liteSettings);   // v324
+    std::printf("analog: %ld blocks through its renders, %ld words drawn finite, %ld NOISE holds steered, %ld blocks "
+                "the check's, their words no XT's\n", shared.analogBlocks, shared.analogFinite, shared.analogHolds,
+                shared.analogOutside);   // v337
     std::printf("xt_vc2osc: %ld different\n", tally.different);
     return 0;
 }

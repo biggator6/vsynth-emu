@@ -54,6 +54,21 @@ void mixBothWords(ToneSides& s, int i, size_t offset, const Word& word) {
     s.fw.cpu.write(s.pool.addressOf(i) + kMixAt + (uint32_t)offset, &word, sizeof word);
 }
 
+// v337: one time in four a delay's OSC 2 past full scale, up to twice, as an analog OSC's Impact takes it now its renders
+// are the voice's own: the delay then reads beside its ring, in the one before or after (Vc2ToneMixRings::at).  Not on
+// the first ring or the last, whose far sides are other memory in rom.4.  From the analog's generator, so the other
+// draws stay
+void drawPastFullScale(ToneSides& s, const Vc2MixWords& w) {
+    constexpr float kMost = 2.0f;
+    std::mt19937& rng = s.shared.osc.analogRng;
+    const uint32_t ring = (w.ringA - Vc2ToneMixRings::kAAt) / Vc2ToneMixRings::kBytes;
+    if (ring == 0 || ring + 1 >= (uint32_t)Vc2ToneMixRings::kTones || rng() % 4 != 0) return;
+    const float scale = 1.0f + (kMost - 1.0f) * vc2Unit(rng);
+    for (float& x : s.shared.buffers.b) x *= scale;
+    s.fw.cpu.write(kBufferB, s.shared.buffers.b, sizeof s.shared.buffers.b);
+    ++s.n.mixPastFull;
+}
+
 // What a block reads, on both sides: the OSCs' buffers, the sync mask, half the time new targets (as the settings update
 // 0x893add60 writes them during a note: the gains then ramp), and a delay's gain within 0…1, as the held render, run
 // between a delay's note-on and its install, leaves samples there and rom.4 would read outside its lines
@@ -75,6 +90,7 @@ void drawMixBlockInputs(ToneSides& s, int i, std::mt19937& rng) {
         w.gain[0] = drawMixTarget(rng);
         mixBothWords(s, i, offsetof(Vc2MixWords, gain), w.gain[0]);
     }
+    if (render == kDelayMono || render == kDelayStereo) drawPastFullScale(s, w);
 }
 
 std::string mixLineDifference(ToneSides& s, uint32_t at, const Vc2ToneMixRings::Ring& line) {

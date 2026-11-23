@@ -39,6 +39,7 @@
 // from the user's rom.2 at run time.  v336: the MOD and the tone's render order
 // in XtToneMod.h, the knobs and the block in XtAnalogBlock.h, both included here.
 #include "XtAnalogBlock.h"
+#include "XtAnalogHq.h"
 #include "XtToneMod.h"
 #include <cstdint>
 
@@ -187,6 +188,9 @@ public:
     void setRatio(float r) { ratio_ = r; }
 
 private:
+    // v337: the VC-2's analog renders run on its words (XtAnalogWords.h), the routine and HQ's tables given
+    friend struct XtAnalogWords;
+    XtAnalogHq hq_;
     int code = 2;
     float ratio_ = 1.0f, gainT = 0, gainC = 0;
     float fatT = 0.5f, fatC = 0.5f, pwT = 0.5f, pwC = 0.5f;
@@ -204,8 +208,11 @@ private:
     float sqT = 0, sqC = 0, sq2T = 0, sq2C = 0;
     // HQ-SAW's and HQ-SQUARE's lengths and factors for a block (samples ×
     // 32768): the period, the impulse's width, HQ-SQUARE's halves, the
-    // phase scale, the table step, the impulse gain and the integrator leak
-    struct HqFrame { float p = 0, pc = 0, l1 = 0, l2 = 0, k1 = 0, k2 = 0, k3 = 0, leak = 0; };
+    // phase scale, the table step (v337: with the tables, hq_), the impulse gain and the integrator leak
+    struct HqFrame {
+        float p = 0, pc = 0, l1 = 0, l2 = 0, k1 = 0, k3 = 0, leak = 0;
+        XtAnalogHqScale k2;
+    };
     HqFrame hqFrame() const;
     void shape(const XtAnalogBlock& b, float fatEnv, float pwEnv, float lfo, bool noteOn);
     void laShape(const XtAnalogBlock& b, float gain, float fatEnv, float pwEnv, float lfo);

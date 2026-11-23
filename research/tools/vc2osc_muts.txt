@@ -132,7 +132,7 @@ legato-two|for (Vc2PitchRamp& r : ramps) r.legato(ramp);|for (size_t r = 0; r < 
 render-zero-short|std::fill(out, out + kOut, 0.0f)|std::fill(out, out + kOut / 2, 0.0f)|vc2osc
 render-third-sync|parts.renderBy(tail.render, out, kRenderThird)|parts.renderBy(tail.render, out, tail.sync)|vc2osc
 render-analog-sync|parts.renderBy(tail.renderAnalog, out, tail.sync)|parts.renderBy(tail.renderAnalog, out, kRenderThird)|vc2osc
-render-analog-answer|return parts.renderBy(tail.renderAnalog, out, tail.sync);|parts.renderBy(tail.renderAnalog, out, tail.sync); return 0;|vc2osc
+render-analog-answer|return mask ? *mask : parts.renderBy(tail.renderAnalog, out, tail.sync);|return mask ? *mask : (parts.renderBy(tail.renderAnalog, out, tail.sync), 0u);|vc2osc
 render-by-answer|parts.renderBy(tail.render, out, kRenderThird);\n            return 0;|return parts.renderBy(tail.render, out, kRenderThird);\n            return 0;|vc2osc
 take-gate-ignored|if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;|if (u32(kTakeGate) == 0) return;|vc2osc
 take-legato-ignored|if (u32(kLegato) != 0 && u32(kTakeGate) == 0) return;|if (false) return;|vc2osc
@@ -1011,8 +1011,10 @@ upd-install-sub|if (subOn(*this)) {\n        const uint32_t at|if (!subOn(*this)
 upd-install-sub-past|code < kVc2AnalogCodes ? code : kSubPast|code < kVc2AnalogCodes ? code : 0|vc2oscanalogupdate
 upd-install-sub-float|tail.installed = a.subInstalled[at];|tail.installed = a.installed[at];|vc2oscanalogupdate
 upd-install-past|if (code >= kVc2AnalogCodes) return;|if (code >= kVc2AnalogCodes - 1) return;|vc2oscanalogupdate
-upd-install-row|0x893c5810, 0x893c2230, 0x893c4fa0,|0x893c5810, 0x893c2230, 0x893c4c50,|vc2oscanalogupdate
-upd-install-sub-row|0x893c2230, 0x893c50d0, 0x893c4db0|0x893c2230, 0x893c4db0, 0x893c4db0|vc2oscanalogupdate
+# v337: upd-install-row and upd-install-sub-row re-aimed at the install's reads: the two tables moved to Vc2OscAnalog.h
+# (a header, which a VC-2 port doesn't plant), the routines' lookup reading them too; each gives code 9 LA-SAW's render
+upd-install-row|tail.renderAnalog = kRenders[code];|tail.renderAnalog = kRenders[code == 9 ? 10 : code];|vc2oscanalogupdate
+upd-install-sub-row|tail.renderAnalog = kSubRenders[at];|tail.renderAnalog = kSubRenders[at == 9 ? 10 : at];|vc2oscanalogupdate
 upd-settings-copied|0x20, 0x30, 0x38, 0x3c, 0x40 }|0x20, 0x34, 0x38, 0x3c, 0x40 }|vc2oscanalogupdate
 upd-settings-at|setU32(kCode + at, from[at / 4]);|setU32(kCode + at, from[at / 4 + 1]);|vc2oscanalogupdate
 upd-way-update|case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;|case Vc2OscUpdate::analog: break;|vc2osc
@@ -2413,3 +2415,29 @@ tb-jump-gain|{ 0x893cd190, &j.setUpGain }|{ 0x893cd194, &j.setUpGain }|vc2osctab
 tb-jump-read|        vc2ReadPool(image, jumpWords(jump));\n||vc2osctables
 own-render-jump|{ 0x893ca8b0, vc2OscJump }|{ 0x893ca8b4, vc2OscJump }|vc2osc
 seek-own-jump-at|{ 0x893cd090, vc2OscSeekJump }|{ 0x893cd094, vc2OscSeekJump }|vc2oscbeat
+# v337: the analog's 19 renders the voice's own (vc2oscanalogrender: the routine by its address; XtAnalogWords' table,
+# its place and HQ's tables at their calls, as a VC-2 port plants no header; the voice's row, vc2osc, with
+# render-analog-answer on its new text), rom.4's HQ tables (vc2osctables) and XtAnalogOsc's HQ tap given its tables
+# (vc2xtanalog, XtAnalog.cpp under xt_vc2osc, where rom.2's tables are never read: a tap on them reads zeros).  Not
+# planted: XtAnalogWords' rows one by one and the hold's sign (XtAnalogWords.h, a header; the hold is steered to 1…31,
+# so its sign shows nowhere), Vc2OscAnalogPool::hqTables (a header; ar-hq-rom2 at its call)
+ar-plain-code|(int)(plain - kRenders.begin()), false|(int)(plain - kRenders.begin()) ^ 1, false|vc2oscanalogrender
+ar-plain-sub|(int)(plain - kRenders.begin()), false|(int)(plain - kRenders.begin()), true|vc2oscanalogrender
+ar-sub-code|(int)(sub - kSubRenders.begin()), true|(int)(sub - kSubRenders.begin()) ^ 1, true|vc2oscanalogrender
+ar-sub-off|(int)(sub - kSubRenders.begin()), true|(int)(sub - kSubRenders.begin()), false|vc2oscanalogrender
+ar-none|    return std::nullopt;\n}|    return Vc2AnalogRoutine {};\n}|vc2oscanalogrender
+ar-words-from|    vc2OscWordsFrom(*this, &osc, XtAnalogWords::words(), vc2OscInRom4);\n||vc2oscanalogrender
+ar-words-to|    vc2OscWordsTo(*this, &osc, XtAnalogWords::words(), vc2OscInRom4);\n||vc2oscanalogrender
+ar-words-ratio|vc2OscWordsFrom(*this, &osc, XtAnalogWords::words(), vc2OscInRom4)|vc2OscWordsFrom(*this, &osc, XtAnalogWords::words().subspan(1), vc2OscInRom4)|vc2oscanalogrender
+ar-words-hold|vc2OscWordsFrom(*this, &osc, XtAnalogWords::words(), vc2OscInRom4)|vc2OscWordsFrom(*this, &osc, XtAnalogWords::words().first(34), vc2OscInRom4)|vc2oscanalogrender
+ar-words-back|vc2OscWordsTo(*this, &osc, XtAnalogWords::words(), vc2OscInRom4)|vc2OscWordsTo(*this, &osc, XtAnalogWords::words().first(33), vc2OscInRom4)|vc2oscanalogrender
+ar-place|vc2OscWordsFrom(*this, &osc, XtAnalogWords::words(), vc2OscInRom4)|vc2OscWordsFrom(*this, &osc, XtAnalogWords::words(), [](uint32_t at) { return Vc2OscVoice::kObject + at; })|vc2oscanalogrender
+ar-hq-rom2|vc2OscTables().analog.hqTables()|XtAnalogHq {}|vc2oscanalogrender
+ar-sync|osc.process(out, tail.sync)|osc.process(out, 0u)|vc2oscanalogrender
+ar-voice-own|const std::optional<uint32_t> mask = renderAnalog(tail.renderAnalog, out);|const std::optional<uint32_t> mask = std::nullopt;|vc2osc
+ar-voice-mask|return mask ? *mask : parts.renderBy|return mask ? 0u : parts.renderBy|vc2osc
+tb-hq-first|- 4u * XtAnalogHq::kAHalf;|- 4u * XtAnalogHq::kAHalf + 4u;|vc2osctables
+tb-hq-read|        return readHq(image, analog);|        return true;|vc2osctables
+xa-hq-a|a = (k2.t.a ? k2.t.a : T.hqA) + i;|a = T.hqA + i;|vc2xtanalog
+xa-hq-b|b = (k2.t.b ? k2.t.b : T.hqB) + ftrc(x);|b = T.hqB + ftrc(x);|vc2xtanalog
+xa-hq-k2|h.k2 = { div(mul(g, K(0x3affffff)), h.k1), hq_ };|h.k2 = { div(mul(g, K(0x3affffff)), h.k1), {} };|vc2xtanalog

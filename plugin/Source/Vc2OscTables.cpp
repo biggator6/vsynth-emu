@@ -221,6 +221,16 @@ auto jumpWords(Vc2OscJumpPool& j) {
     });
 }
 
+// [FW] the analog renders' HQ tables (v337): where rom.4's two pointers lead after its startup's copy, A's centre and
+// B's, B right after A as in rom.2; else none
+constexpr uint32_t kHqPointers = 0x8993fbf8;
+bool readHq(Sh4& image, Vc2OscAnalogPool& a) {
+    const uint32_t first = image.rd32(kHqPointers) - 4u * XtAnalogHq::kAHalf;
+    if (image.rd32(kHqPointers + 4) != first + 4u * Vc2OscAnalogPool::kHqB) return false;
+    vc2ReadFloats(image, { first, XtAnalogHq::kFloats }, a.hq.data());
+    return true;
+}
+
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, soloWords(solo));
@@ -242,7 +252,7 @@ struct Read : Vc2OscTables {
         readShapeWaves(image, analog.shape.waves);
         vc2ReadFloats(image, kShapeToneKf, analog.shape.toneKf.data());
         readBandTables(image, bands);
-        return true;
+        return readHq(image, analog);
     }
 };
 

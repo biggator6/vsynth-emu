@@ -162,6 +162,10 @@ struct OscShared {
     std::mt19937 jumpRng {};
     std::vector<OscBandWave> jumpWaves {};
     long jumpSteers = 0, jumpSetUps = 0, jumpSeeks = 0;
+    // v337: the analog's renders' generator (Vc2OscAnalogRenderDraws.cpp), the blocks through one of its 19 renders,
+    // their words drawn finite, the NOISE holds steered and the blocks turned to the check's renders, their words no XT's
+    std::mt19937 analogRng {};
+    long analogBlocks = 0, analogFinite = 0, analogHolds = 0, analogOutside = 0;
     Vc2MicRing ring {};
     std::array<float, Vc2Kind6::kBlock> unvoiced {};
     OscRecords records {};

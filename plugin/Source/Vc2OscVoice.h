@@ -18,6 +18,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 
 // What the note-on reads of the wave's header the block's +0xd4 points at, by its offsets
 struct Vc2OscWaveHeader {
@@ -158,6 +159,9 @@ public:
     // v323: the renders the voice has as its own, run when `routine`, the address an install writes, is one of them:
     // the EXT IN player's two and Vari off's two (v261); false, nothing done, for any other
     bool renderOwn(uint32_t routine, float* out, Vc2OscParts& parts);
+    // v337 (Vc2OscAnalogRender.cpp): the analog's 19 renders, by the routine an install writes (+0xa48), its mask; none,
+    // nothing done, for any other
+    std::optional<uint32_t> renderAnalog(uint32_t routine, float* out);
     // v325 (Vc2OscBeat.cpp): the players' beat, 0x893cbf40 (its start, from the position +0x194) and 0x893cbfe0 (its
     // reset, where a seek ends), XtBeat's on the object's words; and a seek by the routine's address, given the
     // position ×16: the voice's own (Vari off's 0x893c6360, LITE's heads' 0x893c6de0) or, any other, out through parts

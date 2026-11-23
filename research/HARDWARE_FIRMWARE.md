@@ -1546,6 +1546,81 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's analog renders (2026-11-23, v337) {#vc2-osc-analog-renders}
+
+Step 4.3's sixty-fifth version: the analog OSC's 19 renders, the routines the installs write by the waveform's code
+(0x893c2ad0's eleven) and with the sub oscillator on (0x893c3e60's eight more; HQ-SAW's, HQ-SQUARE's and NOISE's are
+the plain ones), the voice's own. Kind 3's frame calls the word at +0xa48 (0x893aea70…: `jsr` on it, the object at
+r5, OSC 2's mask at r6), so before this the 19 were hooked as renders.
+
+**What rom.4's renders are.** Laid beside rom.2's (XtAnalog.h's addresses) instruction by instruction, all 19 are
+rom.2's code, each the same length (HQ-SAW 0x893c3890 against 0x895063f0, … sub TRIANGLE 0x893c60e0 against
+0x89509680), but for three things:
+- their object words lie four bytes up from the object's +0x94, the insert LITE's heads and the band players found
+  (`vc2OscInRom4`): `mov #0x5e,r0; shll2` for rom.2's `#0x5d`, the pools' 0xfc for 0xf8, 0x104 for 0x100;
+- NOISE stores its gain at +0x84 by `mov #-124; extu.b` where rom.2 does `add #-128` from +0x104, and the sub
+  oscillator's TRIANGLE reaches +0x108 by a pool word 0x84 where rom.2's is 0x80 (both from +0x84): the same words;
+- HQ-SAW and HQ-SQUARE read HQ's tables through rom.4's own pointers, 0x8993fbf8 and 0x8993fbfc (rom.2's 0x8987c898
+  and 0x8987c89c), in .data, which lead to 0x8954b830 and 0x89558034. The 25,603 floats from 0x89547030 are rom.2's
+  from 0x897d4cdc byte for byte, B right after A as in rom.2.
+
+So the port is rom.2's `XtAnalogOsc` on the voice's words. `XtAnalogWords` (XtAnalogWords.h, a friend of
+XtAnalogOsc) holds its 35 words by their places in rom.2's object: the ratio, the gain, Fat and the Pulse Width, the
+decay, phase, Impact, flags, edge, HQ's integrator and direction, the sub oscillator's words, LA's, the steepnesses,
+NOISE's states and its hold (a signed byte, as `mov.b` reads it). `Vc2OscVoice::renderAnalog` (Vc2OscAnalogRender.cpp)
+copies the words in through `vc2OscInRom4` and takes the routine's code and sub switch by its address. That is
+`Vc2OscAnalog::routineAt`, over the installs' two tables, now in Vc2OscAnalog.h, which the install keeps using. It
+then runs `XtAnalogOsc::process` with OSC 2's mask, copies the words back, and returns its mask. HQ's tap reads the
+tables its block's frame carries (`XtAnalogHqScale`, k2 with them); a null one is rom.2's, as before. The VC-2's are
+rom.4's, read at load through its two pointers into `Vc2OscAnalogPool::hq` (`readHq`, which refuses rom.4 if B isn't
+right after A). XtAnalog.cpp gained no line: its HQ tap and its frame's k2 were changed in place. SUPER-SAW,
+FEEDBACK-OSC and X-MOD have no VC-2 renders, and their words aren't in the table.
+
+**Found: FM's delay lines read beside a ring.** The tone's mix of the two OSCs (v269) delays OSC 1 by OSC 2:
+`delay = (b + 2^31)·depth/2^31`, each tap brought back once by the 496-sample line. With an analog OSC 2 above full
+scale, which its Impact gives at a note's start (up to five times), the index leaves the line. On the XT it reads on
+into the rings beside it: A's 24 at 0x8a0af984 are followed at once by B's 24 at 0x8a0bb384, as rom.2's FM lines are
+(XtModShared). The port's rings were two arrays and its index had one wrap, so such a read left the array: a crash
+in xt_vc2tone at seeds 7 and 31337, and one waiting in the plugin's audio thread once the analog renders sounded.
+`Vc2ToneMixRings` is now one array of 48 rings, end to end as rom.4 lays them. `Vc2ToneMixRings::at` reads by a
+sample's place from a ring's first, beside it where that falls, and 0 past all 48, as rom.2's port does.
+
+**The checks** (xt_vc2osc, and xt_vc2tone through the same steer). The 19 hooks went; the check's own two renders stay
+for a drawn render word. Words drawn for other kinds give an analog voice states no XT reaches. A phase of 887, a Fat
+of 10^28, LA's per-sample gain targets (×2^26) through a plain code's render, a NaN gain: their outputs are NaNs and
+values far past full scale. xtf's arithmetic and the interpreter's carry those NaNs with other signs into the mix and
+the COSMs, and NOISE's loop never ends with a hold of 0 (0x893c22b8: the count goes down only while the hold is above
+0, which a finite Pulse Width always gives). So before an analog voice's render, `oscSteerAnalogRender`
+(Vc2OscAnalogRenderDraws.cpp, from `oscSteerRenders`, its own generator `analogRng`) does the following:
+- One time in two it takes the install's render word for the voice's code copy and sub switch (its +0xa40 and +0xa88
+  kept: an install at a render's time cleared the flag the mix's note-on reads).
+- A word naming no render becomes one of the check's own. An analog voice no analog note-on reached keeps another
+  kind's code copy and no render, and rom.4's frame calls address 0 there (0x893aea84).
+- The render's float words become finite (0…1). A moderate ±1000 reached COSM 1's pitch through the ratio.
+- NOISE's hold is kept at 1…31.
+- Where the port's output on a copy still isn't finite within 16 × full scale, the block goes to one of the check's
+  own renders, counted on an `analog:` line.
+
+Results:
+- About half the analog blocks run through the 19 (400 of 900 at 400 cases), and every line of all 19 and of HQ's
+  frame and tap is reached. The renders' `process` misses only SUPER-SAW's, FEEDBACK-OSC's and X-MOD's cases.
+- Both checks are 0 different at 2024 (40 cases), 7 and 31337 (400).
+- The plants:
+  - the changed lists' 365 (xt_vc2osc) and 80 (xt_vc2tone), mutate_tone.py's 11 (XtAnalog.cpp's, two new on rom.2's
+    tap) and the loader's rom4-no-osc, 0 missed;
+  - v248's upd-install-row and upd-install-sub-row were re-aimed at the install's reads, as the tables moved to a header;
+  - five mixer plants were moved onto delayedSample's new text, and two of the rings' new ones were caught only once
+    the mix part drew a delay's OSC 2 past full scale.
+- fcheck: its baseline updated; the diff read, xt_vc2osc's and xt_vc2tone's count lines and the `analog:` lines alone.
+- verify.sh green.
+
+**Open**, found on the way, neither v337's:
+- v332's band wave draw (`bandSegments`, Vc2OscBandVpdt.cpp) takes `front()` of a segment with no records when a
+  drawn start lands at or past the next. -O2's draws at these seeds never do; an -O0 or ASan build's floats differ
+  and do, and fault.
+- A coverage build of xt_vc2osc, its draws its own from there, finds VariPhrase's update writing +0x1d0: rom.4
+  0xffffa8ea, the port a NaN (seed 7, case 383).
+
 ### XtAnalog.h's split (2026-11-23, v336) {#xt-analog-header-split}
 
 Step 4.3's sixty-fourth version, a move with no code changed. The analog's 19 renders (next) are rom.2's code on rom.4's

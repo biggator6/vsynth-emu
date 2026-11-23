@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
     shared.osc.bandRng.seed((uint32_t)run->seed * 3 + 1);   // v332: the band players' states, before the hooks
     shared.osc.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
     shared.osc.jumpRng.seed((uint32_t)run->seed * 7 + 5);   // v335: the period-jump player's
+    shared.osc.analogRng.seed((uint32_t)run->seed * 11 + 7);   // v337: the analog's renders'
     std::string start = oscCaptureBandStates(fw, shared.osc, oscVoiceAt(0));
     toneInstallRom(fw, rom, shared.fade, shared.osc.draws, oscRom);
     if (start.empty()) start = toneOscSetUp(s);   // v319: the records' exp2 octaves, the carriers' rate, kind 6's globals
@@ -116,7 +117,7 @@ int main(int argc, char** argv) {
     std::printf("modulators: %ld reads of their bound words\n", n.bounds);
     std::printf("mix: %ld plays, blocks by routine:", n.mixPlays);
     for (long blocks : n.mixBlocks) std::printf(" %ld", blocks);
-    std::printf("\n");
+    std::printf("; %ld delays' OSC 2 past full scale\n", n.mixPastFull);   // v337
     std::printf("methods: %ld setters, %ld key-offs, %ld truncations (%ld waits), %ld costs, %ld getters\n", n.setters,
                 n.keyOffs, n.truncations, n.waits, n.costs, n.getters);
     std::printf("lists: %ld starts (%ld tones started), %ld moves alone, %ld left before a rebuild\n", n.starts,
@@ -142,6 +143,9 @@ int main(int argc, char** argv) {
                 "set-up state\n", shared.osc.soloSteers, shared.osc.soloSetUps, shared.osc.soloSeeks);   // v334
     std::printf("jump: %ld OSCs' renders steered to a set-up state, %ld OSC blocks given a wave of periods, %ld "
                 "re-seeks a set-up state\n", shared.osc.jumpSteers, shared.osc.jumpSetUps, shared.osc.jumpSeeks);
+    std::printf("analog: %ld OSC blocks through its renders, %ld words drawn finite, %ld NOISE holds steered, %ld "
+                "blocks the check's, their words no XT's\n", shared.osc.analogBlocks, shared.osc.analogFinite,
+                shared.osc.analogHolds, shared.osc.analogOutside);   // v337
     std::printf("lite: %ld settings on a type with a way, %ld through an earlier tone's head; %ld inputs of two "
                 "VariPhrase OSCs; %ld mode 1 set-ups (%ld through an earlier tone's head, %ld earlier voices' heads "
                 "stale), %ld OSCs steered for its seek\n", n.liteSettings, n.settingsTaken, n.bothVari,
