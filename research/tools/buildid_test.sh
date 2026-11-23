@@ -1,5 +1,6 @@
 #!/bin/bash
-# buildid_test.sh: plugin/BuildId.cmake on a small git repository of its own, through what a working day does to one.  A second or so.  In verify.sh.
+# buildid_test.sh: plugin/BuildId.cmake on a small git repository of its own, through what a working day does to one, then buildid.sh on it as a
+# checkout, with planted copies of its build and of ~/Library's.  A few seconds.  In verify.sh.
 source "$(dirname "$0")/env.sh"
 T="$WORK/buildid_test"; rm -rf "${T:?}"; mkdir -p "$T/plugin/Source" "$T/research"
 SCRIPT="$REPO/plugin/BuildId.cmake"
@@ -62,5 +63,62 @@ n=$((n+1)); grep -Eq '^#define XT_BUILD_TIME "[0-9]{2} [A-Z][a-z]{2} [0-9]{2}:[0
 none=$(mktemp -d)        # outside this checkout, or git finds it
 say "no git: still a build" "$(run "$none")" "unknown"
 rm -rf "${none:?}" "${T:?}.out"
+
+# buildid.sh, verify.sh's line, on this repository as a checkout: its own build's test, AU and VST3 hold it to its id,
+# and the folder the builds install into (PLUGINS, ~/Library's stand-in) is only named.  Another checkout's build
+# installing between a run's build and its check must not fail it (2026-11-22, workflow-bugs.md).
+mkdir -p "$T/research/tools"
+: > "$T/research/tools/env.sh"
+cp "$SCRIPT" "$T/plugin/BuildId.cmake"
+commit "the tools, not a version"
+id="v8 $(sha)"
+B="$T/build/plugin"
+A="$B/VSynthEmu_artefacts/Release"
+P="$T/plugins"
+other="v330 dbddaec"
+carry() {
+    mkdir -p "$(dirname "$1")"
+    printf 'x\0V-Synth Emu build %s\0y' "$2" > "$1"
+}
+au() { echo "$1/V-Synth Emu.component/Contents/MacOS/V-Synth Emu"; }
+vst3() { echo "$1/V-Synth Emu.vst3/Contents/MacOS/V-Synth Emu"; }
+own() {
+    carry "$B/VSynthEmuTest" "$1"
+    carry "$(au "$A/AU")" "$2"
+    carry "$(vst3 "$A/VST3")" "$3"
+}
+installed() {
+    carry "$(au "$P/Components")" "$1"
+    carry "$(vst3 "$P/VST3")" "$2"
+}
+# expect <case> <exit status> <text its line must hold>
+expect() {
+    local o st
+    n=$((n+1))
+    o=$(REPO="$T" PLUGINS="$P" bash "$(dirname "$0")/buildid.sh" 2>&1)
+    st=$?
+    [ "$st" = "$2" ] && [[ "$o" == *"$3"* ]] && return
+    fail=$((fail+1))
+    echo "buildid_test: $1: exit $st, wanted $2 and '$3'; it said: $o"
+}
+own "$id" "$id" "$id"
+installed "$id" "$id"
+expect "this build installed" 0 "installed: AU this build's, VST3 this build's"
+installed "$other" "v394 1234567+abcd"
+expect "another checkout's build installed since: named, not failed" 0 \
+    "installed: AU $other (another build's), VST3 v394 1234567+abcd (another build's)"
+rm -rf "${P:?}"
+expect "nothing installed" 0 "installed: no AU, no VST3"
+# This build's own copies wrong, with ~/Library's right: the line reads what was built here
+installed "$id" "$id"
+own "$id" "$other" "$id"
+expect "a wrong id in this build's AU" 1 "$other in $A/AU/"
+own "$id" "$id" "$other"
+expect "a wrong id in this build's VST3" 1 "$other in $A/VST3/"
+own "$other" "$id" "$id"
+expect "a wrong id in this build's test" 1 "$other in $B/VSynthEmuTest"
+own "$id" "$id" "$id"
+rm -rf "${A:?}/AU"
+expect "this build's AU missing" 1 "no id in $A/AU/"
 
 [ $fail = 0 ] && echo "build id's script: $n cases as they should be" || { echo "buildid_test: $fail of $n wrong"; exit 1; }

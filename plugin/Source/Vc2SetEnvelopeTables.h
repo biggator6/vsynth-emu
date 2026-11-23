@@ -33,6 +33,12 @@ struct Vc2SetEnvelopeTables {
     float tvaSendTwo = 0;                  // 0x893a6920: block[14]'s scale
     float tvaRateScale = 0;                // 0x893a6928: the rate's divisor
     float tvaSampleRate = 0;               // 0x893a692c: its unit, kHz
+    // The OSC blocks' (v391): the vibrato's rows from 0x8953ffd0, 80 bytes by Vibrato Type (its four, and the twelve
+    // after them its four bits reach), the rate's scale (0x8939fd58, 6/127), the depth's (0x8939fd68, 300), and EXTIN's
+    // start's tempo divisor (0x8939eb7c, 10; the analog's is Vc2OscConvertTables::perTenth); from v397 PCM's start's
+    // (0x8939e29c, 10)
+    std::array<std::array<uint32_t, 20>, 16> vibrato {};
+    float vibratoRate = 0, vibratoDepth = 0, extinTenth = 0, pcmTenth = 0;
 };
 
 // The level run's halfword at `at` over `scale`, as the SH-4 divides (the mix's and TVA's gains, v284, v285)

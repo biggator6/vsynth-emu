@@ -716,6 +716,51 @@ version against rom.4's routines with what it calls hooked:
         update, copy and the block writer `0x893a6260` (the level with CC 7 and 11, two depths, the pan with CC 10,
         the outputs by a route, two sends with CC 93, the part's gain, the global step); xt_vc2sets' sixth part
         (HARDWARE_FIRMWARE.md, "The VC-2 part's sets' TVA"). Item 8 is done.
+      - the COSM inputs' done (v390, another session's, beside 4.3's from v329): `Vc2SetCosmInputs`, the 48 inputs, the
+        constructor `0x89399b10` (its 42 bytes placed by the kind's and index's whole words), conversion, update and copy
+        on the dispatcher `0x89399920` and its converters (v235…v241's); xt_vc2sets' seventh part (HARDWARE_FIRMWARE.md,
+        "The VC-2 part's sets' COSM inputs"). v314's other child: the OSC blocks' (`0x8939fe00` and its kin).
+      - the OSC blocks' done (v391): `Vc2SetOscBlocks`, the 48 inputs, constructor, conversion, update, copy and refresh,
+        Random Pitch's seed, the step counts and the start key; `Vc2SetOscKinds`, the dispatch `0x8939fb40` with the
+        analog's, EXTIN's and the VOCODER's starts and the converter `0x8939fbd0` with the vibrato's words and the analog's
+        and VOCODER's converters (v251, v256, v222); xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2 part's sets'
+        OSC blocks"). Both of v314's children are done. Left, which the OSC blocks call by rom.4's address through
+        `Vc2SetReads::unportedOscKind`: PCM's start `0x8939e120` (its wave lookups `0x89394b30`, `0x89394c20`,
+        `0x89394d10`, `0x89351840`, `0x89351ad0`, `0x89351ff0`, `0x893520a0`, `0x8939cd30`, `0x8939cba0`), the PCM
+        converter `0x8939e300` and EXTIN's `0x8939e9e0` (its own level law `0x8939c490` on a .data table), a version each.
+      - EXTIN's converter done (v393): `vc2OscExtinConvert`, v251's head with its own gain, its kind 6 or 7 and its words,
+        the formant law `0x8939c490` on rom.4's .data rows; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's
+        EXTIN converter"). Left: PCM's start `0x8939e120` and the PCM converter `0x8939e300`.
+      - PCM's converter's own part done (v394): `vc2OscPcmConvert`, the Time law `0x8939c310`, the Formant law
+        `0x8939c410`, the depth curve and the gain; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's PCM
+        converter"). Left: what it calls by the wave's type, LITE's words `0x8939efa0` and VariPhrase's `0x8939f2a0`
+        (about 1,100 instructions), and PCM's start `0x8939e120` with its wave lookups.
+      - LITE's words done (v395): `vc2OscPcmLite`, the pitch10s and key as v251's head makes them, the cents against
+        the wave's root, the start sample held below the length, the switches (Time Trip under way through the part
+        table, `Vc2SetReads::tripMoving`) and the wave's bytes; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The
+        VC-2's LITE words"). Left: VariPhrase's words `0x8939f2a0` and PCM's start `0x8939e120`.
+      - VariPhrase's words done (v396): `vc2OscPcmVari`, the Playback Mode's ways (STEP's and EVENT's events from the
+        wave's events' table through `Vc2SetReads::waveHalf`, EVENT's key by periods about a moved centre), the pitch
+        about that centre on v251's key sum, which takes the centre now, the cents, the level and the flags;
+        xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase words"). PCM's converter is whole. Left:
+        PCM's start `0x8939e120`.
+      - PCM's start done (v397): the starts' words, LEGATO's flag and key, the key Pitch KF gives, the kind by the
+        wave's type; the wave store's four routines it calls (`0x89351840`, `0x8939cd30`, `0x893520a0`, `0x8939cba0`)
+        through `Vc2SetReads::waveStore`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's PCM start"). Every
+        routine the OSC blocks call is the port's now but the wave store's, which `Vc2Synth` must give (the wave
+        memory's lookups, a port of their own).
+      - The wave store's lookups (v398): `Vc2WaveStore`, rom.4's store at `0x8997c52c` (its key and 128 lists) with
+        the find `0x89353130`, whether a record is loaded `0x89351840`, a set's index `0x893520a0` and the wave's words
+        `0x8939cd30` with the getters it calls, on the wave memory by rom.4's address (`Vc2WaveMemory`, through
+        `Vc2SetReads::waveMemory`, which VariPhrase's words read their events from too); xt_vc2sets' eighth part
+        (HARDWARE_FIRMWARE.md, "The VC-2's wave store"). Left: the words by a set's index `0x8939cba0` and its three
+        sets (v399). `Vc2Synth` must give the store and the memory; the store's set-up and insert, which its loader
+        runs, aren't ported.
+      - The wave sets (v399): `Vc2WaveSets`, the velocity's, key's and alias's sets (counts `0x8993448c`, tables
+        `0x89973084`, buffers `0x89989754`) with their routines `0x89394b30`, `0x89394c20`, `0x89394d10` and the words
+        by a set's index `0x8939cba0`; xt_vc2sets' eighth part (HARDWARE_FIRMWARE.md, "The VC-2's wave sets"). Every
+        routine PCM's start calls is the port's now; `Vc2Synth` must give the store, the sets and the wave memory, and
+        the loaders that fill the store and the sets aren't ported.
    9. The part's settings by ID: `0x8939b170`'s readers, the system's `0x8939b0d0`, the mode row `0x89396e20`, the
       Category and budget `0x89392c60`, the nodes `0x893932c0`, `0x89393100`, with G's channel word, the static M and
       event 0x200.

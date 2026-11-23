@@ -14,12 +14,16 @@ public:
 
     static constexpr int kDial = 30, kCell = 64, kGap = 8;
     int made() const { return (int)controls_.size(); }   // fewer than its rows: a row named no parameter
+    int dimmed() const { return dimmed_; }               // the VC-2's that nothing found reads, drawn faint (d-6)
+    juce::Component* control(const juce::String& id) const;   // a row's control, or none (v453)
     int heightFor(int width) const;                       // the height its rows take across a width
     void resized() override;
 
 private:
     Controls::Attached attached_;
     std::vector<std::unique_ptr<juce::Component>> controls_;
+    std::vector<juce::String> ids_;
+    int dimmed_ = 0;
     std::vector<int> cells_, heights_;   // each control's cells across and its height
     template <class Place>
     int flow(int width, Place&& place) const;

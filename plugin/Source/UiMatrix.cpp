@@ -29,16 +29,16 @@ std::array<juce::Rectangle<int>, kWidths.size()> columnsOf(juce::Rectangle<int> 
 
 }
 
-MatrixRow::MatrixRow(Controls::State& state, int control) {
+MatrixRow::MatrixRow(Controls::State& state, int control, Matrix::FieldIds ids) {
     Look::setTextLook(number_, Look::mono(11.0f), Look::label);
     number_.setText(juce::String(control + 1), juce::dontSendNotification);
     addAndMakeVisible(number_);
-    made_ += Controls::box(source_, state, Matrix::sourceId(control), attached_) ? 1 : 0;
+    made_ += Controls::box(source_, state, ids(control, 0), attached_) ? 1 : 0;
     addAndMakeVisible(source_);
     for (int d = 0; d < Matrix::kDests; ++d) {
-        made_ += Controls::box(dests_[(size_t)d], state, Matrix::destId(control, d), attached_) ? 1 : 0;
+        made_ += Controls::box(dests_[(size_t)d], state, ids(control, Matrix::destField(d)), attached_) ? 1 : 0;
         addAndMakeVisible(dests_[(size_t)d]);
-        const juce::String sens = Matrix::sensId(control, d);
+        const juce::String sens = ids(control, Matrix::sensField(d));
         if (state.getParameter(sens) == nullptr) continue;
         sens_[(size_t)d] = std::make_unique<Bar>(state, sens, juce::String(), Look::mod);
         addAndMakeVisible(*sens_[(size_t)d]);
@@ -57,7 +57,7 @@ void MatrixRow::resized() {
     }
 }
 
-MatrixView::MatrixView(Controls::State& state) {
+MatrixView::MatrixView(Controls::State& state, Matrix::FieldIds ids) {
     for (const char* name : kHeads) {
         auto head = std::make_unique<juce::Label>();
         Look::fieldName(*head, name);
@@ -65,7 +65,7 @@ MatrixView::MatrixView(Controls::State& state) {
         heads_.push_back(std::move(head));
     }
     for (int control = 0; control < Matrix::kControls; ++control) {
-        rows_.push_back(std::make_unique<MatrixRow>(state, control));
+        rows_.push_back(std::make_unique<MatrixRow>(state, control, ids));
         addAndMakeVisible(*rows_.back());
     }
 }

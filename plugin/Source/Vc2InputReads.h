@@ -18,4 +18,6 @@ inline int32_t s32(const uint8_t* in, int at) {
     std::memcpy(&v, in + at, sizeof v);
     return v;
 }
+// A word as the registers hold it, unsigned (v396: LITE's and VariPhrase's words')
+inline uint32_t u32(const uint8_t* in, int at) { return static_cast<uint32_t>(s32(in, at)); }
 } // namespace vc2in

@@ -7,6 +7,7 @@
 class PageBar : public Tabs {
 public:
     PageBar();
+    void showVc2(bool vc2);   // the VC-2 mode's pages' names (Blocks::kVc2Pages, v453), or the V-Synth's
     void paint(juce::Graphics&) override;
     void resized() override;
     juce::Button& keyboardSwitch() { return keyboard_; }

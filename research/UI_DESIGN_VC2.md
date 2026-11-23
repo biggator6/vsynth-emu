@@ -5,6 +5,14 @@ questions", {#vc2-questions}), 2026-11-22: "take the recommendations from VC-2 m
 and no editor code came with it. Building the pages is step 4.5's second half (VC2_MODE_PLAN.md, step 5), once step
 4.3's `Vc2Synth` is whole.
 
+**Built in v453** (2026-11-22; HARDWARE_FIRMWARE.md, "The VC-2 mode's pages in the editor"), as laid out here but for
+these: the FX page is D's cards, not `FxPanel`, as the types' own parameters need rom.4's effect driver in the plugin
+(a card says so, and a Type shows its number); Pad Mode is a box on a row of its own over Pad Hold (TIME-TRIP doesn't fit
+beside it); the VOCODER card's word for the engine that reads its faint controls is one line under the card; what nothing
+found reads (d-6) is faint with a line under DETAILS. What waits for `Vc2Synth` says so on its page: the mic's state and
+NO MIC and NO NOTE, the bands' display (d-14), the switch's audio, a wave's name and picture, the effect types'
+parameters. This file stays until those come, then goes into UI_DESIGN.md.
+
 It is a file beside UI_DESIGN.md, not a section of it, for two reasons: it is longer than UI_DESIGN.md itself (a table of
 IDs for every card of six pages), and it was written as a draft for the user's answers, which the questions keep. As the
 pages are built, what it says goes into UI_DESIGN.md's own sections, as D's design did (UI_DESIGN.md, "The steps", step
@@ -386,6 +394,10 @@ Each question is kept as it was put, its recommendation first and the alternativ
   card's checklist. Or on the MIC IN card alone.
 - **d-13, MFX Send on AMP.** Decided as recommended (2026-11-22). Recommended: a fifth knob on AMP, as it is the vocoder's output level. Or in AMP's DETAILS,
   AMP keeping D's four.
+- **d-15, the mode switch's form.** Decided as recommended (the user's answer, 2026-11-22), asked as v453 was built:
+  a session setting, the processor's, kept in its state as the keyboard's fold is, not a host parameter; a project
+  reopens in its mode, no host switches the engine mid-note, and the parameters' list stays as it is. Or a host
+  parameter appended after every other, or the editor's own, not saved.
 - **d-14, the VOCODER card's display.** Decided as recommended (2026-11-22). Recommended: the engine's bands as they play (LEGACY's 10, HIRESO's 32), the
   mic's envelope in each band and the output's, which needs `Vc2Synth` to hand them out. Or a picture of the settings
   alone (the levels and the formant warp), which needs nothing from it.

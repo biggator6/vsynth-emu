@@ -30,16 +30,6 @@ constexpr int kKfDivisor = 6000;                 // [FW] 0x8939c0e0's magic divi
 constexpr int32_t kPitchEnvWords[2] = { 1, 5 }, kLevelEnvWords[2] = { 4, 8 };   // [FW] by OSC
 constexpr int kPitch = 0, kLevel = 3, kLfoPitch = 1, kLfoLevel = 4;   // the groups' sums the part reads
 
-// The key follow's sum, tenths of a cent before the fine: rom.2's 0x894e1250's law.  rom.4 (0x8939c8a0, 0x8939c910 and
-// the +0x98 inline) forms KF 0 and 1000 (100%) without the product, which gives the same integer at both
-int keySum(int key, int coarse, int kf) { return (kCentre + coarse) * kPerKey + (key - kCentre) * kf; }
-
-// 0x8939c910: the key Pitch KF gives, the sum rounded up a key (the magic division by 1000 is C's), within 0…127; at
-// KF 0 and 1000 rom.4 takes the key without the rounding, the same key once held to 0…127
-uint8_t followedKey(int key, int coarse, int kf) {
-    return (uint8_t)vc2OscHeld((keySum(key, coarse, kf) + kPerKey - 1) / kPerKey, 0, kLevelTop);
-}
-
 // The inline cents (and 0x8939c150's): pitch10 against A4, ÷ 10, held to ±6000, the upper bound first
 float centsFromA4(uint32_t p10, const Vc2OscConvertTables& t) {
     return vc2OscHeld(div(flt((int32_t)(p10 - kA4)), t.perTenth), t.centsLeast, t.centsMost);
@@ -77,11 +67,11 @@ float calibrationGain(int row, uint32_t p10, const Vc2OscConvertIn& in, const Vc
 void pitchWords(uint8_t* input, const Vc2OscConvertIn& in, const Vc2ToneShared& shared, Vc2OscBlockHead& b,
                 const Vc2OscConvertTables& t) {
     const int key = u8(input, kKeyAt), coarse = s16(input, kCoarseAt), kf = s16(input, kPitchKfAt);
-    const uint32_t fine = (uint32_t)s32(input, kFineAt), p10 = (uint32_t)keySum(key, coarse, kf) + fine;
-    const uint32_t keyP10 = (uint32_t)keySum(u8(input, kSecondKeyAt), coarse, kf) + fine;
+    const uint32_t fine = (uint32_t)s32(input, kFineAt), p10 = vc2OscKeySum(key, coarse, kf, kCentre) + fine;
+    const uint32_t keyP10 = vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, kCentre) + fine;
     std::memcpy(input + kPitch10At, &p10, sizeof p10);
     std::memcpy(input + kKeyPitch10At, &keyP10, sizeof keyP10);
-    b.key = followedKey(key, coarse, kf);
+    b.key = vc2OscFollowedKey(key, coarse, kf, kCentre);
     b.cents = centsFromA4(p10, t);
     b.keyCents = centsFromA4(keyP10, t);
     const float x = add(div(mul(flt(in.sums.osc[kPitch]), t.depthMost), t.sumScale), flt(s8(input, kPitchAt)));
@@ -112,6 +102,16 @@ int vc2OscHeld(int v, int least, int most) {
 float vc2OscHeld(float v, float least, float most) {
     if (v > most) return most;
     return least > v ? least : v;
+}
+
+uint32_t vc2OscKeySum(int key, int coarse, int kf, int centre) {
+    const auto keyed = static_cast<uint32_t>(key - centre) * static_cast<uint32_t>(kf);
+    return static_cast<uint32_t>(centre + coarse) * static_cast<uint32_t>(kPerKey) + keyed;
+}
+
+uint8_t vc2OscFollowedKey(int key, int coarse, int kf, int centre) {
+    const auto sum = static_cast<int32_t>(vc2OscKeySum(key, coarse, kf, centre) + static_cast<uint32_t>(kPerKey - 1));
+    return static_cast<uint8_t>(vc2OscHeld(sum / kPerKey, 0, kLevelTop));
 }
 
 float vc2OscOnLines(float x, std::span<const Vc2OscCentsLine> lines) {

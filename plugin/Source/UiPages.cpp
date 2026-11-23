@@ -15,11 +15,27 @@ std::unique_ptr<Card> gridCard(Controls::State& state, const juce::String& title
     return card;
 }
 
-std::unique_ptr<Card> gridCard(Controls::State& state, const CardRows& rows) {
+juce::String rowAsId(const char* row) {
+    return row;
+}
+
+TitleSwitch::TitleSwitch(Controls::State& state, const juce::String& id) {
+    getProperties().set(Look::power, true);
+    Controls::toggle(*this, state, id, attached_);
+}
+
+TitleBox::TitleBox(Controls::State& state, const juce::String& id) {
+    Controls::box(*this, state, id, attached_);
+}
+
+std::unique_ptr<Card> gridCard(Controls::State& state, const CardRows& rows, RowId idOf) {
     ControlGrid::Rows made;
     for (const Controls::KnobRow& row : rows.rows)
-        if (row.id != nullptr) made.push_back({ row.id, row.name });
-    return gridCard(state, rows.title, made);
+        if (row.id != nullptr) made.push_back({ idOf(row.id), row.name });
+    auto card = gridCard(state, rows.title, made);
+    if (rows.titleSwitch != nullptr)
+        card->toTitle(std::make_unique<TitleSwitch>(state, idOf(rows.titleSwitch)), TitleSwitch::kWidth);
+    return card;
 }
 
 void stack(const std::vector<Card*>& cards, juce::Rectangle<int> r, bool fill) {
@@ -33,27 +49,19 @@ void stack(const std::vector<Card*>& cards, juce::Rectangle<int> r, bool fill) {
     }
 }
 
-namespace {
-
 std::unique_ptr<juce::Component> noPage(VSynthEmuProcessor&) {
     return nullptr;
 }
-std::unique_ptr<juce::Component> modulation(VSynthEmuProcessor& p) {
-    return std::make_unique<ModulationPage>(p);
-}
+
+namespace {
+
 std::unique_ptr<juce::Component> effects(VSynthEmuProcessor& p) {
     return std::make_unique<FxPanel>(p, Look::cards);
 }
-std::unique_ptr<juce::Component> play(VSynthEmuProcessor& p) {
-    return std::make_unique<PlayPage>(p);
-}
-std::unique_ptr<juce::Component> zones(VSynthEmuProcessor& p) {
-    return std::make_unique<ZonesPage>(p);
-}
 
 // Each page's maker, in Blocks::kPages' order: SYNTH, MODULATION, FX, PLAY, ZONES
-using Maker = std::unique_ptr<juce::Component> (*)(VSynthEmuProcessor&);
-constexpr std::array<Maker, Blocks::kPages.size()> kMakers { noPage, modulation, effects, play, zones };
+constexpr std::array<Maker, Blocks::kPages.size()> kMakers { noPage, made<ModulationPage>, effects, made<PlayPage>,
+                                                             made<ZonesPage> };
 
 }
 

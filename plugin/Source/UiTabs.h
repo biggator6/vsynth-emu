@@ -18,6 +18,7 @@ public:
 
     std::function<void(int tab)> onChoose;   // a click's choice, after it is shown
     void choose(int tab);                    // shown, with no call
+    void setNames(juce::StringArray names);  // others in their place (v453: the page bar's, by mode)
     int chosen() const { return chosen_; }
     const juce::StringArray& names() const { return names_; }
     virtual std::vector<juce::Rectangle<int>> tabs() const;   // where each name is, in their order

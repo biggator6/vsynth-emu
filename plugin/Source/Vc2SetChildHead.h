@@ -11,9 +11,11 @@
 #include <cstddef>
 #include <span>
 
-// The part's words for a child: five by part, kind and index (Vc2SetReads::envelopeOf, lfoOf), or N by part and kind
-// (mixOf's 11, v284; tvaOf's 12, v285)
-using Vc2ChildWords = std::array<uint16_t, 5> (Vc2SetReads::*)(uint32_t, uint32_t, uint32_t);
+// The part's words for a child: N by part, kind and index (Vc2SetReads::envelopeOf's and lfoOf's 5; v390,
+// cosmInputOf's 21), or N by part and kind (mixOf's 11, v284; tvaOf's 12, v285)
+template <size_t N>
+using Vc2IndexWords = std::array<uint16_t, N> (Vc2SetReads::*)(uint32_t, uint32_t, uint32_t);
+using Vc2ChildWords = Vc2IndexWords<5>;
 template <size_t N>
 using Vc2KindWords = std::array<uint16_t, N> (Vc2SetReads::*)(uint32_t, uint32_t);
 
@@ -28,8 +30,10 @@ void vc2ChildVoice(uint8_t* at, const Vc2SetCall& call, Vc2SetReads& reads);
 uint32_t vc2CallsPart(const Vc2SetCall& call, Vc2SetReads& reads);
 // +6… the part's words, as rom.4 writes the halfwords
 void vc2PartWords(uint8_t* object, std::span<const uint16_t> words);
-// +6… the part's words, by the call's part and the object's kind (+0) and index (+1), or by the kind alone
-void vc2ChildPart(uint8_t* object, Vc2ChildWords of, const Vc2SetCall& call, Vc2SetReads& reads);
+// +6… the part's words, by the call's part and the object's kind (+0) and index (+1) (Vc2SetChildHead.cpp's, for the
+// counts there), or by the kind alone
+template <size_t N>
+void vc2ChildPart(uint8_t* object, Vc2IndexWords<N> of, const Vc2SetCall& call, Vc2SetReads& reads);
 
 template <size_t N>
 void vc2ChildPart(uint8_t* object, Vc2KindWords<N> of, const Vc2SetCall& call, Vc2SetReads& reads) {
@@ -39,6 +43,10 @@ void vc2ChildPart(uint8_t* object, Vc2KindWords<N> of, const Vc2SetCall& call, V
 // rom.4's signed division by a reciprocal `magic`: the product's high word, plus n where the magic is past 2^31 as a
 // word, shifted by `shift`, rounded toward 0 (the common's by 127², the envelopes' by 6400, the TVA's by 6000 and 63)
 int32_t vc2ByMagic(int32_t n, int32_t magic, int shift);
+
+// The clock's tempo, held as rom.4 holds it: the library's signed division, below 200 to 20, above 2500 to 250 (v282's,
+// the envelopes' constructor's; v391, the OSC blocks' kinds' starts' too)
+uint16_t vc2SetTempo(const Vc2SetClock& c);
 
 // A float as the block's word (the envelopes', LFOs' and mix's writers)
 inline uint32_t floatWord(float f) {

@@ -53,18 +53,6 @@ std::array<uint16_t, 5> envelopeWordsDrawn(std::mt19937& rng) {
              pairOf((uint8_t)envelopeSens(rng), (uint8_t)envelopeSens(rng)), (uint16_t)envelopeFollow(rng) };
 }
 
-// The clock: internal or outside; half the time its words give a tempo at or either side of the holds' thresholds, or
-// between them, else over a wide span (where both holds show); never 0 below
-void envelopeClock(Vc2Fw& fw, std::mt19937& rng) {
-    const auto targets = std::to_array<uint32_t>({ 199, 200, 201, 2499, 2500, 2501, 20 + rng() % 2400 });
-    const uint32_t tempo = setsOneOf(targets, rng);
-    const bool aimed = rng() % 2;
-    fw.cpu.wr8(kSetsClockAt + 0x40, rng() % 2 ? 0 : rng() % 2 ? 1 : (uint8_t)rng());
-    fw.cpu.wr32(kSetsClockAt + 0x10, aimed ? tempo : rng() % 100000);
-    fw.cpu.wr32(kSetsClockAt + 0x14, aimed ? 30000 : 1 + rng() % 30000);
-    fw.cpu.wr16(kSetsClockAt + 0x48, (uint16_t)(aimed ? 150000 / tempo : 1 + rng() % 65535));
-}
-
 void envelopeWordsOf(Vc2EnvelopeWords& w, std::mt19937& rng) {
     setsNoise(w, rng);
     w.index = (uint8_t)(rng() % 4 ? rng() % 13 : rng());
@@ -81,7 +69,7 @@ void envelopeWordsOf(Vc2EnvelopeWords& w, std::mt19937& rng) {
 void envelopeDraw(EnvelopeSides& e, std::mt19937& rng, bool all) {
     setsDraw(e.s, rng, all);
     setsPartWordsDrawn(e.s.fw, rng, all, kSetsEnvelopeTable, envelopeWordsDrawn);
-    if (all || rng() % 8 == 0) envelopeClock(e.s.fw, rng);
+    if (all || rng() % 8 == 0) setsClockDrawn(e.s.fw, rng);
     setsSumsDrawn(e.s.fw, rng, all);
     for (Vc2EnvelopeWords& w : e.port.items)
         if (all || rng() % 8 == 0) envelopeWordsOf(w, rng);

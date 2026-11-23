@@ -29,6 +29,14 @@ namespace Ui {
         g.setColour(c);
         g.fillRect(r);
     }
+    // Text over as many lines as it takes, up to `lines`, in a style's font and colour from the top left: what a zone
+    // plays, the VC-2's status and what waits (v453, one place for it)
+    inline void drawWrapped(juce::Graphics& g, const juce::String& t, juce::Rectangle<int> r, const TextStyle& s,
+                            int lines) {
+        g.setFont(s.font);
+        g.setColour(s.colour);
+        g.drawFittedText(t, r, juce::Justification::topLeft, lines);
+    }
     // A rounded rectangle filled in a colour: D's boxes, chips, switches and keys (UI step 1)
     inline void fillRounded(juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c, float radius) {
         g.setColour(c);
@@ -38,6 +46,11 @@ namespace Ui {
     inline void stroke(juce::Graphics& g, const juce::Path& p, juce::Colour c, const juce::PathStrokeType& type) {
         g.setColour(c);
         g.strokePath(p, type);
+    }
+    // A path filled in a colour: an envelope's area, a wave's columns, the VC-2 carrier's bands (v453, one place for it)
+    inline void fillPath(juce::Graphics& g, const juce::Path& p, juce::Colour c) {
+        g.setColour(c);
+        g.fillPath(p);
     }
     // A key's name, as Roland's: C4 is 60 (the Zones tab's, v195; D's ZONES page, UI step 4)
     inline juce::String keyName(int key) {

@@ -17,5 +17,14 @@ inline juce::String destId(int control, int dest) {
 inline juce::String sensId(int control, int dest) {
     return VSynthEmuProcessor::matrixParamId(control, ("Sens" + juce::String(dest + 1)).toRawUTF8());
 }
+// A Control's parameter by its field, as a mode's Matrix gives them (Blocks::Model, v453): 0 Source, then each
+// destination and its Sens
+inline juce::String controlFieldId(int control, int field) {
+    if (field == 0) return sourceId(control);
+    return field % 2 == 1 ? destId(control, (field - 1) / 2) : sensId(control, (field - 1) / 2);
+}
+// The field of a destination and of its Sens
+constexpr int destField(int dest) { return 1 + 2 * dest; }
+constexpr int sensField(int dest) { return 2 + 2 * dest; }
 
 }

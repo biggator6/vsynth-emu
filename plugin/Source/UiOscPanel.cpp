@@ -1,4 +1,4 @@
-// D's OSC panel (UiOscPanel.h; UI step 2)
+// D's OSC panel (UiOscPanel.h; UI step 2; a mode's faces, v453)
 #include "UiOscPanel.h"
 #include "PluginParamIds.h"
 #include "UiLook.h"
@@ -8,18 +8,13 @@
 namespace {
 
 using Controls::KnobRow;
-constexpr int kFaceCount = OscPanel::kTypes, kPcm = 1, kExtIn = 2;   // OSC Type's values: ANALOG 0, PCM 1, EXT IN 2
-constexpr int kBigDial = 44, kSmallDial = 30, kBig = 4, kSmall = 6;
+constexpr int kBigDial = 44, kSmallDial = 30;
 constexpr int kTitleH = 22, kDisplayH = 72, kRowGap = 7, kStatusH = 22, kNameH = 16;
 constexpr float kPercent = 100.0f;   // Loop Start and End are percents of the wave
 
-// What each Type shows: the box beside Type, the big knobs and the small, as the processor's IDs for OSC 1
-struct OscFace {
-    const char* sub;
-    std::array<KnobRow, kBig> big;
-    std::array<KnobRow, kSmall> small;
-};
-constexpr OscFace kFaces[kFaceCount] = {
+// What each of the V-Synth's Types shows (ANALOG 0, PCM 1, EXT IN 2): the box beside Type, the big knobs and the small,
+// as the processor's IDs for OSC 1
+constexpr OscPanel::Face kFaces[OscPanel::kTypes] = {
     { "anaWave",
       { { { "oscPitch", "Pitch" }, { "anaPw", "Pulse W" }, { "anaImpact", "Impact" }, { "oscLevel", "Level" } } },
       { { { "oscCoarse", "Coarse" }, { "oscFine", "Fine" }, { "anaPwKF", "PW KF" }, { "anaPwLfo", "PW LFO" },
@@ -35,6 +30,24 @@ constexpr OscFace kFaces[kFaceCount] = {
           { "randomPitch", "Random" }, { "oscLevelKF", "Level KF" }, { "oscVelSens", "Vel Sens" } } } },
 };
 
+juce::String vsynthId(int osc, const juce::String& name) {
+    return Params::oscId(osc, name);
+}
+
+// The V-Synth's OSC panel: its three faces, its PCM line, a PCM OSC loading its wave, the analog cycles from its controls
+OscPanel::Model vsynthModel(VSynthEmuProcessor& p) {
+    OscPanel::Model m;
+    m.faces = kFaces;
+    m.count = OscPanel::kTypes;
+    m.id = vsynthId;
+    m.switchRow = Params::kOscSwitch;
+    m.typeRow = Params::kOscType;
+    m.line = { "vari", "playbackMode", Params::kTempoSync };
+    m.extInType = "fxExtInType";
+    m.analog = [&p](int osc) { return WaveDisplay::analogSettings(p.currentControls(), osc); };
+    return m;
+}
+
 // Knobs side by side across r, each its share of the width: n of them from `first` on
 void placeRow(const std::vector<std::unique_ptr<Knob>>& knobs, size_t first, size_t n, juce::Rectangle<int> r) {
     const int w = r.getWidth() / (int)n;
@@ -43,31 +56,39 @@ void placeRow(const std::vector<std::unique_ptr<Knob>>& knobs, size_t first, siz
 
 }
 
-OscPanel::OscPanel(VSynthEmuProcessor& p, int osc)
-    : FacedPanel(p.apvts, { "OSC " + juce::String(osc + 1), Params::oscId(osc, Params::kOscSwitch),
-                            Params::oscId(osc, Params::kOscType) }, kFaceCount),
-      processor_(p), osc_(osc) {
-    Controls::box(playback_, p.apvts, id("playbackMode"), attached_);
-    Controls::toggle(vari_, p.apvts, id("vari"), attached_);
-    Controls::toggle(sync_, p.apvts, id(Params::kTempoSync), attached_);
-    for (int face = 0; face < kFaceCount; ++face) {
-        addSub(face, id(kFaces[face].sub));
-        for (const KnobRow& k : kFaces[face].big) addKnob(face, id(k.id), k.name, kBigDial);
-        for (const KnobRow& k : kFaces[face].small) addKnob(face, id(k.id), k.name, kSmallDial);
+OscPanel::OscPanel(VSynthEmuProcessor& p, int osc) : OscPanel(p, osc, vsynthModel(p)) {}
+
+OscPanel::OscPanel(VSynthEmuProcessor& p, int osc, Model model)
+    : FacedPanel(p.apvts, { "OSC " + juce::String(osc + 1), model.id(osc, model.switchRow),
+                            model.id(osc, model.typeRow) }, model.count),
+      processor_(p), osc_(osc), model_(std::move(model)) {
+    Controls::box(playback_, p.apvts, id(model_.line[1]), attached_);
+    Controls::toggle(vari_, p.apvts, id(model_.line[0]), attached_);
+    Controls::toggle(sync_, p.apvts, id(model_.line[2]), attached_);
+    for (int face = 0; face < model_.count; ++face) {
+        addSub(face, id(model_.faces[face].sub));
+        for (const KnobRow& k : model_.faces[face].big) addKnob(face, id(k.id), k.name, kBigDial);
+        for (const KnobRow& k : model_.faces[face].small) addKnob(face, id(k.id), k.name, kSmallDial);
     }
     load_.onClick = [this] { chooseWave(); };
-    for (juce::Component* c : std::initializer_list<juce::Component*> { &load_, &vari_, &playback_, &sync_ })
-        addChildComponent(c);
+    for (juce::Component* c : pcmLine()) addChildComponent(c);
     refresh();
 }
 
 juce::String OscPanel::id(const juce::String& name) const {
-    return Params::oscId(osc_, name);
+    return model_.id(osc_, name);
+}
+
+// What a PCM OSC shows besides its knobs: Load... where it loads a file, and the line of Vari, Playback Mode and Sync
+std::vector<juce::Component*> OscPanel::pcmLine() {
+    std::vector<juce::Component*> line { &vari_, &playback_, &sync_ };
+    if (model_.loads) line.push_back(&load_);
+    return line;
 }
 
 void OscPanel::faceShown() {
-    for (juce::Component* c : std::initializer_list<juce::Component*> { &load_, &vari_, &playback_, &sync_ })
-        c->setVisible(face() == kPcm);
+    for (juce::Component* c : pcmLine())
+        c->setVisible(face() == model_.pcm);
 }
 
 void OscPanel::refresh() {
@@ -79,8 +100,15 @@ void OscPanel::refresh() {
         input_ = input;
         repaint(display_);
     }
-    if (face() == kPcm) refreshWave();
-    else if (face() != kExtIn) refreshCycles();   // EXT IN draws its words, no cycles
+    if (face() == model_.pcm && model_.loads) refreshWave();
+    else if (face() != model_.extIn && face() != model_.pcm && face() != model_.vocoder) refreshCycles();
+    if (!model_.draw) return;
+    juce::String now;   // a mode's own drawing: its face's knobs as they stand
+    now << face();
+    for (const auto& k : knobs_[(size_t)juce::jmax(0, face())]) now << '|' << k->dial().getValue();
+    if (now == shown_) return;
+    shown_ = now;
+    repaint(display_);
 }
 
 // A PCM OSC's picture: the processor's newest view of its wave and the loop's span, repainted only when either moved
@@ -100,7 +128,7 @@ void OscPanel::refreshWave() {
 
 // An analog OSC's picture: the oscillator's own cycles, made again only when a setting it reads has moved
 void OscPanel::refreshCycles() {
-    const WaveDisplay::AnalogSettings now = WaveDisplay::analogSettings(processor_.currentControls(), osc_);
+    const WaveDisplay::AnalogSettings now = model_.analog(osc_);
     if (!cycles_.empty() && now == drawn_) return;
     drawn_ = now;
     cycles_ = WaveDisplay::analogCycles(now);
@@ -132,19 +160,23 @@ void OscPanel::resized() {
     sync_.setBounds(status.removeFromLeft(64));
 }
 
-// A PCM OSC: its wave, the loop's span shaded, its name over it; an analog OSC: the oscillator's own cycles (v200);
 // EXT IN: the outside input by External In Type (v206), and why it's silent if there's none (v207)
+void OscPanel::paintExtIn(juce::Graphics& g) const {
+    const juce::String type = Controls::currentText(processor_.apvts, model_.extInType);
+    auto lines = display_.reduced(10, 6);
+    Ui::drawText(g, "External input, " + type, lines.removeFromTop(16), { Look::sans(11.0f), Look::label });
+    Ui::drawText(g, noInputWord(), lines.removeFromTop(16), { Look::sans(11.0f), Look::warning });
+    if (model_.draw) model_.draw(g, lines, osc_, face());
+}
+
+// A PCM OSC: its wave, the loop's span shaded, its name over it; an analog OSC: the oscillator's own cycles (v200);
+// EXT IN its words; what a mode draws itself (the VC-2's PCM and VOCODER, v453)
 void OscPanel::paintDisplay(juce::Graphics& g) const {
     Ui::fillRounded(g, display_.toFloat(), Look::field, 6.0f);
-    if (face() == kExtIn) {
-        const auto* type = processor_.apvts.getParameter("fxExtInType");
-        const juce::String text = "External input, " + (type ? type->getCurrentValueAsText() : juce::String());
-        auto lines = display_.reduced(10, 6);
-        Ui::drawText(g, text, lines.removeFromTop(16), { Look::sans(11.0f), Look::label });
-        Ui::drawText(g, noInputWord(), lines.removeFromTop(16), { Look::sans(11.0f), Look::warning });
-        return;
-    }
-    if (face() != kPcm) {
+    if (face() == model_.extIn) return paintExtIn(g);
+    if (model_.draw && (face() == model_.vocoder || (face() == model_.pcm && !model_.loads)))
+        return model_.draw(g, display_.reduced(10, 6), osc_, face());
+    if (face() != model_.pcm) {
         WaveDisplay::paintCycles(g, display_.reduced(10, 14).toFloat(), cycles_);
         return;
     }

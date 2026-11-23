@@ -35,10 +35,48 @@ auto secondPartWords(Vc2OscConvertTables& t) {
     });
 }
 
+// [FW] EXTIN's converter's and its formant law's (v393)
+auto extinWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939edf8, &t.extinGainScale }, { 0x8939edec, &t.extinVelocityScale }, { 0x8939edc4, &t.extinDepthTop },
+        { 0x8939c59c, &t.formantStep }, { 0x8939c560, &t.formantCents }, { 0x8939c56c, &t.formantMost },
+        { 0x8939c568, &t.formantDepth },
+    });
+}
+constexpr uint32_t kFormantRowsAt = 0x8993d0c8;   // [FW] .data, as C startup leaves it
+
+// [FW] PCM's converter's and its Time and Formant laws' (v394)
+auto pcmWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939e4b4, &t.pcmDepthTop }, { 0x8939e4dc, &t.pcmVelocityScale }, { 0x8939e8d8, &t.pcmGainScale },
+        { 0x8939e724, &t.depthKnee }, { 0x8939e728, &t.depthOffset }, { 0x8939e72c, &t.depthPer },
+        { 0x8939e730, &t.depthKneeLow }, { 0x8939e734, &t.depthSlopeLow }, { 0x8939e738, &t.depthPerLow },
+        { 0x8939e73c, &t.depthScale }, { 0x8939c570, &t.timeLeast }, { 0x8939c574, &t.timeKnee },
+        { 0x8939c578, &t.timeKneeLow }, { 0x8939c57c, &t.timeScale }, { 0x8939c580, &t.timeFromLow },
+        { 0x8939c584, &t.timeLeastOut }, { 0x8939c588, &t.timeFrom }, { 0x8939c58c, &t.timeMostOut },
+        { 0x8939c590, &t.timeBeam }, { 0x8939c594, &t.pcmFormantLeast },
+    });
+}
+
+// [FW] what PCM's converter calls by the wave's type: LITE's words' (v395) and VariPhrase's (v396)
+auto wavePoolWords(Vc2OscConvertTables& t) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x8939f2dc, &t.lite.tenth }, { 0x8939f2e0, &t.lite.most }, { 0x8939f2e4, &t.lite.least },
+        { 0x8939f8d0, &t.variA4.tenth }, { 0x8939f8d8, &t.variA4.most }, { 0x8939f8dc, &t.variA4.least },
+        { 0x8939f8d0, &t.variRoot.tenth }, { 0x8939f8d8, &t.variRoot.most }, { 0x8939fb78, &t.variRoot.least },
+        { 0x8939fb7c, &t.variRootOther.tenth }, { 0x8939fb80, &t.variRootOther.most },
+        { 0x8939fb78, &t.variRootOther.least }, { 0x8939fb88, &t.variLevel },
+    });
+}
+
 struct Read : Vc2OscConvertTables {
     bool read(Sh4& image) {
         vc2ReadPool(image, convertWords(*this));
         vc2ReadPool(image, secondPartWords(*this));
+        vc2ReadPool(image, extinWords(*this));
+        vc2ReadPool(image, pcmWords(*this));
+        vc2ReadPool(image, wavePoolWords(*this));
+        image.read(kFormantRowsAt, formantRows.data(), sizeof formantRows);
         detune[0].slope = 1.0f;   // [FW] 0x8939c744: the first line is x itself (+ fldi0's 0)
         detune[1].slope = 2.0f;   // [FW] 0x8939c75a: fldi1, doubled
         for (uint32_t i = 0; i < cents.size(); ++i) cents[i] = image.rd8(kCentsAt + i);

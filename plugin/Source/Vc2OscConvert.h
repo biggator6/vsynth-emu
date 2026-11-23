@@ -55,6 +55,13 @@ float vc2OscHeld(float v, float least, float most);
 float vc2OscOnLines(float x, std::span<const Vc2OscCentsLine> lines);
 // A depth −63…+63 as the converters square it: (d/63)·|d/63|
 float vc2OscDepthSquared(int depth, const Vc2OscConvertTables& t);
+// The key follow's sum about a centre key, tenths of a cent before the fine (0x8939c8a0, rom.2's 0x894e1250's law):
+// (centre + coarse) × 1000 + (key − centre) × KF, as rom.4's registers hold it; rom.4 forms KF 0 and 1000 (100%)
+// without the product, the same integer.  v251's part gives it 60; VariPhrase's words (v396) EVENT's centre too
+uint32_t vc2OscKeySum(int key, int coarse, int kf, int centre);
+// 0x8939c910: the key Pitch KF gives about the centre, the sum rounded up a key (C's division by 1000), within 0…127;
+// at KF 0 and 1000 rom.4 takes the key without the rounding, the same key once held
+uint8_t vc2OscFollowedKey(int key, int coarse, int kf, int centre);
 
 // The block's words the part writes (the block the voice + 0x54, rom.4's layout from +0); `wordNN` a word it leaves
 struct Vc2OscBlockHead {

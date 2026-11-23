@@ -20,16 +20,21 @@ XtArpSettings xtArpSettingsOf(const std::vector<uint8_t>& store) {
 }
 
 // The pattern as 0x8930ca30 lays it out: a line's State and Note/CC, then its 32 steps
-XtArpPattern xtArpPatternOf(const std::vector<uint8_t>& store) {
+XtArpPattern xtArpPatternRead(const std::function<int(int id, int line)>& value, int state, int note, int step1) {
     XtArpPattern p;
     for (int l = 0; l < XtArpPattern::kLines; ++l) {
-        const bool ctrl = (xtPatchValue(store, kState, l) & 1) != 0;
-        const int n = xtPatchValue(store, kNote, l) & kNoteBits;
+        const bool ctrl = (value(state, l) & 1) != 0;
+        const int n = value(note, l) & kNoteBits;
         p.line[l] = (uint8_t)(ctrl ? kCtrl | std::min(n, kXtArpCtrlMost) : n);
         for (int s = 0; s < XtArpPattern::kSteps; ++s)
-            p.cell[s][l] = (uint8_t)xtPatchValue(store, kStep1 + kStepIds * s, l);
+            p.cell[s][l] = (uint8_t)value(step1 + kStepIds * s, l);
     }
     return p;
+}
+
+XtArpPattern xtArpPatternOf(const std::vector<uint8_t>& store) {
+    const auto read = [&store](int id, int line) { return xtPatchValue(store, id, line); };
+    return xtArpPatternRead(read, kState, kNote, kStep1);
 }
 
 XtPatchIds xtArpPatchIds(XtPatchIds p, const XtArpSettings& s, const XtArpPattern& pat) {

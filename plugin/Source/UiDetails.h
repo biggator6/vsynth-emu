@@ -20,7 +20,7 @@ private:
     Controls::State& state_;
     juce::String typeId_;
     std::vector<std::unique_ptr<ControlGrid>> faces_;
-    juce::Label none_;
+    juce::Label none_, faint_;
     int face_ = -1;
     void show(int face);
 };

@@ -137,12 +137,12 @@ env-top|kNoteFrom = 128, kTop = 127;|kNoteFrom = 128, kTop = 126;|vc2setenvelope
 env-centre-key|kCentreKey = 60|kCentreKey = 61|vc2setenvelope
 env-centre-velocity|kCentreVelocity = 64|kCentreVelocity = 63|vc2setenvelope
 env-ticks|kTicksTimes = 24|kTicksTimes = 25|vc2setenvelope
-env-internal|kInternalScale = 30000|kInternalScale = 15000|vc2setenvelope
-env-outside|kOutsideScale = 150000|kOutsideScale = 75000|vc2setenvelope
-env-slowest|kSlowest = 200|kSlowest = 199|vc2setenvelope
-env-fastest|kFastest = 2500|kFastest = 2501|vc2setenvelope
-env-slow-held|kSlowHeld = 20|kSlowHeld = 21|vc2setenvelope
-env-fast-held|kFastHeld = 250|kFastHeld = 251|vc2setenvelope
+env-internal|kInternalScale = 30000|kInternalScale = 15000|vc2setchildhead
+env-outside|kOutsideScale = 150000|kOutsideScale = 75000|vc2setchildhead
+env-slowest|kSlowest = 200|kSlowest = 199|vc2setchildhead
+env-fastest|kFastest = 2500|kFastest = 2501|vc2setchildhead
+env-slow-held|kSlowHeld = 20|kSlowHeld = 21|vc2setchildhead
+env-fast-held|kFastHeld = 250|kFastHeld = 251|vc2setchildhead
 env-depth-scale|kDepthScale = 256000|kDepthScale = 128000|vc2setenvelope
 env-magic|kMagic = 0x51eb851f|kMagic = 0x28f5c28f|vc2setenvelope
 env-magic-shift|kMagicShift = 11|kMagicShift = 10|vc2setenvelope
@@ -181,9 +181,9 @@ decay-sens|curveTime(value, w.velocity, w.decaySens, w.factor)|curveTime(value, 
 stage-attack|matrixTime(w.attack, w.matrix, w.index, 0, reads)|matrixTime(w.attack, w.matrix, w.index, 1, reads)|vc2setenvelope
 stage-decay|matrixTime(w.decay, w.matrix, w.index, 1, reads)|matrixTime(w.decay, w.matrix, w.index, 0, reads)|vc2setenvelope
 stage-release|matrixTime(w.release, w.matrix, w.index, 2, reads)|matrixTime(w.release, w.matrix, w.index, 1, reads)|vc2setenvelope
-tempo-external|c.external == 0|c.external == 1|vc2setenvelope
-tempo-held-low|t < kSlowest ? kSlowHeld|t <= kSlowest ? kSlowHeld|vc2setenvelope
-tempo-held-high|t > kFastest ? kFastHeld|t >= kFastest ? kFastHeld|vc2setenvelope
+tempo-external|c.external == 0|c.external == 1|vc2setchildhead
+tempo-held-low|t < kSlowest ? kSlowHeld|t <= kSlowest ? kSlowHeld|vc2setchildhead
+tempo-held-high|t > kFastest ? kFastHeld|t >= kFastest ? kFastHeld|vc2setchildhead
 block-type|    block[0] = type;|    block[0] = 0;|vc2setenvelope
 block-one|block[1] = floatWord(kOne);|block[1] = floatWord(kZero);|vc2setenvelope
 block-two|    block[2] = 0;\n|\n|vc2setenvelope
@@ -203,8 +203,8 @@ make-release-velocity|w.releaseVelocity = kCentreVelocity;|w.releaseVelocity = 0
 make-part|    vc2ChildPart(vc2ChildBytes(w), &Vc2SetReads::envelopeOf, c.call, reads);\n|\n|vc2setenvelope
 make-made|    vc2ChildMade(vc2ChildBytes(w), c, reads);\n|\n|vc2setenvelope
 make-words|&Vc2SetReads::envelopeOf, c.call|&Vc2SetReads::lfoOf, c.call|vc2setenvelope
-make-tempo|    w.tempo = tempoOf(reads.clock());\n|\n|vc2setenvelope
-make-block|    w.tempo = tempoOf(reads.clock());\n    blockOf(w, block, reads);|    w.tempo = tempoOf(reads.clock());|vc2setenvelope
+make-tempo|    w.tempo = vc2SetTempo(reads.clock());\n|\n|vc2setenvelope
+make-block|    w.tempo = vc2SetTempo(reads.clock());\n    blockOf(w, block, reads);|    w.tempo = vc2SetTempo(reads.clock());|vc2setenvelope
 release-store|w.releaseVelocity = static_cast<uint8_t>(velocity);|w.releaseVelocity = 64;|vc2setenvelope
 release-on|block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|block[8] = floatWord(w.on == 0 ? releaseTime(w, envelopeTables().releaseScale|vc2setenvelope
 release-word|block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|block[7] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale|vc2setenvelope
@@ -387,3 +387,679 @@ tva-make-block|madeByKind(c, reads);\n    velocityLevelOf(w, reads);\n    blockO
 tva-convert-voice|    vc2ChildVoice(&w.key, call, reads);\n|\n|vc2settva
 tva-convert-level|call, reads);\n    velocityLevelOf(w, reads);|call, reads);|vc2settva
 tva-convert-block|call, reads);\n    velocityLevelOf(w, reads);\n    blockOf(w, block, reads);|call, reads);\n    velocityLevelOf(w, reads);|vc2settva
+# The COSM inputs (vc2setcosminput, Vc2SetCosmInput.cpp, v390), not planted: the constructor's index word for its byte
+# (the sets' parts draw it below 16, so the two are one), and what Vc2SetCosmInput.h holds (the pool's place, two a
+# voice, the voice's bytes at +2).
+cosm-reader-which|kReaders[second ? 1 : 0]|kReaders[second ? 0 : 1]|vc2setcosminput
+cosm-reader-first|{ 0x893a2960, 0x893a2aa0 }|{ 0x893a2aa0, 0x893a2aa0 }|vc2setcosminput
+cosm-reader-second|{ 0x893a2960, 0x893a2aa0 }|{ 0x893a2960, 0x893a2960 }|vc2setcosminput
+cosm-reader-matrix|kReaders[second ? 1 : 0], matrix);|kReaders[second ? 1 : 0], matrix + 4);|vc2setcosminput
+cosm-types-type|vc2CosmPortedConvert(type, in, block|vc2CosmPortedConvert(type + 1, in, block|vc2setcosminput
+cosm-types-none|        (void)vc2CosmPortedConvert(type, in, block, matrix_, shared_);\n|\n|vc2setcosminput
+cosm-made-head|    vc2ChildMade(bytes, c, reads);\n|\n|vc2setcosminput
+cosm-made-matrix|    w.matrix = c.matrix;\n|\n|vc2setcosminput
+cosm-made-matrix-which|w.matrix = c.matrix;|w.matrix = c.object;|vc2setcosminput
+cosm-made-part|    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, reads), c.kind, c.index));\n|\n|vc2setcosminput
+cosm-made-kind-byte|reads), c.kind, c.index));|reads), bytes[0], c.index));|vc2setcosminput
+cosm-made-swap|reads), c.kind, c.index));|reads), c.index, c.kind));|vc2setcosminput
+cosm-made-part-which|reads.cosmInputOf(vc2CallsPart(c.call, reads),|reads.cosmInputOf(0,|vc2setcosminput
+cosm-made-block|c.index));\n    blockOf(w, block, reads);|c.index));|vc2setcosminput
+cosm-made-order|    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, reads), c.kind, c.index));\n    blockOf(w, block, reads);|    blockOf(w, block, reads);\n    vc2PartWords(bytes, reads.cosmInputOf(vc2CallsPart(c.call, reads), c.kind, c.index));|vc2setcosminput
+# The OSC blocks (vc2setoscblock, Vc2SetOscBlock.cpp, and vc2setosckinds, Vc2SetOscKinds.cpp, v391), not planted: what
+# Vc2SetOscBlock.h holds (the pool's place, two a voice, the seed's start); the frame's two 63s for the converters'
+# (0x8939fd64 and 0x8939c2c0 hold the same as 0x8939d31c); PCM's start and the PCM and EXTIN converters (not ported);
+# the start key's low hold at 1 for 0 (both give 0 there).
+osc-seed-times|kSeedTimes = 18813;|kSeedTimes = 18812;|vc2setoscblock
+osc-seed-one|static_cast<uint32_t>(seed) * kSeedTimes + 1u;|static_cast<uint32_t>(seed) * kSeedTimes;|vc2setoscblock
+osc-seed-kept|    seed = static_cast<uint16_t>(next);\n|\n|vc2setoscblock
+osc-seed-none|    if (depth == 0) return 0;\n|\n|vc2setoscblock
+osc-random-signed|static_cast<int32_t>(static_cast<int16_t>(next))|static_cast<int32_t>(static_cast<uint16_t>(next))|vc2setoscblock
+osc-random-double|return static_cast<int16_t>((product << 1) >> 16);|return static_cast<int16_t>(product >> 16);|vc2setoscblock
+osc-random-half|return static_cast<int16_t>((product << 1) >> 16);|return static_cast<int32_t>((product << 1) >> 16);|vc2setoscblock
+osc-key-top|kKeyTop = 127;|kKeyTop = 126;|vc2setoscblock
+osc-pedal|kPedalDown = 64;|kPedalDown = 65;|vc2setoscblock
+osc-legato-on|kLegatoOn = 1;|kLegatoOn = 2;|vc2setoscblock
+osc-octave|kOctave = 12;|kOctave = 11;|vc2setoscblock
+osc-shift-at|kKeyShiftAt = 0, kCoarseAt = 1|kKeyShiftAt = 3, kCoarseAt = 1|vc2setoscblock
+osc-coarse-at|kCoarseAt = 1, kFineAt = 2|kCoarseAt = 0, kFineAt = 2|vc2setoscblock
+osc-fine-at|kFineAt = 2, kMonoAt = 4|kFineAt = 4, kMonoAt = 4|vc2setoscblock
+osc-mono-at|kMonoAt = 4, kLegatoAt = 5|kMonoAt = 5, kLegatoAt = 5|vc2setoscblock
+osc-legato-at|kLegatoAt = 5, kScaleAt = 6|kLegatoAt = 4, kScaleAt = 6|vc2setoscblock
+osc-scale-at|kScaleAt = 6;|kScaleAt = 8;|vc2setoscblock
+osc-systems-fine|kSystemsFineAt = 0, kSystemsCoarseAt = 2|kSystemsFineAt = 2, kSystemsCoarseAt = 2|vc2setoscblock
+osc-systems-coarse|kSystemsCoarseAt = 2;|kSystemsCoarseAt = 3;|vc2setoscblock
+osc-record-coarse|kRecordCoarseAt = 0x0e|kRecordCoarseAt = 0x0f|vc2setoscblock
+osc-record-fine|kRecordFineAt = 0x10|kRecordFineAt = 0x12|vc2setoscblock
+osc-random-at|kRandomAt = 0x12|kRandomAt = 0x10|vc2setoscblock
+osc-refresh-type|kTypeAt = 1;|kTypeAt = 0;|vc2setoscblock
+osc-refresh-wave|kWaveformAt = 0x20|kWaveformAt = 0x21|vc2setoscblock
+osc-refresh-number|kWaveNumberAt = 0x3c|kWaveNumberAt = 0x3e|vc2setoscblock
+osc-refresh-byte|kWaveByteAt = 0x5c|kWaveByteAt = 0x5d|vc2setoscblock
+osc-refresh-byte-two|kWaveByteTwoAt = 0x59|kWaveByteTwoAt = 0x58|vc2setoscblock
+osc-refresh-moved|    if (type != now[kTypeAt]) return 1;\n|\n|vc2setoscblock
+osc-refresh-analog|return w.record[kWaveformAt] != now[kWaveformAt];|return 0;|vc2setoscblock
+osc-refresh-pcm|if (type != kPcmType) return 0;|if (type != kPcmType) return 1;|vc2setoscblock
+osc-refresh-number-test|s16(w.record.data(), kWaveNumberAt) == s16(now.data(), kWaveNumberAt) &&|true &&|vc2setoscblock
+osc-refresh-byte-test|w.record[kWaveByteAt] == now[kWaveByteAt] && |true && |vc2setoscblock
+osc-refresh-byte-two-test|w.record[kWaveByteTwoAt] == now[kWaveByteTwoAt];|true;|vc2setoscblock
+osc-coarse-systems|s8(sys.data(), kSystemsCoarseAt) + s8(h.data()|s8(h.data()|vc2setoscblock
+osc-coarse-signed|int8_t s8(const uint8_t* b, uint32_t at) { return static_cast<int8_t>(b[at]); }|int8_t s8(const uint8_t* b, uint32_t at) { return static_cast<int8_t>(b[at] & 0x7f); }|vc2setoscblock
+osc-fine-scale|s16(h.data(), kScaleAt + 2 * (w.key % kOctave))|s16(h.data(), kScaleAt + 2 * (w.velocity % kOctave))|vc2setoscblock
+osc-fine-systems|    sum += static_cast<uint32_t>(s16(sys.data(), kSystemsFineAt));\n|\n|vc2setoscblock
+osc-fine-part|    sum += static_cast<uint32_t>(s16(h.data(), kFineAt));\n|\n|vc2setoscblock
+osc-fine-record|    sum += static_cast<uint32_t>(s16(w.record.data(), kRecordFineAt));\n|\n|vc2setoscblock
+osc-fine-bend|    sum += static_cast<uint32_t>(reads.matrixBend(w.matrix));\n|\n|vc2setoscblock
+osc-fine-random|    sum += static_cast<uint32_t>(random);\n|\n|vc2setoscblock
+osc-fine-half|int16_t v;\n    std::memcpy(&v, b + at, sizeof v);|int16_t v = static_cast<int8_t>(b[at]);|vc2setoscblock
+osc-tunes-random|w.random = randomOf(s16(w.record.data(), kRandomAt), seed);|w.random = 0;|vc2setoscblock
+osc-held-high|k > kKeyTop ? kKeyTop : k|k >= kKeyTop ? 0 : k|vc2setoscblock
+osc-start-poly-held|legato && g.prevPolyHeld == 0 && reads.holdOf|legato && reads.holdOf|vc2setoscblock
+osc-start-pedal|reads.holdOf(g.table) < kPedalDown|reads.holdOf(g.table) <= kPedalDown|vc2setoscblock
+osc-start-poly-key|own ? w.key : g.prevPoly + shift|own ? w.key : g.prevMono + shift|vc2setoscblock
+osc-start-mono-held|legato && g.prevMonoHeld == 0 ? w.key|g.prevMonoHeld == 0 ? w.key|vc2setoscblock
+osc-start-mono-key|w.key : g.prevMono + shift);\n}|w.key : g.prevPoly + shift);\n}|vc2setoscblock
+osc-start-mono-test|if (h[kMonoAt] == 0) {|if (h[kMonoAt] != 1) {|vc2setoscblock
+osc-start-convert|return startKeyHeld(reads.glideAt(v.source).prevMono + s8(h.data(), kKeyShiftAt));|return startKeyHeld(reads.glideAt(v.source).prevPoly + s8(h.data(), kKeyShiftAt));|vc2setoscblock
+osc-start-shift|return startKeyHeld(reads.glideAt(v.source).prevMono + s8(h.data(), kKeyShiftAt));|return startKeyHeld(reads.glideAt(v.source).prevMono);|vc2setoscblock
+osc-voice-key|    w.key = v.key;|    w.key = v.byte42;|vc2setoscblock
+osc-voice-velocity|    w.velocity = v.byte43;|    w.velocity = v.key;|vc2setoscblock
+osc-made-matrix|    w.matrix = c.matrix;\n|\n|vc2setoscblock
+osc-made-kind|w.kind = static_cast<uint8_t>(c.kind);|w.kind = static_cast<uint8_t>(c.index);|vc2setoscblock
+osc-made-osc|w.osc = static_cast<uint8_t>(c.index);|w.osc = static_cast<uint8_t>(c.kind);|vc2setoscblock
+osc-made-legato-key|w.legatoKey = legato[1];|w.legatoKey = legato[0];|vc2setoscblock
+osc-made-legato|w.legato = legato[0];|w.legato = legato[1];|vc2setoscblock
+osc-made-step|    w.step = step;\n|\n|vc2setoscblock
+osc-made-count|    step = static_cast<uint16_t>(step + 1);\n|\n|vc2setoscblock
+osc-made-step-which|reads.oscStep(part, w.kind, w.osc);|reads.oscStep(part, w.osc, w.kind);|vc2setoscblock
+osc-made-part|    w.part = static_cast<uint8_t>(part);\n|\n|vc2setoscblock
+osc-made-start|    w.startKey = madeStartKey(w, h, v, reads);\n|\n|vc2setoscblock
+osc-made-dispatch|    vc2SetOscStart(w, block, reads);\n    vc2SetOscConvert|    vc2SetOscConvert|vc2setoscblock
+osc-made-convert|    vc2SetOscStart(w, block, reads);\n    vc2SetOscConvert(w, block, reads);|    vc2SetOscStart(w, block, reads);|vc2setoscblock
+osc-record-which|w.record = reads.oscRecord(part, w.kind, w.osc);|w.record = reads.oscRecord(part, w.osc, w.kind);|vc2setoscblock
+osc-convert-voice|    voiceBytes(w, v);\n    const Header h = reads.oscHeader(reads.firstByte(v.part));|    const Header h = reads.oscHeader(reads.firstByte(v.part));|vc2setoscblock
+osc-convert-part|reads.oscHeader(reads.firstByte(v.part));|reads.oscHeader(w.part);|vc2setoscblock
+osc-convert-tunes|    tunesDrawn(w, h, seed.value, reads);\n    w.startKey = startKey|    w.startKey = startKey|vc2setoscblock
+osc-convert-start|    w.startKey = startKey(h, v, reads);\n|\n|vc2setoscblock
+osc-convert-converter|    w.startKey = startKey(h, v, reads);\n    vc2SetOscConvert(w, block, reads);|    w.startKey = startKey(h, v, reads);|vc2setoscblock
+osc-update-record|    recordOf(w, part, reads);\n    const Header h = reads.oscHeader(part);\n    const Systems|    const Header h = reads.oscHeader(part);\n    const Systems|vc2setoscblock
+osc-update-coarse|    coarseOf(w, h, sys);\n    fineOf(w, h, sys, w.random, reads);|    fineOf(w, h, sys, w.random, reads);|vc2setoscblock
+osc-update-random|    coarseOf(w, h, sys);\n    fineOf(w, h, sys, w.random, reads);|    coarseOf(w, h, sys);\n    fineOf(w, h, sys, 0, reads);|vc2setoscblock
+osc-copy-none|    vc2SetOscConvert(at(object), block, reads);\n|\n|vc2setoscblock
+osc-kinds-analog|kAnalogKind = 3,|kAnalogKind = 2,|vc2setosckinds
+osc-kinds-extin|kExtinKind = 4,|kExtinKind = 3,|vc2setosckinds
+osc-kinds-vocoder|kVocoderKind = 5;|kVocoderKind = 6;|vc2setosckinds
+osc-kinds-switch|kSwitchAt = 0, kTypeAt = 1;|kSwitchAt = 2, kTypeAt = 1;|vc2setosckinds
+osc-kinds-type|kSwitchAt = 0, kTypeAt = 1;|kSwitchAt = 0, kTypeAt = 0;|vc2setosckinds
+osc-kinds-vibrato-type|kVibratoTypeAt = 0x1c,|kVibratoTypeAt = 0x1d,|vc2setosckinds
+osc-kinds-rate-at|kRateAt = 0x1d,|kRateAt = 0x1c,|vc2setosckinds
+osc-kinds-depth-at|kDepthAt = 0x1e;|kDepthAt = 0x1f;|vc2setosckinds
+osc-kinds-tempo-at|kTempoAt = 0x60 / 4,|kTempoAt = 0x5c / 4,|vc2setosckinds
+osc-kinds-flag-at|kFlagAt = 0x64 / 4,|kFlagAt = 0x6c / 4,|vc2setosckinds
+osc-kinds-zeros-at|kZerosAt = 0x68 / 4,|kZerosAt = 0x6c / 4,|vc2setosckinds
+osc-kinds-ones-at|kOnesAt = 0x70 / 4, kOnes = 4;|kOnesAt = 0x70 / 4, kOnes = 3;|vc2setosckinds
+osc-kinds-vibrato-at|kVibratoAt = 0x80 / 4,|kVibratoAt = 0x84 / 4,|vc2setosckinds
+osc-kinds-words-at|kKindWordsAt = 0xb0 / 4;|kKindWordsAt = 0xb4 / 4;|vc2setosckinds
+osc-kinds-rate-word|kRateWord = 1,|kRateWord = 2,|vc2setosckinds
+osc-kinds-copied|kCopiedWord = 2, kCopied = 5,|kCopiedWord = 2, kCopied = 4,|vc2setosckinds
+osc-kinds-fall|kFallWord = 7,|kFallWord = 6,|vc2setosckinds
+osc-kinds-ratio|kRatioWord = 8,|kRatioWord = 7,|vc2setosckinds
+osc-kinds-scale-word|kScaleWord = 9;|kScaleWord = 10;|vc2setosckinds
+osc-kinds-depth-word|kDepthWord = 10,|kDepthWord = 11,|vc2setosckinds
+osc-kinds-level-word|kLevelWord = 11,|kLevelWord = 10,|vc2setosckinds
+osc-kinds-row-copied|kRowCopiedAt = 6,|kRowCopiedAt = 7,|vc2setosckinds
+osc-kinds-row-level|kRowLevelAt = 19;|kRowLevelAt = 18;|vc2setosckinds
+osc-kinds-rate-from|kRateFrom = 2.0f;|kRateFrom = 1.0f;|vc2setosckinds
+osc-kinds-lfo-pitch|kLfoPitch = 1;|kLfoPitch = 0;|vc2setosckinds
+osc-kinds-depth-top|kDepthTop = 63;|kDepthTop = 62;|vc2setosckinds
+osc-kinds-beam|kBeamAt = 10, kWidthBeamAt = 8;|kBeamAt = 11, kWidthBeamAt = 8;|vc2setosckinds
+osc-kinds-width-beam|kBeamAt = 10, kWidthBeamAt = 8;|kBeamAt = 10, kWidthBeamAt = 9;|vc2setosckinds
+osc-kinds-system|kSystemAt = 5,|kSystemAt = 6,|vc2setosckinds
+osc-kinds-saw-slope|kSawSlopeAt = 0xa,|kSawSlopeAt = 0xc,|vc2setosckinds
+osc-kinds-square-slope|kSquareSlopeAt = 0xc,|kSquareSlopeAt = 0xa,|vc2setosckinds
+osc-kinds-calibration|kCalibrationAt = 0xe;|kCalibrationAt = 0xd;|vc2setosckinds
+osc-start-kind|    block[0] = kind;\n|\n|vc2setosckinds
+osc-start-zero|    block[kZerosAt] = floatWord(0.0f);\n|\n|vc2setosckinds
+osc-start-zero-two|    block[kZerosAt + 1] = floatWord(0.0f);\n|\n|vc2setosckinds
+osc-start-ones|block[kOnesAt + k] = floatWord(1.0f);|block[kOnesAt + k] = floatWord(0.5f);|vc2setosckinds
+osc-start-tempo|xtf::div(flt(static_cast<int32_t>(vc2SetTempo(reads.clock()))), perTenth)|flt(static_cast<int32_t>(vc2SetTempo(reads.clock())))|vc2setosckinds
+osc-start-flag|    block[kFlagAt] = 0;\n|\n|vc2setosckinds
+osc-start-off|        block[0] = 0;\n        return;|        return;|vc2setosckinds
+osc-start-off-test|if (in.record[kSwitchAt] == 0) {|if (in.record[kSwitchAt] == 1) {|vc2setosckinds
+osc-start-pcm|    kindStart(block, 0, setTables().pcmTenth, reads);\n|\n|vc2setosckinds
+osc-start-extin-tenth|kindStart(block, kExtinKind, setTables().extinTenth, reads);|kindStart(block, kExtinKind, setTables().vibratoRate, reads);|vc2setosckinds
+osc-start-analog-tenth|kindStart(block, kAnalogKind, vc2OscConvertTables().perTenth, reads);|kindStart(block, kAnalogKind, setTables().extinTenth + 1.0f, reads);|vc2setosckinds
+osc-convert-none|    if (block[0] == 0) return;\n|\n|vc2setosckinds
+osc-convert-vibrato|    vibratoOf(in, block, reads);\n|\n|vc2setosckinds
+osc-vibrato-wave|    v[0] = row[0];\n|\n|vc2setosckinds
+osc-vibrato-copied|v[kCopiedWord + k] = row[kRowCopiedAt + 2 * k];|v[kCopiedWord + k] = row[kRowCopiedAt + k];|vc2setosckinds
+osc-vibrato-fall|v[kFallWord] = floatWord(0.0f);|v[kFallWord] = floatWord(1.0f);|vc2setosckinds
+osc-vibrato-ratio|v[kRatioWord] = floatWord(1.0f);|v[kRatioWord] = floatWord(0.0f);|vc2setosckinds
+osc-vibrato-scale|v[kScaleWord] = in.velocity >> 1;|v[kScaleWord] = in.velocity;|vc2setosckinds
+osc-vibrato-rate-fmac|add(mul(flt(in.record[kRateAt]), setTables().vibratoRate), kRateFrom)|mul(add(flt(in.record[kRateAt]), kRateFrom), setTables().vibratoRate)|vc2setosckinds
+osc-vibrato-rate-signed|flt(in.record[kRateAt])|flt(static_cast<int8_t>(in.record[kRateAt]))|vc2setosckinds
+osc-vibrato-depth-signed|const int16_t depth = static_cast<int8_t>(in.record[kDepthAt]);|const int16_t depth = in.record[kDepthAt];|vc2setosckinds
+osc-vibrato-depth-sum|vc2OscHeld(depth + sum, -kDepthTop, kDepthTop), vc2OscConvertTables());\n    v[kDepthWord]|vc2OscHeld(depth, -kDepthTop, kDepthTop), vc2OscConvertTables());\n    v[kDepthWord]|vc2setosckinds
+osc-vibrato-depth-scale|floatWord(mul(squared, setTables().vibratoDepth));|floatWord(squared);|vc2setosckinds
+osc-vibrato-level-sum|levelDepth(depth, again, |levelDepth(depth, 0, |vc2setosckinds
+osc-vibrato-level-scale|std::bit_cast<float>(row[kRowLevelAt])|1.0f|vc2setosckinds
+osc-vibrato-osc|reads.oscGroups(in.matrix, in.osc).lfo[kLfoPitch];\n    const float|reads.oscGroups(in.matrix, in.osc ^ 1).lfo[kLfoPitch];\n    const float|vc2setosckinds
+osc-level-held|return vc2OscHeld(mul(d, scale), -1.0f, 1.0f);|return mul(d, scale);|vc2setosckinds
+osc-level-low|vc2OscHeld(mul(d, scale), -1.0f, 1.0f)|vc2OscHeld(mul(d, scale), 0.0f, 1.0f)|vc2setosckinds
+osc-level-depth|vc2OscHeld(depth + sum, -kDepthTop, kDepthTop), vc2OscConvertTables());\n    return|vc2OscHeld(depth - sum, -kDepthTop, kDepthTop), vc2OscConvertTables());\n    return|vc2setosckinds
+osc-world-osc|w.sums = reads.oscGroups(in.matrix, in.osc);|w.sums = reads.oscGroups(in.matrix, 0);|vc2setosckinds
+osc-world-source|    w.pitchSource = reads.pitchSource();\n|\n|vc2setosckinds
+osc-world-saw-tone|a.sawTone = sys[kSystemAt];|a.sawTone = sys[kSystemAt + 1];|vc2setosckinds
+osc-world-square-tone|a.squareTone = sys[kSystemAt + 1];|a.squareTone = sys[kSystemAt];|vc2setosckinds
+osc-world-saw-kf|a.sawToneKf = sys[kSystemAt + 2];|a.sawToneKf = sys[kSystemAt + 3];|vc2setosckinds
+osc-world-square-kf|a.squareToneKf = sys[kSystemAt + 3];|a.squareToneKf = sys[kSystemAt + 2];|vc2setosckinds
+osc-world-calibration|std::memcpy(w.calibration.data(), sys.data() + kCalibrationAt, sizeof w.calibration);|std::memcpy(w.calibration.data(), sys.data() + kCalibrationAt, sizeof w.calibration - 4);|vc2setosckinds
+osc-ported-row|vocoder ? kVc2OscVocoderRow : vc2OscAnalogRow(input)|vc2OscAnalogRow(input)|vc2setosckinds
+osc-ported-head|onWords<Vc2OscBlockHead>(block, 0,|onWords<Vc2OscBlockHead>(block, 1,|vc2setosckinds
+osc-ways-pcm-start|{ { pcmStart, pcmConvert },|{ { extinStart, pcmConvert },|vc2setosckinds
+osc-ways-pcm-convert|{ { pcmStart, pcmConvert },|{ { pcmStart, extinConvert },|vc2setosckinds
+osc-ways-extin-start|{ extinStart, extinConvert },\n|{ analogStart, extinConvert },\n|vc2setosckinds
+osc-ways-extin-convert|{ extinStart, extinConvert },\n|{ extinStart, analogConvert },\n|vc2setosckinds
+osc-ways-vocoder-start|{ vocoderStart, vocoderConvert } } };|{ analogStart, vocoderConvert } } };|vc2setosckinds
+osc-ways-vocoder-convert|{ vocoderStart, vocoderConvert } } };|{ vocoderStart, analogConvert } } };|vc2setosckinds
+osc-ways-analog|kAnalogWays { analogStart, analogConvert };|kAnalogWays { analogStart, vocoderConvert };|vc2setosckinds
+osc-ways-less|in.record[kTypeAt] - 1u;|in.record[kTypeAt];|vc2setosckinds
+osc-start-vocoder|    analogStart(in, block, reads);\n    block[0] = kVocoderKind;|    analogStart(in, block, reads);|vc2setosckinds
+osc-ported-vocoder|portedConvert(in, block, true, reads); }|portedConvert(in, block, false, reads); }|vc2setosckinds
+osc-world-alias|a.aliasCancel = sys[kSystemAt + 4];|a.aliasCancel = 1;|vc2setosckinds
+# EXTIN's converter (vc2oscextin, Vc2OscExtinConvert.cpp, and its constants, vc2setoscconvtables, v393), not planted:
+# the block's key read unsigned (0x8939c910 holds it to 0…127), the formant's offset as a word (no row's offset takes a
+# halfword past its range).
+extin-gain|    head.gain = shared.pow(kTwo, div(flt(s8(input, kGainAt)), t.extinGainScale));\n|\n|vc2oscextin
+extin-gain-at|kGainAt = 0x0a,|kGainAt = 0x0b,|vc2oscextin
+extin-gain-two|constexpr float kTwo = 2.0f;|constexpr float kTwo = 2.5f;|vc2oscextin
+extin-system|x.system == 0 ? 1 : 0;|x.system == 0 ? 0 : 1;|vc2oscextin
+extin-header|if (x.header != 0) {|if (x.header == 0) {|vc2oscextin
+extin-held-kind|kHeldKind = 7;|kHeldKind = 6;|vc2oscextin
+extin-own-kind|kOwnKind = 6,|kOwnKind = 7,|vc2oscextin
+extin-kind-test|if (u8(input, kKindAt) == 0) block[0] = kHeldKind;|block[0] = kHeldKind;|vc2oscextin
+extin-kind-at|kKindAt = 1,|kKindAt = 3,|vc2oscextin
+extin-osc-at|kOscAt = 2,|kOscAt = 1,|vc2oscextin
+extin-velocity-at|kVelocityAt = 4,|kVelocityAt = 3,|vc2oscextin
+extin-formant-at|kFormantAt = 0x56,|kFormantAt = 0x57,|vc2oscextin
+extin-follow-at|kFollowAt = 0x58;|kFollowAt = 0x5a;|vc2oscextin
+extin-lfo-at|kFormantLfoAt = 0x5a,|kFormantLfoAt = 0x5b,|vc2oscextin
+extin-env-at|kFormantEnvAt = 0x5b,|kFormantEnvAt = 0x5a,|vc2oscextin
+extin-curve-at|kCurveAt = 0x5c,|kCurveAt = 0x5d,|vc2oscextin
+extin-sens-at|kSensAt = 0x5e,|kSensAt = 0x5c,|vc2oscextin
+extin-row-at|kRowAt = 0x66;|kRowAt = 0x67;|vc2oscextin
+extin-env-words|kEnvWords[2] = { 3, 7 };|kEnvWords[2] = { 7, 3 };|vc2oscextin
+extin-osc-formant|kOscFormant = 2,|kOscFormant = 1,|vc2oscextin
+extin-lfo-formant|kLfoFormant = 3;|kLfoFormant = 2;|vc2oscextin
+extin-level-index|kLevelIndex = 40;|kLevelIndex = 41;|vc2oscextin
+extin-last-row|kLastRow = 10;|kLastRow = 9;|vc2oscextin
+extin-key-byte|kKeyByte = 4,|kKeyByte = 5,|vc2oscextin
+extin-zero|    block[kZeroWord] = 0;\n|\n|vc2oscextin
+extin-env-velocity|mul(div(flt(s8(input, kFormantEnvAt)), t.extinDepthTop), velocity)|div(flt(s8(input, kFormantEnvAt)), t.extinDepthTop)|vc2oscextin
+extin-lfo-hold|-kDepthMost, kDepthMost);|-kDepthMost, kDepthMost + 1);|vc2oscextin
+extin-level-scale|div(flt(vc2OscLevelWord(t, kLevelIndex)), t.extinVelocityScale)|div(flt(vc2OscLevelWord(t, kLevelIndex)), t.extinDepthTop)|vc2oscextin
+extin-velocity-scale|const float velocity = div(flt(curve), t.extinVelocityScale);|const float velocity = div(flt(curve), t.extinDepthTop);|vc2oscextin
+extin-span-first|if (key < r[0]) return { r[0], r[1] };|if (key < r[0]) return { r[0], r[3] };|vc2oscextin
+extin-span-first-test|if (key < r[0]) return|if (key <= r[0]) return|vc2oscextin
+extin-span-second|if (key < r[2]) return { r[2], r[3] };|if (key < r[2]) return { r[0], r[3] };|vc2oscextin
+extin-span-third|if (key < r[4]) return { r[2], r[5] };|if (key < r[4]) return { r[4], r[5] };|vc2oscextin
+extin-span-third-offset|if (key < r[4]) return { r[2], r[5] };|if (key < r[4]) return { r[2], r[6] };|vc2oscextin
+extin-span-last|return { r[4], r[7] };|return { r[4], r[6] };|vc2oscextin
+extin-formant-step|t.formantStep),|t.formantCents),|vc2oscextin
+extin-formant-sum|t.formantDepth), flt(sum)), least,|t.formantDepth), flt(sum / 2)), least,|vc2oscextin
+extin-formant-low|return vc2OscFormantHeld(offset, sum, keyed, t.sumLeast);|return vc2OscFormantHeld(offset, sum, keyed, -t.formantDepth);|vc2oscextin
+extin-formant-scaled|div(mul(div(held, t.formantMost), t.formantDepth), t.formantDepth)|div(held, t.formantDepth)|vc2oscextin
+extin-formant-held|return vc2OscHeld(add(scaled, keyed), -1.0f, 1.0f);|return add(scaled, keyed);|vc2oscextin
+extin-formant-keyed|add(scaled, keyed)|add(scaled, 0.0f)|vc2oscextin
+extin-ported-world|vc2OscExtinConvert(bytesOf(in), worldOf(in, reads), x, reads.shared(), block);|(void)x;|vc2setosckinds
+extin-ported-system|reads.oscSystems()[kExtinSystemAt]|reads.oscSystems()[kExtinSystemAt + 1]|vc2setosckinds
+extin-ported-header|reads.oscHeader(in.part)[kExtinHeaderAt]|reads.oscHeader(0)[kExtinHeaderAt]|vc2setosckinds
+extin-pool-gain|{ 0x8939edf8, &t.extinGainScale }|{ 0x8939edfc, &t.extinGainScale }|vc2setoscconvtables
+extin-pool-velocity|{ 0x8939edec, &t.extinVelocityScale }|{ 0x8939edf8, &t.extinVelocityScale }|vc2setoscconvtables
+extin-pool-depth|{ 0x8939edc4, &t.extinDepthTop }|{ 0x8939edf8, &t.extinDepthTop }|vc2setoscconvtables
+extin-pool-step|{ 0x8939c59c, &t.formantStep }|{ 0x8939c560, &t.formantStep }|vc2setoscconvtables
+extin-pool-cents|{ 0x8939c560, &t.formantCents }|{ 0x8939c56c, &t.formantCents }|vc2setoscconvtables
+extin-pool-most|{ 0x8939c56c, &t.formantMost }|{ 0x8939c560, &t.formantMost }|vc2setoscconvtables
+extin-pool-formant-depth|{ 0x8939c568, &t.formantDepth }|{ 0x8939c56c, &t.formantDepth }|vc2setoscconvtables
+extin-rows-at|kFormantRowsAt = 0x8993d0c8;|kFormantRowsAt = 0x8993d0cc;|vc2setoscconvtables
+
+# PCM's converter's own part (vc2oscpcm, Vc2OscPcmConvert.cpp, and its constants, vc2setoscconvtables, v394), not
+# planted: the head's words PCM writes alike (v251's plants reach them), the Time law's two 63s for the formant law's
+# (the same pool words, 0x8939c568).
+pcm-time-at|kTimeAt = 0x4c,|kTimeAt = 0x4d,|vc2oscpcm
+pcm-time-kf-at|kTimeKfAt = 0x4e,|kTimeKfAt = 0x50,|vc2oscpcm
+pcm-time-lfo-at|kTimeLfoAt = 0x50,|kTimeLfoAt = 0x51,|vc2oscpcm
+pcm-time-env-at|kTimeEnvAt = 0x51,|kTimeEnvAt = 0x50,|vc2oscpcm
+pcm-time-curve-at|kTimeCurveAt = 0x52;|kTimeCurveAt = 0x53;|vc2oscpcm
+pcm-time-sens-at|kTimeSensAt = 0x54,|kTimeSensAt = 0x5e,|vc2oscpcm
+pcm-formant-at|kFormantAt = 0x56,|kFormantAt = 0x57,|vc2oscpcm
+pcm-formant-kf-at|kFormantKfAt = 0x58,|kFormantKfAt = 0x4e,|vc2oscpcm
+pcm-formant-lfo-at|kFormantLfoAt = 0x5a,|kFormantLfoAt = 0x5b,|vc2oscpcm
+pcm-formant-env-at|kFormantEnvAt = 0x5b;|kFormantEnvAt = 0x5a;|vc2oscpcm
+pcm-formant-curve-at|kFormantCurveAt = 0x5c,|kFormantCurveAt = 0x52,|vc2oscpcm
+pcm-formant-sens-at|kFormantSensAt = 0x5e,|kFormantSensAt = 0x54,|vc2oscpcm
+pcm-mode-at|kTimeModeAt = 0x65,|kTimeModeAt = 0x64,|vc2oscpcm
+pcm-wave-level-at|kWaveLevelAt = 0xa4;|kWaveLevelAt = 0xa5;|vc2oscpcm
+pcm-wave-level-two-at|kWaveLevelTwoAt = 0xa6;|kWaveLevelTwoAt = 0xa4;|vc2oscpcm
+pcm-gain-at|kGainAt = 0x0a;|kGainAt = 0x0b;|vc2oscpcm
+pcm-osc-time|kOscTime = 1,|kOscTime = 2,|vc2oscpcm
+pcm-osc-formant|kOscFormant = 2,|kOscFormant = 1,|vc2oscpcm
+pcm-lfo-time|kLfoTime = 2,|kLfoTime = 3,|vc2oscpcm
+pcm-lfo-formant|kLfoFormant = 3;|kLfoFormant = 2;|vc2oscpcm
+pcm-signs|kSigns[3] = { -1.0f, 0.0f, 1.0f };|kSigns[3] = { 1.0f, 0.0f, -1.0f };|vc2oscpcm
+pcm-sign-past|kSignPast = 1.0f;|kSignPast = 0.0f;|vc2oscpcm
+pcm-env-words|kTimeEnvWords[2] = { 2, 6 }|kTimeEnvWords[2] = { 6, 2 }|vc2oscpcm
+pcm-formant-words|kFormantEnvWords[2] = { 3, 7 }|kFormantEnvWords[2] = { 7, 3 }|vc2oscpcm
+pcm-centre|kCentre = 60,|kCentre = 61,|vc2oscpcm
+pcm-depth-most|kDepthMost = 63;|kDepthMost = 62;|vc2oscpcm
+pcm-curve-upper|if (x > t.depthKnee) return|if (x > t.depthKnee + 1.0f) return|vc2oscpcm
+pcm-curve-upper-fmac|add(div(add(mul(x, kTwo), t.depthOffset), t.depthPer), t.depthPer)|add(div(add(mul(x, kTwo), t.depthOffset), t.depthPer), 0.0f)|vc2oscpcm
+pcm-curve-lower|if (t.depthKneeLow > x) return|if (t.depthKneeLow - 1 > x) return|vc2oscpcm
+pcm-curve-lower-slope|mul(x, t.depthSlopeLow)|mul(x, kTwo)|vc2oscpcm
+pcm-curve-middle|return add(div(x, t.depthScale), 0.0f);|return div(x, t.depthPer);|vc2oscpcm
+pcm-time-upper-from|const float from = add(sign, t.timeFrom);|const float from = t.timeFrom;|vc2oscpcm
+pcm-time-upper-line|add(x, t.timeKneeLow)), t.timeFrom), from);|add(x, t.timeKnee)), t.timeFrom), from);|vc2oscpcm
+pcm-time-lower-from|const float from = add(sign, t.timeFromLow);|const float from = t.timeFromLow;|vc2oscpcm
+pcm-time-lower-line|add(x, t.timeKnee)), t.timeFromLow));|add(x, t.timeKneeLow)), t.timeFromLow));|vc2oscpcm
+pcm-time-held|if (x > t.formantDepth) return timeUpper(t.formantDepth, sign);|if (x > t.formantDepth) return timeUpper(x, sign);|vc2oscpcm
+pcm-time-held-low|if (t.timeLeast > x) return timeLower(t.timeLeast, sign);|if (t.timeLeast > x) return timeLower(x, sign);|vc2oscpcm
+pcm-time-knee|if (x > t.timeKnee) return timeUpper(x, sign);|if (x > t.timeKnee + 2) return timeUpper(x, sign);|vc2oscpcm
+pcm-time-knee-low|if (t.timeKneeLow > x) return timeLower(x, sign);|if (t.timeKneeLow - 2 > x) return timeLower(x, sign);|vc2oscpcm
+pcm-time-middle|return add(div(x, t.timeScale), sign);|return div(x, t.timeScale);|vc2oscpcm
+pcm-time-scale|const float scale = shared.pow(kTwo, div(flt(keyed), t.formantCents));|const float scale = 1.0f;|vc2oscpcm
+pcm-time-sum|add(div(mul(flt(in.sum), t.formantDepth), t.formantMost), flt(in.depth))|flt(in.depth)|vc2oscpcm
+pcm-time-beam|const int beamed = in.beam[1] - 3 * in.beam[0];|const int beamed = in.beam[1] - in.beam[0];|vc2oscpcm
+pcm-time-beam-scale|div(flt(beamed), t.timeBeam)|div(flt(beamed), t.formantDepth)|vc2oscpcm
+pcm-time-held-out|return vc2OscHeld(out, t.timeLeastOut, t.timeMostOut);|return out;|vc2oscpcm
+pcm-formant-keyed|return vc2OscFormantHeld(depth, sum, div(flt(keyed), t.formantCents), t.pcmFormantLeast);|return vc2OscFormantHeld(depth, sum, 0.0f, t.pcmFormantLeast);|vc2oscpcm
+pcm-formant-least|t.formantCents), t.pcmFormantLeast);|t.formantCents), -t.formantDepth);|vc2oscpcm
+pcm-head-ratio|    head.ratio = made.ratio;\n|\n|vc2oscpcm
+pcm-head-level|    head.level = made.level;\n|\n|vc2oscpcm
+pcm-head-lfo|    head.levelLfoDepth = made.levelLfoDepth;\n|\n|vc2oscpcm
+pcm-time-word|    block[kTimeWord] = pcmWord(vc2OscPcmTime(timeIn(input, in), shared));\n|\n|vc2oscpcm
+pcm-time-env|mul(timeDepthCurve(flt(s8(input, kTimeEnvAt))), timeVelocity)|timeDepthCurve(flt(s8(input, kTimeEnvAt)))|vc2oscpcm
+pcm-time-lfo-zero|    block[kTimeLfoZero] = 0;\n|\n|vc2oscpcm
+pcm-time-lfo|timeDepthCurve(flt(heldDepth(s8(input, kTimeLfoAt), in.sums.lfo[kLfoTime])))|flt(heldDepth(s8(input, kTimeLfoAt), in.sums.lfo[kLfoTime]))|vc2oscpcm
+pcm-formant-word|    block[kFormantWord] = pcmWord(vc2OscPcmFormant(|    block[kFormantLfoZero] = pcmWord(vc2OscPcmFormant(|vc2oscpcm
+pcm-formant-env|mul(div(flt(s8(input, kFormantEnvAt)), t.pcmDepthTop), formantVelocity)|div(flt(s8(input, kFormantEnvAt)), t.pcmDepthTop)|vc2oscpcm
+pcm-formant-lfo-zero|    block[kFormantLfoZero] = 0;\n|\n|vc2oscpcm
+pcm-formant-lfo|block[kFormantLfoDepth] = pcmWord(div(flt(formantLfo), t.pcmDepthTop));|block[kFormantLfoDepth] = pcmWord(flt(formantLfo));|vc2oscpcm
+pcm-gain-pow|const float gain = shared.pow(kTwo, div(flt(s8(input, kGainAt)), t.pcmGainScale));|const float gain = 1.0f;|vc2oscpcm
+pcm-gain-second|block[kGainWord] = pcmWord(mul(mul(first, gain), second));|block[kGainWord] = pcmWord(mul(first, gain));|vc2oscpcm
+pcm-ways-type-at|kWaveTypeAt = 0xa7;   // [FW] the wave's type|kWaveTypeAt = 0xa6;   // [FW] the wave's type|vc2setosckinds
+pcm-ways-lite|kWaveWays { liteWords, variWords,|kWaveWays { variWords, variWords,|vc2setosckinds
+pcm-ways-vari|kWaveWays { liteWords, variWords, noWords,|kWaveWays { liteWords, noWords, noWords,|vc2setosckinds
+pcm-ways-none|noWords, variWords, noWords, variWords };|liteWords, variWords, noWords, variWords };|vc2setosckinds
+pcm-ways-past|(type < kWaveWays.size() ? kWaveWays[type] : noWords)|kWaveWays[type % kWaveWays.size()]|vc2setosckinds
+pcm-ways-call|{ vc2OscPcmVari(bytesOf(in), reads, block); }|{}|vc2setosckinds
+pcm-ways-convert|    vc2OscPcmConvert(bytesOf(in), worldOf(in, reads), reads.shared(), block);\n|\n|vc2setosckinds
+lite-trip-part|reads.tripMoving(in.part)|reads.tripMoving(in.kind)|vc2setosckinds
+pcm-pool-depth-top|{ 0x8939e4b4, &t.pcmDepthTop }|{ 0x8939e4b8, &t.pcmDepthTop }|vc2setoscconvtables
+pcm-pool-velocity|{ 0x8939e4dc, &t.pcmVelocityScale }|{ 0x8939e4b4, &t.pcmVelocityScale }|vc2setoscconvtables
+pcm-pool-gain|{ 0x8939e8d8, &t.pcmGainScale }|{ 0x8939e72c, &t.pcmGainScale }|vc2setoscconvtables
+pcm-pool-knee|{ 0x8939e724, &t.depthKnee }|{ 0x8939e730, &t.depthKnee }|vc2setoscconvtables
+pcm-pool-offset|{ 0x8939e728, &t.depthOffset }|{ 0x8939e734, &t.depthOffset }|vc2setoscconvtables
+pcm-pool-per|{ 0x8939e72c, &t.depthPer }|{ 0x8939e73c, &t.depthPer }|vc2setoscconvtables
+pcm-pool-knee-low|{ 0x8939e730, &t.depthKneeLow }|{ 0x8939e724, &t.depthKneeLow }|vc2setoscconvtables
+pcm-pool-slope-low|{ 0x8939e734, &t.depthSlopeLow }|{ 0x8939e738, &t.depthSlopeLow }|vc2setoscconvtables
+pcm-pool-per-low|{ 0x8939e738, &t.depthPerLow }|{ 0x8939e72c, &t.depthPerLow }|vc2setoscconvtables
+pcm-pool-scale|{ 0x8939e73c, &t.depthScale }|{ 0x8939e72c, &t.depthScale }|vc2setoscconvtables
+pcm-pool-time-least|{ 0x8939c570, &t.timeLeast }|{ 0x8939c578, &t.timeLeast }|vc2setoscconvtables
+pcm-pool-time-knee|{ 0x8939c574, &t.timeKnee }|{ 0x8939c58c, &t.timeKnee }|vc2setoscconvtables
+pcm-pool-time-knee-low|{ 0x8939c578, &t.timeKneeLow }|{ 0x8939c570, &t.timeKneeLow }|vc2setoscconvtables
+pcm-pool-time-scale|{ 0x8939c57c, &t.timeScale }|{ 0x8939c588, &t.timeScale }|vc2setoscconvtables
+pcm-pool-time-from-low|{ 0x8939c580, &t.timeFromLow }|{ 0x8939c588, &t.timeFromLow }|vc2setoscconvtables
+pcm-pool-time-least-out|{ 0x8939c584, &t.timeLeastOut }|{ 0x8939c580, &t.timeLeastOut }|vc2setoscconvtables
+pcm-pool-time-from|{ 0x8939c588, &t.timeFrom }|{ 0x8939c580, &t.timeFrom }|vc2setoscconvtables
+pcm-pool-time-most-out|{ 0x8939c58c, &t.timeMostOut }|{ 0x8939c588, &t.timeMostOut }|vc2setoscconvtables
+pcm-pool-time-beam|{ 0x8939c590, &t.timeBeam }|{ 0x8939c568, &t.timeBeam }|vc2setoscconvtables
+pcm-pool-formant-least|{ 0x8939c594, &t.pcmFormantLeast }|{ 0x8939c570, &t.pcmFormantLeast }|vc2setoscconvtables
+# LITE's words (vc2oscpcmlite, Vc2OscPcmLite.cpp, and its constants, vc2setoscconvtables, v395), not planted: the
+# calibration row the copy of v251's head is given (its gain, the row's only use, isn't LITE's), the copy's length
+# (v251's head reads nothing past +0xa0), the root's cast to a halfword (u8 less s8 fits one).
+lite-pitch10-at|kPitch10At = 0x94,|kPitch10At = 0x98,|vc2oscpcmlite
+lite-key-pitch10-at|kKeyPitch10At = 0x98,|kKeyPitch10At = 0x94,|vc2oscpcmlite
+lite-start-at|kStartAt = 0x48,|kStartAt = 0x4c,|vc2oscpcmlite
+lite-e8-at|kSwitchE8At = 0x60,|kSwitchE8At = 0x61,|vc2oscpcmlite
+lite-e4-at|kSwitchE4At = 0x63;|kSwitchE4At = 0x62;|vc2oscpcmlite
+lite-mode-at|kModeAt = 0x64,|kModeAt = 0x65,|vc2oscpcmlite
+lite-ec-at|kSwitchECAt = 0x67,|kSwitchECAt = 0x66,|vc2oscpcmlite
+lite-f0-at|kSwitchF0At = 0x68,|kSwitchF0At = 0x69,|vc2oscpcmlite
+lite-root-offset-at|kRootOffsetAt = 0xa5,|kRootOffsetAt = 0xa6,|vc2oscpcmlite
+lite-root-at|kRootAt = 0xa8;|kRootAt = 0xa9;|vc2oscpcmlite
+lite-no-wave-at|kNoWaveAt = 0xb0,|kNoWaveAt = 0xb1,|vc2oscpcmlite
+lite-length-at|kLengthAt = 0xbc,|kLengthAt = 0xc0,|vc2oscpcmlite
+lite-wave-bytes-at|kWaveBytesAt = 0xcc,|kWaveBytesAt = 0xd0,|vc2oscpcmlite
+lite-wave-word-at|kWaveWordAt = 0xfc;|kWaveWordAt = 0xf8;|vc2oscpcmlite
+lite-per-key|kPerKey = 1000;|kPerKey = 100;|vc2oscpcmlite
+lite-mode-on|kModeOn = 2;|kModeOn = 1;|vc2oscpcmlite
+lite-key-byte|kKeyByte = 4,|kKeyByte = 5,|vc2oscpcmlite
+lite-cents-word|kCentsWord = 0x08 / 4,|kCentsWord = 0x0c / 4,|vc2oscpcmlite
+lite-key-cents-word|kKeyCentsWord = 0x68 / 4,|kKeyCentsWord = 0x64 / 4,|vc2oscpcmlite
+lite-mode-word|kModeWord = 0xb0 / 4;|kModeWord = 0xb4 / 4;|vc2oscpcmlite
+lite-wave-bytes-word|kWaveBytesWord = 0xb4 / 4,|kWaveBytesWord = 0xb8 / 4,|vc2oscpcmlite
+lite-e4-word|kE4Word = 0xe4 / 4,|kE4Word = 0xe8 / 4,|vc2oscpcmlite
+lite-e8-word|kE8Word = 0xe8 / 4,|kE8Word = 0xec / 4,|vc2oscpcmlite
+lite-ec-word|kECWord = 0xec / 4;|kECWord = 0xf0 / 4;|vc2oscpcmlite
+lite-f0-word|kF0Word = 0xf0 / 4,|kF0Word = 0xf4 / 4,|vc2oscpcmlite
+lite-f4-word|kF4Word = 0xf4 / 4,|kF4Word = 0xf0 / 4,|vc2oscpcmlite
+lite-start-word|kStartWord = 0xf8 / 4,|kStartWord = 0xfc / 4,|vc2oscpcmlite
+lite-length-word|kLengthWord = 0xfc / 4;|kLengthWord = 0xf8 / 4;|vc2oscpcmlite
+lite-start-again-word|kStartAgainWord = 0x100 / 4,|kStartAgainWord = 0xfc / 4,|vc2oscpcmlite
+lite-wave-bytes|kWaveBytes = 48;|kWaveBytes = 44;|vc2oscpcmlite
+lite-oneif|return b ? 1u : 0u;|return b ? 2u : 0u;|vc2oscpcmlite
+lite-root-offset-signed|u8(input, kRootAt) - s8(input, kRootOffsetAt)|u8(input, kRootAt) - u8(input, kRootOffsetAt)|vc2oscpcmlite
+lite-root-offset-sign|u8(input, kRootAt) - s8(|u8(input, kRootAt) + s8(|vc2oscpcmlite
+lite-root-signed|static_cast<int16_t>(u8(input, kRootAt)|static_cast<int16_t>(s8(input, kRootAt)|vc2oscpcmlite
+lite-cents-from-a4|vc2OscCentsFrom(u32(input, kPitch10At), root, hold)|vc2OscCentsFrom(u32(input, kPitch10At), 69000u, hold)|vc2oscpcmlite
+lite-cents-tenth|xtf::div(xtf::flt(static_cast<int32_t>(p10 - from)), c.tenth)|xtf::mul(xtf::flt(static_cast<int32_t>(p10 - from)), 0.1f)|vc2oscpcmlite
+lite-cents-unsigned|xtf::flt(static_cast<int32_t>(p10 - from))|xtf::flt(static_cast<int32_t>((p10 - from) >> 1) * 2)|vc2oscpcmlite
+lite-cents-held-order|vc2OscHeld(cents, c.least, c.most)|vc2OscHeld(cents, c.most, c.least)|vc2oscpcmlite
+lite-cents-unheld|    return vc2OscHeld(cents, c.least, c.most);|    return cents;|vc2oscpcmlite
+lite-pitch-copy|    std::memcpy(input + kPitch10At, &p10, sizeof p10);\n|\n|vc2oscpcmlite
+lite-pitch-copy-key|    std::memcpy(input + kKeyPitch10At, &keyP10, sizeof keyP10);\n|\n|vc2oscpcmlite
+lite-key|[kKeyByte] = vc2OscFollowedKey(key, coarse, kf, centre);|[kKeyByte] = 0;|vc2oscpcmlite
+lite-pitch-first|    vc2OscPitchAbout(input, kCentre, block);\n|\n|vc2oscpcmlite
+lite-cents-of-key|vc2OscCentsFrom(u32(input, kPitch10At), root, hold));|vc2OscCentsFrom(u32(input, kKeyPitch10At), root, hold));|vc2oscpcmlite
+lite-mode|u8(input, kModeAt) != 0 ? kModeOn : 0|u8(input, kModeAt) != 0 ? 0 : kModeOn|vc2oscpcmlite
+lite-start-held-equal|start >= length ? length - 1 : start|start > length ? length - 1 : start|vc2oscpcmlite
+lite-start-held-short|start >= length ? length - 1 : start|start >= length ? length : start|vc2oscpcmlite
+lite-start-held-signed|start >= length ? length - 1 : start|(int32_t)start >= (int32_t)length ? length - 1 : start|vc2oscpcmlite
+lite-length|block[kLengthWord] = length;|block[kLengthWord] = start;|vc2oscpcmlite
+lite-start-again|block[kStartAgainWord] = block[kStartWord];|block[kStartAgainWord] = start;|vc2oscpcmlite
+lite-e4-or|u8(input, kSwitchE4At) != 0 \|\| u8(input, kNoWaveAt) == 0|u8(input, kSwitchE4At) != 0 && u8(input, kNoWaveAt) == 0|vc2oscpcmlite
+lite-e4-no-wave|u8(input, kNoWaveAt) == 0|u8(input, kNoWaveAt) != 0|vc2oscpcmlite
+lite-ec-and|tripMoving != 0 && u8(input, kSwitchECAt) != 0|tripMoving != 0 \|\| u8(input, kSwitchECAt) != 0|vc2oscpcmlite
+lite-ec-trip|oneIf(tripMoving != 0 &&|oneIf(tripMoving == 0 &&|vc2oscpcmlite
+lite-e8|oneIf(u8(input, kSwitchE8At) != 0)|oneIf(u8(input, kSwitchE8At) == 0)|vc2oscpcmlite
+lite-f0|oneIf(u8(input, kSwitchF0At) != 0)|oneIf(u8(input, kSwitchF0At) == 0)|vc2oscpcmlite
+lite-f4-word-read|oneIf(u32(input, kWaveWordAt) != 0)|oneIf(u8(input, kWaveWordAt) != 0)|vc2oscpcmlite
+lite-wave-bytes-copy|    std::memcpy(block + kWaveBytesWord, input + kWaveBytesAt, kWaveBytes);\n|\n|vc2oscpcmlite
+lite-pool-tenth|{ 0x8939f2dc, &t.lite.tenth }|{ 0x8939f2e0, &t.lite.tenth }|vc2setoscconvtables
+lite-pool-most|{ 0x8939f2e0, &t.lite.most }|{ 0x8939f2e4, &t.lite.most }|vc2setoscconvtables
+lite-pool-least|{ 0x8939f2e4, &t.lite.least }|{ 0x8939f2e0, &t.lite.least }|vc2setoscconvtables
+lite-pool-read|        vc2ReadPool(image, wavePoolWords(*this));\n|\n|vc2setoscconvtables
+# VariPhrase's words (vc2oscpcmvari, Vc2OscPcmVari.cpp; the pitch and cents laws it shares with LITE's in Vc2OscPcmLite.cpp,
+# vc2oscpcmlite; the key sum about a centre in Vc2OscConvert.cpp, vc2setoscconv; its constants, vc2setoscconvtables,
+# v396), not planted: the type 1's +0xb0 as its type (both 1), the type 1's and the others' root holds for each other
+# (the same values; their addresses are planted; A4's least for the root's too), the count's and the period's halfword
+# casts in eventOf (both fit), a key of 60 counted below the centre (0 either way, in eventOf and the centre's), the
+# centre's quotient and its product's period as halfwords (the quotient fits one; the centre is cut to one after) and
+# the period's local as a word (both routines take it as a halfword).
+vari-key-at|kKeyAt = 3, kPitch10At|kKeyAt = 4, kPitch10At|vc2oscpcmvari
+vari-start-at|kStartAt = 0x48,|kStartAt = 0x4c,|vc2oscpcmvari
+vari-tempo-sync-at|kTempoSyncAt = 0x60;|kTempoSyncAt = 0x5f;|vc2oscpcmvari
+vari-robot-at|kRobotAt = 0x61,|kRobotAt = 0x60,|vc2oscpcmvari
+vari-mode-at|kModeAt = 0x62,|kModeAt = 0x61,|vc2oscpcmvari
+vari-loop-at|kLoopAt = 0x63,|kLoopAt = 0x62,|vc2oscpcmvari
+vari-vari-at|kVariAt = 0x64,|kVariAt = 0x65,|vc2oscpcmvari
+vari-energy-at|kEnergyAt = 0x66,|kEnergyAt = 0x65,|vc2oscpcmvari
+vari-time-trip-at|kTimeTripAt = 0x67;|kTimeTripAt = 0x66;|vc2oscpcmvari
+vari-beat-keep-at|kBeatKeepAt = 0x68,|kBeatKeepAt = 0x69,|vc2oscpcmvari
+vari-table-flag-at|kTableFlagAt = 0xa0,|kTableFlagAt = 0xa4,|vc2oscpcmvari
+vari-type-at|kTypeAt = 0xa7,|kTypeAt = 0xa6,|vc2oscpcmvari
+vari-word-ac-at|kWordAcAt = 0xac,|kWordAcAt = 0xa8,|vc2oscpcmvari
+vari-no-wave-at|kNoWaveAt = 0xb0;|kNoWaveAt = 0xb1;|vc2oscpcmvari
+vari-events-at|kEventsAt = 0xb4,|kEventsAt = 0xb6,|vc2oscpcmvari
+vari-length-at|kLengthAt = 0xbc,|kLengthAt = 0xc0,|vc2oscpcmvari
+vari-table-at|kTableAt = 0xc4,|kTableAt = 0xc8,|vc2oscpcmvari
+vari-wave-bytes-at|kWaveBytesAt = 0xcc,|kWaveBytesAt = 0xd0,|vc2oscpcmvari
+vari-step-at|kStepAt = 0x104;|kStepAt = 0x106;|vc2oscpcmvari
+vari-event-centre-at|kEventCentreAt = 4;|kEventCentreAt = 3;|vc2oscpcmvari
+vari-step-mode|kStep = 2;|kStep = 1;|vc2oscpcmvari
+vari-type-one|kTypeOne = 1;|kTypeOne = 3;|vc2oscpcmvari
+vari-entries-at|kEntriesAt = 12;|kEntriesAt = 10;|vc2oscpcmvari
+vari-centre|kCentre = 60;|kCentre = 64;|vc2oscpcmvari
+vari-period-keys|kPeriodKeys = 12, kRound|kPeriodKeys = 11, kRound|vc2oscpcmvari
+vari-round|kRound = 11;|kRound = 12;|vc2oscpcmvari
+vari-a4|kA4 = 69000;|kA4 = 60000;|vc2oscpcmvari
+vari-flags-byte|kFlagsByte = 0xe4,|kFlagsByte = 0xe7,|vc2oscpcmvari
+vari-flags5-byte|kFlags5Byte = 0xe5,|kFlags5Byte = 0xe7,|vc2oscpcmvari
+vari-flags6-byte|kFlags6Byte = 0xe6,|kFlags6Byte = 0xe7,|vc2oscpcmvari
+vari-first-at|kFirstAt = 0xe8,|kFirstAt = 0xea,|vc2oscpcmvari
+vari-last-at|kLastAt = 0xec;|kLastAt = 0xee;|vc2oscpcmvari
+vari-from-at|kFromAt = 0xf0,|kFromAt = 0xf2,|vc2oscpcmvari
+vari-cents-word|kCentsWord = 0x08 / 4,|kCentsWord = 0x0c / 4,|vc2oscpcmvari
+vari-key-cents-word|kKeyCentsWord = 0x68 / 4,|kKeyCentsWord = 0x64 / 4,|vc2oscpcmvari
+vari-level-word|kLevelWord = 0x18 / 4;|kLevelWord = 0x1c / 4;|vc2oscpcmvari
+vari-type-word|kTypeWord = 0xb0 / 4,|kTypeWord = 0xac / 4,|vc2oscpcmvari
+vari-wave-bytes-word|kWaveBytesWord = 0xb4 / 4,|kWaveBytesWord = 0xb8 / 4,|vc2oscpcmvari
+vari-wave-bytes|kWaveBytes = 48;|kWaveBytes = 44;|vc2oscpcmvari
+vari-bit0|kBit0 = 0x01,|kBit0 = 0x08,|vc2oscpcmvari
+vari-bit1|kBit1 = 0x02,|kBit1 = 0x08,|vc2oscpcmvari
+vari-bit2|kBit2 = 0x04,|kBit2 = 0x02,|vc2oscpcmvari
+vari-bit3|kBit3 = 0x08,|kBit3 = 0x04,|vc2oscpcmvari
+vari-bit4|kBit4 = 0x10,|kBit4 = 0x20,|vc2oscpcmvari
+vari-bit5|kBit5 = 0x20,|kBit5 = 0x40,|vc2oscpcmvari
+vari-bit6|kBit6 = 0x40;|kBit6 = 0x10;|vc2oscpcmvari
+vari-bit7|kBit7 = 0x80;|kBit7 = 0x40;|vc2oscpcmvari
+vari-half-signed|static_cast<uint16_t>(s16(input, at))|static_cast<uint16_t>(u8(input, at))|vc2oscpcmvari
+vari-bit-of|b = on ? static_cast<uint8_t>(b \| bit)|b = !on ? static_cast<uint8_t>(b \| bit)|vc2oscpcmvari
+vari-events-table|u32(input, kTableAt) + kEntriesAt|u32(input, kTableAt)|vc2oscpcmvari
+vari-events-first|const uint16_t from = memory.half(table + 2 * first);|const uint16_t from = memory.half(table + first);|vc2oscpcmvari
+vari-events-last|memory.half(table + 2 * last)|memory.half(table + 2 * first)|vc2oscpcmvari
+vari-events-from|    storeHalf(block, kFromAt, from);\n|\n|vc2oscpcmvari
+vari-event-none|    if (count == 0) return 0;\n|    if (count == 0) return 1;\n|vc2oscpcmvari
+vari-event-low|    if (key < kCentre) within = (within + period) % period;\n|\n|vc2oscpcmvari
+vari-event-low-wrap|(within + period) % period|within + period|vc2oscpcmvari
+vari-event-count|static_cast<uint16_t>(within) % count|static_cast<uint16_t>(within) % (count + 1)|vc2oscpcmvari
+vari-centre-none|if (period == 0) return kCentre;|if (period == 0) return 0;|vc2oscpcmvari
+vari-centre-low|key - (kCentre - 1) - period|key - kCentre - period|vc2oscpcmvari
+vari-centre-short|return static_cast<int16_t>(periods|return static_cast<int>(periods|vc2oscpcmvari
+vari-mode-flags|f = static_cast<uint8_t>(f & ~(kBit0 \| kBit7 \| kBit3));|f = static_cast<uint8_t>(f & ~(kBit0 \| kBit7));|vc2oscpcmvari
+vari-default-bit0-or|u8(input, kLoopAt) != 0 \|\| u8(input, kNoWaveAt) == 0|u8(input, kLoopAt) != 0 && u8(input, kNoWaveAt) == 0|vc2oscpcmvari
+vari-default-bit7|f = static_cast<uint8_t>((f \| kBit7) & ~kBit3);|f = static_cast<uint8_t>(f & ~kBit3);|vc2oscpcmvari
+vari-default-bit3|f = static_cast<uint8_t>((f \| kBit7) & ~kBit3);|f = static_cast<uint8_t>(f \| kBit7);|vc2oscpcmvari
+vari-default-held|start >= length ? length - 1 : start;|start > length ? length - 1 : start;|vc2oscpcmvari
+vari-default-short|start >= length ? length - 1 : start;|start >= length ? length : start;|vc2oscpcmvari
+vari-default-length|storeWord(block, kLastAt, length);|storeWord(block, kLastAt, start);|vc2oscpcmvari
+vari-default-from|storeWord(block, kFromAt, held);|storeWord(block, kFromAt, start);|vc2oscpcmvari
+vari-default-pitch|    vc2OscPitchAbout(input, kCentre, block);\n}\n\n// STEP|    vc2OscPitchAbout(input, kCentre + 1, block);\n}\n\n// STEP|vc2oscpcmvari
+vari-step-count|inputHalf(input, kEventsAt) - 1u;|inputHalf(input, kEventsAt) - 0u;|vc2oscpcmvari
+vari-step-next|eventsFrom(input, e, e + 1u, reads, block);\n    vc2OscPitchAbout(input, kCentre, block);\n}\n\n// EVENT|eventsFrom(input, e, e, reads, block);\n    vc2OscPitchAbout(input, kCentre, block);\n}\n\n// EVENT|vc2oscpcmvari
+vari-step-few|if (inputHalf(input, kEventsAt) < 2) {|if (inputHalf(input, kEventsAt) < 3) {|vc2oscpcmvari
+vari-step-flags|    modeFlags(block);\n    const uint32_t count|    const uint32_t count|vc2oscpcmvari
+vari-event-flags|    modeFlags(block);\n    const uint16_t events|    const uint16_t events|vc2oscpcmvari
+vari-event-flag|if (u32(input, kTableFlagAt) == 0) {|if (u8(input, kTableFlagAt) == 0) {|vc2oscpcmvari
+vari-event-first-last|eventsFrom(input, 0, events - 1u, reads, block);|eventsFrom(input, 0, events, reads, block);|vc2oscpcmvari
+vari-event-period|(count + kRound) / kPeriodKeys * kPeriodKeys|count / kPeriodKeys * kPeriodKeys|vc2oscpcmvari
+vari-event-count-short|const auto count = static_cast<uint16_t>(events - 1);|const auto count = static_cast<uint32_t>(events - 1);|vc2oscpcmvari
+vari-event-next|eventsFrom(input, e, e + 1u, reads, block);\n    vc2OscPitchAbout(input, reads|eventsFrom(input, e, e + 2u, reads, block);\n    vc2OscPitchAbout(input, reads|vc2oscpcmvari
+vari-event-system|reads.oscSystems()[kEventCentreAt] == 0 ? kCentre|reads.oscSystems()[kEventCentreAt] != 0 ? kCentre|vc2oscpcmvari
+vari-fixed-and|u8(input, kVariAt) != 0 && u8(input, kRobotAt) != 0|u8(input, kVariAt) != 0 \|\| u8(input, kRobotAt) != 0|vc2oscpcmvari
+vari-fixed-one|const bool fixed = one && |const bool fixed = |vc2oscpcmvari
+vari-fixed-bit|    bitOf(blockBytes(block)[kFlagsByte], kBit4, fixed);\n|\n|vc2oscpcmvari
+vari-cents-from|const uint32_t from = fixed ? kA4 : vc2OscRootPitch10(input);|const uint32_t from = vc2OscRootPitch10(input);|vc2oscpcmvari
+vari-cents-key|vc2OscCentsFrom(u32(input, kKeyPitch10At), from, hold)|vc2OscCentsFrom(u32(input, kPitch10At), from, hold)|vc2oscpcmvari
+vari-bit5-test|bitOf(f, kBit5, u8(input, kVariAt) == 0);|bitOf(f, kBit5, u8(input, kVariAt) != 0);|vc2oscpcmvari
+vari-level-scale|vc2OscLevelWord(t, u8(input, kEnergyAt))), t.variLevel)|vc2OscLevelWord(t, u8(input, kEnergyAt))), 32767.0f)|vc2oscpcmvari
+vari-level-signed|vc2OscLevelWord(t, u8(input, kEnergyAt))|vc2OscLevelWord(t, static_cast<int8_t>(u8(input, kEnergyAt)))|vc2oscpcmvari
+vari-wave-bytes-copy|    std::memcpy(block + kWaveBytesWord, input + kWaveBytesAt, kWaveBytes);\n|\n|vc2oscpcmvari
+vari-bit6-word|bitOf(f, kBit6, u32(input, kWordAcAt) != 0);|bitOf(f, kBit6, u8(input, kWordAcAt) != 0);|vc2oscpcmvari
+vari-bit2-and|tripMoving != 0 && u8(input, kTimeTripAt) != 0|tripMoving != 0 \|\| u8(input, kTimeTripAt) != 0|vc2oscpcmvari
+vari-bit1|bitOf(f, kBit1, u8(input, kTempoSyncAt) != 0);|bitOf(f, kBit1, u8(input, kTempoSyncAt) == 0);|vc2oscpcmvari
+vari-bit7-e5|kBit7, u8(input, kBeatKeepAt) != 0);|kBit7, u8(input, kBeatKeepAt) == 0);|vc2oscpcmvari
+vari-e6|g = static_cast<uint8_t>(g & ~(kBit2 \| kBit1 \| kBit0));|g = static_cast<uint8_t>(g & ~(kBit1 \| kBit0));|vc2oscpcmvari
+vari-ways-step|kModeWays { stepWay, eventWay }|kModeWays { eventWay, eventWay }|vc2oscpcmvari
+vari-ways-event|kModeWays { stepWay, eventWay }|kModeWays { stepWay, stepWay }|vc2oscpcmvari
+vari-ways-past|(way < kModeWays.size() ? kModeWays[way] : defaultWay)|kModeWays[way % kModeWays.size()]|vc2oscpcmvari
+vari-trip-part|reads.tripMoving(input[0])|reads.tripMoving(input[2])|vc2oscpcmvari
+vari-cents-first|    centsWords(input, block);\n|\n|vc2oscpcmvari
+vari-pitch-centre|vc2OscKeySum(key, coarse, kf, centre) + fine;\n    const uint32_t keyP10|vc2OscKeySum(key, coarse, kf, kCentre) + fine;\n    const uint32_t keyP10|vc2oscpcmlite
+vari-pitch-second-centre|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, centre)|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, kCentre)|vc2oscpcmlite
+vari-key-centre|vc2OscFollowedKey(key, coarse, kf, centre)|vc2OscFollowedKey(key, coarse, kf, kCentre)|vc2oscpcmlite
+vari-pitch-second|vc2OscKeySum(u8(input, kSecondKeyAt), coarse, kf, centre)|vc2OscKeySum(key, coarse, kf, centre)|vc2oscpcmlite
+vari-pitch-fine|vc2OscKeySum(key, coarse, kf, centre) + fine;\n    const uint32_t keyP10|vc2OscKeySum(key, coarse, kf, centre);\n    const uint32_t keyP10|vc2oscpcmlite
+vari-root-signed|u8(input, kRootAt) - s8(input, kRootOffsetAt)|u8(input, kRootAt) - u8(input, kRootOffsetAt)|vc2oscpcmlite
+vari-keysum-centre-coarse|static_cast<uint32_t>(centre + coarse) * static_cast<uint32_t>(kPerKey)|static_cast<uint32_t>(kCentre + coarse) * static_cast<uint32_t>(kPerKey)|vc2setoscconv
+vari-keysum-centre-key|static_cast<uint32_t>(key - centre) * static_cast<uint32_t>(kf);|static_cast<uint32_t>(key - kCentre) * static_cast<uint32_t>(kf);|vc2setoscconv
+vari-pool-a4-tenth|{ 0x8939f8d0, &t.variA4.tenth }|{ 0x8939fb88, &t.variA4.tenth }|vc2setoscconvtables
+vari-pool-a4-most|{ 0x8939f8d8, &t.variA4.most }|{ 0x8939f8dc, &t.variA4.most }|vc2setoscconvtables
+vari-pool-a4-least|{ 0x8939f8dc, &t.variA4.least }|{ 0x8939f8d8, &t.variA4.least }|vc2setoscconvtables
+vari-pool-root-tenth|{ 0x8939f8d0, &t.variRoot.tenth }|{ 0x8939fb88, &t.variRoot.tenth }|vc2setoscconvtables
+vari-pool-root-most|{ 0x8939f8d8, &t.variRoot.most }|{ 0x8939fb78, &t.variRoot.most }|vc2setoscconvtables
+vari-pool-root-least|{ 0x8939fb78, &t.variRoot.least }|{ 0x8939fb80, &t.variRoot.least }|vc2setoscconvtables
+vari-pool-other-tenth|{ 0x8939fb7c, &t.variRootOther.tenth }|{ 0x8939fb88, &t.variRootOther.tenth }|vc2setoscconvtables
+vari-pool-other-most|{ 0x8939fb80, &t.variRootOther.most }|{ 0x8939fb78, &t.variRootOther.most }|vc2setoscconvtables
+vari-pool-other-least|{ 0x8939fb78, &t.variRootOther.least }|{ 0x8939fb80, &t.variRootOther.least }|vc2setoscconvtables
+vari-pool-level|{ 0x8939fb88, &t.variLevel }|{ 0x8939fb7c, &t.variLevel }|vc2setoscconvtables
+vari-ways-lite|    vc2OscPcmLite(bytesOf(in), reads.tripMoving(in.part), block);\n|\n|vc2setosckinds
+# PCM's start (vc2setosckinds, Vc2SetOscKinds.cpp; its tempo's divisor, vc2setenvtables, v397), not planted: the Wave
+# Number read unsigned (cut to a halfword after), its tempo's divisor for EXTIN's (both 10; its address is planted).
+# From v399, not planted: the index's cut to a halfword and its test for 0 (the sets take a halfword, and a number of
+# 0 finds nothing there and writes nothing).
+pstart-mode-at|kPcmModeAt = 0x62,|kPcmModeAt = 0x63,|vc2setosckinds
+pstart-kf-at|kPcmKfAt = 0x0e,|kPcmKfAt = 0x0c,|vc2setosckinds
+pstart-number-at|kPcmNumberAt = 0x44,|kPcmNumberAt = 0x46,|vc2setosckinds
+pstart-wave-at|kPcmWaveAt = 0xa0,|kPcmWaveAt = 0xa4,|vc2setosckinds
+pstart-base|kStoreBase = 3000;|kStoreBase = 3001;|vc2setosckinds
+pstart-legato|kLegato = 1;|kLegato = 2;|vc2setosckinds
+pstart-centre|kPcmCentre = 60;|kPcmCentre = 64;|vc2setosckinds
+pstart-kinds-lite|kPcmKinds { 1, 2, 0, 2, 0, 2 }|kPcmKinds { 2, 2, 0, 2, 0, 2 }|vc2setosckinds
+pstart-kinds-none|kPcmKinds { 1, 2, 0, 2, 0, 2 }|kPcmKinds { 1, 2, 2, 2, 0, 2 }|vc2setosckinds
+pstart-kinds-last|kPcmKinds { 1, 2, 0, 2, 0, 2 }|kPcmKinds { 1, 2, 0, 2, 0, 0 }|vc2setosckinds
+pstart-kinds-past|type < kPcmKinds.size() ? kPcmKinds[type] : 0|kPcmKinds[type % kPcmKinds.size()]|vc2setosckinds
+pstart-found|block[0] = found && type|block[0] = true && type|vc2setosckinds
+pstart-number-less|vc2in::s16(input, kPcmNumberAt) - 1 + kStoreBase|vc2in::s16(input, kPcmNumberAt) + kStoreBase|vc2setosckinds
+pstart-holds-test|if (store.loadedRecord(number, memory) != 0) return|if (store.loadedRecord(number, memory) == 0) return|vc2setosckinds
+pstart-words-number|vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory)|vc2WaveWords(store, number, wave, memory)|vc2setosckinds
+pstart-words-answer|return vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);|return !vc2WaveWords(store, u16(input, kPcmNumberAt), wave, memory);|vc2setosckinds
+pstart-index-key|waveWords(index, wave, key, in.velocity|waveWords(index, wave, in.key, in.velocity|vc2setosckinds
+pstart-index-velocity|waveWords(index, wave, key, in.velocity|waveWords(index, wave, key, 0|vc2setosckinds
+pstart-index-answer|return index != 0 && reads.waveSets()|return index != 0 && !reads.waveSets()|vc2setosckinds
+pstart-legato-and|input[kPcmModeAt] == kLegato && in.legato != 0|input[kPcmModeAt] == kLegato \|\| in.legato != 0|vc2setosckinds
+pstart-legato-flag|block[kFlagAt] = legato ? 1 : 0;|block[kFlagAt] = 0;|vc2setosckinds
+pstart-legato-key|legato ? in.legatoKey : in.key|in.key|vc2setosckinds
+pstart-key-kf|vc2OscFollowedKey(legato ? in.legatoKey : in.key, in.coarse, kf, kPcmCentre)|vc2OscFollowedKey(legato ? in.legatoKey : in.key, in.coarse, 0, kPcmCentre)|vc2setosckinds
+pstart-key-coarse|vc2OscFollowedKey(legato ? in.legatoKey : in.key, in.coarse, kf, kPcmCentre)|vc2OscFollowedKey(legato ? in.legatoKey : in.key, 0, kf, kPcmCentre)|vc2setosckinds
+pstart-type-after|    const bool found = pcmWaveFound(in, key, reads);\n    const uint8_t type = input[kWaveTypeAt];|    const uint8_t type = input[kWaveTypeAt];\n    const bool found = pcmWaveFound(in, key, reads);|vc2setosckinds
+pstart-tenth-pool|{ 0x8939e29c, &pcmTenth }|{ 0x8939e724, &pcmTenth }|vc2setenvtables
+pstart-loaded-key|store.loadedRecord(number, memory)|store.loadedRecord(u16(input, kPcmNumberAt), memory)|vc2setosckinds
+pstart-index-number|store.setIndex(number, memory)|store.setIndex(u16(input, kPcmNumberAt), memory)|vc2setosckinds
+# The wave store (vc2wavestore, Vc2WaveStore.cpp, v398).
+store-node-at|kNodeAt = 0x18,|kNodeAt = 0x14,|vc2wavestore
+store-next-at|kNextAt = 4,|kNextAt = 0,|vc2wavestore
+store-key-at|kKeyAt = 8,|kKeyAt = 12,|vc2wavestore
+store-lists|kBuckets = 128;|kBuckets = 64;|vc2wavestore
+store-vpsc-at|kVpscAt = 0x28,|kVpscAt = 0x2c,|vc2wavestore
+store-data-at|kDataAt = 0x38,|kDataAt = 0x3c,|vc2wavestore
+store-set-at|kSetAt = 0x4c,|kSetAt = 0x48,|vc2wavestore
+store-busy-at|kBusyAt = 0x52;|kBusyAt = 0x50;|vc2wavestore
+store-block-data|kBlockData = 28;|kBlockData = 32;|vc2wavestore
+store-frames-at|kFramesAt = 0x20;|kFramesAt = 0x1c;|vc2wavestore
+store-no-record|kNoRecord = -1,|kNoRecord = 0,|vc2wavestore
+store-no-set|kNoSet = -2;|kNoSet = -1;|vc2wavestore
+store-base|kNumberBase = 3000;|kNumberBase = 3001;|vc2wavestore
+store-velocity-level-at|kVelocityLevelAt = 4,|kVelocityLevelAt = 9,|vc2wavestore
+store-root-offset-at|kRootOffsetAt = 5,|kRootOffsetAt = 9,|vc2wavestore
+store-key-level-at|kKeyLevelAt = 6,|kKeyLevelAt = 9,|vc2wavestore
+store-type-at|kTypeAt = 7,|kTypeAt = 9,|vc2wavestore
+store-root-at|kRootAt = 8;|kRootAt = 9;|vc2wavestore
+store-stereo-at|kStereoAt = 0xc,|kStereoAt = 0x48,|vc2wavestore
+store-switch-at|kLoopSwitchAt = 0x10,|kLoopSwitchAt = 0x11,|vc2wavestore
+store-zero-half-at|kZeroHalfAt = 0x12,|kZeroHalfAt = 0x16,|vc2wavestore
+store-events-at|kEventsAt = 0x14,|kEventsAt = 0x16,|vc2wavestore
+store-zero-at|kZeroAt = 0x18;|kZeroAt = 0x48;|vc2wavestore
+store-frames-word-at|kFramesWordAt = 0x1c,|kFramesWordAt = 0x48,|vc2wavestore
+store-chunks-at|kChunksAt = 0x20,|kChunksAt = 0x24,|vc2wavestore
+store-kept-at|kKeptAt = 0x4c,|kKeptAt = 0x50,|vc2wavestore
+store-kept|kKept = 3,|kKept = 2,|vc2wavestore
+store-data-words-at|kDataWordsAt = 0x30;|kDataWordsAt = 0x34;|vc2wavestore
+store-vpsc-type|kVpscTypeAt = 1,|kVpscTypeAt = 0,|vc2wavestore
+store-vpsc-stereo|kVpscStereoAt = 2,|kVpscStereoAt = 3,|vc2wavestore
+store-vpsc-root|kVpscRootAt = 0xa,|kVpscRootAt = 0xb,|vc2wavestore
+store-vpno-count|kVpnoCountAt = 4,|kVpnoCountAt = 8,|vc2wavestore
+store-vplp-switch|kVplpSwitchAt = 0x1a;|kVplpSwitchAt = 0x1b;|vc2wavestore
+store-no-vpno|kNoVpno = 2;|kNoVpno = 0;|vc2wavestore
+store-level-top|kLevelTop = 127;|kLevelTop = 126;|vc2wavestore
+store-chunks-vpdt|{ 0x2c, 0x34 }|{ 0x2c, 0x30 }|vc2wavestore
+store-chunks-vplp|{ 0x54, 0x30 }|{ 0x54, 0x34 }|vc2wavestore
+store-chunks-loop-events|{ 0x58, 0x44 }|{ 0x58, 0x40 }|vc2wavestore
+store-data-words-second|{ 0, 2, 3, 4, 5, 6 }|{ 0, 1, 3, 4, 5, 6 }|vc2wavestore
+store-data-words-last|{ 0, 2, 3, 4, 5, 6 }|{ 0, 2, 3, 4, 5, 7 }|vc2wavestore
+store-chunk-none|return block == 0 ? 0 : block + kBlockData;|return block + kBlockData;|vc2wavestore
+store-data-step|kBlockData + 4 * i);|kBlockData + 2 * i);|vc2wavestore
+store-data-direct|m.word(m.word(record + kDataAt) + kBlockData + 4 * i)|m.word(record + kDataAt + kBlockData + 4 * i)|vc2wavestore
+store-half-order|byte(at) \| byte(at + 1) << 8|byte(at) << 8 \| byte(at + 1)|vc2wavestore
+store-word-order|half(at) \| static_cast<uint32_t>(half(at + 2)) << 16|static_cast<uint32_t>(half(at)) << 16 \| half(at + 2)|vc2wavestore
+store-own-key-zero|words.key >= 0 ?|words.key > 0 ?|vc2wavestore
+store-own-key-unread|words.key >= 0 ? static_cast<uint32_t>(words.key) : key|key|vc2wavestore
+store-list-own-key|words.heads[k % kBuckets]|words.heads[key % kBuckets]|vc2wavestore
+store-match-own-key|m.word(node + kKeyAt) == k)|m.word(node + kKeyAt) == key)|vc2wavestore
+store-node-less|return node - kNodeAt;|return node;|vc2wavestore
+store-ring-end|        if (node == head) break;\n|\n|vc2wavestore
+store-alone-link|for (uint32_t node = head; node != 0;)|for (uint32_t node = head;;)|vc2wavestore
+store-loaded-set|if (record == 0 \|\| m.word(record + kSetAt) != 0) return 0;|if (record == 0) return 0;|vc2wavestore
+store-loaded-busy|return m.half(record + kBusyAt) == 0 ? record : 0;|return record;|vc2wavestore
+store-loaded-busy-word|m.half(record + kBusyAt) == 0|m.word(record + kBusyAt) == 0|vc2wavestore
+store-index-set-read|static_cast<int32_t>(m.word(set + kBlockData))|static_cast<int32_t>(m.word(set))|vc2wavestore
+store-index-none|return set == 0 ? kNoSet :|return set == 0 ? kNoRecord :|vc2wavestore
+store-words-zero|    if (number == 0) return false;\n|\n|vc2wavestore
+store-words-found-first|    put32(wave + kFoundAt, 1);\n    return vc2WaveLoadedWords(store, static_cast<uint16_t>(number - 1 + kNumberBase), wave, m, true);|    return vc2WaveLoadedWords(store, static_cast<uint16_t>(number - 1 + kNumberBase), wave, m, true) && (put32(wave + kFoundAt, 1), true);|vc2wavestore
+store-words-key|number - 1 + kNumberBase|number + kNumberBase|vc2wavestore
+store-words-not-loaded|    if (record == 0) return false;\n    for|    if (record == 0) return true;\n    for|vc2wavestore
+store-words-kept|    std::memmove(wave + kChunksAt, wave + kKeptAt, sizeof(uint32_t) * kKept);\n|\n|vc2wavestore
+store-root-offset-zero|wave[kRootOffsetAt] = 0;|wave[kRootOffsetAt] = kLevelTop;|vc2wavestore
+store-stereo-byte|put32(wave + kStereoAt, m.byte(vpsc + kVpscStereoAt));|wave[kStereoAt] = m.byte(vpsc + kVpscStereoAt);|vc2wavestore
+store-zero-half-gone|    put16(wave + kZeroHalfAt, 0);\n|\n|vc2wavestore
+store-events-untested|fromStore && vpno == 0 ? kNoVpno : m.word(vpno + kVpnoCountAt)|m.word(vpno + kVpnoCountAt)|vc2wavestore
+store-events-word|put16(wave + kEventsAt,|put32(wave + kEventsAt,|vc2wavestore
+store-zero-gone|    put32(wave + kZeroAt, 0);\n|\n|vc2wavestore
+store-frames-from-data|m.word(m.word(record + kVpscAt) + kFramesAt)|m.word(vpsc + kFramesAt)|vc2wavestore
+store-switch-of-vpno|m.byte(vc2in::u32(wave, kChunksAt + 8) + kVplpSwitchAt)|m.byte(vc2in::u32(wave, kChunksAt + 4) + kVplpSwitchAt)|vc2wavestore
+store-vpno-of-vplp|vpno = vc2in::u32(wave, kChunksAt + 4)|vpno = vc2in::u32(wave, kChunksAt + 8)|vc2wavestore
+store-words-answer|    return true;\n}|    return false;\n}|vc2wavestore
+store-levels-always|    if (fromStore) {\n        wave[kVelocityLevelAt]|    if (true) {\n        wave[kVelocityLevelAt]|vc2wavestore
+store-levels-by-set|    if (fromStore) {\n        wave[kVelocityLevelAt]|    if (!fromStore) {\n        wave[kVelocityLevelAt]|vc2wavestore
+store-events-by-set-tested|fromStore && vpno == 0 ? kNoVpno|vpno == 0 ? kNoVpno|vc2wavestore
+store-words-from-sets|wave, m, true);|wave, m, false);|vc2wavestore
+# The wave sets (vc2wavesets, Vc2WaveSets.cpp, v399), not planted: an alias's link of 0 let past its test, which reads
+# the entry before the table's first (out of the port's array, not a planted error a run can be sure to show).
+sets-from-store|vc2WaveLoadedWords(store, alias.number, wave, m, false)|vc2WaveLoadedWords(store, alias.number, wave, m, true)|vc2wavesets
+sets-entries-at|kEntriesAt = 0x10,|kEntriesAt = 0x12,|vc2wavesets
+sets-entries|kEntries = 128,|kEntries = 127,|vc2wavesets
+sets-flag-from|kFlagFrom = 127,|kFlagFrom = 128,|vc2wavesets
+sets-mark-at|kMarkAt = 0xa;|kMarkAt = 0xb;|vc2wavesets
+sets-mark-m|{ ' ', 'M' }|{ ' ', 'N' }|vc2wavesets
+sets-linked-type|kLinkedType = 1;|kLinkedType = 2;|vc2wavesets
+sets-found-at|kFoundAt = 0,|kFoundAt = 8,|vc2wavesets
+sets-velocity-level-at|kVelocityLevelAt = 4,|kVelocityLevelAt = 9,|vc2wavesets
+sets-root-offset-at|kRootOffsetAt = 5,|kRootOffsetAt = 9,|vc2wavesets
+sets-key-level-at|kKeyLevelAt = 6,|kKeyLevelAt = 9,|vc2wavesets
+sets-type-at|kTypeAt = 7,|kTypeAt = 9,|vc2wavesets
+sets-marked-at|kMarkedAt = 0x5c;|kMarkedAt = 0x48;|vc2wavesets
+sets-velocity-entry|velocityBuffer, 4, 2 }|velocityBuffer, 6, 2 }|vc2wavesets
+sets-velocity-next|velocityBuffer, 4, 2 }|velocityBuffer, 4, 4 }|vc2wavesets
+sets-key-entry|keyBuffer, 6, 4 }|keyBuffer, 4, 4 }|vc2wavesets
+sets-key-next|keyBuffer, 6, 4 }|keyBuffer, 6, 2 }|vc2wavesets
+sets-velocity-count|&Vc2WaveSetCounts::velocity, &Vc2WaveSetTables::velocity|&Vc2WaveSetCounts::key, &Vc2WaveSetTables::velocity|vc2wavesets
+sets-key-table|&Vc2WaveSetCounts::key, &Vc2WaveSetTables::key|&Vc2WaveSetCounts::key, &Vc2WaveSetTables::velocity|vc2wavesets
+sets-held-count|std::min<uint32_t>(count, kVc2WaveSetEntries)|std::min<uint32_t>(count, 20)|vc2wavesets
+sets-stream-short|into.size() > bytes ? bytes :|into.size() > bytes ? 0 :|vc2wavesets
+sets-stream-from|into[i] = m.byte(at + i);|into[i] = m.byte(at + i + 1);|vc2wavesets
+sets-read-whole|!= buffer.size()) return false;|== 0) return false;|vc2wavesets
+sets-number-past|if (n == 0 \|\| n > heldCount(s.counts.*row.count)) return false;|if (n == 0 \|\| n >= heldCount(s.counts.*row.count)) return false;|vc2wavesets
+sets-entry-order|table[2 * (n - 1)], table[2 * (n - 1) + 1]|table[2 * (n - 1) + 1], table[2 * (n - 1)]|vc2wavesets
+sets-flag|out.flag = buffer[kEntriesAt] >= kFlagFrom;|out.flag = buffer[kEntriesAt] > kFlagFrom;|vc2wavesets
+sets-mark-second|buffer[kMarkAt] == kMark[0] && buffer[kMarkAt + 1] == kMark[1]|buffer[kMarkAt] == kMark[0]|vc2wavesets
+sets-bound|if (by > entry[0]) continue;|if (by >= entry[0]) continue;|vc2wavesets
+sets-first|out.first = entry[1];|out.first = entry[2];|vc2wavesets
+sets-second|out.second = entry[2];|out.second = entry[1];|vc2wavesets
+sets-next-at|vc2in::s16(entry, static_cast<int>(row.nextAt))|vc2in::s16(entry, 2)|vc2wavesets
+sets-alias-past|if (n == 0 \|\| n > heldCount(s.counts.alias)) return false;|if (n == 0 \|\| n >= heldCount(s.counts.alias)) return false;|vc2wavesets
+sets-alias-entry|    s.buffers.alias = s.tables.alias[n - 1];\n    out.type|    s.buffers.alias = s.tables.alias[n];\n    out.type|vc2wavesets
+sets-alias-type|out.type = s.buffers.alias[0];|out.type = s.buffers.alias[1];|vc2wavesets
+sets-alias-link-at|vc2in::s16(s.buffers.alias.data(), 2)|vc2in::s16(s.buffers.alias.data(), 0)|vc2wavesets
+sets-alias-link-below|if (link == 0 \|\| n <= link) return true;|if (link == 0 \|\| n <= link + 1) return true;|vc2wavesets
+sets-alias-linked|if (s.buffers.alias[0] == kLinkedType) out.number = link;|out.number = link;|vc2wavesets
+sets-alias-relink|    s.buffers.alias = s.tables.alias[link - 1];\n|\n|vc2wavesets
+sets-by-key|splitOf(*this, kKey, byVelocity.next, key, byKey, m)|splitOf(*this, kKey, byVelocity.next, velocity, byKey, m)|vc2wavesets
+sets-by-velocity|splitOf(*this, kVelocity, index, velocity, byVelocity, m)|splitOf(*this, kVelocity, index, key, byVelocity, m)|vc2wavesets
+sets-alias-of-velocity|aliasOf(*this, byKey.next, alias)|aliasOf(*this, byVelocity.next, alias)|vc2wavesets
+sets-marked|byVelocity.marked ? 1 : 0|byKey.marked ? 1 : 0|vc2wavesets
+sets-found-and|byVelocity.flag && byKey.flag ? 1 : 0|byVelocity.flag \|\| byKey.flag ? 1 : 0|vc2wavesets
+sets-velocity-level|wave[kVelocityLevelAt] = byVelocity.first;|wave[kVelocityLevelAt] = byKey.first;|vc2wavesets
+sets-root-offset|wave[kRootOffsetAt] = byKey.second;|wave[kRootOffsetAt] = byKey.first;|vc2wavesets
+sets-key-level|wave[kKeyLevelAt] = byKey.first;|wave[kKeyLevelAt] = byKey.second;|vc2wavesets
+sets-type|wave[kTypeAt] = alias.type;|wave[kTypeAt] = 0;|vc2wavesets
+sets-record-number|vc2WaveLoadedWords(store, alias.number, wave, m, false)|vc2WaveLoadedWords(store, byKey.next, wave, m, false)|vc2wavesets
+sets-written-first|    if (!named) return false;\n|    if (!named \|\| store.loadedRecord(alias.number, m) == 0) return false;\n|vc2wavesets

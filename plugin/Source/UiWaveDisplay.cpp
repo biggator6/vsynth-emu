@@ -69,8 +69,7 @@ void paintWave(juce::Graphics& g, juce::Rectangle<float> area, const View& view,
         const float x = area.getX() + w * (float)i;
         bars.addRectangle(x, top, std::max(w, 1.0f), std::max(1.0f, bottom - top));
     }
-    g.setColour(Look::accent);
-    g.fillPath(bars);
+    Ui::fillPath(g, bars, Look::accent);
 }
 
 void paintCycles(juce::Graphics& g, juce::Rectangle<float> area, const std::vector<float>& samples) {
