@@ -844,6 +844,7 @@ class: 16000 events: 793 updates, 786 retunes, 843 destroys, 794 key-offs, 1626 
 listeners: 16000 events, 76169 change tests
 update task: 16000 events: 16000 passes, 31089 task calls, 33774 OS calls
 queue node: 16000 events: 7999 passes, 8001 other events, 2547 with the static M's node on the queue, 15669 task calls, 18540 OS calls
+stops: 16000 events: 5434 stops, 5249 truncations, 5317 of all; 8031 change tests, 1670 all notes off
 xt_vc2voices: 0 different
 == xt_vc2notes
 notes: 40 cases, 16000 events: 1964 constructors, 2023 note-ons (1375 with a partner), 993 ends, 983 and 1056 passes, 1032 releases, 1070 truncations once, 1017 starts and 1005 copies', 985 placements, 947 positions, 940 and 1001 of the tone's routines, 984 initializers

@@ -4198,3 +4198,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
   share a byte, found the part mixer's offsets inside the static M (its levels, 0x89997290): three ports keep one
   rom.4 memory, which the block's wiring has to make one. A planted error that the drawn placements reached only by
   chance at the list's one case made the placements a sweep.
+- v344 ported the three voice loops the settings call out. Its part came after the voice class's, which had unhooked
+  the queue's wait and the note voice's virtuals to run them as rom.4's own: the first runs differed (a wait logged on
+  one side) and then faulted in rom.4's queue on drawn links, until the part put the earlier hooks back.

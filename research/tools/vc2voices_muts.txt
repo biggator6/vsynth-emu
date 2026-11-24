@@ -172,8 +172,8 @@ rel-off-held|vc2KeysHighestIn(k.held, 0, kKeysTo) >= 0|vc2KeysHighestIn(k.held, 
 rel-off-flag|if (parts.partSetting(0, kKindOneHeld) == 0) release(kindOne, k, v, parts);|release(kindOne, k, v, parts);|vc2release
 rel-hold-off-pedal|pedalOff(table, keys.table(table).hold, kHoldHeld, v, parts);|pedalOff(table, keys.table(table).sostenuto, kHoldHeld, v, parts);|vc2release
 rel-sost-off-bit|pedalOff(table, keys.table(table).sostenuto, kSostenutoHeld, v, parts);|pedalOff(table, keys.table(table).sostenuto, kHoldHeld, v, parts);|vc2release
-rel-trunc-queue|parts.waitQueue(kQueuesAt + kQueueBytes * v.at(voice).queue, voice);\n    });\n}\n\nvoid Vc2Assigner::releaseBut|parts.waitQueue(kQueuesAt, voice);\n    });\n}\n\nvoid Vc2Assigner::releaseBut|vc2release
-rel-trunc-voice|        truncateVoice(voice, v, parts);\n        parts.waitQueue|        clearOrders(voice, v);\n        parts.waitQueue|vc2release
+rel-trunc-queue|    parts.waitQueue(kQueuesAt + kQueueBytes * v.at(voice).queue, voice);\n}\n\nvoid Vc2Assigner::truncateTable|    parts.waitQueue(kQueuesAt, voice);\n}\n\nvoid Vc2Assigner::truncateTable|vc2release
+rel-trunc-voice|    truncateVoice(voice, v, parts);\n    parts.waitQueue|    clearOrders(voice, v);\n    parts.waitQueue|vc2release
 rel-but-flag|parts.kindOf(v.at(voice).note) == kOneOfKind && parts.partSetting(0, kKindOneHeld) != 0;|parts.kindOf(v.at(voice).note) == kOneOfKind;|vc2release
 rel-all-but|eachOf(table, v, [&](uint32_t voice) { release(voice, keys.table(table), v, parts); });|releaseBut(table, keys, v, parts);|vc2release
 notes-channel-bytes|kSourceBytes = 0x480, kChannelBytes = 0x48, kGlideBytes = 0x24;|kSourceBytes = 0x480, kChannelBytes = 0x24, kGlideBytes = 0x24;|vc2nodenotes
@@ -346,3 +346,17 @@ ut-off-current|            q.q.current = n.next;|            q.q.current = n.pre
 ut-end-current|    q.q.current = at;\n}|}|vc2updatetask
 ut-pitch|    w.parts.pitchSource();\n|\n|vc2updatetask
 ut-voices|    w.parts.voicesUpdate();\n|\n|vc2updatetask
+# v344: the part's voices' stops and truncations (vc2release, Vc2AssignRelease.cpp), by xt_vc2voices' eighth part;
+# the voice not freed loops its walk for ever, which the port's log bound would end, not planted
+stop-word|        if (v.at(voice).part != word \|\| parts.changed(voice, word) == 0) {|        if (v.at(voice).part == word \|\| parts.changed(voice, word) == 0) {|vc2release
+stop-answer|parts.changed(voice, word) == 0) {|parts.changed(voice, word) != 0) {|vc2release
+stop-arg|parts.changed(voice, word) == 0) {|parts.changed(voice, v.at(voice).source) == 0) {|vc2release
+stop-again|        stopped = true;\n        voice = v.at(sounding).next;|        stopped = true;\n        voice = v.at(voice).next;|vc2release
+stop-flag|        stopped = true;\n||vc2release
+stop-notes-off|    if (stopped) parts.allNotesOff();|    if (stopped) return;|vc2release
+trunc-released|    n.released = 0;\n||vc2release
+trunc-asked|n.updated = (uint16_t)(n.updated \| kUpdateAsked);|n.updated = (uint16_t)(n.updated \| 2);|vc2release
+trunc-word|return n.part == word; };|return n.part != word; };|vc2release
+trunc-all|const auto any = [](const Vc2VoiceNode&) { return true; };|const auto any = [](const Vc2VoiceNode& n) { return n.part != 0; };|vc2release
+trunc-all-asked|eachWhere(v, any, [&](uint32_t voice) { truncateAsked(voice, v, parts); });|eachWhere(v, any, [&](uint32_t voice) { truncateQueued(voice, v, parts); });|vc2release
+trunc-part-asked|eachWhere(v, ofWord, [&](uint32_t voice) { truncateAsked(voice, v, parts); });|eachWhere(v, ofWord, [&](uint32_t voice) { truncateQueued(voice, v, parts); });|vc2release

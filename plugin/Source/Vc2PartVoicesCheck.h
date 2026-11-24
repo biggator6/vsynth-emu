@@ -157,3 +157,5 @@ long vc2UpdateTaskPart(VoicesSides& s, const Vc2Run& run);
 // The static M's node on the update queue's part (v312, Vc2UpdateTaskCheck.cpp), after the update task's on the seed
 // after its
 long vc2QueueNodePart(VoicesSides& s, const Vc2Run& run);
+// The stops' part (v344, Vc2AssignListenersCheck.cpp), after the static M's node's on the seed seven after the run's
+long vc2AssignStopsPart(VoicesSides& s, const Vc2Run& run);

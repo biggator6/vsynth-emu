@@ -35,7 +35,8 @@ public:
     void readParameters(uint32_t part) override;
     uint8_t firstByte(uint32_t object) override { return s_.fw.cpu.rd8(object); }
     int32_t clock() override;
-    void changed(uint32_t voice, uint32_t part) override;
+    uint32_t changed(uint32_t voice, uint32_t part) override;   // v344: answering as rom.4's hook answers
+    void allNotesOff() override;                                // v344: logged
 
     int32_t ms = 0;   // what the OS clock answers, drawn before an event
 
@@ -52,6 +53,9 @@ private:
 // classes hooked in theirs' place (the static M's node's, the seventh part's)
 void assignHookSlot(VoicesSides& s, VoicesKind kind, uint32_t entry, int registers,
                     uint32_t (*answer)(VoicesSides&) = nullptr, std::initializer_list<uint32_t> classes = {});
+// v344: the +0x48 virtual's answer on rom.4's side, a drawn word (the port's AssignPortParts::changed takes the same)
+uint32_t assignChangedAnswer(VoicesSides& s);
+inline constexpr uint32_t kAssignNotesOffAt = 0x89391e30;   // [FW] all notes off, event 0x80 to the notes' task
 
 inline constexpr uint32_t kAssignSettingsAt = 0x89995390, kAssignSettingBytes = 32;    // [FW] the parts' settings
 inline constexpr uint32_t kAssignParametersAt = 0x89996120, kAssignParameterBytes = 24;   // [FW] their messages

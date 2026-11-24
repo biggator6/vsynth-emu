@@ -51,8 +51,10 @@ public:
     virtual uint8_t firstByte(uint32_t object) = 0;
     virtual int32_t clock() = 0;
     // v305: the voice's +0x48 virtual (a note's change test 0x893972d0, the plain voice's 0x89391720 answering 0),
-    // given its +0x3c; its answer unread
-    virtual void changed(uint32_t voice, uint32_t part) = 0;
+    // given its +0x3c; its answer the listeners' run leaves unread, the part's stop reads (v344)
+    virtual uint32_t changed(uint32_t voice, uint32_t part) = 0;
+    // v344: all notes off, event 0x80 to the notes' task (0x89391e30)
+    virtual void allNotesOff() = 0;
 };
 
 struct Vc2KeyTable;
@@ -108,8 +110,17 @@ public:
     // The listeners' run (v305, Vc2AssignRelease.cpp): each sounding voice whose key table's channel state is
     // `state`, its +0x48 virtual
     void notify(uint32_t state, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts);   // 0x89390ea0
+    // v344 (Vc2AssignRelease.cpp): over the sounding voices of a part node's word (their +0x3c): the stop, each whose
+    // +0x48 virtual answers moved to the free list and the walk begun again, all notes off after any; the truncation,
+    // each released 0, an update asked for, truncated and waited on its update queue; and the truncation of every one
+    void stopPart(uint32_t word, Vc2PartVoices& v, Vc2AssignParts& parts);       // 0x89390f70
+    void truncatePart(uint32_t word, Vc2PartVoices& v, Vc2AssignParts& parts);   // 0x89390fd0
+    void truncateAll(Vc2PartVoices& v, Vc2AssignParts& parts);                   // 0x89391120
 
 private:
     bool sameNote(uint32_t voice, const Vc2AssignCall& call, Vc2PartVoices& v, Vc2AssignParts& parts);
     void splice(Vc2PartVoices& v);
+    // A voice truncated, then waited on its update queue; v344: with its released byte 0 and an update asked for first
+    void truncateQueued(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts);
+    void truncateAsked(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts);
 };

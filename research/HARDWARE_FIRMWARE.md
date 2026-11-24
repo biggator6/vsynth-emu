@@ -1546,6 +1546,41 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's voices' stops and truncations (2026-11-23, v344) {#vc2-voices-stops}
+
+Step 4.3's seventy-second version, Vc2Synth whole's fifth. The part's settings call out three routines over the
+sounding voices that no port had (`Vc2Assigner`, Vc2AssignRelease.cpp). Each takes a part node's word, the word a
+voice keeps at +0x3c, which `Vc2PartNodes::stop` and the Category's truncation hand on.
+- **The stop** `0x89390f70` (the nodes' `stopVoices`): it walks the sounding list from its first. A voice of the word
+  whose +0x48 virtual answers nonzero (the note's change test `0x893972d0`, the plain voice's `0x89391720` answering 0)
+  goes to the free list (`0x893918e0`), and the walk begins again from the list's first, because the move took the voice
+  off the list. If any voice stopped, all notes off follows (`0x89391e30`: the OS's event 0x80 to the notes' task's
+  object `0x8994fec8`, through `0x89301830`). The virtual's answer, which the listeners' run (v305) leaves unread, is now
+  `Vc2AssignParts::changed`'s, and all notes off is a part of its own.
+- **The truncation of a part's voices** `0x89390fd0` (the settings' `truncateVoices`): for each voice of the word, its
+  +0x2d is set to 0 and bit 0 of +0x30 (an update asked for) is set; then the voice is truncated (`0x89391a50`) and
+  waited on its update queue (`0x893951b0` on 0x89989cc4 + 36 × its +0x0c). The next link is read after.
+  **Every voice's truncation** `0x89391120` (`truncateAll`) does the same with no word. `truncateTable`'s truncation
+  and wait are one helper with these (`truncateQueued`).
+- Also found: `0x893b1be0`, the vocoder's settings wrapper, writes its second argument (stereo) to 0x8993eac8, the part
+  mixer's second word. `0x893b1c00` and `0x893b1c10` are plain jumps to the vocoder's mode switch and pedal.
+  `0x89391e40` and `0x89391e50` post events 0x100 and 0x200 the same way. With no store, rom.4's parameter getter
+  `0x89324350` gives an ID's descriptor default less its centre (`0x8932b340` → `0x89328780`: +6 less +4 of the
+  12-byte descriptor at 0x8950f0b0 + 12 × ID). The typed getter gives a typed ID's default (`0x8932b530` →
+  `0x89328d10`: +2 of the 8-byte descriptor at 0x895131a8 + 8 × (ID − 0x56a)). After the start every read object is 0.
+  These are for the part's patch load, next.
+
+Results:
+- xt_vc2voices' eighth part (Vc2AssignListenersCheck.cpp, on the listeners' rig, on the seed seven after the run's):
+  the voices' and the assigner's hooks are installed again, because the voice class's part ran them as rom.4's own. The
+  virtual answers a drawn word (in the listeners' part too, on both sides). Then the three routines run on a part
+  node's word: a voice's +0x3c half the time, else a message, now and then any word.
+- 0 different at 2024 (40 cases; 16,000 events, 8,031 change tests, 1,670 all notes off), 7 and 31337 (400; 160,000
+  events each).
+- The plants: 12 new (`stop-`, `trunc-`), and two re-aimed at `truncateQueued`; the voices list's 50 changed were all
+  caught. Not planted: a stopped voice left on the list, whose walk would loop for ever.
+- fcheck's baseline updated (the stops line). verify.sh green.
+
 ### C's reads in the part (2026-11-23, v343) {#vc2-synth-reads}
 
 Step 4.3's seventy-first version, Vc2Synth whole's fourth. `Vc2SynthReads` (Vc2SynthReads.h, .cpp) is C's reads and
