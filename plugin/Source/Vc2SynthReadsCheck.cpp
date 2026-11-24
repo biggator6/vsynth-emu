@@ -219,6 +219,8 @@ long vc2SynthReadsPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run) {
     std::mt19937 rng((uint32_t)run.seed + 1);
     Vc2SynthMemory memory(s);
     const std::vector<Vc2SynthRegion> regions = vc2SynthRegions(s);
+    for (const Vc2SynthRegion& r : regions)   // v347: the part's own words, where rom.4 holds nothing, given it
+        if (r.own) fw.cpu.write(r.at, r.mine, r.bytes);
     for (int c = 0; c < run.cases; ++c) {
         for (int k = 0; k < kNoised; ++k) regionNoised(fw, regions[rng() % regions.size()], rng);
         std::string d;

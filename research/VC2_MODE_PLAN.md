@@ -1186,6 +1186,12 @@ version against rom.4's routines with what it calls hooked:
          voice yet: Part 1 Receive Switch is a system ID, read as its default (off) with no system store. Next: the
          system store (rom.4's store object 0x89961250 and its read objects), so a note reaches the assigner, then the
          update task, the block and the whole check.
+       - The part's system store (v347): `Vc2System` (rom.4's three system areas, its defaults run once in an image by
+         `vc2LoadSystem`), the part given it and reading the system's blocks from it, the OS's 16 part objects (the OS
+         row 0x89318140's); xt_vc2synth's notes reach the voices (the assigner, C, the tones' note-ons, voices stolen,
+         the fade's wait rendered at once) on rom.2's and rom.4's tables as the plugin loads them (HARDWARE_FIRMWARE.md,
+         "The part's system store"). Next: the update task on the part, the block (mixer, renders, vocoder, tracker,
+         Auto Note) with the waits rendering in place, the OS model, and the whole check.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

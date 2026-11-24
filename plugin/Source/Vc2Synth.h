@@ -36,6 +36,7 @@
 #include "Vc2Sets.h"
 #include "Vc2StaticMatrix.h"
 #include "Vc2SynthTone.h"
+#include "Vc2SystemStore.h"
 #include "Vc2TimeTrip.h"
 #include "Vc2Tone.h"
 #include "Vc2ToneLists.h"
@@ -92,6 +93,9 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     void giveWaves(const Vc2LoadedWaves& w);
     // v345: the patch store the part's parameters read (Vc2PatchStore's bytes), none for every ID's default
     void givePatch(const std::vector<uint8_t>* store) { patch = store; }
+    // v347: the system's three areas (vc2SystemDefaults(), or a system's own), copied in, as rom.4's store object aims
+    // its system read objects at them; until then, every system ID its default
+    void giveSystem(const Vc2System& given);
     // v345: the notes' task's start to its loop (0x8938fc00…0x8938fc66) as the part has it: the notes' init
     // (0x89396960), the hook word the notes' task's, the start-up (0x89392ab0), the note-on gate open
     void taskStart();
@@ -191,6 +195,8 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2Assigner assigner {};
     std::array<uint8_t, 4> legato {};
     const std::vector<uint8_t>* patch = nullptr;
+    Vc2System system {};      // v347: 0x89add9a8, 0x8996126d, 0x8995cc14 (.bss)
+    bool hasSystem = false;   // rom.4's store object built (0x8931a640)
     std::unique_ptr<Vc2SynthNotes> noteParts;
     std::unique_ptr<Vc2SynthVoices> voiceParts;
     std::unique_ptr<Vc2SynthControls> controls;

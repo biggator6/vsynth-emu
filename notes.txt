@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's system store v347 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v346's 115c238;
+  HARDWARE_FIRMWARE.md, "The part's system store"): rom.4's three system areas (Vc2System, vc2SystemValue), their
+  defaults run once in an image (vc2LoadSystem), the part given them (giveSystem) and reading the system's blocks from
+  them; the OS's 16 part objects (Vc2OsPartObject, the OS row 0x89318140); a read no region holds fails a step; the
+  legato's struct the part's own. Notes now reach the voices: xt_vc2synth 0 different at 2024/7/31337 with thousands
+  voiced, on rom.4's OSC converters' tables and rom.2's port tables, the fade's wait rendered at once; xt_vc2midi 0
+  different; plants --synth --changed 85 (82 caught; the Matrix levels' copy for v348), v346's voice path 14 of 24 now
+  caught, --midi --changed 58 all caught; fcheck's baseline updated; verify.sh green.
+
 The part's MIDI note path v346 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v345's 984e5c3;
   HARDWARE_FIRMWARE.md, "The part's MIDI note path"): a message through the OS MIDI's handler and the dispatcher on the
   part's ports (Vc2SynthMidi, Vc2Synth::midiMessage), a part object's note-on and note-off by its class, the

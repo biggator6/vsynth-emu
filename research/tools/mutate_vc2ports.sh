@@ -189,6 +189,8 @@ VC2PORTS=(
     "vc2synthvoices|Vc2SynthVoices.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthnumbers|Vc2PartNumbers.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthmidi|Vc2SynthMidi.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2systemstore|Vc2SystemStore.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthosmidi|Vc2OsMidi.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

@@ -15,6 +15,7 @@ struct Vc2SynthRegion {
     void* mine;
     size_t bytes;
     const char* what;
+    bool own = false;   // v347: the part's own word, where rom.4 holds nothing (the legato's struct, on its stack)
 };
 
 template <class T>
@@ -35,6 +36,7 @@ public:
     void write(uint32_t at, const void* from, size_t bytes);
     // How many bytes read or written so far that no region holds
     long unheld() const { return unheld_; }
+    uint32_t firstUnheld() const { return firstUnheld_; }   // v347: the first such byte's address
 
 private:
     // The byte of the part at `at`, none (counted) where no region holds it
@@ -42,4 +44,5 @@ private:
     const Vc2SynthRegion* holding(uint32_t at) const;
     std::vector<Vc2SynthRegion> regions_;   // by address
     long unheld_ = 0;
+    uint32_t firstUnheld_ = 0;
 };

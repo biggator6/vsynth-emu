@@ -15,7 +15,7 @@ elapsed-set|    time.elapsed = kElapsed;\n|\n|vc2synth
 receive-set|    midi.receiveProgram = midi.receiveBank = kReceiveOn;\n|    midi.receiveProgram = kReceiveOn;\n|vc2synth
 nodes-channel|    for (Vc2PartNode& n : nodes.nodes) n.channel = 0;|    for (Vc2PartNode& n : nodes.nodes) n.channel = 1;|vc2synth
 midi-ports|    midi.staticInitPorts();   // the whole table's 0x893179d0\n|\n|vc2synth
-midi-states|    midi.staticInitStates();  // and 0x89317db0, before the part's rows\n|\n|vc2synth
+midi-states|    midi.staticInitStates();  // and 0x89317db0\n|\n|vc2synth
 voices-init|    voices.staticInit();      // row 4|    // row 4|vc2synth
 glides-init|    keys.constructGlides();   // row 7|    // row 7|vc2synth
 trips-init|    trips.staticInit();       // row 11|    // row 11|vc2synth
@@ -85,7 +85,7 @@ ss-levels-mixer|    std::memcpy(&s_.mixer.offsets, setup.levelsOut.values.data()
 ss-levels-targets|    s_.mixer.targets();\n}\n\n// [FW] 0x893b1be0|}\n\n// [FW] 0x893b1be0|vc2synthsettings
 ss-stereo|    s_.mixer.w.stereo = stereo;\n||vc2synthsettings
 ss-sound-off|vc2NumbersSoundOff(source, channel, w);|vc2NumbersSoundOff(source, channel + 1, w);|vc2synthsettings
-ss-receiving|t.states[(size_t)(16 * t.sources[0] + channel)]|t.states[(size_t)(16 * t.sources[1] + channel)]|vc2synthsettings
+ss-receiving|t.states[(size_t)(16 * t.sources[0] + channel)]|t.states[(size_t)(16 * t.sources[3] + channel)]|vc2synthsettings
 ss-part-message|settings.partParameters(w, kind, part);|settings.partParameters(w, kind, 0);|vc2synthsettings
 ss-message|settings.parameters(w, kind, byte1);|settings.parameters(w, kind, 0);|vc2synthsettings
 ss-routing|return settings.routing(w, on);|return settings.routing(w, false);|vc2synthsettings
@@ -98,18 +98,19 @@ syn-sound-off|soundOff(w, { source, channel, 0 }); }|soundOff(w, { source, chann
 # v346: the part's MIDI note path (vc2synthmidi, Vc2SynthMidi.cpp; vc2synth, Vc2Synth.cpp's audio task's object and
 # SysEx's flag; vc2synthmemory, their regions), by xt_vc2synth's notes part; and the voices' and notes' parts v345 left
 # for it (vc2synthvoices, Vc2SynthVoices.cpp).  Not planted: Vc2SynthMidi.h's bodies (the parameters' word's two bytes,
-# DC cut, all notes off), a header's; the OS MIDI's listeners read from the part's memory (listenerOf, nextListener),
-# as no routine of the part's installs one, so every port's list is empty on both sides.  Missed until the part has a
-# system store (v347): every plant on the voice path (smi-heard, -held, -held-range, -object-key, -object-word and the
-# svo- ones), as Part 1 Receive Switch reads its default, off, with none, so part 0's node receives on no channel and
-# no note reaches a held object, on rom.4's side as on the part's
+# DC cut, all notes off), a header's; the held class's test (v347: every object a note reaches is held after part 0's
+# message, the four sources' nodes on one object); the OS MIDI's listeners read from the part's memory (listenerOf,
+# nextListener), as no routine of the part's installs one, so every port's list is empty on both sides.  Missed in
+# v346 (no system store yet), caught from v347 but these: the notes' block pass's mix and COSM setters (svo-block-mix, -cosm,
+# the update task's), the ended hook (svo-ended, the renders' ended scan), the plain voice class's routines
+# (svo-destroy-end, -note, -updated, svo-prepare-plain, svo-keyoff-plain: no voice of the notes' is plain), the
+# note-on's fix-up written back (svo-noteon-back) and the legato's struct's second byte (svo-legato), equal in the
+# notes drawn
 smi-ways|{ partNoteOff, partNoteOn, partHeard,|{ partNoteOn, partNoteOff, partHeard,|vc2synthmidi
 smi-heard|    vc2ChannelHeard(w, source, channel);|    vc2ChannelHeard(w, source, channel ^ 1);|vc2synthmidi
 smi-controller|(int32_t)number, (int32_t)value);|(int32_t)number, (int32_t)value / 2);|vc2synthmidi
 smi-note-off|    vc2ChannelNoteOff(w, source, channel, key, velocity);|    vc2ChannelNoteOff(w, source, channel, key + 3, velocity);|vc2synthmidi
 smi-note-on|    vc2ChannelNoteOn(w, source, channel, key, velocity);|    vc2ChannelNoteOn(w, source, channel, key, velocity ^ 1);|vc2synthmidi
-smi-held|objects[k].vtable == kHeldClass;|objects[k].vtable != 0;|vc2synthmidi
-smi-held-range|return k < s_.nodes.objects.size() &&|return k < 1 &&|vc2synthmidi
 smi-object-key|{ object, table, word, (int32_t)key, velocity }|{ object, table, word, (int32_t)key + 1, velocity }|vc2synthmidi
 smi-object-word|{ object, table, word, 0, 0 }|{ object, table, 0, 0, 0 }|vc2synthmidi
 smi-handle|    s_.midi.handle(m, word, *this, *s_.settings);\n|\n|vc2synthmidi
@@ -138,4 +139,30 @@ svo-retune|s_.classes.retune(voice, message, value,|s_.classes.retune(voice, mes
 svo-keyoff-plain|    if (note != 0) s_.notes.release(note, *s_.noteParts);|    (void)note;|vc2synthvoices
 svo-changed|? s_.classes.changed(voice, s_.voices, *this) : 0;|? 0 : 0;|vc2synthvoices
 svo-table|/ sizeof(Vc2KeyGlide)].table;|/ sizeof(Vc2KeyGlide) + 1].table;|vc2synthvoices
-svo-reload|s_.reloads.message(Vc2PartReloads::kAt + (uint32_t)sizeof(Vc2Reload) * part);|s_.reloads.message(Vc2PartReloads::kAt);|vc2synthvoices
+svo-reload|(uint32_t)sizeof(Vc2Reload) * part);|(uint32_t)sizeof(Vc2Reload) * (part + 1));|vc2synthvoices
+# v347: the part's system store (vc2systemstore, Vc2SystemStore.cpp: each area's base, the defaults' routines, the read
+# by area), the part given it (vc2synth), the settings' system blocks from it (vc2synthsettings), its areas and the OS's
+# part objects as regions (vc2synthmemory), the OS's part objects' start (vc2synthosmidi, Vc2OsMidi.cpp under
+# xt_vc2synth).  Not planted: Vc2SystemStore.h's areas, a header's.  v345's Matrix levels' copy (ss-levels-static,
+# -mixer, -targets) is still missed: M's init runs on the update task, v348's
+sys-b-base|{ { { 0, kLastId, Vc2System::kRecord, 0 } },|{ { { 0, kLastId, Vc2System::kRecord + 1, 0 } },|vc2systemstore
+sys-block-base|Vc2System::kRecord + kSystemBlock, 0 } },|Vc2System::kRecord + kSystemBlock + 1, 0 } },|vc2systemstore
+sys-c-base|{ { 0, kLastId, Vc2System::kC, 0 } },|{ { 0, kLastId, Vc2System::kC + 1, 0 } },|vc2systemstore
+sys-d-base|{ { 0, kLastId, Vc2System::kD, 0 } } };|{ { 0, kLastId, Vc2System::kD + 1, 0 } } };|vc2systemstore
+sys-defaults-d|{ 0x89328d60, 0x89329190, 0x89328d20 };|{ 0x89328d60, 0x89329190, 0x89329190 };|vc2systemstore
+sys-read-at|image.read(a.at, s->bytes.data() + a.from|image.read(a.at + 1, s->bytes.data() + a.from|vc2systemstore
+sys-value-area|return xtStoreValue(kLayouts[(size_t)area], s.bytes, id);|return xtStoreValue(kLayouts[0], s.bytes, id);|vc2systemstore
+syn-give-system|    hasSystem = true;\n|\n|vc2synth
+syn-give-bytes|given.bytes.data(), system.bytes.size());|given.bytes.data(), Vc2System::kRecordBytes);|vc2synth
+syn-os-parts|    midi.staticInitParts();   // v347: and 0x89318140, before the part's rows\n|\n|vc2synth
+osp-index|partObjects[k] = { (uint8_t)k, kOs, kClass };|partObjects[k] = { (uint8_t)(k + 1), kOs, kClass };|vc2synthosmidi
+osp-os|kOs = { 1, 0xff, 0 };|kOs = { 1, 0xfe, 0 };|vc2synthosmidi
+osp-class|kClass = 0x898c872c;|kClass = 0x898c8660;|vc2synthosmidi
+ss-system-sys|{ { Block::kSystem, Vc2SystemArea::kSystem },|{ { Block::kSystem, Vc2SystemArea::kB },|vc2synthsettings
+ss-system-b|{ Block::kSystemB, Vc2SystemArea::kB },|{ Block::kSystemB, Vc2SystemArea::kSystem },|vc2synthsettings
+ss-system-c|{ Block::kSystemC, Vc2SystemArea::kC },|{ Block::kSystemC, Vc2SystemArea::kD },|vc2synthsettings
+ss-system-d|{ Block::kSystemD, Vc2SystemArea::kD } };|{ Block::kSystemD, Vc2SystemArea::kC } };|vc2synthsettings
+ss-has-system|&& s_.hasSystem) return vc2SystemValue|&& !s_.hasSystem) return vc2SystemValue|vc2synthsettings
+smem-os-parts|vc2SynthRegion(Vc2OsMidi::kPartObjectsAt, s.midi.partObjects,|vc2SynthRegion(Vc2OsMidi::kPartObjectsAt + 8, s.midi.partObjects,|vc2synthmemory
+smem-system|out.push_back({ a.at, s.system.bytes.data() + a.from,|out.push_back({ a.at + 1, s.system.bytes.data() + a.from,|vc2synthmemory
+smem-legato-own|"the legato's struct", true },|"the legato's struct", false },|vc2synthmemory

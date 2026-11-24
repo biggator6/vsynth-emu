@@ -4,7 +4,9 @@
 #include "Vc2Params.h"
 #include "Vc2PatchStore.h"
 #include "Vc2SynthControls.h"
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 
 namespace {
 using Block = Vc2ParamBlock;
@@ -20,13 +22,26 @@ int32_t defaultOf(int16_t id) {
     return d != nullptr ? d->def - d->centre : 0;
 }
 
-// The blocks in the part's store: the part's (0x893207b0) and a kind's three (0x89320a50, 0x89320ad0, 0x89320b70); the
-// system's are in the system's store, which the part has none of yet
+// The blocks in the part's store: the part's (0x893207b0) and a kind's three (0x89320a50, 0x89320ad0, 0x89320b70)
 bool inPatch(Block b) { return b == Block::kPart || b == Block::kKindA || b == Block::kKindB || b == Block::kKindC; }
+
+// [FW] v347: the system's blocks, each its area of the system store: the system's (0x89320790), B's (0x89320760), C's
+// (0x89320f60) and D's (0x893206f0)
+struct SystemBlock {
+    Block block;
+    Vc2SystemArea area;
+};
+constexpr SystemBlock kSystemBlocks[] = { { Block::kSystem, Vc2SystemArea::kSystem },
+                                          { Block::kSystemB, Vc2SystemArea::kB },
+                                          { Block::kSystemC, Vc2SystemArea::kC },
+                                          { Block::kSystemD, Vc2SystemArea::kD } };
 } // namespace
 
-// A part past 0 has no store (the VC-2's part 0 alone); a kind's blocks are its zone's
+// The system's blocks from the system store once given; a part past 0 has no store (the VC-2's part 0 alone); a kind's
+// blocks are its zone's
 int32_t Vc2SynthSettings::value(Block block, int part, int kind, int16_t id) {
+    const auto* system = std::ranges::find(kSystemBlocks, block, &SystemBlock::block);
+    if (system != std::end(kSystemBlocks) && s_.hasSystem) return vc2SystemValue(s_.system, system->area, id);
     if (s_.patch == nullptr || part != 0 || !inPatch(block)) return defaultOf(id);
     return xtStoreValue(vc2Store(), *s_.patch, id, block == Block::kPart ? 0 : kind, 0);
 }

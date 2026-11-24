@@ -894,11 +894,11 @@ xt_vc2settings: 0 different
 midi: 40 cases, 16000 events: 3063 handled (2862 by status's way), 1511 control changes, 761 program changes, 787 set-ups, 762 full resets, 780 controller resets, 755 defaults, 752 stores, 791 bends, 742 poly pressures, 741 pressures, 739 source resets, 768 channel resets, 784 resets of all, 727 flag reads, 781 and 756 initializers; 1419 listeners told, 462 OS routines, 1518 reads
 xt_vc2midi: 0 different
 == xt_vc2synth
-synth: the start, 96 of rom.4's initializers, 145 regions and the vocoder compared
+synth: the start, 97 of rom.4's initializers, 149 regions and the vocoder compared
 synth: 24 tones made through the part's hosts, their words compared, then given back
-synth load: the task's start, 16 cases (10 with a store), 320 events: 68 part reads, 70 dispatchers, 103 messages, 79 part messages
-synth notes: 16 cases, 640 events: 203 note-ons, 141 note-offs, 77 controllers, 28 bends, 35 poly pressures, 32 pressures, 15 programs, 53 parameters', 27 the part's, 29 resets; 0 voiced
-synth reads: 1 cases, 40 events: 12 memory reads, 70 readers, 14 getters, 7 sums, 600 placements; 0 bytes no region holds
+synth load: the task's start, 16 cases (16 with a store), 320 events: 90 part reads, 79 dispatchers, 69 messages, 82 part messages
+synth notes: 16 cases, 640 events: 230 note-ons, 125 note-offs, 86 controllers, 25 bends, 26 poly pressures, 28 pressures, 28 programs, 47 parameters', 22 the part's, 23 resets; 200 voiced
+synth reads: 1 cases, 40 events: 17 memory reads, 100 readers, 8 getters, 5 sums, 600 placements; 0 bytes no region holds
 xt_vc2synth: 0 different
 == xt_vc2patch
 sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)

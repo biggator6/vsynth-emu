@@ -2,7 +2,7 @@
 // The part's settings, the part's own (v345, Vc2Synth whole's sixth version): its parameters by read object (a patch's
 // store given, read as xt_vc2patch reads one, the kind its zone; with none, each ID's default less its centre, as
 // rom.4's getter 0x89324350 reads a read object never set up, 0x8932b340, and a typed ID's typed default, 0x8932b530;
-// the system's blocks the defaults, no system store yet), the held flags, the readers and messages on the part's tables
+// v347: the system's blocks from the system store given, Vc2SystemStore.h), the held flags, the readers and messages
 // (Vc2PartSettings) with the Matrix's set-up, and what they call out to the part's ports.  The set-up's levels
 // (0x89997290) are the static M's (+0x188), whose region holds them, and the part mixer's offsets the same three
 // floats: each move gives the mixer theirs, then its targets (0x893b1ee0).  Bit for bit: xt_vc2synth's load part.

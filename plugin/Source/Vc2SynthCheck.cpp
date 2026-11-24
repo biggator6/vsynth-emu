@@ -1,6 +1,7 @@
 // xt_vc2synth <rom.4> (v314): Vc2Synth's start against rom.4's.  On a fresh image (C startup's .data and .bss), rom.4's
-// own static initializers run in the interpreter in its table's order: the whole table's two OS MIDI rows (0x893179d0,
-// 0x89317db0), then the part's rows from 0x898c5cc0 to the one before 0x893f5070 (a task's that isn't the part's).
+// own static initializers run in the interpreter in its table's order: the whole table's three OS MIDI rows (0x893179d0,
+// 0x89317db0, v347's 0x89318140), then the part's rows from 0x898c5cc0 to the one before 0x893f5070 (a task's that
+// isn't the part's); from v347 the system's start after them (the store object, the record's and D's defaults).
 // Then Vc2Synth built and started, and every member compared with rom.4's memory at its address, byte for byte: the
 // whole objects, the tables a field at a time, the tone pool's tones by the words a tone holds (its head and tail),
 // the vocoder by v219's shared compares (its engines and stages) with its engine and hook words.  The start is one,
@@ -22,6 +23,14 @@
 #include "Vc2LibMathTables.h"
 #include "Vc2MatrixTables.h"
 #include "Vc2OsMidiTables.h"
+#include "Vc2CheckRom2.h"          // v347
+#include "Vc2OscConvertTables.h"   // v347
+#include "XtAnalog.h"              // v347: rom.2's tables
+#include "XtCosm.h"
+#include "XtEnvelope.h"
+#include "XtLfo.h"
+#include "XtMultiBandPlayer.h"
+#include "XtOsc.h"
 #include "Vc2OscTables.h"
 #include "Vc2PartMixerTables.h"
 #include "Vc2PartSettingsTables.h"
@@ -41,7 +50,8 @@
 namespace {
 constexpr uint32_t kRowsAt = 0x898c5cc0, kRowBytes = 12, kRowRoutine = 4;   // [FW] the part's rows: {0, routine, 0}
 constexpr uint32_t kFirstOutside = 0x893f5070;                              // [FW] row 95's routine, not the part's
-constexpr uint32_t kMidiRows[] = { 0x893179d0, 0x89317db0 };                 // [FW] the OS MIDI's rows, earlier
+// [FW] the OS MIDI's rows, earlier: its ports, its states, (v347) its part objects
+constexpr uint32_t kMidiRows[] = { 0x893179d0, 0x89317db0, 0x89318140 };
 
 // v342: the part's regions are the plugin's (Vc2SynthMemory.h, moved from here)
 using SynthRegion = Vc2SynthRegion;
@@ -146,11 +156,31 @@ std::string unmakeTones(Vc2Fw& fw, Vc2Synth& s) {
     return "";
 }
 
+// v347: rom.2's tables the part's ports read (its math's velocity curve and exp2, the envelopes', LFOs', COSMs', band
+// players' and analog OSC's), from the rom.2 beside rom.4, as the plugin loads them beside rom.4's
+bool synthRom2Tables(const std::string& rom2) {
+    const char* p = rom2.c_str();
+    return xtOscLoadTables(p) && xtEnvLoadTables(p) && xtLfoLoadTables(p) && xtCosmLoadTables(p) && xtMbLoadTables(p)
+           && xtAnalogLoadTables(p);
+}
+
 bool synthLoadTables(const char* path) {
     return vc2LoadAll<vc2LoadPartVoices, vc2LoadKeys, vc2LoadOsMidi, vc2LoadPartSettings, vc2LoadUnvoiced,
                       vc2LoadLegacy, vc2LoadHireso, vc2LoadVocoder, vc2LoadCarrier, vc2LoadTracker, vc2LoadAutoNote,
                       vc2LoadKind6, vc2LoadMixer, vc2LoadCosm, vc2LoadToneMix, vc2LoadSetEnvelopes, vc2LoadMatrix,
-                      vc2LoadLibMath, vc2LoadOsc, vc2LoadRamp, vc2LoadTva, vc2LoadParams>(path);   // v340, v345
+                      vc2LoadLibMath, vc2LoadOsc, vc2LoadRamp, vc2LoadTva, vc2LoadParams, vc2LoadSystem,
+                      vc2LoadOscConvert>(path)   // v347: the system, the OSC converters' (a note reaches C)
+           && synthRom2Tables(vc2Rom2Of(path));
+}
+
+// v347: the system's start on rom.4's side, as an XT starts with no system file: the store object built (its read
+// objects aimed, C's defaults), then the record's defaults and D's (its caller given no flag)
+std::string systemStart(Vc2Fw& fw) {
+    constexpr uint32_t kStoreObject = 0x89961250, kBuild = 0x8931a640;     // [FW] the OS row 0x8931a840's first call
+    constexpr uint32_t kRecordDefaults = 0x89319e10, kDDefaults = 0x89319a40;   // [FW]
+    const bool built = fw.call(kBuild, { kStoreObject });
+    const bool done = built && fw.call(kRecordDefaults, {}) && fw.call(kDDefaults, { 0, 0 });
+    return done ? "" : "the system's start faults: " + fw.cpu.error();
 }
 } // namespace
 
@@ -169,8 +199,8 @@ std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r) {
 }
 
 std::string vc2SynthRegionsDifference(Vc2Fw& fw, Vc2Synth& s) {
-    for (const SynthRegion& r : synthRegions(s))
-        if (std::string d = vc2SynthBytesDifference(fw, r); !d.empty()) return d;
+    for (const SynthRegion& r : synthRegions(s))   // v347: not the part's own words
+        if (std::string d = r.own ? "" : vc2SynthBytesDifference(fw, r); !d.empty()) return d;
     return "";
 }
 
@@ -188,8 +218,10 @@ int main(int argc, char** argv) {
     if (!run) return 1;
     int rows = 0;
     std::string what = runRows(fw, rows);
+    if (what.empty()) what = systemStart(fw);   // v347
     const auto synth = std::make_unique<Vc2Synth>();
     synth->start();
+    if (vc2SystemDefaults() != nullptr) synth->giveSystem(*vc2SystemDefaults());
     if (what.empty()) what = synthDifference(fw, *synth);
     if (!what.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the start: %s\n", what.c_str());
     std::printf("synth: the start, %d of rom.4's initializers, %zu regions and the vocoder compared\n", rows,

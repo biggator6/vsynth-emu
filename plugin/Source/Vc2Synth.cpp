@@ -59,6 +59,11 @@ Vc2Synth::Vc2Synth() {
 
 void Vc2Synth::midiMessage(const Vc2MidiMessage& m, uint32_t word) { midiParts->message(m, word); }
 
+void Vc2Synth::giveSystem(const Vc2System& given) {
+    std::memcpy(system.bytes.data(), given.bytes.data(), system.bytes.size());
+    hasSystem = true;
+}
+
 Vc2Synth::~Vc2Synth() = default;
 
 // [FW] the tone the pool's take gives: its head, the first when the pool was never taken from (any host past its end)
@@ -109,7 +114,8 @@ void Vc2Synth::start() {
     for (Vc2PartNode& n : nodes.nodes) n.channel = 0;   // .bss: the part's init gives them none
 
     midi.staticInitPorts();   // the whole table's 0x893179d0
-    midi.staticInitStates();  // and 0x89317db0, before the part's rows
+    midi.staticInitStates();  // and 0x89317db0
+    midi.staticInitParts();   // v347: and 0x89318140, before the part's rows
     voices.staticInit();      // row 4, 0x89391450 (row 6's age word the default 0)
     keys.constructGlides();   // row 7, 0x89392560
     trips.staticInit();       // row 11, 0x89394570

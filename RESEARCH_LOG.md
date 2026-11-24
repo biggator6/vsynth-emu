@@ -4210,3 +4210,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
   so part 0 receives no channel and every plant on the voice path went unseen. A pass needs a count of what it
   reached beside it. The parameters' messages added to the draws reached an OS routine the harness never set up, now
   hooked as xt_vc2midi hooks it. Next, the system store.
+- v347 gave the part rom.4's system store, and the notes reached the voices. Each step behind it was a table or an
+  object the harness had never needed, since no note had reached C: the OSC converters' tables, rom.2's tables the
+  part's ports read beside rom.4's, the OS's part objects (found by making a read past the part's memory fail the
+  step), and the OS's wait a stolen voice makes for its fade. The system's own defaults, not the descriptors', turn
+  Part 1's receive on.

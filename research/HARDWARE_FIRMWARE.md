@@ -1546,6 +1546,71 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's system store (2026-11-24, v347) {#vc2-synth-system}
+
+Step 4.3's seventy-fifth version, Vc2Synth whole's eighth. The part now reads the system's blocks from a system store
+as rom.4 does, so a note reaches its voices.
+
+**rom.4's store object** `0x89961250` (28 bytes) is built by the OS's row `0x8931a840` (its first call, `0x8931a640`).
+It aims the system's read objects at three areas in .bss:
+- +0, system D's: `0x8995cc14`, 46 bytes (ChordMemory, the bank's record);
+- +4, the system record: `0x89add9a8`, 104 bytes. System B's block is at its +0 (`0x89320760`: Part n's Receive Switch
+  and Channel, the Receive flags, Patch Remain) and the system's block at its +24 (`0x89320790`: Time Trip's assigns,
+  the controls);
+- +8: `0x89addb10`, eight 29-byte records; +0x10: `0x89adda10`, 64 words (neither read by the part);
+- +0x18, system C's: `0x8996126d`, 56 bytes (IDs 0x527…0x569: Out DC cut and Out Gain for TG, the voices' power).
+
+The getter on a real read object (`0x8932b050` → `0x89328630` → `0x89328580`) reads an ID's bits at the area's base
+plus its descriptor's offset, big-endian, gives the default when out of range, and takes off the centre. That is
+`xtStoreValue`'s read with one section an area (`vc2SystemValue`).
+
+**The defaults.** Each area has rom.4's own defaults routine: the record's `0x89328d60` (through `0x89319e10`), C's
+`0x89329190` (the store object's construction runs it) and D's `0x89328d20` (through `0x89319a40` given no flag).
+Each clears its area, then writes its IDs' descriptor defaults (`0x8932b2f0`) and some values of its own
+(`0x8932b1d0`). The record's set Part 1 Receive Switch on (ID 0x47, whose descriptor default is off) and part n's
+channel to n. A system file, "VC-2 System.s00", is loaded over them by `0x89344860` when the XT has saved one. The
+update's disk image holds none.
+
+`vc2LoadSystem` runs the three in an image after its C startup (Vc2RomTables) and keeps the bytes;
+`Vc2Synth::giveSystem` copies them into the part, whose three areas are regions at their addresses. Until a system
+is given, every system ID reads its default, as before.
+
+**The OS's part objects.** Each voice's part word (the part nodes' +8) points at one of 16 eight-byte objects of the
+OS's at `0x89960b7c`, built by the OS row `0x89318140` (`0x893186c0`, then `0x89317fc0`, by index). Each holds +0 the
+part's index, +1…+3 the OS's own bytes (1, 0xff, 0; `0x893186e0` writes +2 and +3 on a parameters' message of kind 0
+or 4), and +4 its class `0x898c872c`. C reads the index (`firstByte`). They are `Vc2OsMidi::partObjects`, a region,
+started by `staticInitParts`.
+
+**The fade's wait.** A voice stolen with a wait (`0x893b3bc0`) starts its TVA's fade, then calls the OS's event wait
+`0x893017f0(0x1000)` until the tone's fade (+0x1a54, the TVA's +0x64) reaches 0. Only the audio task's renders do that.
+The part's `waitFade` has the fade rendered at once, and the check hooks the wait on rom.4's side to do the same to the
+waiting tone (its address still in r12). The renders in the wait are the block's version.
+
+**What the check found on the way.**
+- Notes sounding brought C's conversions and the tones' note-ons into xt_vc2synth for the first time, and with them
+  tables it had never loaded. The OSC converters' (`vc2LoadOscConvert`) were missing: the OSC block's floats came out
+  infinite. So were rom.2's, which the part's ports read beside rom.4's as the plugin has them: the velocity curve and
+  exp2 of the part's math (XtOsc's), the envelopes', LFOs', COSMs', band players' and analog OSC's.
+- The legato's struct a prepare gives C is the part's own word. rom.4 keeps it on the notes' task's stack, so its
+  region (`own`) isn't compared with rom.4's memory, and the reads part gives rom.4's memory its bytes first.
+- The step compare now fails on a read that reaches no region of the part (`firstUnheld`). That read is how the OS's
+  part objects were found.
+
+Results:
+- xt_vc2synth 0 different at 2024 (40 cases; 412 of 1,600 messages started a voice), 7 and 31337 (400 cases; 3,591
+  and 3,438 of 16,000). Its loads and parts start, load, play and read with the system in. xt_vc2midi 0 different too.
+- The load and notes parts draw a system with each store: rom.4's defaults half the time, else noise in the three
+  areas with Part 1 Receive Switch on three times in four. A kind-0 parameters' message (the routing's reset, where
+  ChordMemory is read) now comes one time in four, so system D's reads are seen.
+- The plants. The synth list's changed 85: 82 caught. The three missed are v345's Matrix levels' copy, which needs
+  M's init on the update task (v348). v346's voice-path plants: 14 of 24 now caught. The ten still unseen are the
+  notes' block pass's mix and COSM setters (the update task's), the ended hook (the renders'), the plain voice
+  class's five routines (no voice of the notes' is plain), the note-on's fix-up written back, and the legato's
+  struct's second byte. Re-aimed: Receive's source (sources 0 and 1 are both 0), the reload by part (part 0 alone),
+  and the defaults' read (each area's last byte is 0). Dropped: the held class's two tests, since every object a
+  note reaches is held. The MIDI list's changed 58: all caught.
+- fcheck's baseline updated (the initializers, the regions, the parts' draws, the voiced count). verify.sh green.
+
 ### The part's MIDI note path (2026-11-23, v346) {#vc2-synth-midi}
 
 Step 4.3's seventy-fourth version, Vc2Synth whole's seventh. A MIDI message now reaches the part as rom.4 takes it,

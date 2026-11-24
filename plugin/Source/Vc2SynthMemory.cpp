@@ -12,6 +12,7 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(Vc2OsMidi::kStatesAt, s.midi.states, "the channel states"),
         vc2SynthRegion(Vc2OsMidi::kFlagsAt, s.midi.receiveProgram, "Receive Program Change"),
         vc2SynthRegion(Vc2OsMidi::kFlagsAt + 1, s.midi.receiveBank, "Receive Bank Select"),
+        vc2SynthRegion(Vc2OsMidi::kPartObjectsAt, s.midi.partObjects, "the OS's part objects"),   // v347
         vc2SynthRegion(0x89981b6c, s.voices.voices, "the voices"),
         vc2SynthRegion(Vc2PartVoices::kHeadsAt, s.voices.heads, "the heads"),
         vc2SynthRegion(0x899826d4, s.voices.g, "the voices' globals"),
@@ -37,7 +38,7 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(Vc2WaveSets::kCountsAt, s.waveSets.counts, "the wave sets' counts"),      // v343
         vc2SynthRegion(Vc2WaveSets::kTablesAt, s.waveSets.tables, "their tables"),               // v343
         vc2SynthRegion(Vc2WaveSets::kBuffersAt, s.waveSets.buffers, "their buffers"),            // v343
-        vc2SynthRegion(kVc2SynthLegatoAt, s.legato, "the legato's struct"),                     // v345
+        { kVc2SynthLegatoAt, &s.legato, sizeof s.legato, "the legato's struct", true },        // v345, v347
         vc2SynthRegion(0x8998a480, s.audioTask, "the audio task's object"),                     // v346
         vc2SynthRegion(0x8992e3d1, s.sysexOn, "SysEx's flag"),                                   // v346
         vc2SynthRegion(0x89997090, r.commons, "the commons' table"),
@@ -109,6 +110,8 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         out.push_back(vc2SynthRegion(at, s.tones.tones[(size_t)k].head, "a tone's head"));
         out.push_back(vc2SynthRegion(at + kVc2ToneTailAt, s.tones.tones[(size_t)k].tail, "a tone's tail"));
     }
+    for (const Vc2System::Area& a : Vc2System::kAreas)   // v347: the system's three areas
+        out.push_back({ a.at, s.system.bytes.data() + a.from, (size_t)a.size, a.what });
     return out;
 }
 
@@ -127,7 +130,7 @@ const Vc2SynthRegion* Vc2SynthMemory::holding(uint32_t at) const {
 uint8_t* Vc2SynthMemory::byteAt(uint32_t at) {
     const Vc2SynthRegion* r = holding(at);
     if (r == nullptr) {
-        ++unheld_;
+        if (unheld_++ == 0) firstUnheld_ = at;
         return nullptr;
     }
     return static_cast<uint8_t*>(r->mine) + (at - r->at);

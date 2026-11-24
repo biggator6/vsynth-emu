@@ -72,14 +72,26 @@ void vc2ChannelBend(Vc2ChannelState& s, uint8_t lsb, uint8_t msb);    // 0x89317
 void vc2ChannelPoly(Vc2ChannelState& s, uint8_t key, uint8_t value);  // 0x89317cc0: keys below 128
 void vc2ChannelPressure(Vc2ChannelState& s, uint8_t value);       // 0x89317cf0
 
+// [FW] v347: one of the OS's 16 part objects (from 0x89960b7c, the OS row 0x89318140: 0x893186c0 on each by its index):
+// +0 the part's index, which C reads through a voice's part word (the part nodes' +8, the first's), +1…+3 the OS's
+// own (its constructor's 1, 0xff and 0; 0x893186e0 writes +2 and +3 on a parameters' message), +4 its class
+struct Vc2OsPartObject {
+    uint8_t index = 0;
+    std::array<uint8_t, 3> os {};
+    uint32_t vtable = 0;
+};
+static_assert(sizeof(Vc2OsPartObject) == 8, "rom.4's layout, a part object of the OS's");
+
 class Vc2OsMidi {
 public:
     static constexpr uint32_t kPortsAt = 0x8995eaf4, kStatesAt = 0x8995edf8, kFlagsAt = 0x8992e3e8;   // [FW]
-    static constexpr int kPorts = 48, kStates = 32;
+    static constexpr uint32_t kPartObjectsAt = 0x89960b7c;                                          // [FW] v347
+    static constexpr int kPorts = 48, kStates = 32, kPartObjects = 16;
     static constexpr uint16_t kNone = 0x7f7f;   // [FW] no RPN or NRPN
 
     void staticInitStates();    // 0x89317d00 (on 0x8995edf4): rows 0 and 1, each channel set up
     void staticInitPorts();     // 0x89317910 (on 0x8995eaf0): rows 0…2 on the states of sources 1…3
+    void staticInitParts();     // v347: 0x89318140 (on 0x89960b78): each part object by its index
     // 0x89314e90: a message (its source the row of port objects) and the word beside it
     void handle(const Vc2MidiMessage& m, uint32_t word, Vc2OsMidiParts& parts, Vc2PartParams& params);
     void controlChange(uint32_t port, uint8_t cc, uint8_t value, Vc2OsMidiParts& parts);   // 0x893172e0
@@ -103,4 +115,5 @@ public:
     std::array<Vc2MidiPort, kPorts> ports {};
     std::array<Vc2ChannelState, kStates> states {};
     uint8_t receiveProgram = 0, receiveBank = 0;   // 0x8992e3e8, 0x8992e3e9
+    std::array<Vc2OsPartObject, kPartObjects> partObjects {};   // v347
 };
