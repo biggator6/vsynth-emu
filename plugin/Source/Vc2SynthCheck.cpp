@@ -19,12 +19,15 @@
 #include "Vc2LibMathTables.h"
 #include "Vc2MatrixTables.h"
 #include "Vc2OsMidiTables.h"
+#include "Vc2OscTables.h"
 #include "Vc2PartMixerTables.h"
 #include "Vc2PartSettingsTables.h"
 #include "Vc2PartVoicesTables.h"
+#include "Vc2RampTables.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2ToneMixTables.h"
 #include "Vc2TrackerTables.h"
+#include "Vc2TvaTables.h"
 #include "Vc2Unvoiced.h"
 #include "Vc2VocoderTables.h"
 #include <cstring>
@@ -163,11 +166,79 @@ std::string runRows(Vc2Fw& fw, int& rows) {
     return "";
 }
 
+// v340: a part's words with the index the tone keeps for it laid over its word at `indexAt` (an envelope's +4, an
+// LFO's +0x34), as rom.4's memory holds the two in one
+template <class Words>
+Words withIndex(const Words& w, int32_t index, size_t indexAt) {
+    Words out = w;
+    std::memcpy(reinterpret_cast<uint8_t*>(&out) + indexAt, &index, sizeof index);
+    return out;
+}
+
+// v340: a made tone's words, each region by its place in the tone: its head, tail and link, its OSC voices, TVA, mix,
+// and its envelopes' and LFOs' words (its COSM objects hold rom.4's own pointers, which xt_vc2tone masks: there)
+std::string madeDifference(Vc2Fw& fw, Vc2Synth& s, int tone) {
+    constexpr uint32_t kOsc2At = 0xba4, kTvaAt = 0x19f0, kMixAt = 0x1ab8, kLinkAt = 0x2618;     // [FW] the tone's
+    constexpr uint32_t kOsc1At = 0x20, kEnvelopesAt = 0x1b38, kLfosAt = 0x2158;                  // [FW]
+    const uint32_t at = s.tones.addressOf(tone);
+    const Vc2Tone& t = s.tones.tones[(size_t)tone];
+    const Vc2SynthTone& h = s.hosts[(size_t)tone];
+    std::vector<SynthRegion> regions = {
+        region(at, t.head, "its head"), region(at + kToneTailAt, t.tail, "its tail"),
+        region(at + kLinkAt, t.link, "its link"), region(at + kOsc1At, h.oscs[0], "OSC 1's voice"),
+        region(at + kOsc2At, h.oscs[1], "OSC 2's voice"), region(at + kTvaAt, h.tva.w, "its TVA"),
+        region(at + kMixAt, h.mix.w, "its mix"),
+    };
+    constexpr size_t kEnvelopeIndexAt = 4, kLfoIndexAt = 0x34;   // [FW]
+    std::vector<Vc2EnvelopeWords> envelopes;
+    std::vector<Vc2LfoWords> lfos;
+    for (size_t k = 0; k < h.mods.envelopes.size(); ++k) {
+        envelopes.push_back(withIndex(h.mods.envelopes[k].w, t.envelopeIndex[k], kEnvelopeIndexAt));
+    }
+    for (size_t k = 0; k < h.mods.lfos.size(); ++k) {
+        lfos.push_back(withIndex(h.mods.lfos[k].w, t.lfoIndex[k], kLfoIndexAt));
+    }
+    for (size_t k = 0; k < envelopes.size(); ++k) {
+        regions.push_back(region(at + kEnvelopesAt + (uint32_t)(k * sizeof(Vc2EnvelopeWords)), envelopes[k],
+                                 "an envelope"));
+    }
+    for (size_t k = 0; k < lfos.size(); ++k) {
+        regions.push_back(region(at + kLfosAt + (uint32_t)(k * sizeof(Vc2LfoWords)), lfos[k], "an LFO"));
+    }
+    for (const SynthRegion& r : regions) {
+        if (std::string d = bytesDifference(fw, r); !d.empty()) return "tone " + std::to_string(tone) + ", " + d;
+    }
+    return "";
+}
+
+// v340: the 24 tones made in turn on both sides, each id drawn: rom.4's 0x893b2db0(0, id), and the pool's make through
+// the tone's host, the part's; after each the pool's words, the chaos generator and the tone's words
+std::string makeTones(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, int& made) {
+    constexpr uint32_t kMakeAt = 0x893b2db0, kIds = 64;   // [FW]
+    // [FW] the OS's lock and unlock the make takes (into the kernel at 0x88008000): nothing on one thread
+    for (uint32_t at : { 0x893018b0u, 0x893018c0u }) {
+        fw.cpu.hook(at, [](Sh4& cpu) { cpu.ret(0); });
+    }
+    for (int k = 0; k < Vc2TonePool::kTones; ++k) {
+        const uint32_t id = rng() % kIds;
+        const int next = s.tones.head == 0 ? 0 : s.tones.indexOf(s.tones.head);
+        if (!fw.call(kMakeAt, { 0, id })) return "the make faults: " + fw.cpu.error();
+        const Vc2Tone* mine = s.tones.make(id, s.hosts[(size_t)next]);
+        if (mine == nullptr || fw.cpu.r[0] != s.tones.addressOf(next)) return "the make's tone";
+        ++made;
+        std::string d = bytesDifference(fw, region(0x8993fb48, s.tones.head, "the tone pool's head"));
+        if (d.empty()) d = bytesDifference(fw, region(0x89999668, s.chaos, "the chaos generator"));
+        if (d.empty()) d = madeDifference(fw, s, next);
+        if (!d.empty()) return d;
+    }
+    return "";
+}
+
 bool synthLoadTables(const char* path) {
     return vc2LoadAll<vc2LoadPartVoices, vc2LoadKeys, vc2LoadOsMidi, vc2LoadPartSettings, vc2LoadUnvoiced,
                       vc2LoadLegacy, vc2LoadHireso, vc2LoadVocoder, vc2LoadCarrier, vc2LoadTracker, vc2LoadAutoNote,
                       vc2LoadKind6, vc2LoadMixer, vc2LoadCosm, vc2LoadToneMix, vc2LoadSetEnvelopes, vc2LoadMatrix,
-                      vc2LoadLibMath>(path);
+                      vc2LoadLibMath, vc2LoadOsc, vc2LoadRamp, vc2LoadTva>(path);   // v340: the tones' parts' too
 }
 } // namespace
 
@@ -183,7 +254,12 @@ int main(int argc, char** argv) {
     if (!what.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the start: %s\n", what.c_str());
     std::printf("synth: the start, %d of rom.4's initializers, %zu regions and the vocoder compared\n", rows,
                 synthRegions(*synth).size());
-    std::printf("xt_vc2synth: %d different\n", what.empty() ? 0 : 1);
+    std::mt19937 rng((uint32_t)run->seed);   // v340: the tones made through the part's hosts
+    int made = 0;
+    std::string tones = what.empty() ? makeTones(fw, *synth, rng, made) : "";
+    if (!tones.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the tones made: %s\n", tones.c_str());
+    std::printf("synth: %d tones made through the part's hosts, their words compared\n", made);
+    std::printf("xt_vc2synth: %d different\n", (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1));
     return 0;
 }
 #endif

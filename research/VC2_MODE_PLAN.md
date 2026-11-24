@@ -1154,6 +1154,11 @@ version against rom.4's routines with what it calls hooked:
          table to a NaN that FSUB and xtf's subtraction carry otherwise; no XT reaches it, so a draw
          (`oscSteerVariFormant`; HARDWARE_FIRMWARE.md, "VariPhrase's formant target finite before its update"). Next:
          Vc2Synth's 24 hosts.
+       - Vc2Synth's tones (v340), Vc2Synth whole's first version: the 24 hosts the part's (`Vc2SynthTone`), their
+         OSC voices' outside from the part and the waves it is given; xt_vc2synth makes the 24 on both sides
+         (HARDWARE_FIRMWARE.md, "Vc2Synth's tones"). Next, as the shared notes plan it: the note's reads
+         (`Vc2SetReads`, `Vc2NoteParts`, `Vc2VoiceParts` from the part), then the tasks' OS model, the block, and the
+         whole check against rom.4's three tasks.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

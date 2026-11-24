@@ -138,7 +138,7 @@ void Vc2SetTvas::blockOf(const Vc2SetTvaWords& w, uint32_t* block, Vc2SetReads& 
     tvaScaled(block[11], gain);
     block[14] = floatWord(xtf::mul(common, t.tvaSendTwo));
     block[15] = floatWord(xtf::mul(gain, out));
-    step = floatWord(xtf::div(kOne, xtf::mul(xtf::div(xtf::flt(g.rate), t.tvaRateScale), t.tvaSampleRate)));
+    step = xtf::div(kOne, xtf::mul(xtf::div(xtf::flt(g.rate), t.tvaRateScale), t.tvaSampleRate));
 }
 
 void Vc2SetTvas::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads) {

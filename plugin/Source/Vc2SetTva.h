@@ -56,7 +56,9 @@ public:
     void blockOf(const Vc2SetTvaWords& w, uint32_t* block, Vc2SetReads& reads);
 
     static constexpr uint32_t kStepAt = 0x8993eb08;   // [FW]
-    uint32_t step = 0;   // rom.4's float at kStepAt, 1 / (the part's rate / 100 × 44.1)
+    // rom.4's float at kStepAt, 1 / (the part's rate / 100 × 44.1); from v340 a float, the word the tones' hosts read
+    // (Vc2ToneCommon::fadeStep)
+    float step = 0.0f;
 };
 static_assert(sizeof(Vc2SetTvaWords) == 40 && offsetof(Vc2SetTvaWords, curve) == 6, "rom.4's layout, C's TVA");
 static_assert(offsetof(Vc2SetTvaWords, velocityLevel) == 0x20, "rom.4's layout, C's TVA");

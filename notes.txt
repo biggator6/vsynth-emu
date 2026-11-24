@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Vc2Synth's tones v340 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v339's d6b79ca; HARDWARE_FIRMWARE.md,
+  "Vc2Synth's tones"): Vc2Synth whole's first version. The part holds its 24 tones' hosts (Vc2SynthTone, on the
+  part's own words) and is their world; their OSC voices read the part's clock word, mic ring, input stage, chip
+  frames and the waves it is given (the wiring's, from vc2Waves()). The tones' render buffers and the mixer's frames
+  join the part; C's TVA step a float, C's envelope words Vc2SetEnvelopeWords. The tail routines and the wait are the
+  tasks' version's. xt_vc2synth makes the 24 tones on both sides, 0 different at 2024/7/31337; the changed plants 31 (synth) and 153 (sets), 0 missed; fcheck's
+  baseline updated (the new line); verify.sh green.
+
 VariPhrase's formant target finite v339 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v338's e5a26b5;
   HARDWARE_FIRMWARE.md, "VariPhrase's formant target finite before its update"): a coverage build's seed 7 case 383
   wrote +0x1d0 rom.4 0xffffa8ea, the port 0x7fc00000. The check's formant depths (±1000 over outputs as wide) took

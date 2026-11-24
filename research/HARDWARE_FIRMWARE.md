@@ -1546,6 +1546,52 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Vc2Synth's tones (2026-11-23, v340) {#vc2-synth-tones}
+
+Step 4.3's sixty-eighth version, the first of Vc2Synth whole (VC2_MODE_PLAN.md, step 4.3's last item). Vc2Synth (v314)
+held every port's object of the part, but no tone's parts: those were the checks' fakes' (xt_vc2tone's
+`TonePortParts`). Now the part holds its 24 tones' hosts, `Vc2SynthTone` (Vc2SynthTone.h). It is Vc2ToneHost's
+deriving class on `Vc2ToneCommon` from the part's own words: the pool, the lists, the mixes' rings, the free LFOs,
+the chaos generator, C's TVA step, the COSM pools, the part mixer's frames after buffer c, and the shared routines
+(`Vc2ToneMath`). The part is the hosts' world (`Vc2SynthToneWorld`): another tone's host, the OS's event, the tail's
+two routines, the truncation's wait, and what the OSC voices read beyond the tone (`Vc2SynthOscOutside`):
+- no render by address: every render an install writes is the voice's own from v337, and any other word renders
+  silence, where rom.4 runs what it names;
+- the OS's millisecond word, the mic ring, the input stage's unvoiced decision and peak (the vocoder's
+  `Vc2Unvoiced`), and the chip's frames for the block (none: silence);
+- the wave memory, its headers and loop records (by fields, `XtWord`) and the samples, as the part is given them.
+  The plugin's wiring takes them from `vc2Waves()` (v504). A tone doesn't reach the process's global: xt_vc2synth
+  leaves the wave boot's files out, and the part is testable with waves of a check's own.
+
+New in the part: the tones' render buffers a, b and c (0x89998b20…0x89998e1f), the part mixer's 32 frames of 8
+floats after them (0x89998e20), the OS's clock word, the chip's frames, and the events posted. The tail's routines
+and the wait are the tasks' version's (VC2_MODE_PLAN.md, the plan's third item). Until then the events are kept and
+a wait ends its tone's fade, so a truncation can't spin. Two of the part's words met the tone's types:
+- C's TVA step (0x8993eb08) is the one float C's TVA child writes and the tones' fades read (`Vc2SetTvas::step`
+  was its bits; now a float).
+- C's `Vc2EnvelopeWords` shared its name with the tone's, as C's LFO and mix words did at v314. It is
+  `Vc2SetEnvelopeWords` now.
+
+**The check.** xt_vc2synth's second part: after the start, the 24 tones are made in turn on both sides, each id
+drawn. rom.4 runs 0x893b2db0(0, id), with the OS's lock and unlock (0x893018b0, 0x893018c0, into the kernel at
+0x88008000) hooked to do nothing. The port runs the pool's make through that tone's host. After each, these are
+compared byte for byte:
+- the pool's head and the chaos generator;
+- the tone's head, tail and link, its OSC voices, its TVA and its mix;
+- its envelopes' and LFOs' words, with the indexes the tone keeps for them laid over their +4 and +0x34.
+The COSM objects hold rom.4's own pointers, which xt_vc2tone masks; they are left to it. Its loads gained the OSC
+voice's, the ramp's and the TVA's tables, which the voices' and TVA's constructors read: without them the first
+ramp's 1.0 came out 0.
+
+Results:
+- 0 different at 2024, 7 and 31337, 24 tones made each.
+- The plants: the synth list's changed 31 and the sets list's 153 (C's TVA step and envelope), 0 missed. Of v340's own, host-chaos is caught.
+  host-number (every host tone 0) shows nowhere a make reaches: a host's number is its address and tail, which the
+  tasks' renders and note-ons reach. The voices' outside is the same. A plant of a common's reference to another word
+  builds no mutant.
+- fcheck's baseline updated for the new line.
+- verify.sh green.
+
 ### VariPhrase's formant target finite before its update (2026-11-23, v339) {#vc2-osc-vari-formant-finite}
 
 Step 4.3's sixty-seventh version, a draw of the checks', not a port's fault. A coverage build of xt_vc2osc (its

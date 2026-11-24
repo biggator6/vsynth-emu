@@ -174,6 +174,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OsMidiHandler.cpp
     Source/Vc2OsMidiTables.cpp
     Source/Vc2Synth.cpp
+    Source/Vc2SynthTone.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

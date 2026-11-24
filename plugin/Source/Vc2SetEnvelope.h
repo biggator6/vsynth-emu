@@ -11,7 +11,7 @@
 #include "Vc2SetChildHead.h"
 #include <cstddef>
 
-struct Vc2EnvelopeWords {
+struct Vc2SetEnvelopeWords {
     uint8_t kind = 0;               // +0x00: the note's
     uint8_t index = 0;              // +0x01: which of the voice's 13
     uint8_t key = 0;                // +0x02: the voice's +0x41
@@ -32,13 +32,13 @@ struct Vc2EnvelopeWords {
     uint8_t unread17 = 0;
     uint32_t matrix = 0;            // +0x18: the note's M
 };
-static_assert(sizeof(Vc2EnvelopeWords) == 0x1c, "rom.4's layout, an envelope of C's");
-static_assert(offsetof(Vc2EnvelopeWords, on) == 6, "the part's words where Vc2SetChildHead puts them");
+static_assert(sizeof(Vc2SetEnvelopeWords) == 0x1c, "rom.4's layout, an envelope of C's");
+static_assert(offsetof(Vc2SetEnvelopeWords, on) == 6, "the part's words where Vc2SetChildHead puts them");
 
 // [FW] the pool at 0x89e2543c, 13 a voice, placed by 0x8939a620(28, number, index); the conversion 0x8939a790, update
 // 0x8939a7b0 and copy 0x8939a800 the pool's (Vc2SetChildHead)
 class Vc2SetEnvelopes
-    : public Vc2SetChildPool<Vc2SetEnvelopes, Vc2EnvelopeWords, 13, 0x89e2543c, &Vc2SetReads::envelopeOf> {
+    : public Vc2SetChildPool<Vc2SetEnvelopes, Vc2SetEnvelopeWords, 13, 0x89e2543c, &Vc2SetReads::envelopeOf> {
 public:
     // 0x8939a690 on the call's object: its kind, index and M, the voice's two bytes, the part's words, the tempo, then
     // the block (the call's block in W, which `block` is)
@@ -46,5 +46,5 @@ public:
     // 0x8939a810: the release's velocity, then the block's release time again
     void release(uint32_t envelope, uint32_t velocity, uint32_t* block, Vc2SetReads& reads);
     // 0x8939a3d0: the block, and the key's factor
-    static void blockOf(Vc2EnvelopeWords& w, uint32_t* block, Vc2SetReads& reads);
+    static void blockOf(Vc2SetEnvelopeWords& w, uint32_t* block, Vc2SetReads& reads);
 };

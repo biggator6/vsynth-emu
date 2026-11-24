@@ -10,7 +10,7 @@ no-source|kNoSource = { -1, 0, 0.0f };|kNoSource = { 0, 0, 0.0f };|vc2synth
 notes-unread|kNotesUnread = 0x3c199999;|kNotesUnread = 0x3c19999a;|vc2synth
 robot-start|kRobotStart = 1.0f;|kRobotStart = 0.0f;|vc2synth
 counts-set|    rows.voiceCounts = kVoiceCounts;\n|\n|vc2synth
-step-set|    tvas.step = kTvaStep;\n|\n|vc2synth
+step-set|    tvas.step = std::bit_cast<float>(kTvaStep);\n|\n|vc2synth
 elapsed-set|    time.elapsed = kElapsed;\n|\n|vc2synth
 receive-set|    midi.receiveProgram = midi.receiveBank = kReceiveOn;\n|    midi.receiveProgram = kReceiveOn;\n|vc2synth
 nodes-channel|    for (Vc2PartNode& n : nodes.nodes) n.channel = 0;|    for (Vc2PartNode& n : nodes.nodes) n.channel = 1;|vc2synth
@@ -32,3 +32,8 @@ autonote-init|    autoNote.init();          // row 83|    // row 83|vc2synth
 ring-init|    ring.setGlobals();        // row 85|    // row 85|vc2synth
 static-state-back|        std::memcpy(m_.state.data(), &s, sizeof s);\n|\n|vc2synth
 static-state-channel|        vc2ChannelSetUp(s, (uint8_t)channel);|        vc2ChannelSetUp(s, (uint8_t)(channel + 1));|vc2synth
+# v340: the tones' hosts on the part's words (vc2synth: the LFOs' generator in their common; step-set above on the
+# step's new text, a float).  Not planted: the voices' outside (Vc2SynthTone.cpp) and each host's number (its own
+# address and tail), which no make reaches (host-number, every host tone 0, missed): the tasks' version's renders
+# and note-ons run them; a common's reference to another word builds no mutant (a temporary bound to it)
+host-chaos|freeLfos, chaos, tvas.step|freeLfos, rows.robot, tvas.step|vc2synth

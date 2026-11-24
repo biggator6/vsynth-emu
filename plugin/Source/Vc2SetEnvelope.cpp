@@ -88,19 +88,19 @@ uint32_t keyFactor(uint8_t key, int16_t keyfollow) {
     return static_cast<uint32_t>(xtf::ftrc(y));
 }
 
-float releaseTime(const Vc2EnvelopeWords& w, float scale, Vc2SetReads& reads) {
+float releaseTime(const Vc2SetEnvelopeWords& w, float scale, Vc2SetReads& reads) {
     if (w.release >= kNoteFrom) return noteTime(w.release, w.tempo, scale);
     const uint32_t value = matrixTime(w.release, w.matrix, w.index, 2, reads);
     return xtf::flt(static_cast<int32_t>(curveTime(value, w.releaseVelocity, w.releaseSens, w.factor)));
 }
 
-float attackTime(const Vc2EnvelopeWords& w, Vc2SetReads& reads) {
+float attackTime(const Vc2SetEnvelopeWords& w, Vc2SetReads& reads) {
     if (w.attack >= kNoteFrom) return noteTime(w.attack, w.tempo, envelopeTables().noteScale);
     const uint32_t value = matrixTime(w.attack, w.matrix, w.index, 0, reads);
     return xtf::flt(static_cast<int32_t>(curveTime(value, w.velocity, w.attackSens, kUnit)));
 }
 
-float decayTime(const Vc2EnvelopeWords& w, uint32_t type, Vc2SetReads& reads) {
+float decayTime(const Vc2SetEnvelopeWords& w, uint32_t type, Vc2SetReads& reads) {
     if (w.decay >= kNoteFrom) return noteTime(w.decay, w.tempo, envelopeTables().noteScale);
     const uint32_t value = matrixTime(w.decay, w.matrix, w.index, 1, reads);
     const uint32_t time = type == 0 ? quarterTime(value) : curveTime(value, w.velocity, w.decaySens, w.factor);
@@ -108,7 +108,7 @@ float decayTime(const Vc2EnvelopeWords& w, uint32_t type, Vc2SetReads& reads) {
 }
 } // namespace
 
-void Vc2SetEnvelopes::blockOf(Vc2EnvelopeWords& w, uint32_t* block, Vc2SetReads& reads) {
+void Vc2SetEnvelopes::blockOf(Vc2SetEnvelopeWords& w, uint32_t* block, Vc2SetReads& reads) {
     const uint32_t type = w.index == kTypeEnvelope || w.index > kTypeFrom ? kFadeType : 0;
     block[0] = type;
     block[1] = floatWord(kOne);
@@ -130,7 +130,7 @@ void Vc2SetEnvelopes::blockOf(Vc2EnvelopeWords& w, uint32_t* block, Vc2SetReads&
 }
 
 void Vc2SetEnvelopes::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2SetReads& reads) {
-    Vc2EnvelopeWords& w = at(c.object);
+    Vc2SetEnvelopeWords& w = at(c.object);
     vc2ChildMade(vc2ChildBytes(w), c, reads);
     w.matrix = c.matrix;
     w.releaseVelocity = kCentreVelocity;
@@ -140,7 +140,7 @@ void Vc2SetEnvelopes::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2Se
 }
 
 void Vc2SetEnvelopes::release(uint32_t envelope, uint32_t velocity, uint32_t* block, Vc2SetReads& reads) {
-    Vc2EnvelopeWords& w = at(envelope);
+    Vc2SetEnvelopeWords& w = at(envelope);
     w.releaseVelocity = static_cast<uint8_t>(velocity);
     block[8] = floatWord(w.on != 0 ? releaseTime(w, envelopeTables().releaseScale, reads) : kZero);
 }

@@ -894,6 +894,7 @@ midi: 40 cases, 16000 events: 3063 handled (2862 by status's way), 1511 control 
 xt_vc2midi: 0 different
 == xt_vc2synth
 synth: the start, 96 of rom.4's initializers, 133 regions and the vocoder compared
+synth: 24 tones made through the part's hosts, their words compared
 xt_vc2synth: 0 different
 == xt_vc2patch
 sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)

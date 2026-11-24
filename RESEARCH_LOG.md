@@ -4189,3 +4189,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
   of an empty list; its draws differ from -O2's (other float arithmetic), so it reaches states the -O2 seeds don't.
 - v339: its other finding, VariPhrase's +0x1d0, was v330's NaN class through the target: an exp2 the check's depths
   took past its table. A steer that draws nothing kept every generator's stream as it was.
+- v340 began Vc2Synth whole: the 24 tones' hosts as the part's, checked by making each tone on both sides. Its plan,
+  in the shared notes, runs the part on one thread block by block, a wait in the notes' task rendering its block in
+  place; the whole check against rom.4's three tasks will test that order.

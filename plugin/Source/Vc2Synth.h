@@ -8,6 +8,8 @@
 // the vocoder and its engines read their tables when constructed.  The tones' own parts (their OSC voices, COSMs, TVA,
 // mix and modulators) and C's OSC-block and COSM-input children come next, then the tasks and the block.  Not in the
 // sound yet.  Bit for bit: xt_vc2synth.  HARDWARE_FIRMWARE.md, "The VC-2 part as one object: Vc2Synth's start".
+// v340: the 24 tones' hosts (Vc2SynthTone) on the part's words, with the tones' render buffers, the part mixer's
+// frames and the shared routines; the part is their world (HARDWARE_FIRMWARE.md, "Vc2Synth's tones").
 #include "Vc2AutoNote.h"
 #include "Vc2CosmPools.h"
 #include "Vc2FreeLfos.h"
@@ -30,14 +32,17 @@
 #include "Vc2SetTva.h"
 #include "Vc2Sets.h"
 #include "Vc2StaticMatrix.h"
+#include "Vc2SynthTone.h"
 #include "Vc2TimeTrip.h"
 #include "Vc2Tone.h"
 #include "Vc2ToneLists.h"
+#include "Vc2ToneMath.h"
 #include "Vc2ToneMix.h"
 #include "Vc2Tracker.h"
 #include "Vc2TrackerAnalysis.h"
 #include "Vc2UpdateTask.h"
 #include "Vc2Vocoder.h"
+#include <deque>
 
 // What the reload objects reach: the OS's timer queue (0x8994fc24) and the part's reader.  Nothing reaches them at the
 // start; the tasks' wiring gives them their work
@@ -48,10 +53,25 @@ public:
     bool readPart(int) override { return true; }
 };
 
-struct Vc2Synth {
+struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2Synth();
+    Vc2Synth(const Vc2Synth&) = delete;   // its tones' hosts hold the part
+    Vc2Synth& operator=(const Vc2Synth&) = delete;
     // rom.4's start: C startup's .data and .bss, then the static initializers in its table's order
     void start();
+    // v340: the tones' world.  The tail's routines, the truncation's wait and the OS's event are the tasks' version's:
+    // until it, the events are kept and a wait ends the fade
+    const Vc2ToneHost& host(int tone) override { return hosts[(size_t)tone]; }
+    void osEvent(uint32_t event, uint32_t) override { events |= event; }
+    void ended(int) override {}
+    void truncated(int) override {}
+    void waitFade(int tone) override { hosts[(size_t)tone].tva.w.fade = 0.0f; }
+    int32_t osClock() override { return clock; }
+    Vc2MicRing& micRing() override { return ring; }
+    const Vc2Unvoiced& inputStage() override { return vocoder.stage; }
+    const int32_t* inputFrames() override { return input; }
+    const Vc2WaveMemory* waveMemory() override { return waves; }
+    Vc2OscSamples waveSamples() override { return samples; }
 
     Vc2OsMidi midi {};                     // 0x8995eaf4, 0x8995edf8, 0x8992e3e8 (v313)
     Vc2PartVoices voices {};               // 0x89981b6c…0x89982710 (v272)
@@ -92,4 +112,17 @@ struct Vc2Synth {
     Vc2AutoNote autoNote {};               // 0x8993fe3c, 0x899d994c (v226)
     Vc2MicRing ring {};                    // 0x8a0f31cc, 0x899d9968, 0x8993fe54 (v225)
     float chaos = 0.0f;                    // 0x89999668: the LFOs' chaos generator (v268)
+    // v340: the tones' render buffers a, b and c (0x89998b20…0x89998e1f), the part mixer's 32 frames of 8 floats after
+    // them (0x89998e20), the shared routines, the OS's millisecond word, the chip's frames for the block (none), the
+    // waves given (the plugin's wiring takes them from vc2Waves(): their memory, the samples their pool holds), the
+    // events posted, then the 24 tones' hosts on all of it (after it: they hold it)
+    Vc2ToneBuffers buffers {};
+    std::array<float, 32 * 8> frames {};
+    Vc2ToneMath math {};
+    int32_t clock = 0;
+    const int32_t* input = nullptr;
+    const Vc2WaveMemory* waves = nullptr;
+    Vc2OscSamples samples {};
+    uint32_t events = 0;
+    std::deque<Vc2SynthTone> hosts;
 };

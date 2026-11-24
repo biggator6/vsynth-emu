@@ -2,6 +2,7 @@
 // initializers by the table's rows.
 #include "Vc2Synth.h"
 #include "Vc2ToneLfo.h"
+#include <bit>
 #include <cstring>
 
 namespace {
@@ -32,11 +33,17 @@ private:
 };
 } // namespace
 
-Vc2Synth::Vc2Synth() { queue.setNode(kVc2StaticNodeAt, staticM.node); }
+// v340: the tones' hosts on the part's words: the pool, the lists, the mixes' rings, the free LFOs, the chaos generator,
+// C's TVA step, the COSM pools, the part mixer's frames after buffer c, the shared routines
+Vc2Synth::Vc2Synth() {
+    queue.setNode(kVc2StaticNodeAt, staticM.node);
+    const Vc2ToneCommon common { tones, lists, rings, freeLfos, chaos, tvas.step, pools, frames.data(), math };
+    for (int tone = 0; tone < Vc2TonePool::kTones; ++tone) hosts.emplace_back(tone, common, *this);
+}
 
 void Vc2Synth::start() {
     rows.voiceCounts = kVoiceCounts;
-    tvas.step = kTvaStep;
+    tvas.step = std::bit_cast<float>(kTvaStep);
     time.elapsed = kElapsed;
     midi.receiveProgram = midi.receiveBank = kReceiveOn;
     for (Vc2PartNode& n : nodes.nodes) n.channel = 0;   // .bss: the part's init gives them none
