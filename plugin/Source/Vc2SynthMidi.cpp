@@ -1,9 +1,11 @@
 // The part's MIDI parts: see Vc2SynthMidi.h (v346).  Every address is rom.4's.
 #include "Vc2SynthMidi.h"
+#include "Vc2SynthUpdate.h"
 
 namespace {
 constexpr uint32_t kHeldClass = 0x898cd3b8;   // [FW] a part object's held class (the plain one's 0x898cd184)
 constexpr uint32_t kNextListenerAt = 0xc;     // [FW] a listener node's next
+constexpr uint8_t kResetStatus = 0x70;        // [FW] the reset's class (v350)
 
 // A channel message's way on the part, by its handler
 using Way = void (*)(Vc2Synth&, Vc2ChannelWorld&, int32_t source, int32_t channel, uint32_t data1, uint32_t data2);
@@ -33,9 +35,22 @@ constexpr Way kWays[] = { partNoteOff, partNoteOn, partHeard, partController, pa
 
 void Vc2SynthMidi::message(const Vc2MidiMessage& m, uint32_t word) {
     s_.midi.handle(m, word, *this, *s_.settings);
-    Vc2MidiWorld w { s_.rows, s_.noteGate, *s_.settings, *this };
+    Vc2MidiWorld w = dispatchWorld();
     vc2MidiDispatch(w, m, word);
 }
+
+// v350: the notes' task's calls
+void Vc2SynthMidi::endedScan() { s_.voices.endedScan(*s_.voiceParts); }
+
+// [FW] 0x89390340 is the dispatcher's way for 0x70, given the source
+void Vc2SynthMidi::reset(int32_t source) {
+    Vc2MidiWorld w = dispatchWorld();
+    vc2MidiDispatch(w, { kResetStatus, 0, 0, (uint8_t)source }, 0);
+}
+
+void Vc2SynthMidi::schedule() { s_.updateParts->schedule(); }
+
+void Vc2SynthMidi::autoNoteRelease() { s_.autoNote.askRelease(); }
 
 void Vc2SynthMidi::channelMessage(Vc2MidiHandler h, int32_t source, int32_t channel, uint32_t data1,
                                   uint32_t data2) {

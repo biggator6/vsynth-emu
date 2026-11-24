@@ -25,6 +25,7 @@ struct Vc2SynthPosts {
     uint32_t notes = 0;
     bool others = false;
     uint32_t updateEvents = 0;   // v349: what the update task's wait (0x893017f0 on mask 3) answers
+    uint32_t notesWaited = 0;    // v350: and the notes' task's (on mask 0x3fe)
 };
 void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts);
 // After a step: every region, the vocoder, and the flags each side posted the notes' task

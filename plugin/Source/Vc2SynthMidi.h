@@ -8,14 +8,21 @@
 // (0x898cd184: 0x89390540, 0x89390550) bare returns.  The parameters' messages by their word's two bytes, the kind and
 // the second; Out DC cut for TG (0x893955e0) into the audio task's object at 0x8998a480 (+0x24).  The OS MIDI's
 // listeners read from the part's memory (none after the start); the OS's routines a 0x40 or 0x01 message runs are the
-// OS's, not the part's.  Bit for bit: xt_vc2synth's notes part.  HARDWARE_FIRMWARE.md, "The part's MIDI note path".
-// The notes' task.
+// OS's, not the part's.  v350: the notes' task's pass's parts too (v309's vc2NotesTaskPass): the MIDI queue's drain
+// none, as the part dispatches a message as it comes; the ended scan (0x89390ee0); a source's reset (0x89390340, the
+// dispatcher's way for 0x70); the voices' schedule (0x893b1710, Vc2SynthUpdate's); Auto Note's release (0x893ebcf0);
+// a channel message as the dispatcher's.  Bit for bit: xt_vc2synth's notes part.  HARDWARE_FIRMWARE.md, "The part's
+// MIDI note path", "The part's notes' task".  The notes' task.
+#include "Vc2NotesTask.h"
 #include "Vc2OsMidi.h"
 #include "Vc2PartChannel.h"
 #include "Vc2SynthControls.h"
 #include "Vc2SynthSettings.h"
 
-class Vc2SynthMidi final : public Vc2MidiParts, public Vc2ChannelParts, public Vc2OsMidiParts {
+class Vc2SynthMidi final : public Vc2MidiParts,
+                           public Vc2ChannelParts,
+                           public Vc2OsMidiParts,
+                           public Vc2NotesTaskParts {
 public:
     explicit Vc2SynthMidi(Vc2Synth& s) : s_(s) {}
     // A message as rom.4 takes it: the OS MIDI's handler, then the dispatcher, each on the message and its word
@@ -38,8 +45,15 @@ public:
     void heard(uint32_t, uint32_t, uint32_t, uint32_t) override {}   // no listener of the part's
     void osRoutine(uint32_t, uint32_t) override {}                    // the OS's own, not the part's
     uint8_t sysexOn() override { return s_.sysexOn; }
+    // v350: the notes' task's pass's calls beyond a channel message
+    void drainQueue() override {}   // no mailbox: `message` dispatches as a message comes
+    void endedScan() override;
+    void reset(int32_t source) override;
+    void schedule() override;
+    void autoNoteRelease() override;
 
 private:
+    Vc2MidiWorld dispatchWorld() { return { s_.rows, s_.noteGate, *s_.settings, *this }; }
     static uint8_t kindOf(uint32_t word) { return (uint8_t)(word & 0xff); }
     static uint8_t secondOf(uint32_t word) { return (uint8_t)((word >> 8) & 0xff); }
     bool held(uint32_t object) const;   // a part object's class the held one

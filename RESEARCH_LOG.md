@@ -4223,3 +4223,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
   sides then differing in the NaN's sign alone. A steer on the check's draw was asked for only if the word came from
   the draw; a run with every field in range showed it didn't, so it went to the user, who deferred it. The check now
   keeps such a note's Type, and the plugin's guard against NaN samples is step 4.5's.
+- v350 ran the notes' task's pass on the part. A plant of v349's that the list had caught went unseen again, and the
+  cause was the check: the flags each side posted the task only gathered, so after the first 0x100 a missing one could
+  not show. An XT's wait takes them; the check's now does. A check that only accumulates can stop seeing.

@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's notes' task v350 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v349's 66d2c16;
+  HARDWARE_FIRMWARE.md, "The part's notes' task"): v309's pass on the part (Vc2Synth::notesPass), its parts the
+  part's MIDI parts (Vc2SynthMidi: the queue's drain none, as the part dispatches a message as it comes; the ended
+  scan; a source's reset by the dispatcher's 0x70 way; the voices' schedule, Vc2SynthUpdate::schedule; Auto Note's
+  release). xt_vc2synth's notes part a notes' task's pass one event in 13 (rom.4's loop body, its drain a bare
+  return, its wait taking what each side posted), the gate, the schedule's count and Auto Note's words drawn for it;
+  robot depth 0 one patch in 4. 0 different at 2024/7/31337; plants --synth --changed 73, all caught but the ended
+  scan's (the renders end a tone) and upd-glue (caught at 400 cases); fcheck's baseline updated; verify.sh green.
+
 The part's update task v349 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v348's a7d4336;
   HARDWARE_FIRMWARE.md, "The part's update task"): the update task's pass on the part (Vc2SynthUpdate: a node's
   update by what it is, the static M's M's init answering 1, a voice's by its class answering 0; the pitch source;

@@ -162,11 +162,13 @@ void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts) {
     }
     // v347: the OS's event wait, which a truncate-and-wait (0x893b3bc0) calls on the TVA's fade with its tone in r12:
     // the fade rendered at once, as the part's waitFade has it (its TVA's +0x64, the tone's +0x1a54, 0); v349: the
-    // update task's (mask 3) answered the events drawn for its pass
+    // update task's (mask 3) answered the events drawn for its pass; v350: the notes' task's (mask 0x3fe) its
     constexpr uint32_t kOsWait = 0x893017f0, kFadeEvent = 0x1000, kFadeAt = 0x19f0 + 0x64, kUpdateMask = 3;   // [FW]
+    constexpr uint32_t kNotesMask = 0x3fe;   // [FW]
     fw.cpu.hook(kOsWait, [&posts](Sh4& c) {
         if (c.r[4] == kFadeEvent) c.wr32(c.r[12] + kFadeAt, 0);
-        c.ret(c.r[4] == kUpdateMask ? posts.updateEvents : 0);
+        const uint32_t waited = c.r[4] == kNotesMask ? posts.notesWaited : 0;
+        c.ret(c.r[4] == kUpdateMask ? posts.updateEvents : waited);
     });
 }
 

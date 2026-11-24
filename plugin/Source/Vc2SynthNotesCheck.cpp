@@ -1,7 +1,7 @@
 // xt_vc2synth's notes part (v346): the part's MIDI note path against rom.4's own, after the load part and before the
 // reads part, on the seed three after the run's.  [cases] cases (16 at the least), each a patch loaded on both sides
 // (a store of noise or none, the part's read, the system's dispatchers and part 0's message, its node the held class;
-// v349: a sounding tone's VOCODER OSC keeping its Type, vocoderTypesKept; robot human depth 0 one time in 8),
+// v349: a sounding tone's VOCODER OSC keeping its Type, vocoderTypesKept; robot human depth 0 one time in 4),
 // then 40 MIDI messages, each as rom.4 takes it: the OS MIDI's handler 0x89314e90 then the notes' task's dispatcher
 // 0x8938fed0, each given (0, the message, its word), on rom.4's side; `Vc2Synth::midiMessage` on the part's.  A
 // message: a note-on (two in five: a key of a few near the middle, a velocity 1…127, now and then 0), a note-off (a key
@@ -37,11 +37,23 @@ constexpr size_t kWordFrom = 7, kResetKind = 9;   // the kinds given a word, the
 // OS's lock wait, r9 the interrupts' mask), the events its wait answers
 constexpr uint32_t kUpdateLoopAt = 0x89395310, kTicksAt = 0x8993d080, kLockWait = 0x893018b0;
 constexpr uint32_t kInterruptMask = 0xffffff0f, kUpdateEvent = 1, kTimerEvent = 2;
-constexpr uint32_t kUpdateOneIn = 13, kTicksPast = 8;   // an event an update pass one time in 13; its ticks' step
+constexpr uint32_t kPassOneIn = 13, kTicksPast = 8;   // an event each task's pass one time in 13; the ticks' step
+
+// [FW] v350: the notes' task's loop top (its wait's call), its wait's mask, its events' bits; the registers its
+// prologue leaves (r8…r12: source 4's nodes' offset, the nodes, the schedule, the interrupts' mask, the task), the
+// MIDI queue on its stack (v309's check's); the note-on gate's word and the schedule's count (each the part's region)
+constexpr uint32_t kNotesLoopAt = 0x8938fc66, kNotesMask = 0x3fe, kNotesFirstBit = 0x002, kNotesLastBit = 0x200;
+constexpr uint32_t kNotesQueueAt = 0x89981918, kDrainAt = 0x893110b0;   // the MIDI queue and its drain, the OS's
+constexpr uint32_t kNotesRegisters[5] = { 0x300, 0x899888d0, 0x893b1710, kInterruptMask, 0x8998190c };
+constexpr uint32_t kGateAt = 0x89981904, kScheduledAt = 0x89981b60, kAutoNoteKeysAt = 0x8993d034;
+constexpr uint32_t kScheduledMost = 4;   // the schedule's count drawn 0…3
+constexpr uint32_t kAutoNoteAt = 0x8993fe3c;   // [FW] Auto Note's words: its note, its period (the block's)
+constexpr uint32_t kPeriodFrom = 50, kPeriods = 350;   // a sounding note's period drawn, in samples
 
 struct NotesCounts {
     long events = 0, voiced = 0;   // voiced: the messages after which a note's age is new (a voice started)
     long updates = 0;              // v349: the update passes among the events
+    long notesPasses = 0;          // v350: the notes' task's passes among them
     long under = 0, kept = 0;   // v349: the patches drawn under a VOCODER's tone, the Types kept (vocoderTypesKept)
     std::array<long, std::size(kClasses)> byKind {};
 };
@@ -72,7 +84,7 @@ Drawn messageDrawn(std::mt19937& rng, NotesCounts& n, uint8_t receiving) {
 // [FW] v349: OSC 1's Type (OSC 2's 52 IDs on), its VOCODER, and the kind an OSC voice of VOCODER holds; robot human
 // depth (the part's block)
 constexpr int kOscTypeId = 0x2e5, kOscTypeStep = 52, kOscs = 2, kRobotId = 0x1a3;
-constexpr uint32_t kVocoderType = 3, kVocoderKind = 5, kRobotZeroOneIn = 8;
+constexpr uint32_t kVocoderType = 3, kVocoderKind = 5, kRobotZeroOneIn = 4;
 
 // An ID's bits in the store at a zone set to `raw`, where xtStoreRaw reads them (its value raw less the centre)
 void rawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw) {
@@ -114,8 +126,9 @@ bool vocoderTypesKept(Vc2Synth& s, std::vector<uint8_t>& store, long& changed) {
     return under;
 }
 
-// v349: robot human depth 0 one time in 8, so that the pitch source's post (0x89394a60) is seen on Auto Note's On
-// Switch alone, its depth 0 (the depth is read with an EXTIN OSC, Auto Note's switch too; noise gives 0 one time in 128)
+// v349: robot human depth 0 one time in 4 (v350; 8 until then), so that the pitch source's post (0x89394a60) is seen on
+// Auto Note's On Switch alone, its depth 0 (the depth is read with an EXTIN OSC, Auto Note's switch too; noise gives 0
+// one time in 128)
 void robotDepthDrawn(std::vector<uint8_t>& store, std::mt19937& rng) {
     if (rng() % kRobotZeroOneIn != 0) return;
     const XtParamDesc* d = vc2ParamDesc(kRobotId);
@@ -145,9 +158,22 @@ std::string partMidiEvent(Vc2Fw& fw, Vc2Synth& s, const Drawn& m, const Vc2Synth
     return partStepDifference(fw, s, posts);
 }
 
+// A task's loop body on rom.4's side, from its top until it comes back there (v309's way), with the registers its
+// prologue left already set; whether it ran without a fault
+bool loopBodyRan(Vc2Fw& fw, uint32_t top) {
+    uint32_t back = 0;
+    int entries = 0;
+    fw.cpu.hook(top, [&back, &entries](Sh4& m) {
+        if (entries++ == 0) back = m.pr;
+        else m.pc = back;
+    });
+    const bool ran = fw.call(top, {});
+    fw.cpu.unhook(top);
+    return ran;
+}
+
 // v349: one update pass on both sides, then what differs: the ticks a few past the last, the events its wait answers
-// (each half the time); rom.4's loop body from its top until it comes back there (v309's way), with the registers
-// its prologue leaves
+// (each half the time); rom.4's loop body with the registers its prologue leaves
 std::string updatePassEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
     posts.updateEvents = (rng() % 2 ? kUpdateEvent : 0) | (rng() % 2 ? kTimerEvent : 0);
     s.ticks = s.time.last + rng() % kTicksPast;
@@ -155,17 +181,52 @@ std::string updatePassEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthP
     fw.cpu.r[8] = kLockWait;
     fw.cpu.r[9] = kInterruptMask;
     fw.cpu.r[12] = Vc2UpdateQueue::kAt;
-    uint32_t back = 0;
-    int entries = 0;
-    fw.cpu.hook(kUpdateLoopAt, [&back, &entries](Sh4& m) {
-        if (entries++ == 0) back = m.pr;
-        else m.pc = back;
-    });
-    const bool ran = fw.call(kUpdateLoopAt, {});
-    fw.cpu.unhook(kUpdateLoopAt);
-    if (!ran) return "the update pass faults: " + fw.cpu.error();
+    if (!loopBodyRan(fw, kUpdateLoopAt)) return "the update pass faults: " + fw.cpu.error();
     s.updatePass(posts.updateEvents);
     return partStepDifference(fw, s, posts);
+}
+
+// v350: one notes' task's pass on both sides, then what differs: the events its wait answers (what each side posted
+// the task, which the wait takes, and each bit half the time besides); the note-on gate set one time in four for the pass alone (the front's routines set it, 0x8942d686 among
+// them, which the part has none of), the schedule's count 0…3 (a timer's), Auto Note's two keys and its note with its
+// period (its block's) drawn; rom.4's loop body with the registers its prologue leaves and the MIDI queue on its stack,
+// its drain (the OS's mailbox) a bare return as the part's
+std::string notesPassEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
+    posts.notesWaited = posts.notes & kNotesMask;   // the wait takes what each side posted the task (equal)
+    posts.notes &= ~kNotesMask;
+    s.notesEvents &= ~kNotesMask;
+    for (uint32_t bit = kNotesFirstBit; bit <= kNotesLastBit; bit <<= 1) posts.notesWaited |= rng() % 2 ? bit : 0;
+    s.noteGate = rng() % 4 == 0 ? 1 : 0;
+    s.scheduled = rng() % kScheduledMost;
+    for (uint32_t& key : s.autoNoteKeys) key = rng() % 128;
+    const bool sounding = rng() % 2 != 0;   // Auto Note sounding a note, its period C4's (else −1 and 0)
+    s.autoNote.w.note = sounding ? (int32_t)(rng() % 128) : -1;
+    s.autoNote.w.period = sounding ? (float)(kPeriodFrom + rng() % kPeriods) : 0.0f;
+    fw.cpu.wr32(kGateAt, s.noteGate);
+    fw.cpu.wr32(kScheduledAt, s.scheduled);
+    fw.cpu.write(kAutoNoteKeysAt, s.autoNoteKeys.data(), sizeof s.autoNoteKeys);
+    fw.cpu.write(kAutoNoteAt, &s.autoNote.w, sizeof s.autoNote.w);
+    fw.cpu.wr32(kVc2Sp, kNotesQueueAt);
+    for (size_t k = 0; k < std::size(kNotesRegisters); ++k) fw.cpu.r[8 + k] = kNotesRegisters[k];
+    fw.cpu.hook(kDrainAt, [](Sh4& c) { c.ret(0); });   // the OS's mailbox: the part has none, as its drainQueue
+    const bool ran = loopBodyRan(fw, kNotesLoopAt);
+    fw.cpu.unhook(kDrainAt);
+    if (!ran) return "the notes' task's pass faults: " + fw.cpu.error();
+    s.notesPass(posts.notesWaited);
+    std::string d = partStepDifference(fw, s, posts);
+    s.noteGate = 0;
+    fw.cpu.wr32(kGateAt, 0);
+    return d;
+}
+
+// An event of the notes part: an update pass or a notes' task's pass one time in 13 each, else a message
+std::string notesStepEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts, NotesCounts& n) {
+    const uint32_t pick = rng() % kPassOneIn;
+    n.updates += pick == 0 ? 1 : 0;
+    n.notesPasses += pick == 1 ? 1 : 0;
+    if (pick == 0) return updatePassEvent(fw, s, rng, posts);
+    if (pick == 1) return notesPassEvent(fw, s, rng, posts);
+    return partMidiEvent(fw, s, messageDrawn(rng, n, receivingOf(s)), posts);
 }
 } // namespace
 
@@ -182,10 +243,7 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
         for (int e = 0; e < kEvents && d.empty(); ++e) {
             ++n.events;
             const uint32_t age = s.voices.ages;
-            const bool update = rng() % kUpdateOneIn == 0;
-            n.updates += update ? 1 : 0;
-            d = update ? updatePassEvent(fw, s, rng, posts)
-                       : partMidiEvent(fw, s, messageDrawn(rng, n, receivingOf(s)), posts);
+            d = notesStepEvent(fw, s, rng, posts, n);
             n.voiced += s.voices.ages != age && s.voices.ages != 0 ? 1 : 0;
         }
         return d;
@@ -193,9 +251,10 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
     const long different = vc2SynthCases(fw, s, run, 3, "the notes", oneCase);
     std::printf("synth notes: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
                 "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets, %ld update "
-                "passes; %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept\n",
+                "passes, %ld notes' task's passes; %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept\n",
                 vc2SynthCaseCount(run), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3], n.byKind[4],
-                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.updates, n.voiced, n.under, n.kept);
+                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.updates, n.notesPasses, n.voiced,
+                n.under, n.kept);
     return different;
 }
 #endif

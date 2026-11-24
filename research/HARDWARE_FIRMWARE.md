@@ -1546,6 +1546,52 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's notes' task (2026-11-24, v350) {#vc2-synth-notes-task}
+
+Step 4.3's seventy-eighth version, Vc2Synth whole's tenth. The notes' task's pass (v309's `vc2NotesTaskPass`) now
+runs on the part (`Vc2Synth::notesPass`), its parts the part's MIDI parts (`Vc2SynthMidi`, whose channel message the
+dispatcher's and the pass's alike):
+- **The MIDI queue's drain** (`0x893110b0` on `0x89981918`) is none. The part dispatches a message as it comes
+  (`Vc2Synth::midiMessage`: the OS MIDI's handler, then the dispatcher), so it has no mailbox. On rom.4's side the
+  drain is the OS's mailbox receive, which goes into the kernel (`0x88008020`, not in the image); the check makes it a
+  bare return.
+- **The ended scan** `0x89390ee0` is v272's `Vc2PartVoices::endedScan` on the part's voices.
+- **A source's reset** `0x89390340` is the dispatcher's way for 0x70, so the part gives the dispatcher a 0x70 message
+  on that source.
+- **The voices' schedule** `0x893b1710` is v311's `Vc2PartMixer::scheduleTones` on the sounding list's tones
+  (`Vc2SynthUpdate::schedule`, beside the update): the free LFOs' clock, then each tone's +0x30 and +0x3c.
+- **Auto Note's release** `0x893ebcf0` is `Vc2AutoNote::askRelease`: a release asked for only with no detector and a
+  period above 0.
+
+Two words the pass reads have no writer in the part. The note-on gate `0x89981904` is set only by the front's routines:
+its loads are at `0x893525a4`, `0x8935263e`, `0x893526c2`, `0x89356512`, `0x89359b02`, `0x89359b24`, `0x8942d686` and
+`0x8942d6b4`, besides the part's own tests. The schedule's count `0x89981b60` has no literal load anywhere in rom.4: a
+timer steps it through the schedule object `0x89981b40` (its +0x20).
+
+**The check.** xt_vc2synth's notes part gives one event in 13 to a notes' task's pass, beside the update pass's one in
+13. rom.4's loop body runs from its top (`0x8938fc66`) until it comes back there, with the registers its prologue
+leaves (r8…r12: source 4's nodes' offset 0x300, the nodes, the schedule, the interrupts' mask, the task) and the MIDI
+queue on its stack, as v309's check has it. The OS's wait answers its mask (0x3fe) with what each side posted the
+task, which it takes on both sides as an XT's wait does, and each of the nine bits half the time besides. Until v350
+the posted flags only gathered, so once a pass had posted one, a plant that dropped that post could not show. Drawn
+before it, on both sides: the note-on gate, set one time in four for that pass alone;
+the schedule's count, 0…3; Auto Note's two keys; and its note with its period, none (−1 and 0) or a key with a period
+of 50…399 samples, as its block would leave them. After each pass come every region, the vocoder, the events and the
+tones' words.
+The notes part's patches now set robot human depth to 0 one time in 4 (v349's one in 8), so the pitch source's post
+on Auto Note's switch alone is seen at the plant list's 40 cases.
+
+Results:
+- First run: the pass faulted in the kernel at `0x88008020`, from the drain; with it a bare return, 0 different.
+- xt_vc2synth 0 different at 2024 (40 cases), 7 and 31337 (400): 127, 1199 and 1250 notes' task's passes beside 125,
+  1270 and 1225 update passes; 299, 3619 and 3439 messages voicing.
+- Plants: v350's 8 new, 7 caught. smi-release showed once Auto Note's note and period were drawn (it asks a release
+  only with a period); syn-notes-events drops the schedule's bit. smi-ended-scan is missed until the block: the ended
+  scan frees a voice whose tone's TVA has ended, which takes the renders. --synth --changed 73, all caught but
+  smi-ended-scan and v349's upd-glue (caught at 400 cases at 7 and 31337; the vocoder on with Auto Note's template
+  offsets is rare). v349's upd-pitch-switch, missed once the posted flags only gathered, is caught again.
+- fcheck: xt_vc2synth's notes line alone differed (its new passes, its counts), the baseline updated. verify.sh green.
+
 ### The part's update task (2026-11-24, v349) {#vc2-synth-update}
 
 Step 4.3's seventy-seventh version, Vc2Synth whole's ninth. The update task's pass (v310's `vc2UpdateTaskPass`) now

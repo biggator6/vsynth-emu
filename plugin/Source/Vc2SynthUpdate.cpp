@@ -59,6 +59,8 @@ size_t Vc2SynthUpdate::sounding() {
 
 void Vc2SynthUpdate::voicesUpdate() { s_.mixer.updateTones({ listed_.data(), sounding() }, *this); }
 
+void Vc2SynthUpdate::schedule() { s_.mixer.scheduleTones({ listed_.data(), sounding() }, *this); }   // v350
+
 void Vc2SynthUpdate::freeLfosClock(float seconds) { s_.freeLfos.clock(seconds); }
 
 void Vc2SynthUpdate::glue(float carried) { s_.vocoder.glue(carried, s_.tracker.period()); }

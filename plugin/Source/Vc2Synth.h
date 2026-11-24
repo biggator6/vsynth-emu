@@ -105,6 +105,9 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     // v349: the update task's pass (vc2UpdateTaskPass) on the events its wait answers (0x2 the timer's, 0x1 the
     // update's), the ticks as `ticks` stands
     void updatePass(uint32_t events);
+    // v350: the notes' task's pass (vc2NotesTaskPass) on the events its wait answers (mask 0x3fe: the queue, the ended
+    // scan, the reset, the schedule, Auto Note's three, the poly pressure and the held note's)
+    void notesPass(uint32_t events);
     // v345: a tone of the pool made (0x893b2db0(0, id)) through the host of the tone it takes, its address, 0 none
     uint32_t makeTone(uint32_t id);
     Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }

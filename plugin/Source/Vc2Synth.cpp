@@ -66,6 +66,11 @@ void Vc2Synth::updatePass(uint32_t events) {
 
 void Vc2Synth::midiMessage(const Vc2MidiMessage& m, uint32_t word) { midiParts->message(m, word); }
 
+void Vc2Synth::notesPass(uint32_t events) {   // v350
+    Vc2NotesTaskWorld w { noteGate, pitch, scheduled, autoNoteKeys[0], autoNoteKeys[1], nodes, *midiParts };
+    vc2NotesTaskPass(w, events);
+}
+
 void Vc2Synth::giveSystem(const Vc2System& given) {
     std::memcpy(system.bytes.data(), given.bytes.data(), system.bytes.size());
     hasSystem = true;

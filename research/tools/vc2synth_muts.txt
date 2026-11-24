@@ -185,3 +185,16 @@ upd-glue|s_.vocoder.glue(carried, s_.tracker.period());|s_.vocoder.glue(carried,
 upd-refresh|{ reads_.refreshMatrix(Vc2StaticMatrix::kAt); }|{}|vc2synthupdate
 syn-update-events|    vc2UpdateTaskPass(w, events);|    vc2UpdateTaskPass(w, events & 1);|vc2synth
 srd-refresh|    core.refresh(*m);\n}|}|vc2synthreads
+# v350: the notes' task's pass on the part (vc2synth, the pass and its world; vc2synthmidi, the part's MIDI parts as
+# the pass's: the ended scan, a source's reset by the dispatcher's 0x70 way, the schedule, Auto Note's release;
+# vc2synthupdate, the voices' schedule on the sounding list), by xt_vc2synth's notes part's notes' task's passes.  Not
+# planted: the queue's drain, an empty override in the header (rom.4's drain hooked to return as it).  Missed until
+# the block: smi-ended-scan (the ended scan frees a voice whose tone's TVA has ended, which takes the renders)
+syn-notes-keys|autoNoteKeys[0], autoNoteKeys[1], nodes|autoNoteKeys[1], autoNoteKeys[0], nodes|vc2synth
+syn-notes-events|    vc2NotesTaskPass(w, events);|    vc2NotesTaskPass(w, events & ~0x10u);|vc2synth
+smi-ended-scan|void Vc2SynthMidi::endedScan() { s_.voices.endedScan(*s_.voiceParts); }|void Vc2SynthMidi::endedScan() {}|vc2synthmidi
+smi-reset-status|constexpr uint8_t kResetStatus = 0x70;|constexpr uint8_t kResetStatus = 0x71;|vc2synthmidi
+smi-reset-source|{ kResetStatus, 0, 0, (uint8_t)source }|{ kResetStatus, 0, 0, (uint8_t)(source + 1) }|vc2synthmidi
+smi-schedule|void Vc2SynthMidi::schedule() { s_.updateParts->schedule(); }|void Vc2SynthMidi::schedule() {}|vc2synthmidi
+smi-release|void Vc2SynthMidi::autoNoteRelease() { s_.autoNote.askRelease(); }|void Vc2SynthMidi::autoNoteRelease() {}|vc2synthmidi
+upd-schedule|s_.mixer.scheduleTones({ listed_.data(), sounding() }, *this);|s_.mixer.scheduleTones({ listed_.data(), 0 }, *this);|vc2synthupdate

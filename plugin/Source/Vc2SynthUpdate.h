@@ -27,6 +27,9 @@ public:
     uint32_t nodeUpdate(uint32_t node, uint32_t time) override;
     void pitchSource() override;
     void voicesUpdate() override;
+    // v350: the voices' schedule 0x893b1710, the notes' task's: the part mixer's on the sounding list's tones (the
+    // free LFOs' clock, then each tone's +0x30 and +0x3c)
+    void schedule();
     // The mixer's tasks' calls beyond the tones: the free LFOs' clock (the schedule's), the vocoder's glue
     void freeLfosClock(float seconds) override;
     void glue(float carried) override;
