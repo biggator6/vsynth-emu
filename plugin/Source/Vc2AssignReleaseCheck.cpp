@@ -10,6 +10,7 @@
 #ifdef XT_VC2VOICES_MAIN
 #include "Vc2AssignReleaseCheck.h"
 #include "Vc2CheckCalls.h"
+#include <algorithm>
 #include <cstring>
 
 namespace {
@@ -105,11 +106,39 @@ void steerRelease(ReleaseSides& r, std::mt19937& rng, bool all) {
     r.a.parts.ms = (int32_t)(rng() % kClockMost);
 }
 
+namespace {
+constexpr uint8_t kKeysMask = 0x7f;   // a key as MIDI gives it, 0…127
+
+void tableKeysAsKeys(Vc2KeyTable& t) {
+    t.onKey &= kKeysMask;
+    t.offKey &= kKeysMask;
+}
+
+void glideKeysAsKeys(Vc2KeyGlide& g) {
+    for (int8_t* key : { &g.key, &g.prevPoly, &g.lastPoly, &g.prevMono, &g.lastMono }) *key &= kKeysMask;
+}
+
+// The keys the noise gave, as an XT holds them, 0…127 (v550): a voice's +0x42 (its glide's sounding key), each table's
+// last note-on and note-off keys, each glide's keys.  Every one comes from MIDI's keys or a held key's bit on an XT; a
+// voice's +0x42 of 128 or more took the release's latched halfword past its table's eight, beside rom.4's read of the
+// table's next words (undefined behaviour in the port, the same bytes at -O2 by layout).  Masks, so the draws after
+// are as they were.
+void keysAsKeys(ReleaseSides& r) {
+    for (int i = 0; i < V::kVoices; ++i) r.a.s.port.at(r.a.s.port.addressOf(i)).byte42 &= kKeysMask;
+    std::ranges::for_each(r.keys.tables, tableKeysAsKeys);
+    tableKeysAsKeys(r.keys.spare);
+    tableKeysAsKeys(r.keys.own);
+    std::ranges::for_each(r.keys.glides, glideKeysAsKeys);
+    glideKeysAsKeys(r.keys.ownGlide);
+}
+} // namespace
+
 std::string releaseStart(ReleaseSides& r, std::mt19937& rng) {
     const std::string what = assignStart(r.a, rng);
     std::vector<uint32_t> noise(sizeof r.keys / 4);
     for (uint32_t& w : noise) w = (uint32_t)rng();
     std::memcpy(&r.keys, noise.data(), sizeof r.keys);
+    keysAsKeys(r);
     return what;
 }
 

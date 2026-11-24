@@ -3,10 +3,16 @@
 # plugin/Source tree (default the working tree) into out (default $WORK/bin), side by
 # side.  What does not build is left missing, not as the last build's binary.
 source "$(dirname "$0")/env.sh"
-S="${1:-$REPO/plugin/Source}"; O="${2:-$WORK/bin}"; mkdir -p "$O"
+S="${1:-$REPO/plugin/Source}"
+O="${2:-$WORK/${XT_SANITIZE:+asan/}bin}"
+mkdir -p "$O"
 # XT_STACK_INIT=pattern (or zero): locals start as that (clang's -ftrivial-auto-var-init), for tone_stack_test.sh (v189)
+# XT_SANITIZE=1: AddressSanitizer, UndefinedBehaviorSanitizer and libc++'s bounds at -O1 -g, out by default to
+# $WORK/asan/bin (v550); ASan's recoverable, so ASAN_OPTIONS=halt_on_error=0 reports every error of one run
+SAN=(${XT_SANITIZE:+-fsanitize=address,undefined -fsanitize-recover=address -fno-omit-frame-pointer -O1 -g})
+SAN+=(${XT_SANITIZE:+-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE})
 cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 ${XT_STACK_INIT:+-ftrivial-auto-var-init=$XT_STACK_INIT} \
-       "${HARNESS_SWITCHES[@]}" "$@" 2>&1 | grep -E " error"; return 0; }
+       "${SAN[@]}" "${HARNESS_SWITCHES[@]}" "$@" 2>&1 | grep -E " error"; return 0; }
 cd "$S" || exit 1
 FW=(XtFirmware.cpp $( [ -f XtFwMachine.cpp ] && echo XtFwMachine.cpp ))   # the routines and their machine (v175 on)
 SH4=(Sh4Interp.cpp $( [ -f Sh4Setup.cpp ] && echo Sh4Setup.cpp ))   # the interpreter and its setup (v197 on)

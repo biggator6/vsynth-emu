@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The VC-2 checks under the sanitizers v550 (2026-11-23, on claude/vc2-sanitize-4e66c9 from vc2-mode's c79fd54;
+  HARDWARE_FIRMWARE.md, "The VC-2 checks under the sanitizers"): XT_SANITIZE=1 build.sh builds its programs under
+  ASan, UBSan and libc++'s bounds into build/tools/asan/bin (TOOLS.md, build.sh). The 21 VC-2 harnesses step 4.3
+  isn't changing ran at fcheck's counts and at 400 cases, at 2024, 7 and 31337: all 0 different. Found: xt_vc2voices'
+  noise gave a voice a key of 128 or more, which took Vc2Assigner::release's latched index past its table (libc++'s
+  trap; no XT holds such a key), so the draw now keeps the keys in 0…127 (releaseStart, the port as it is); and the
+  check rig's vc2FirstDifference overran a 6-byte region (xt_vc2sets, Vc2CheckRig.h, step 4.3's file: passed to it).
+
 The VC-2's waves at the plugin's start v504 (2026-11-23, after v503 and vc2-mode's merge; HARDWARE_FIRMWARE.md,
   "The VC-2's waves at the plugin's start"): v503's load once a process, beside rom.4's tables. PluginRom.cpp seeks
   V-SynthXTDiskImage.bin.0.bin once rom.4 is in, beside rom.4 first; Vc2WavesInUse takes it (read, its VC-2 index and
