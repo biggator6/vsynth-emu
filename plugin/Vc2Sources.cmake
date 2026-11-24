@@ -180,6 +180,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SynthReads.cpp
     Source/Vc2SynthVoices.cpp
     Source/Vc2SynthSettings.cpp
+    Source/Vc2SynthMidi.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

@@ -1546,6 +1546,69 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's MIDI note path (2026-11-23, v346) {#vc2-synth-midi}
+
+Step 4.3's seventy-fourth version, Vc2Synth whole's seventh. A MIDI message now reaches the part as rom.4 takes it,
+through the part's own ports:
+- **The way in** (`Vc2Synth::midiMessage`, `Vc2SynthMidi`): the OS MIDI's handler (`0x89314e90`, v313's `Vc2OsMidi`),
+  then the notes' task's dispatcher (`0x8938fed0`, v308's), each given the message and its word. The dispatcher's
+  channel messages go by their handler, a table. The note-on and note-off go to the channel's (v307's). The pressures
+  and the bend go to the channel's listeners (the controllers' notify). The controller goes to the part's
+  (`0x89392f90`), and the program change is a bare return (`0x89393090`).
+- **A part object's note-on and note-off go by its class** (its +4). The held class's (`0x898cd3b8`: `0x89396a80`,
+  `0x89396c90`) hand the assigner the node, its key table, its word, the key and the velocity. The plain class's
+  (`0x898cd184`: `0x89390540`, `0x89390550`) are bare returns.
+- **The parameters' messages** (0x40, 0x41) go by their word's two bytes, the kind and the second. Out DC cut for TG
+  (`0x893955e0`) goes into the audio task's object. The reset (0x70) is v308's.
+- **The audio task's object** (`0x8998a480`, 0x34 bytes) is built by row 16 (`0x89396470`, through `0x89395f90`): +8
+  its class `0x898cd394`, +0x18 the stereo source's flag, +0x24 Out DC cut for TG. The DC cut starts at 1, until the
+  system's read sets it. The row also builds an OS object at `0x8998a4b4` (`0x8930f000`, its class `0x898cd370` at
+  +0x18), and writes two floats at `0x8998a50c` and `0x8998a510`: 44100/440 and 440/22050. Those three are the audio
+  block's, for its version.
+- **SysEx's flag** (`0x8992e3d1`, .data) is 1.
+- **The OS's listeners and routines.** The OS MIDI's handler reads a port's listeners from the part's memory, and no
+  routine of the part's installs one. The nine routines a 0x40 or 0x01 message runs (`Vc2OsMidiParts::kOsRoutines`)
+  are the OS's. The part leaves them, and the checks hook them.
+
+**Why no note sounds yet.** Part 1 Receive Switch and Channel (IDs 71 and 72) are on system B's block. The part has no
+system store yet, so it reads every system ID's default, as rom.4's getter does on a read object never set up. Receive
+Switch's default is off, so part 0's node receives on no channel. No note-on reaches a held object, on rom.4's side as
+on the part's.
+
+rom.4's store object `0x89961250` (28 bytes) is built by the OS's initializer `0x8931a840` → `0x8931a640`, which the
+part's rows don't include:
+- +0: system D's read object, `0x8995cc14`;
+- +4: `0x89add9a8`;
+- +8: `0x89addb10`, eight 29-byte records (`0x8931a690(object, n)`, n 1…8); +0xc: 8;
+- +0x10: `0x89adda10`, 64 words (`0x8931a6d0(object, n)`, n 1…64); +0x14: 64;
+- +0x18: a sub-object at `0x8996126d` (built by `0x89329190`), system C's, the DC cut's.
+
+The system store is v347's.
+
+Results:
+- xt_vc2synth's notes part (Vc2SynthNotesCheck.cpp) runs after the load part, on the seed three after the run's: at
+  least 16 cases. Each case loads a patch on both sides: a store of noise or none, the part's read, the system's
+  dispatchers, then part 0's message, which gives its node the held class. Then come 40 MIDI messages through rom.4's
+  handler and dispatcher against `Vc2Synth::midiMessage`:
+  - note-ons and note-offs on a few keys, mostly on the channel part 0 receives on;
+  - controllers, mostly those the part has a class for;
+  - bends, both pressures and program changes;
+  - one in six a parameters' message with a drawn word (kind 3, with Out DC cut, one time in four) or the reset.
+  After each: every region, the vocoder, the flags posted to the notes' task, and each tone's words.
+- At the first run, the start differed at `0x8998a488`: the audio task's object, which no port had made. Its class and
+  DC cut are now `Vc2Synth::start`'s, and the region is the object alone.
+- At the first run with the parameters' messages, the OS's kind-4 routine `0x89318450` faulted on an OS object the
+  harness never set up. The routines are now hooked, as xt_vc2midi hooks them, and the list is shared.
+- 0 different at 2024 (40 cases, 1,600 events), 7 and 31337 (400 cases, 16,000 events each), with no voice started
+  at any; xt_vc2midi is 0 different too, its OS routines' list now `Vc2OsMidiParts::kOsRoutines`.
+- The plants: 78 of the synth list reach the change, and 54 are caught. Those are the MIDI path's six (the handlers'
+  table, the controller, the note-on and note-off, the handler, the dispatcher), the start's four (the audio task's
+  class and DC cut, SysEx's flag, the message's word), the two regions, and Vc2Synth.cpp's older plants. The 24
+  missed are every plant on the voice path: five of Vc2SynthMidi.cpp's and the 19 of Vc2SynthVoices.cpp's, which v345
+  left for this part. The system store (v347) is to reach them. v345's six are missed for the same reason. Two plants
+  on the listeners' reads were dropped, as no routine of the part's installs a listener.
+- fcheck's baseline updated (the notes line). verify.sh green.
+
 ### The part's settings and voices wired (2026-11-23, v345) {#vc2-synth-wired}
 
 Step 4.3's seventy-third version, Vc2Synth whole's sixth. The part now runs its own notes' task start and settings,

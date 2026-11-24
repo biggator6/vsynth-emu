@@ -1180,6 +1180,12 @@ version against rom.4's routines with what it calls hooked:
          part's ports; xt_vc2synth's load part (HARDWARE_FIRMWARE.md, "The part's settings and voices wired"). Next:
          the notes' task's pass on the part (MIDI through the dispatcher and channel to the assigner, the notes, C and
          the tones), then the update task, the block and the whole check.
+       - The part's MIDI note path (v346): `Vc2SynthMidi`, a message through the OS MIDI's handler and the dispatcher on
+         the part's ports, a part object's note-on and note-off by its class, the audio task's object (row 16's start,
+         DC cut's word); xt_vc2synth's notes part (HARDWARE_FIRMWARE.md, "The part's MIDI note path"). No note reaches a
+         voice yet: Part 1 Receive Switch is a system ID, read as its default (off) with no system store. Next: the
+         system store (rom.4's store object 0x89961250 and its read objects), so a note reaches the assigner, then the
+         update task, the block and the whole check.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

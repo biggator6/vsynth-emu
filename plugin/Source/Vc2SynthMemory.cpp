@@ -38,6 +38,8 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(Vc2WaveSets::kTablesAt, s.waveSets.tables, "their tables"),               // v343
         vc2SynthRegion(Vc2WaveSets::kBuffersAt, s.waveSets.buffers, "their buffers"),            // v343
         vc2SynthRegion(kVc2SynthLegatoAt, s.legato, "the legato's struct"),                     // v345
+        vc2SynthRegion(0x8998a480, s.audioTask, "the audio task's object"),                     // v346
+        vc2SynthRegion(0x8992e3d1, s.sysexOn, "SysEx's flag"),                                   // v346
         vc2SynthRegion(0x89997090, r.commons, "the commons' table"),
         vc2SynthRegion(0x89e2765c, r.envelopes, "the envelopes' table"),
         vc2SynthRegion(0x89e2f85c, r.lfos, "the LFOs' table"), vc2SynthRegion(0x89e32a60, r.mixes, "the mixes' table"),

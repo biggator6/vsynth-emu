@@ -4205,3 +4205,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
   little, because a read of an unchanged store changes nothing; drawing part of the store again before each event,
   and at least 16 cases, made 15 of 21 plants visible. The other six (the Matrix levels' copy, All Sound Off, the
   receiving channel) need a note sounding or a system store, which the load has neither of.
+- v346 routed MIDI through the part. Its notes part passed at every seed at once, too easily: a count of the voices
+  started said none. Part 1 Receive Switch is a system ID, and with no system store both sides read its default, off,
+  so part 0 receives no channel and every plant on the voice path went unseen. A pass needs a count of what it
+  reached beside it. The parameters' messages added to the draws reached an OS routine the harness never set up, now
+  hooked as xt_vc2midi hooks it. Next, the system store.

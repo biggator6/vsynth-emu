@@ -50,6 +50,10 @@ static_assert(sizeof(Vc2MidiPort) == 16, "rom.4's layout, a port object");
 class Vc2OsMidiParts {
 public:
     static constexpr uint32_t kProgramSlot = 0x0c, kControllerSlot = 0x18, kRpnSlot = 0x24, kNrpnSlot = 0x30;
+    // [FW] osRoutine's: the OS's routines a 0x40 or 0x01 message runs, each given the word's address (SysEx's, the
+    // last, its object 0x8995dd0c and the word); the checks hook them (v346: xt_vc2synth's too)
+    static constexpr uint32_t kOsRoutines[] = { 0x89317fe0, 0x89318420, 0x89318210, 0x89318040, 0x89318450,
+                                                0x893154a0, 0x8931a420, 0x8931a460, 0x89310640 };
     virtual ~Vc2OsMidiParts() = default;
     virtual uint32_t listenerOf(uint32_t node) = 0;    // the node's +0
     virtual uint32_t nextListener(uint32_t node) = 0;  // its +0xc

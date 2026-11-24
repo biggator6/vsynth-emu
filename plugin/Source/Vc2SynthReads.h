@@ -39,6 +39,8 @@ public:
     Vc2WaveSets& waveSets() override;
     // How many bytes the reads have reached that no region of the part holds (xt_vc2synth's)
     long unheld() const { return memory_.unheld(); }
+    // v346: a word of the part's memory by rom.4's address (the OS MIDI's listeners' nodes)
+    uint32_t wordAt(uint32_t at) { return rd32(at); }
 
 protected:
     void read(uint32_t at, void* to, size_t bytes) override { memory_.read(at, to, bytes); }

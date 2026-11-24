@@ -2,6 +2,7 @@
 // initializers by the table's rows.
 #include "Vc2Synth.h"
 #include "Vc2SynthControls.h"
+#include "Vc2SynthMidi.h"
 #include "Vc2SynthReads.h"
 #include "Vc2SynthSettings.h"
 #include "Vc2SynthVoices.h"
@@ -16,10 +17,13 @@ constexpr std::array<int16_t, 4> kVoiceCounts = { -1, -1, -1, 0 };   // 0x8993d0
 constexpr uint32_t kTvaStep = 0x3bf7adf6;                            // 0x8993eb08: C's TVA step
 constexpr int16_t kElapsed = 1;                                      // 0x8993d084: the update task's count
 constexpr uint8_t kReceiveOn = 1;                                    // 0x8992e3e8, 0x8992e3e9: both Receive flags
+constexpr uint8_t kSysexOn = 1;                                      // 0x8992e3d1: SysEx's flag (v346)
 // [FW] what the initializers no port runs write
 constexpr Vc2PitchSource kNoSource = { -1, 0, 0.0f };   // row 12, 0x89394a90
 constexpr uint32_t kNotesUnread = 0x3c199999;           // row 17, 0x89396970: 0.009375
 constexpr float kRobotStart = 1.0f;                     // row 42, 0x893a7650
+constexpr uint32_t kAudioClass = 0x898cd394;            // row 16, 0x89396470: the audio task's object's class (+8)
+constexpr uint32_t kDcCutStart = 1;                     // and its DC cut (+0x24), before the system's read
 
 // What the static M's initializers reach: its own channel state's set-up, v313's on its bytes, and (the part's init's,
 // v345) its node onto the update queue
@@ -50,7 +54,10 @@ Vc2Synth::Vc2Synth() {
     voiceParts = std::make_unique<Vc2SynthVoices>(*this);
     controls = std::make_unique<Vc2SynthControls>(*this);
     settings = std::make_unique<Vc2SynthSettings>(*this);
+    midiParts = std::make_unique<Vc2SynthMidi>(*this);   // v346
 }
+
+void Vc2Synth::midiMessage(const Vc2MidiMessage& m, uint32_t word) { midiParts->message(m, word); }
 
 Vc2Synth::~Vc2Synth() = default;
 
@@ -98,6 +105,7 @@ void Vc2Synth::start() {
     tvas.step = std::bit_cast<float>(kTvaStep);
     time.elapsed = kElapsed;
     midi.receiveProgram = midi.receiveBank = kReceiveOn;
+    sysexOn = kSysexOn;
     for (Vc2PartNode& n : nodes.nodes) n.channel = 0;   // .bss: the part's init gives them none
 
     midi.staticInitPorts();   // the whole table's 0x893179d0
@@ -107,6 +115,8 @@ void Vc2Synth::start() {
     trips.staticInit();       // row 11, 0x89394570
     pitch = kNoSource;        // row 12
     queue.staticInit();       // row 14, 0x89395280
+    audioTask[kAudioClassWord] = kAudioClass;   // row 16
+    audioTask[kDcCutWord] = kDcCutStart;
     notes.unread = kNotesUnread;   // row 17
     reloads.staticInit();     // row 26, 0x8939b350
     StaticParts parts { *this };

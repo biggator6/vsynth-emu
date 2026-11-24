@@ -25,7 +25,7 @@ constexpr uint32_t kAnswered[] = { 0x893004a0, 0x89300640, 0x893018a0, 0x893018b
                                    0x893018e0, 0x893018f0 };
 constexpr uint32_t kEntryAt = 0x899612a8, kEntryStore = 8;   // [FW] part 0's store entry: +0 1 with a store, +8 it
 constexpr uint32_t kStoreAt = 0x8C150000, kMessageAt = 0x8C160000;   // in Vc2Fw's RAM: a drawn store, a message
-constexpr int kEvents = 20, kKinds = 14, kLeastCases = 16;
+constexpr int kEvents = 20, kKinds = 14;
 constexpr size_t kWindow = 0x200;   // the most bytes of the store drawn again before an event
 
 // [FW] the system's, the assignments' and the calibration's dispatchers, each the part's
@@ -42,31 +42,10 @@ struct LoadCounts {
     std::array<long, 4> byEvent {};
 };
 
-// What rom.4 posted, by event object: the notes' task's flags, and whether any other object was posted
-struct Posts {
-    uint32_t notes = 0;
-    bool others = false;
-};
+using Posts = Vc2SynthPosts;   // v346: the parts' shared rig (Vc2SynthCheck.h)
 
-void installRom(Vc2Fw& fw, Posts& posts) {
-    fw.cpu.hook(kOsEvent, [&posts](Sh4& c) {
-        if (c.r[4] == kVc2SynthNotesTask) {
-            posts.notes |= c.r[5];
-        } else {
-            posts.others = true;
-        }
-        c.ret(0);
-    });
-    for (const uint32_t at : kAnswered) {
-        fw.cpu.hook(at, [](Sh4& c) { c.ret(0); });
-    }
-}
-
-// After a step: the part's regions and vocoder, then what each side posted
 std::string loadDifference(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
-    std::string d = vc2SynthDifference(fw, s);
-    if (d.empty() && (posts.notes != s.notesEvents || posts.others)) d = "the notes' task's events";
-    return d;
+    return vc2SynthStepDifference(fw, s, posts);
 }
 
 std::string taskStart(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
@@ -79,15 +58,28 @@ std::string taskStart(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
     return d.empty() ? "" : "the task's start: " + d;
 }
 
-// A store's bytes drawn for both sides, or none
-void storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng, LoadCounts& n) {
+// A store's bytes drawn for both sides, or none: whether one was
+bool storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng) {
     const bool none = rng() % 4 == 0;
     for (uint8_t& b : store) b = (uint8_t)rng();
     fw.cpu.write(kStoreAt, store.data(), store.size());
     fw.cpu.wr8(kEntryAt, none ? 0 : 1);
     fw.cpu.wr32(kEntryAt + kEntryStore, kStoreAt);
     s.givePatch(none ? nullptr : &store);
-    n.stores += none ? 0 : 1;
+    return !none;
+}
+
+// The part's read and a dispatcher, each on both sides
+std::string partRead(Vc2Fw& fw, Vc2Synth& s) {
+    if (!fw.call(kReadPart, { 0 })) return "the part's read faults: " + fw.cpu.error();
+    s.settings->readPart(0);
+    return "";
+}
+
+std::string dispatched(Vc2Fw& fw, Vc2Synth& s, const Dispatcher& d) {
+    if (!fw.call(d.routine, {})) return "a dispatcher faults: " + fw.cpu.error();
+    (s.settings.get()->*d.mine)();
+    return "";
 }
 
 // A window of the store drawn again on both sides, so that a read after it has something to change
@@ -97,10 +89,8 @@ void storeMoved(Vc2Fw& fw, std::vector<uint8_t>& store, std::mt19937& rng) {
     fw.cpu.write(kStoreAt + (uint32_t)from, store.data() + from, bytes);
 }
 
-// A message's two bytes on rom.4's side, then the routine on both: the part's (kind 0 half the time) or any kind's
-std::string loadMessage(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, bool part) {
-    const uint8_t kind = part && rng() % 2 ? 0 : (uint8_t)(rng() % kKinds);
-    const uint8_t second = (uint8_t)(rng() % 2 ? 0 : rng());
+// A message's two bytes on rom.4's side, then the routine on both: the part's or any kind's
+std::string messageBoth(Vc2Fw& fw, Vc2Synth& s, bool part, uint8_t kind, uint8_t second) {
     fw.cpu.wr8(kMessageAt, kind);
     fw.cpu.wr8(kMessageAt + 1, second);
     if (!fw.call(part ? kPartMessages : kMessages, { 0, kMessageAt })) return "a message faults: " + fw.cpu.error();
@@ -112,51 +102,93 @@ std::string loadMessage(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, bool part) {
     return "";
 }
 
+// A drawn message: the part's (kind 0 half the time) or any kind's, its second byte 0 half the time
+std::string loadMessage(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, bool part) {
+    const uint8_t kind = part && rng() % 2 ? 0 : (uint8_t)(rng() % kKinds);
+    const uint8_t second = (uint8_t)(rng() % 2 ? 0 : rng());
+    return messageBoth(fw, s, part, kind, second);
+}
+
 std::string loadEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, LoadCounts& n) {
     ++n.events;
     const uint32_t pick = rng() % 4;
     ++n.byEvent[pick];
-    if (pick == 0) {
-        if (!fw.call(kReadPart, { 0 })) return "the part's read faults: " + fw.cpu.error();
-        s.settings->readPart(0);
-        return "";
-    }
-    if (pick == 1) {
-        const Dispatcher& d = kDispatchers[rng() % std::size(kDispatchers)];
-        if (!fw.call(d.routine, {})) return "a dispatcher faults: " + fw.cpu.error();
-        (s.settings.get()->*d.mine)();
-        return "";
-    }
+    if (pick == 0) return partRead(fw, s);
+    if (pick == 1) return dispatched(fw, s, kDispatchers[rng() % std::size(kDispatchers)]);
     return loadMessage(fw, s, rng, pick == 3);
 }
 } // namespace
 
-long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run) {
-    LoadCounts n;
-    Posts posts;
-    installRom(fw, posts);
-    std::string first = taskStart(fw, s, posts);
-    long different = first.empty() ? 0 : 1;
-    std::mt19937 rng((uint32_t)run.seed + 2);
+void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts) {
+    fw.cpu.hook(kOsEvent, [&posts](Sh4& c) {
+        if (c.r[4] == kVc2SynthNotesTask) {
+            posts.notes |= c.r[5];
+        } else {
+            posts.others = true;
+        }
+        c.ret(0);
+    });
+    for (const uint32_t at : kAnswered) {
+        fw.cpu.hook(at, [](Sh4& c) { c.ret(0); });
+    }
+    for (const uint32_t at : Vc2OsMidiParts::kOsRoutines) {   // v346: the OS's, as the part's osRoutine leaves them
+        fw.cpu.hook(at, [](Sh4& c) { c.ret(0); });
+    }
+}
+
+std::string vc2SynthStepDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts) {
+    std::string d = vc2SynthDifference(fw, s);
+    if (d.empty() && (posts.notes != s.notesEvents || posts.others)) d = "the notes' task's events";
+    return d;
+}
+
+void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s) {
+    fw.cpu.wr8(kEntryAt, 0);
+    s.givePatch(nullptr);
+}
+
+std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
+                                const Vc2SynthPosts& posts) {
+    storeDrawn(fw, s, store, rng);
+    std::string d = partRead(fw, s);
+    for (const Dispatcher& k : kDispatchers) {
+        if (d.empty()) d = dispatched(fw, s, k);
+    }
+    if (d.empty()) d = messageBoth(fw, s, true, 0, 0);   // v346: part 0's message, its node the held class
+    return d.empty() ? vc2SynthStepDifference(fw, s, posts) : d;
+}
+
+long vc2SynthCases(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, uint32_t offset, const char* what,
+                   const std::function<std::string(std::mt19937&, std::vector<uint8_t>&)>& one) {
+    std::mt19937 rng((uint32_t)run.seed + offset);
     std::vector<uint8_t> store((size_t)kVc2StoreBytes);
-    const int cases = std::max(run.cases, kLeastCases);
-    for (int c = 0; c < cases && first.empty(); ++c) {
-        storeDrawn(fw, s, store, rng, n);
+    std::string d;
+    int c = 0;
+    for (; c < vc2SynthCaseCount(run) && d.empty(); ++c) d = one(rng, store);
+    vc2SynthPatchDropped(fw, s);
+    if (d.empty()) return 0;
+    if (xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  %s: case %d: %s\n", what, c - 1, d.c_str());
+    return 1;
+}
+
+long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthPosts& posts) {
+    LoadCounts n;
+    const auto oneCase = [&](std::mt19937& rng, std::vector<uint8_t>& store) {
+        n.stores += storeDrawn(fw, s, store, rng) ? 1 : 0;
         std::string d;
         for (int e = 0; e < kEvents && d.empty(); ++e) {
             if (rng() % 2) storeMoved(fw, store, rng);
             d = loadEvent(fw, s, rng, n);
             if (d.empty()) d = loadDifference(fw, s, posts);
         }
-        if (d.empty()) continue;
-        if (first.empty()) first = "case " + std::to_string(c) + ": " + d;
-        ++different;
-    }
-    s.givePatch(nullptr);
-    if (!first.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the load: %s\n", first.c_str());
+        return d;
+    };
+    const std::string start = taskStart(fw, s, posts);
+    if (!start.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the load: %s\n", start.c_str());
+    const long different = !start.empty() ? 1 : vc2SynthCases(fw, s, run, 2, "the load", oneCase);
     std::printf("synth load: the task's start, %d cases (%ld with a store), %ld events: %ld part reads, %ld "
                 "dispatchers, %ld messages, %ld part messages\n",
-                cases, n.stores, n.events, n.byEvent[0], n.byEvent[1], n.byEvent[2], n.byEvent[3]);
+                vc2SynthCaseCount(run), n.stores, n.events, n.byEvent[0], n.byEvent[1], n.byEvent[2], n.byEvent[3]);
     return different;
 }
 #endif

@@ -58,6 +58,7 @@ class Vc2SynthNotes;
 class Vc2SynthVoices;
 class Vc2SynthControls;
 class Vc2SynthSettings;
+class Vc2SynthMidi;
 
 // [FW] v345: the notes' task's event object and what the part posts it through the OS (0x89301830): the ended scan's
 // (the notes' hook word's routine 0x893901a0), all notes off (0x89391e30) and the held note's (0x89391e50); where the
@@ -94,6 +95,8 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     // v345: the notes' task's start to its loop (0x8938fc00…0x8938fc66) as the part has it: the notes' init
     // (0x89396960), the hook word the notes' task's, the start-up (0x89392ab0), the note-on gate open
     void taskStart();
+    // v346: a MIDI message (its four bytes and word) as rom.4 takes it: the OS MIDI's handler, then the dispatcher
+    void midiMessage(const Vc2MidiMessage& m, uint32_t word);
     // v345: a tone of the pool made (0x893b2db0(0, id)) through the host of the tone it takes, its address, 0 none
     uint32_t makeTone(uint32_t id);
     Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }
@@ -141,9 +144,14 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     std::array<uint8_t, 0x4c> clockObject {};   // 0x8995cb40: the OS's clock object, as far as C reads it (v343)
     Vc2PartStartWords startWords {};       // 0x899893f8… (v304)
     Vc2PitchSource pitch {};               // 0x89989748 (v226)
-    int32_t noteGate = 0;                  // 0x89981904: no note-on while set (v308)
+    uint32_t noteGate = 0;                 // 0x89981904: no note-on while set (v308)
     uint32_t scheduled = 0;                // 0x89981b60: the schedule's count (v309)
-    std::array<int32_t, 2> autoNoteKeys {};   // 0x8993d034, 0x8993d038: Auto Note's note-on and note-off keys (v309)
+    std::array<uint32_t, 2> autoNoteKeys {};   // 0x8993d034, 0x8993d038: Auto Note's note-on and note-off keys (v309)
+    // v346: the audio task's object (0x8998a480, .bss, row 16's 0x89396470: +8 its class, +0x18 the stereo source's
+    // flag, +0x24 Out DC cut for TG; past it, 0x8998a4b4…, the block's), SysEx's flag (0x8992e3d1, .data 1)
+    static constexpr size_t kAudioClassWord = 8 / 4, kDcCutWord = 0x24 / 4;
+    std::array<uint32_t, 0x34 / 4> audioTask {};
+    uint8_t sysexOn = 0;
     uint32_t ticks = 0;                    // 0x8993d080: the update task's timer's ticks (v310)
     Vc2TaskTime time {};                   // 0x8993d084 (v310)
     Vc2TonePool tones {};                  // 0x8999f524, its head and serial 0x8993fb48 (v228)
@@ -187,4 +195,5 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     std::unique_ptr<Vc2SynthVoices> voiceParts;
     std::unique_ptr<Vc2SynthControls> controls;
     std::unique_ptr<Vc2SynthSettings> settings;
+    std::unique_ptr<Vc2SynthMidi> midiParts;   // v346
 };

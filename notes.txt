@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's MIDI note path v346 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v345's 984e5c3;
+  HARDWARE_FIRMWARE.md, "The part's MIDI note path"): a message through the OS MIDI's handler and the dispatcher on the
+  part's ports (Vc2SynthMidi, Vc2Synth::midiMessage), a part object's note-on and note-off by its class, the
+  parameters' words, the audio task's object (row 16's start) and SysEx's flag; the OS routines' list shared
+  (Vc2OsMidiParts::kOsRoutines). xt_vc2synth's notes part 0 different at 2024/7/31337, xt_vc2midi 0 different; no
+  voice starts yet (Part 1 Receive Switch a system ID, read as its default, off, with no system store: v347's); plants
+  --synth --changed 78, 54 caught, the 24 missed the voice path's; fcheck's baseline updated; verify.sh green.
+
 The part's settings and voices wired v345 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v344's 14a0228;
   HARDWARE_FIRMWARE.md, "The part's settings and voices wired"): the notes' task's start on the part, its parameters
   by read object (the defaults with no store), the settings' readers and messages, and the voices', notes' and

@@ -133,6 +133,19 @@ std::string makeTones(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, int& made) {
     return "";
 }
 
+// v346: the tones given back in turn, rom.4's 0x893b2fc0(tone, 3) and the pool's unmake through the tone's host, so a
+// note finds the pool free; every region after each
+std::string unmakeTones(Vc2Fw& fw, Vc2Synth& s) {
+    constexpr uint32_t kUnmakeAt = 0x893b2fc0, kBack = 3;   // [FW]
+    for (int k = 0; k < Vc2TonePool::kTones; ++k) {
+        if (!fw.call(kUnmakeAt, { s.tones.addressOf(k), kBack })) return "the unmake faults: " + fw.cpu.error();
+        s.tones.unmake(s.tones.tones[(size_t)k], true, s.hosts[(size_t)k]);
+        const std::string d = vc2SynthRegionsDifference(fw, s);
+        if (!d.empty()) return "tone " + std::to_string(k) + "'s unmake: " + d;
+    }
+    return "";
+}
+
 bool synthLoadTables(const char* path) {
     return vc2LoadAll<vc2LoadPartVoices, vc2LoadKeys, vc2LoadOsMidi, vc2LoadPartSettings, vc2LoadUnvoiced,
                       vc2LoadLegacy, vc2LoadHireso, vc2LoadVocoder, vc2LoadCarrier, vc2LoadTracker, vc2LoadAutoNote,
@@ -161,6 +174,8 @@ std::string vc2SynthRegionsDifference(Vc2Fw& fw, Vc2Synth& s) {
     return "";
 }
 
+std::string vc2SynthToneDifference(Vc2Fw& fw, Vc2Synth& s, int tone) { return madeDifference(fw, s, tone); }
+
 // v345: the vocoder by the checks' shared compare (its engine's and hook's words by the port's engine)
 std::string vc2SynthDifference(Vc2Fw& fw, Vc2Synth& s) {
     const std::string d = vc2SynthRegionsDifference(fw, s);
@@ -182,12 +197,17 @@ int main(int argc, char** argv) {
     std::mt19937 rng((uint32_t)run->seed);   // v340: the tones made through the part's hosts
     int made = 0;
     std::string tones = what.empty() ? makeTones(fw, *synth, rng, made) : "";
+    if (tones.empty() && what.empty()) tones = unmakeTones(fw, *synth);   // v346: the pool free again
     if (!tones.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the tones made: %s\n", tones.c_str());
-    std::printf("synth: %d tones made through the part's hosts, their words compared\n", made);
+    std::printf("synth: %d tones made through the part's hosts, their words compared, then given back\n", made);
     const bool sound = what.empty() && tones.empty();
-    const long load = sound ? vc2SynthLoadPart(fw, *synth, *run) : 0;    // v345
+    Vc2SynthPosts posts;   // v346: the OS's hooks, the parts' one rig
+    vc2SynthInstallOs(fw, posts);
+    const long load = sound ? vc2SynthLoadPart(fw, *synth, *run, posts) : 0;     // v345
+    const long notes = sound ? vc2SynthNotesPart(fw, *synth, *run, posts) : 0;   // v346
     const long reads = sound ? vc2SynthReadsPart(fw, *synth, *run) : 0;   // v343: after the load, its noise last
-    std::printf("xt_vc2synth: %ld different\n", (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1) + load + reads);
+    const long tally = (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1) + load + notes + reads;
+    std::printf("xt_vc2synth: %ld different\n", tally);
     return 0;
 }
 #endif

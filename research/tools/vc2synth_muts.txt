@@ -95,3 +95,47 @@ syn-make-tone|return tones.make(id, h) != nullptr ? taken : 0;|return tones.make
 syn-static-enqueue|override { s_.queue.enqueue(node, s_.voices, *s_.voiceParts); }|override {}|vc2synth
 syn-reload-read|{ return s_.settings->readPart(part); }|{ return part == 0; }|vc2synth
 syn-sound-off|soundOff(w, { source, channel, 0 }); }|soundOff(w, { source, channel, 1 }); }|vc2synthnumbers
+# v346: the part's MIDI note path (vc2synthmidi, Vc2SynthMidi.cpp; vc2synth, Vc2Synth.cpp's audio task's object and
+# SysEx's flag; vc2synthmemory, their regions), by xt_vc2synth's notes part; and the voices' and notes' parts v345 left
+# for it (vc2synthvoices, Vc2SynthVoices.cpp).  Not planted: Vc2SynthMidi.h's bodies (the parameters' word's two bytes,
+# DC cut, all notes off), a header's; the OS MIDI's listeners read from the part's memory (listenerOf, nextListener),
+# as no routine of the part's installs one, so every port's list is empty on both sides.  Missed until the part has a
+# system store (v347): every plant on the voice path (smi-heard, -held, -held-range, -object-key, -object-word and the
+# svo- ones), as Part 1 Receive Switch reads its default, off, with none, so part 0's node receives on no channel and
+# no note reaches a held object, on rom.4's side as on the part's
+smi-ways|{ partNoteOff, partNoteOn, partHeard,|{ partNoteOn, partNoteOff, partHeard,|vc2synthmidi
+smi-heard|    vc2ChannelHeard(w, source, channel);|    vc2ChannelHeard(w, source, channel ^ 1);|vc2synthmidi
+smi-controller|(int32_t)number, (int32_t)value);|(int32_t)number, (int32_t)value / 2);|vc2synthmidi
+smi-note-off|    vc2ChannelNoteOff(w, source, channel, key, velocity);|    vc2ChannelNoteOff(w, source, channel, key + 3, velocity);|vc2synthmidi
+smi-note-on|    vc2ChannelNoteOn(w, source, channel, key, velocity);|    vc2ChannelNoteOn(w, source, channel, key, velocity ^ 1);|vc2synthmidi
+smi-held|objects[k].vtable == kHeldClass;|objects[k].vtable != 0;|vc2synthmidi
+smi-held-range|return k < s_.nodes.objects.size() &&|return k < 1 &&|vc2synthmidi
+smi-object-key|{ object, table, word, (int32_t)key, velocity }|{ object, table, word, (int32_t)key + 1, velocity }|vc2synthmidi
+smi-object-word|{ object, table, word, 0, 0 }|{ object, table, 0, 0, 0 }|vc2synthmidi
+smi-handle|    s_.midi.handle(m, word, *this, *s_.settings);\n|\n|vc2synthmidi
+smi-dispatch|    vc2MidiDispatch(w, m, word);|    (void)w;|vc2synthmidi
+syn-audio-class|kAudioClass = 0x898cd394;|kAudioClass = 0x898cd370;|vc2synth
+syn-dc-start|kDcCutStart = 1;|kDcCutStart = 0;|vc2synth
+syn-sysex|kSysexOn = 1;|kSysexOn = 0;|vc2synth
+syn-midi-message|{ midiParts->message(m, word); }|{ midiParts->message(m, 0); }|vc2synth
+smem-audio|vc2SynthRegion(0x8998a480, s.audioTask,|vc2SynthRegion(0x8998a484, s.audioTask,|vc2synthmemory
+smem-sysex|vc2SynthRegion(0x8992e3d1, s.sysexOn,|vc2SynthRegion(0x8992e3d0, s.sysexOn,|vc2synthmemory
+svo-noteon-back|Vc2NoteWords& w = s_.notes.at(s_.notes.addressOf(&note));|Vc2NoteWords w = note;|vc2synthvoices
+svo-block-osc|t.setOscBlock(row.n, block, h); break;|t.setOscBlock(0, block, h); break;|vc2synthvoices
+svo-block-mix|    case Vc2NoteBlock::mix: t.setMixBlock(block, h); break;\n|\n|vc2synthvoices
+svo-block-cosm|t.setCosmBlock(row.n, block, h); break;|t.setCosmBlock(0, block, h); break;|vc2synthvoices
+svo-block-env|t.setEnvelopeBlock(row.n, block, h); break;|t.setEnvelopeBlock(0, block, h); break;|vc2synthvoices
+svo-block-lfo|t.setLfoBlock(row.n, block, h); break;|t.setLfoBlock(0, block, h); break;|vc2synthvoices
+svo-block-tva|    case Vc2NoteBlock::tva: t.setTvaBlock(block, h); break;\n|\n|vc2synthvoices
+svo-ended|if (routine == kVc2SynthEndedHook) s_.post(|if (routine != kVc2SynthEndedHook) s_.post(|vc2synthvoices
+svo-destroy-end|    s_.notes.end(n.note, *s_.noteParts);\n|\n|vc2synthvoices
+svo-destroy-note|    n.note = 0;\n    n.updated = 0;|    n.updated = 0;|vc2synthvoices
+svo-destroy-updated|    n.note = 0;\n    n.updated = 0;|    n.note = 0;|vc2synthvoices
+svo-legato|s_.legato = { legato.found, legato.marked, legato.onByte, 0 };|s_.legato = { legato.found, legato.found, legato.onByte, 0 };|vc2synthvoices
+svo-prepare-plain|        s_.voices.at(voice).updated = 0;\n        return;|        return;|vc2synthvoices
+svo-prepare-kind|kVc2SynthLegatoAt, call.passed, call.kind };|kVc2SynthLegatoAt, call.passed, 0 };|vc2synthvoices
+svo-retune|s_.classes.retune(voice, message, value,|s_.classes.retune(voice, message, 0,|vc2synthvoices
+svo-keyoff-plain|    if (note != 0) s_.notes.release(note, *s_.noteParts);|    (void)note;|vc2synthvoices
+svo-changed|? s_.classes.changed(voice, s_.voices, *this) : 0;|? 0 : 0;|vc2synthvoices
+svo-table|/ sizeof(Vc2KeyGlide)].table;|/ sizeof(Vc2KeyGlide) + 1].table;|vc2synthvoices
+svo-reload|s_.reloads.message(Vc2PartReloads::kAt + (uint32_t)sizeof(Vc2Reload) * part);|s_.reloads.message(Vc2PartReloads::kAt);|vc2synthvoices
