@@ -64,6 +64,8 @@ void oscDrawVoicedWords(std::span<uint32_t> words, std::mt19937& rng, uint32_t b
 // (+0x6c) drawn again moderate when not finite, as a note leaves them: the step takes each from its target by FSUB,
 // whose NaN's sign is the host's (xtf::sub; a case's noise had one); how many were drawn
 long oscSteerVariWords(Vc2OscVoice& o, std::mt19937& rng);
+// v339: before VariPhrase's update, its formant's target finite (Vc2OscDraws.cpp); 1 where it was drawn so
+long oscSteerVariFormant(Vc2OscVoice& o, Vc2OscParts& parts, const Vc2ToneShared& shared);
 
 // The vibrato's block as the converter could write it (v267; waves 0 and 1 alone: past them rom.4 reads what lies after
 // its table): alone, into a note-on's or the settings' words, or onto a voice's; and its fade's rates held to 1 over

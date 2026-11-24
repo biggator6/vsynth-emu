@@ -1150,6 +1150,10 @@ version against rom.4's routines with what it calls hooked:
        - The band waves' segments distinct (v338): the checks' band wave draw (v332's) no longer gives a segment no
          records when two drawn starts fall alike, which an AddressSanitizer build reached (HARDWARE_FIRMWARE.md, "The
          band waves' segments distinct").
+       - VariPhrase's formant target finite before its update (v339): the check's formant depths took exp2 past its
+         table to a NaN that FSUB and xtf's subtraction carry otherwise; no XT reaches it, so a draw
+         (`oscSteerVariFormant`; HARDWARE_FIRMWARE.md, "VariPhrase's formant target finite before its update"). Next:
+         Vc2Synth's 24 hosts.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

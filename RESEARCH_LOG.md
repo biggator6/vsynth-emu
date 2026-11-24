@@ -4187,3 +4187,5 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the check keeps an analog render's words an XT's, or gives the block the check's render.
 - v338: the AddressSanitizer build that measured v337's coverage also found v332's band draw reading the first
   of an empty list; its draws differ from -O2's (other float arithmetic), so it reaches states the -O2 seeds don't.
+- v339: its other finding, VariPhrase's +0x1d0, was v330's NaN class through the target: an exp2 the check's depths
+  took past its table. A steer that draws nothing kept every generator's stream as it was.

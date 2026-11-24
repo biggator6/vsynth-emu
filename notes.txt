@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+VariPhrase's formant target finite v339 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v338's e5a26b5;
+  HARDWARE_FIRMWARE.md, "VariPhrase's formant target finite before its update"): a coverage build's seed 7 case 383
+  wrote +0x1d0 rom.4 0xffffa8ea, the port 0x7fc00000. The check's formant depths (±1000 over outputs as wide) took
+  rom.4's exp2 past its table to a NaN's bits, which the update's FSUB keeps and xtf's TwoSum doesn't. No XT reaches
+  it (depths and outputs within ±1), so the draw: oscSteerVariFormant gives a voice whose formant target isn't
+  finite a plain note's formant before its update. xt_vc2osc 0 different at 2024/7/31337 and in the coverage build;
+  fcheck's baseline updated (xt_vc2osc's count lines); no port changed; verify.sh green.
+
 The band waves' segments distinct v338 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after the merge 8ab70ab;
   HARDWARE_FIRMWARE.md, "The band waves' segments distinct"): v332's band wave draw took front() of a segment with
   no records when two drawn starts fell alike (undefined behaviour; an AddressSanitizer build faulted at seed 7);

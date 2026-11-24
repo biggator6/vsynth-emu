@@ -12,6 +12,7 @@ struct OscCounts {
     long events = 0, noteOns = 0, plain = 0, sampled = 0, updates = 0, takes = 0, renders = 0, settings = 0;
     long getters = 0, gliding = 0;   // v331: the event lookups went; v335: the seeks
     long variDrawn = 0;              // v330: VariPhrase's words drawn finite (v335: its players' set-ups went)
+    long variFormants = 0;           // v339: its formant's base, depths and factor drawn where its target isn't finite
     long variByEvents = 0;                 // v331: its note-ons by events, their table steered
     long carrierStarts = 0, carrierBlocks = 0, carrierSettings = 0, kind6Starts = 0, kind6Blocks = 0;   // v266
     long voicedSounding = 0, voicedNotFinite = 0;   // v266: those blocks with a sample that isn't 0, or isn't finite

@@ -79,6 +79,9 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     Vc2OscVoice& seeking = s.voices[(size_t)v];   // v329: a seek pending re-seeks once the level has fallen
     if (seeking.tail.seekPending != 0) oscSteerBandSeek(seeking, s.shared);   // v333: through the band players' seek
     if (seeking.kind() == kVariPhrase) s.n.variDrawn += oscSteerVariWords(seeking, s.shared.renders);   // v330
+    if (seeking.kind() == kVariPhrase) {   // v339
+        s.n.variFormants += oscSteerVariFormant(seeking, s.parts[(size_t)v], s.romShared);
+    }
     oscSteerSeek(s, v, oscIsModeOne(seeking) && seeking.tail.seekPending != 0);
     ++s.n.updates;
     constexpr uint32_t kLite = 1, kLiteTypes = 3;   // [FW] v324: LITE's kind and the wave types its update has ways for

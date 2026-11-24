@@ -219,8 +219,8 @@ int main(int argc, char** argv) {
     std::printf("kinds 5 and 6: %ld carriers started, %ld carrier blocks, %ld carrier settings, %ld kind 6 starts, %ld "
                 "kind 6 blocks; %ld of the blocks sounding, %ld not finite\n", n.carrierStarts, n.carrierBlocks,
                 n.carrierSettings, n.kind6Starts, n.kind6Blocks, n.voicedSounding, n.voicedNotFinite);
-    std::printf("calls: %ld ramps gliding after an event; %ld VariPhrase words drawn finite, %ld note-ons by events\n",
-                n.gliding, n.variDrawn, n.variByEvents);   // v330; v331: VariPhrase's by events; v335: no seeks, set-ups
+    std::printf("calls: %ld ramps gliding after an event; %ld VariPhrase words drawn finite, %ld note-ons by events, "
+                "%ld formants drawn finite\n", n.gliding, n.variDrawn, n.variByEvents, n.variFormants);   // v330…v339
     std::printf("own renders: %ld blocks through the EXT IN player's, %ld through Vari off's, %ld through LITE's "
                 "heads', %ld through mode 1's, %ld through the band players', %ld through SOLO's, %ld through the "
                 "period-jump player's\n", n.extInBlocks, n.variOffBlocks, n.headsBlocks, n.modeOneBlocks, n.bandBlocks,

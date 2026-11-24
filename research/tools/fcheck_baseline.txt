@@ -811,14 +811,14 @@ jump: 40 cases, 120 notes (48 stereo, 95 set up in samples), 325 seeks (260 in s
 mode 1: 40 cases, 20480 blocks (10040 stereo, 4793 in a loop, 4113 bouncing, 8421 held at the range's end), 640 set-ups, 640 seeks (306 in samples)
 osc: 40 cases, 16000 events, 2426 note-ons (412 with a sample, 1215 without), 1727 updates, 1710 renders, 833 settings, 866 takes, 3299 getters
 kinds 5 and 6: 215 carriers started, 170 carrier blocks, 67 carrier settings, 216 kind 6 starts, 185 kind 6 blocks; 355 of the blocks sounding, 0 not finite
-calls: 3239 ramps gliding after an event; 153 VariPhrase words drawn finite, 36 note-ons by events
-own renders: 14 blocks through the EXT IN player's, 222 through Vari off's, 233 through LITE's heads', 212 through mode 1's, 141 through the band players', 54 through SOLO's, 36 through the period-jump player's
+calls: 3258 ramps gliding after an event; 151 VariPhrase words drawn finite, 36 note-ons by events, 7 formants drawn finite
+own renders: 15 blocks through the EXT IN player's, 208 through Vari off's, 233 through LITE's heads', 240 through mode 1's, 128 through the band players', 59 through SOLO's, 27 through the period-jump player's
 band players: 77 note-ons given a band wave, 43 re-seeks a set-up state
-solo: 108 renders steered to a set-up state, 61 note-ons given a SOLO wave, 18 re-seeks a set-up state
-jump: 64 renders steered to a set-up state, 22 note-ons given a wave of periods, 10 re-seeks a set-up state
+solo: 105 renders steered to a set-up state, 61 note-ons given a SOLO wave, 18 re-seeks a set-up state
+jump: 57 renders steered to a set-up state, 22 note-ons given a wave of periods, 10 re-seeks a set-up state
 mode 1's set-ups: 26 (11 with the range in samples); 62 events steered for its seek
-lite: 63 updates and 66 settings on a type with a way
-analog: 29 blocks through its renders, 40 words drawn finite, 9 NOISE holds steered, 42 blocks the check's, their words no XT's
+lite: 63 updates and 71 settings on a type with a way
+analog: 28 blocks through its renders, 28 words drawn finite, 9 NOISE holds steered, 46 blocks the check's, their words no XT's
 xt_vc2osc: 0 different
 == xt_vc2tva
 tva: 40 cases, 16000 events, 2405 note-ons, 1620 updates, 5347 renders (1496 fading, 961 fades ended, 559 told), 88 over, 200 silent

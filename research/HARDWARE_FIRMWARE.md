@@ -1546,6 +1546,34 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### VariPhrase's formant target finite before its update (2026-11-23, v339) {#vc2-osc-vari-formant-finite}
+
+Step 4.3's sixty-seventh version, a draw of the checks', not a port's fault. A coverage build of xt_vc2osc (its
+float arithmetic, and so its draws, its own from the players' part on) differed at seed 7, case 383, the red test:
+VariPhrase's update (0x893c88b0) wrote +0x1d0, the formant, as 0xffffa8ea on rom.4 and as 0x7fc00000 on the port.
+
+The update steps each word 0.7 of the way to its target by FSUB. The formant's target (0x893afeb0) is
+`factor × bounded(exp2(base + sum) × ramp)`, where the sum is the formant's envelope and LFO outputs times their
+depths. There the sum was 151,843: the check's depths are drawn moderate, up to ±1000, over outputs as wide. That
+takes rom.4's exp2 past its table, and it read a NaN's bits (0xffffa8ea), the same on both sides, as the checks run
+rom.4's own exp2. The step then parts them. rom.4's FSUB keeps the NaN it is given; xtf's subtraction, a TwoSum,
+leaves with the default NaN. The class is v330's, there from a stepped word, here from the target.
+
+An XT can't reach this state. Its depths are held within ±1 (0x8939c260: held to ±63, squared, held to ±1), its
+envelopes' and LFOs' outputs are within ±1, and its formant base is a converter's octaves. So the draw is fixed, as
+v330's was: before a VariPhrase voice's update, `oscSteerVariFormant` (Vc2OscDraws.cpp) runs the port's own formant
+target, which logs no call. Only where that is not finite does it give the voice a plain note's formant: base 0,
+depths 0, factor 1. That draws nothing, so the generators' streams stay; the voices it changes go on otherwise.
+xt_vc2tone's update has no voice's parts to run the target with (the host's links are its own) and doesn't reach
+this state at its seeds: open there.
+
+Results:
+- The coverage build is 0 different at seed 7 (130 formants given a plain note's at 400 cases).
+- At -O2 xt_vc2osc is 0 different at 2024, 7 and 31337 (7, 130 and 126 formants), its counts after them moved.
+- fcheck's baseline updated: its diff is xt_vc2osc's count lines alone.
+- No port changed, so no plant to run; the whole --osc list runs at the merge.
+- verify.sh green.
+
 ### The band waves' segments distinct (2026-11-23, v338) {#vc2-osc-band-segments-distinct}
 
 Step 4.3's sixty-sixth version, a fault in the checks' draws (v332's), not a port's. A band wave's segments start
