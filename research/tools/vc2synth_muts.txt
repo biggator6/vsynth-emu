@@ -144,7 +144,7 @@ svo-reload|(uint32_t)sizeof(Vc2Reload) * part);|(uint32_t)sizeof(Vc2Reload) * (p
 # by area), the part given it (vc2synth), the settings' system blocks from it (vc2synthsettings), its areas and the OS's
 # part objects as regions (vc2synthmemory), the OS's part objects' start (vc2synthosmidi, Vc2OsMidi.cpp under
 # xt_vc2synth).  Not planted: Vc2SystemStore.h's areas, a header's.  v345's Matrix levels' copy (ss-levels-static,
-# -mixer, -targets) is still missed: M's init runs on the update task, v348's
+# -mixer, -targets) is still missed: M's init runs on the update task, v349's
 sys-b-base|{ { { 0, kLastId, Vc2System::kRecord, 0 } },|{ { { 0, kLastId, Vc2System::kRecord + 1, 0 } },|vc2systemstore
 sys-block-base|Vc2System::kRecord + kSystemBlock, 0 } },|Vc2System::kRecord + kSystemBlock + 1, 0 } },|vc2systemstore
 sys-c-base|{ { 0, kLastId, Vc2System::kC, 0 } },|{ { 0, kLastId, Vc2System::kC + 1, 0 } },|vc2systemstore

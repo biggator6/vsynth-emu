@@ -1546,6 +1546,27 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The checks' region compare on a part word (2026-11-24, v348) {#vc2-rig-part-word}
+
+Step 4.3's seventy-sixth version, a fix in the check rig that the v550 sanitizer sweep found (claude/vc2-sanitize-4e66c9,
+`v550-for-step-4-3.md` in the shared notes). No port and no XT is involved.
+
+`vc2FirstDifference` (Vc2CheckRig.h) sized its two vectors to `bytes / 4` words, then read `bytes` into each. A region
+that isn't whole words was written past: xt_vc2sets' "the sets' counts" (`Vc2WaveSets::kCountsAt`, 6 bytes, three
+halfwords) got one word, and every OSC-block event wrote 2 bytes beyond it, at each of its two copies. Its third
+halfword, the alias set's count, was never compared, so a difference there would have passed unseen. The vectors now
+take the bytes rounded up to words, so a last part-word is compared to its last byte, the rest 0 on both sides.
+
+Results:
+- Red first: xt_vc2sets under AddressSanitizer and UBSan (the sweep's flags, from a scratch copy of build.sh) gave
+  32,000 heap-buffer-overflow reports at 2024 (40 cases), each a 6-byte write into a 4-byte vector at the rig's read.
+  After the fix there are none at 2024, 7 or 31337. At -O2, xt_vc2sets is 0 different at the three seeds, its output
+  line for line as before.
+- No plant: the header has none of its own, and no port code in xt_vc2sets' events writes the counts (the alias count
+  is only read), so no plant can make the third halfword differ. The whole VC-2 lists run before the merge, as the rig
+  changed (TOOLS.md).
+- fcheck as its baseline, every harness on the rig unchanged. verify.sh green.
+
 ### The part's system store (2026-11-24, v347) {#vc2-synth-system}
 
 Step 4.3's seventy-fifth version, Vc2Synth whole's eighth. The part now reads the system's blocks from a system store
@@ -1603,7 +1624,8 @@ Results:
   areas with Part 1 Receive Switch on three times in four. A kind-0 parameters' message (the routing's reset, where
   ChordMemory is read) now comes one time in four, so system D's reads are seen.
 - The plants. The synth list's changed 85: 82 caught. The three missed are v345's Matrix levels' copy, which needs
-  M's init on the update task (v348). v346's voice-path plants: 14 of 24 now caught. The ten still unseen are the
+  M's init on the update task (v349; v348 is the checks' region fix). v346's voice-path plants: 14 of 24 now caught.
+  The ten still unseen are the
   notes' block pass's mix and COSM setters (the update task's), the ended hook (the renders'), the plain voice
   class's five routines (no voice of the notes' is plain), the note-on's fix-up written back, and the legato's
   struct's second byte. Re-aimed: Receive's source (sources 0 and 1 are both 0), the reload by part (part 0 alone),

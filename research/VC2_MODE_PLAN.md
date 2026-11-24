@@ -1192,6 +1192,10 @@ version against rom.4's routines with what it calls hooked:
          the fade's wait rendered at once) on rom.2's and rom.4's tables as the plugin loads them (HARDWARE_FIRMWARE.md,
          "The part's system store"). Next: the update task on the part, the block (mixer, renders, vocoder, tracker,
          Auto Note) with the waits rendering in place, the OS model, and the whole check.
+       - The checks' region compare on a part word (v348): `vc2FirstDifference` rounds a region's bytes up to words,
+         so xt_vc2sets' sets' counts (6 bytes) are no longer written past and their third halfword is compared (the
+         v550 sweep's finding; HARDWARE_FIRMWARE.md, "The checks' region compare on a part word"). The update task on
+         the part, planned as v348, is v349.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

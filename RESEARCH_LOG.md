@@ -4215,3 +4215,5 @@ Round-2 recordings.  First build-out after that: real-time granular port
   part's ports read beside rom.4's, the OS's part objects (found by making a read past the part's memory fail the
   step), and the OS's wait a stolen voice makes for its fade. The system's own defaults, not the descriptors', turn
   Part 1's receive on.
+- v348 took the sanitizer sweep's finding in the rig, red first: xt_vc2sets passed at -O2 while ASan saw 32,000
+  writes past one region. A compare that passes can still be reading the wrong bytes; the sanitizers see that.
