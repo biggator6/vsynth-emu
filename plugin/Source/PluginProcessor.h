@@ -216,6 +216,7 @@ private:
     std::array<EditorEvent, kEditorEvents> editorEvents_ {};
     void toSynth(const juce::MidiMessage& msg);   // one message to the synth, the host's or the editor's
     void toFile(const juce::MidiMessage& msg);    // or to the file played without the firmware
+    void playFile(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int numOut);   // that file's block
     // A patch's zones 2…16: their settings at once, and again with their waves once the pool has encoded them (each wave once, as its own
     // type).  A newer patch discards an older one's.  The store and the wave folder go in the session, for its zones to come back.
     // PluginZones.cpp (v195), with the splits' parameters

@@ -3912,6 +3912,36 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The plugin's output always numbers (2026-11-24, v454) {#output-finite}
+
+What processBlock hands the host never holds a NaN or an infinity: a sample that isn't a finite number becomes 0, on
+every way out of the block. The user's decision (2026-11-24: "ok, fix the NaN at the output"), taken over keeping an
+OSC's Type from changing under a held note, which would have changed how the XT behaves and covered one cause only.
+
+**Why.** Step 4.3's v349 found a way for the VC-2's voices to make NaN samples: a sounding VOCODER-OSC note whose OSC
+Type changes to PCM, where kind 5's update reads PCM's −1 as its balance envelope depth. rom.4 in the interpreter and
+the port both make NaN there (only its sign differs, deferred by the user; VC2_MODE_PLAN.md, step 4.3's [deferred]
+item, and step 4.5's "A NaN sample to the host"). A NaN handed to a host spreads through its mix and stays in its
+effects' feedback until they're reset. On an XT the voices' floats become integers before they're heard (the effect
+chip's words, the converters'), so a NaN there is some fixed value. 0 stands in for it until the user's XT says which:
+hold a VOCODER note and change OSC Type to PCM.
+
+**Where.** `OutputFinite` (PluginOutputFinite.h) is made at the top of processBlock, and its destructor sets the buffer
+right on every return: the XT's players, the file played without the firmware, and the VC-2 once it is wired all pass
+through it. A block the processor cleared is skipped. No allocation, one pass over the block. processBlock was past
+code-shape's 50 statements, so it was split first: the file played without the firmware moved as it stood into
+`playFile` (PluginProcess.cpp).
+
+**Not changed.** With the Effects on, the frame's floats reach the chip through `XtFxUnit::toChip`, whose cast of a NaN
+is undefined in C++. An ARM host's cast gives 0, and this build is arm64 only, so the chip holds no NaN here; an Intel
+build would need `toChip` to say what a NaN becomes.
+
+**Checks.** `VSynthEmuOutputTest` (OutputTest.cpp, in verify.sh): a float wave with NaN, +infinity and −infinity every
+100 frames (441 of its 44,100 samples as read, checked first so the run can fail), played with no image through
+processBlock for 40 blocks of 512. Before the guard: 410 samples out weren't finite numbers (205 frames, both
+channels), exit 1. After it: 5/5 checks hold, every sample finite and the wave's sine still heard. verify.sh: the
+renders and PluginTest as before.
+
 ### The VC-2's waves at the plugin's start (2026-11-23, v504) {#vc2-waves-at-start}
 
 v503's load now runs at the plugin's start, once a process, beside rom.4's tables. That keeps the user's rule that

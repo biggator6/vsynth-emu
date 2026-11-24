@@ -56,8 +56,9 @@ if [ $BUILT = 1 ]; then
     # and its plugin side: its parameters against the firmware, a patch's, a session's, a chord through processBlock (v190);
     # the editor, D (v196, in TEST_UI_LAYOUT's place): its sizes, its layout on each page and block, every control on its
     # own parameter and every parameter with a control, each press's route; the outside input to the EXT IN OSC (v207):
-    # the feed at nine rates, the processor against XtSynth given the input by the law, the Effects off and on
-    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor ExtIn; do
+    # the feed at nine rates, the processor against XtSynth given the input by the law, the Effects off and on; the output
+    # always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite
+    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor ExtIn Output; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth

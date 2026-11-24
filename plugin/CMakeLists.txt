@@ -233,9 +233,11 @@ vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp T
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
 # against XtSynth given the input by the law, the Effects off and on
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)
+# The output always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite
+vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
                  VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
-                 VSynthEmuExtInTest)
+                 VSynthEmuExtInTest VSynthEmuOutputTest)

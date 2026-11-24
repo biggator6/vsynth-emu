@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The plugin's output always numbers v454 (2026-11-24, on vc2-mode ab50a1c; HARDWARE_FIRMWARE.md, "The plugin's output
+  always numbers"; the user's "ok, fix the NaN at the output"). OutputFinite (PluginOutputFinite.h), made at the top of
+  processBlock, sets a sample that isn't a finite number to 0 on every way out, so no NaN or infinity reaches the host
+  (step 4.3's v349 found the VC-2's voices can make NaN; 0 stands in for what the XT's own conversion gives). processBlock
+  split first (code-shape's 50 statements): the file played without the firmware moved as it stood into playFile.
+  VSynthEmuOutputTest (in verify.sh): a float wave with NaN and ±infinity played with no image, 410 samples out not
+  numbers before the guard, 5/5 checks after. Tests' writeWav (TestWave.cpp) taken out of writeTestWave.
+
 The VC-2's waves at the plugin's start v504 (2026-11-23, after v503 and vc2-mode's merge; HARDWARE_FIRMWARE.md,
   "The VC-2's waves at the plugin's start"): v503's load once a process, beside rom.4's tables. PluginRom.cpp seeks
   V-SynthXTDiskImage.bin.0.bin once rom.4 is in, beside rom.4 first; Vc2WavesInUse takes it (read, its VC-2 index and

@@ -2,6 +2,7 @@
 // 300 lines: the XT's players with their sample-accurate MIDI, or without the firmware the loaded file as it is.
 #include "PluginProcessor.h"
 #include "PluginParamIds.h"
+#include "PluginOutputFinite.h"
 
 // ─── Process ──────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                        juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
+    const OutputFinite finite(buffer);       // every way out: no NaN or infinity reaches the host (v454)
     const int numIn = inputBlock(buffer);   // the outside input, left in the first channels for the render (v207)
 
     const int numOut     = std::min(buffer.getNumChannels(), getTotalNumOutputChannels());
@@ -42,6 +44,14 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     // ── Without the firmware: the loaded file as it is ──────────────────────────
+    playFile(buffer, midi, numOut);
+}
+
+// The file played without the firmware, a block of it (moved from processBlock as it stood, v454): its channels mixed to
+// mono, at the level the XT's voices play, on every output
+void VSynthEmuProcessor::playFile(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int numOut)
+{
+    const int numSamples = buffer.getNumSamples();
     buffer.clear();   // inputBlock left the input in it (v207)
     takeFromEditor([this](const juce::MidiMessage& m) { toFile(m); });
     for (const auto meta : midi) toFile(meta.getMessage());

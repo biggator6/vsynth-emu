@@ -18,12 +18,17 @@ juce::File writeTestWave(const juce::File& folder, int seconds) {
         audio.setSample(0, i, (float)(0.4 * std::sin(2.0 * std::numbers::pi * f * t) * env + 0.01 * n));
     }
     const juce::File file = folder.getChildFile("wave_" + juce::String(seconds) + "s.wav");
+    return writeWav(file, audio, kRate, 16) ? file : juce::File();
+}
+
+bool writeWav(const juce::File& file, const juce::AudioBuffer<float>& audio, int rate, int bits) {
     file.deleteFile();
     juce::WavAudioFormat wav;
     auto stream = std::make_unique<juce::FileOutputStream>(file);
-    if (!stream->openedOk()) return {};
-    std::unique_ptr<juce::AudioFormatWriter> writer(wav.createWriterFor(stream.get(), kRate, 1, 16, {}, 0));
-    if (!writer) return {};
+    if (!stream->openedOk()) return false;
+    std::unique_ptr<juce::AudioFormatWriter> writer(
+        wav.createWriterFor(stream.get(), rate, (unsigned)audio.getNumChannels(), bits, {}, 0));
+    if (!writer) return false;
     stream.release();   // the writer owns it now
-    return writer->writeFromAudioSampleBuffer(audio, 0, frames) ? file : juce::File();
+    return writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples());
 }
