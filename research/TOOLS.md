@@ -23,6 +23,10 @@ Moved here as they stood from CLAUDE.md (2026-11-23, the user's "Yes, all five")
 - `build.sh`: all harnesses and the XtSynth CLI. `make_inputs.py`: the raw test inputs.
 - `ghidra.sh Script.java args`: headless Ghidra on rom.2 (DecompFn, Disasm,
   MkFunc then DecompFn for undefined functions, FuncAt, CallersOf).
+- `kernelmap.py [rom.1] [rom.4]` (v352): what rom.1, the kernel, is, from its bytes: its base by the VBR its reset code
+  sets (0x88000000), its sections by its C start-up's words, its debug dump's names, its service table's 359 slots,
+  and every slot word rom.4 loads and every address `Vc2WaveBootKernel.cpp` answers on a slot's start (exit 1 if one
+  isn't). HARDWARE_FIRMWARE.md, "rom.1, the kernel".
 - `poolrefs.py [--16] <hex>`: code loading a constant/address, and raw words
   equal to it (vtables, tables). `build/tools/bin/rd <rom> <addr> <n>`:
   RAM words after C startup (.data tables).

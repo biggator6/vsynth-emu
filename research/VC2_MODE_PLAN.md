@@ -1213,6 +1213,16 @@ version against rom.4's routines with what it calls hooked:
          0x89391dc0 and 0x89391e20); the audio task's start, the mixer's reset (`Vc2Synth::audioStart`);
          xt_vc2synth's notes part with a block one event in 13 (HARDWARE_FIRMWARE.md, "The part's block"). Next: the
          OS model (the three tasks in their order a block, by the events each is posted) and the whole check.
+       - rom.1, the kernel (v352). **The user's decision (2026-11-24): "Load rom.1".** The OS model goes by the XT's
+         kernel: rom.1 read at run time from `firmware/unpacked/V-SynthXT.rom.1.bin` (none of its bytes, listings or
+         tables committed), its event services run in the interpreter as the reference, the part's model of them (the
+         event set, the wait, the cyclic handlers and alarms, the tempo timers) the hand-port, checked against them at 0
+         different; the task table's order a priority only as the kernel's scheduler reads it. What rom.1 is, from its
+         bytes (`kernelmap.py`): it runs at 0x88000000, and every slot word rom.4 loads and v503's 27 answers are its
+         service table's slots; v503 answered them without rom.1, which still stands. Its scheduler reads a lower level
+         as a higher priority; the update task's 0x1 is its own 10-tick alarm (HARDWARE_FIRMWARE.md, "rom.1, the
+         kernel"). Next: the kernel's event services ported and checked against rom.1's in the interpreter, then the OS
+         model on the part and the whole check.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each

@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+rom.1, the kernel v352 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v351's 3596c4d; the user's "Load
+  rom.1"; HARDWARE_FIRMWARE.md, "rom.1, the kernel"): what rom.1 is, by research/tools/kernelmap.py on its bytes at
+  run time: it runs at 0x88000000 (the VBR its reset code sets, its vectors there, its jump into itself), its .data
+  and .bss by its C start-up's words, its kernel's names from its debug dump (the system's words, a TCB's fields),
+  its service table's 359 slots; all 346 slot words rom.4 loads and v503's 27 answers on slots' starts. Its event
+  services read: priority by level from the dispatchers' scan, the wait, the event sets, the 1 ms tick's alarms and
+  cyclic handlers. Found: the update task's 0x1 is its own 10-tick alarm (0x89301800(10)), v349's 0x893018a0 the
+  task restart, not a wake. No plugin code; verify.sh green.
+
 The part's block v351 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v350's 2be3ae0;
   HARDWARE_FIRMWARE.md, "The part's block"): the part mixer's block on the part (Vc2Synth::block), its voices the
   sounding tones (Vc2SynthTones, the update's and schedule's adapters moved there), its parts the tracker's input

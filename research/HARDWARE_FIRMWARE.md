@@ -1546,6 +1546,76 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.1, the kernel (2026-11-24, v352) {#rom1-kernel}
+
+Step 4.3's eightieth version, Vc2Synth whole's twelfth. **The user's decision (2026-11-24): "Load rom.1".** The
+OS model goes by the XT's own kernel: rom.1 is read at run time from `firmware/unpacked/V-SynthXT.rom.1.bin`, as rom.2
+and rom.4 are, and none of its bytes, listings or tables are committed. Its event services run in the interpreter as
+the reference, and the part's model of them is the hand-port, checked against them at 0 different. Before relying on
+where rom.1 runs, this version establishes what it is, from its own bytes (`research/tools/kernelmap.py`).
+
+**What it is.** The update's blob with header `MI004   2.02` (the table above), 991,665 bytes: the kernel and a library
+the applications reach through stubs (files and folders, strings, the panel, the CS8420's driver of v121).
+- **Where it runs: 0x88000000.** Its reset code (file offset 0x1000, which rom.0 enters) sets VBR to `0x88000000`
+  (`0x88001018`). The SH-4's vectors from there hold code (VBR+0x100, +0x400, +0x600), and the 256 bytes below +0x100
+  are 0xff. The reset code's own jump (`0x88001022`) goes to `0x88001080`, file offset 0x1080, a function's start. So
+  file offset 0 is `0x88000000`, rom.4's `0x89300000` sits just past rom.1's stack, and every pointer below checks.
+- **Its sections**, by its C start-up's words (`0x88001054`…`0x8800107c`, read by `0x88001080`): .data, 0x198c bytes
+  from the image's end (`0x880f0824`…`0x880f21b0`), copied to `0x880f21b0`…`0x880f3b3c`; .bss `0x880f3b3c`…`0x881870fc`
+  and `0x881870fc`…`0x88189900`; an uncached area `0xa81c0000`…`0xa81eae20`; the heap from `0x89200000`, the stack's
+  top `0x892ffffc`. The image is one byte longer than .data's source.
+- **Its names**, from its debug dump's strings ("rtmSys:", `0x880615b8`…), placed by the dump's own reads
+  (`0x88011080`…): the system's words at `0x880f3ce0` are curTask (+0), sysTime (+4), freezTask (+8), lockFlag (+0xc),
+  alarmTop (+0x10) and roundLevel (+0x14). A task's entry (TCBInfo, 20 bytes) is its code, its TCB, its ready queue,
+  its quantum and its stack's record. A TCB is tcbEvent (+0, 16 bits), tcbWait (+2), tcbSuspend (+4), tcbItvl (+6),
+  tcbSusFlag (+8, a byte), tcbSemaFlag (+9), tcbStat (+0xa: STAT_WAIT 0, STAT_READY 1), tcbQtmSize (+0xc), tcbQtmCount
+  (+0xd), tcbTaskInfo (+0x10), tcbRqueue and tcbRqOrg (+0x14, +0x18: its level's head in readyQueue[]), tcbAlink and
+  tcbAtime (+0x1c, +0x20: the alarm list), tcbSlink (+0x24: a semaphore's queue), tcbRlink (+0x28: its ready queue)
+  and tcbSP (+0x2c). Semaphores are PRI_NOT_CHG or PRI_INHERIT.
+- **Its service table**: 359 slots of 16 bytes in 28 pages, `0x88008000`…`0x88009ee0`. Each loads a routine's address
+  and jumps to it, but `0x88008220`, which answers the word at `0x880f21b0` (.data's first), and `0x88009e20`, which
+  only returns.
+
+**rom.4 on it.** rom.4 loads 346 distinct words in the table's span, its stubs' and its direct calls', and every one is
+a slot's start. The 27 addresses v503's `Vc2WaveBootKernel` answers are slots' starts too. v503 answered them without
+rom.1, which still stands: the wave load runs on one thread, so nothing contends for what it locks. Two of its names
+were loose, read from rom.4's use alone: `0x88008000` and `0x88008010` are a semaphore's wait and signal (the pool's
+semaphore), and `0x88008110` and `0x88008120` hold and release the dispatch (lockFlag ± 0x10000).
+
+**The event services, read in rom.1** (each with the interrupts masked):
+- **The scheduler.** readyQueue[] (`0x880f3cf8`, 32 levels) holds each level's ready tasks, linked by tcbRlink. A
+  task's level is its entry's ready queue: rom.4's start (`0x893016d0`) gives each task `0x88008170`'s queue for the
+  level in its halfword at `0x8950cd44` (audio 0, then 1, 2, the clock's task 3, 4, 9, 12, notes 14, three at 16 with
+  the update task, 24 and 27). The dispatchers (`0x88010ef0`, the waits, `0x8800fb00`) scan readyQueue from level 0 up
+  and run the first non-empty queue's head, so **a lower level is a higher priority**, from the kernel's code. A task
+  made ready goes to its queue's head (`0x8800fa40`). rom.4's start (`0x89301790`) pushes its tasks onto the heads and
+  empties no queue, so the kernel's own tasks (`0x88061514`…, levels 10, 22, 25, 28 and 31) stay. The last,
+  `0x8800dd30`, never waits: it runs the application's idle hook (its handler 12, rom.4's `0x89300ba0`) round and
+  round, and it is what runs when every other task waits.
+- **The wait** `0x8800ffc0(mask)`: with none of the mask's events set, the task leaves its queue, tcbWait = mask, and the
+  dispatch runs the next. When it runs again it answers tcbEvent & tcbWait, clears those events and tcbWait. With one
+  set already, it answers them at once, unless its queue holds another task: then it goes to its queue's end first.
+- **The event set** `0x880100a0(tcb, bits)`: tcbEvent |= bits. A waiting task whose mask meets them is made ready, and
+  runs at once if its level is the running task's or higher. From an interrupt (`0x88010190`) the task is made ready
+  and the dispatch is put off (`0x8800fd30`: freezTask) to the watchdog timer's interval interrupt, which the kernel
+  starts for one count (`0x88011bf0`). The dispatch held (lockFlag) puts it off too.
+- **The tick** `0x8800fdf0`, on TMU0's underflow: its interval is 16668 counts of Pφ/4, set the same by rom.0
+  (`0xa0004584`) and rom.1 (`0x88011bc0`), about 1 ms. sysTime += 1. roundLevel's queue (16) turns by its head's
+  quantum. Each task on the alarm list whose tcbAtime is now gets event 1 (as from an interrupt), and goes back on the
+  list at sysTime + tcbItvl. Each cyclic record that is on and due runs its handler, and is due again an interval on.
+  Then the application's handler for TMU0 (`0x8800ea30`, when `0x880f21b4` is set).
+- **A task's own alarm** `0x880101e0(n)`: tcbEvent's bit 1 cleared, tcbItvl = n, off the alarm list, and with n above
+  0 back on it at sysTime + n (in time order, before those due at the same time).
+- **Cyclic handlers** (16 records, the kernel's, whose addresses rom.4 keeps at `0x8992e1e8`): `0x88010810(record,
+  {handler, on, interval})` makes one, due at sysTime + interval when on; `0x88010890` turns one on or off.
+
+**Found: the update task's event 0x1** (v349's open question). It is the update task's own alarm: its prologue's last
+call is `0x89301800(10)`, so the kernel gives it event 1 every 10 ticks. Its event 0x2 is its cyclic handler
+`0x893952a0`, also every 10 ticks. Both come from the same tick: the alarms first, then the handlers. v349's note that
+the update queue wakes its task through `0x893018a0` was wrong. `0x893018a0` is the kernel's task restart
+(`0x88010ae0`, rebuilding the task's TCB and context), called on two other tasks only (`0x8994fefc`, `0x8994ffcc`).
+The update queue's kernel calls are its semaphore's wait and signal (`0x893018b0`, `0x893018c0`, on the queue's +0x20).
+
 ### The part's block (2026-11-24, v351) {#vc2-synth-block}
 
 Step 4.3's seventy-ninth version, Vc2Synth whole's eleventh. The part mixer's block (v227's `Vc2PartMixer::block`,
