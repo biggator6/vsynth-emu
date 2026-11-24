@@ -65,6 +65,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginZones.cpp
     Source/PluginPatchFiles.cpp
     Source/PluginPresetWaves.cpp
+    Source/PluginProject.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
@@ -73,6 +74,7 @@ target_sources(VSynthEmu PRIVATE
     Source/UiLook.cpp
     Source/UiKnob.cpp
     Source/UiHeader.cpp
+    Source/UiPatchBox.cpp
     Source/UiPageBar.cpp
     Source/UiPath.cpp
     Source/UiFooter.cpp
@@ -231,7 +233,8 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
-             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
+             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/TestMain.cpp
+             Tests/TestWave.cpp)
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
 # against XtSynth given the input by the law, the Effects off and on
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)

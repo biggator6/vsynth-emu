@@ -4150,3 +4150,20 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - My test's parse of a host ID looked for "c2" in the whole head, and "vc2" has one: every COSM 1 control seemed to move COSM 2's. It reads the head after the prefix now.
 - The patch EQ's Q from its string would have been 0.5, 2.0, 3.5…: even steps fit 0.5~8.0 over six values. rom.2's routine on its EQ Mid 1 Q gives 0.5, 0.7, 1.0, 2.0, 4.0, 8.0, and rom.4's driver puts the patch EQ in those mid bands, so the editor asks rom.2's routine for both bands' Freq and Q.
 - Pad Mode's box beside Pad Hold cut TIME-TRIP at every size; it has a row of its own.
+
+### Session 25 (2026-11-24) — v600, v601: a project's wave links; the patch box browses a project
+
+- The user asked for three V-Synth items beside the VC-2 work: .w00, projects browsed, patches and projects saved. Their
+  files cross none the VC-2 sessions are editing, so they went on a branch of their own from vc2-mode, numbered v600 on.
+- A .w00 isn't a WAV: it is a 36-byte link to a preset wave by its number in the V-Synth's library. The user's own
+  project (Altered States) linked slot 002 to preset 46, which showed the reader has to go by the link, not the slot.
+- The library's last step, sample n to a stream, is the preset drive's, whose directory no image holds. It stands on
+  two sources: the samples' kind bytes against the streams' types in order (224 of 224, 111 shuffled) and 1stchoice's
+  byte-equal copies, whose names are the same instruments, 33 of them renamed.
+- The first fcheck run lost most of xt_tone's lines. Not the change: the worktree had the projects linked at its root,
+  not at analysis/projects, so make_inputs.py never made w358.bin and xt_tone stopped at it.
+- The patch box became its own component, one table row a mode, so the VC-2's projects browse too. Its test loaded real
+  patches, which left their Matrix routes for the rack's checks; it runs last now.
+- For v602, rom.2's own save path was found by the patch file's header strings (SVD0, PATa, KATE): the writer
+  0x8948fc30, the store-to-file routine 0x8947de90 (825 of 825 full-length files back byte for byte, every store back
+  from its written file, 1,327 of 1,327) and the setters 0x894818b0 and 0x89481e20.

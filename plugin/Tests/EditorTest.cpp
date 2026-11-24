@@ -206,6 +206,7 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     vc2TextChecks(ed, p, check);
     ed.showMode(PluginMode::vsynth);
     check(!ed.vc2() && pluginMode(p.apvts.state) == PluginMode::vsynth, "the V-Synth mode doesn't come back");
+    patchBoxChecks(l, p, rom, work, check);   // last: its patches load their own controls into the processor
     const int reached = coverage(l, check, rest[0] == "list");
     if (rest[0] != "list" && !rest.isEmpty())
         snapshots(ed, juce::File::getCurrentWorkingDirectory().getChildFile(rest[0]), check);

@@ -3912,6 +3912,22 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### The patch box browses a project (2026-11-24, v601) {#patch-box-project}
+
+The user's request (2026-11-24): browse a project's patches. Their choice: in the header's patch box, not a page
+(research/UI_DESIGN.md, "The patch box"). No firmware is run: a project is the XT's folder (`NAME.prj`, the VC-2's
+`NAME.vc2`), its `Patch` folder's files named by slot (`002 HouseOfWax.p00`), and the plugin lists them by file name
+(`PluginProject`), as the XT's own list numbers them; a Mac's `._` files on the XT's drive are hidden ones, passed over.
+The box (`PatchBox`, moved out of the header as it stood) adds ◀ ▶ and the name's menu of the project's patches, the
+project's line under the name, and Browse… taking a project's folder; a mode's patches are a row of one table, so the
+VC-2's `.p02` projects browse alike. The session keeps the patch browsed. Checked by `VSynthEmuEditorTest`
+(`patchBoxChecks`: the arrows grey with no project and at its ends, each step loading its slot's patch, where the box
+says the patch is; a project of six written last slot first, a hidden file among them) and the `editor-d-box-`
+plants, with the three plants of the moved code following it to `UiPatchBox.cpp`. Measured on this Mac:
+`NSFileManager`'s enumerator, which JUCE's iterator reads, gives a folder in its names' hash order (002, 001, 003 for
+three written 003 first) and never gives a `._` file. So the sort is seen (three patches passed unsorted by chance on the
+first plant run, so six), and a plant taking `ignoreHiddenFiles` away can't be: the flag stays for other systems.
+
 ### A project's wave links (2026-11-24, v600) {#wave-links}
 
 The user's request (2026-11-24): read `.w00` files. On the XT these are not waves: they are **link files**, 36 bytes, a

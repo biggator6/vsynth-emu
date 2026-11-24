@@ -90,9 +90,20 @@ editor-d-lower-unselected|    lower_.setSelected(block);|    ;|plugin/Source/UiE
 editor-d-build-text|build_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);|build_.setText("v150", juce::dontSendNotification);|plugin/Source/UiHeader.cpp|layout
 editor-d-build-unplaced|    build_.setBounds(kLeft, 29, kModeX - kLeft - 8, 13);|    ;|plugin/Source/UiHeader.cpp|layout
 editor-d-build-narrow|build_.setBounds(kLeft, 29, kModeX - kLeft - 8, 13);|build_.setBounds(kLeft, 29, 40, 13);|plugin/Source/UiHeader.cpp|layout
-editor-d-browse-unplaced|    browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));|    box.removeFromRight(kBrowseW);|plugin/Source/UiHeader.cpp|layout
-editor-d-note-hidden|        patchNote_.setVisible(noted_);|        ;|plugin/Source/UiHeader.cpp|layout
-editor-d-note-unplaced|    if (noted_) patchNote_.setBounds(lines.removeFromBottom(kNoteH));|    ;|plugin/Source/UiHeader.cpp|layout
+editor-d-browse-unplaced|    browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));|    box.removeFromRight(kBrowseW);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-note-hidden|    patchNote_.setVisible(noted_);|    ;|plugin/Source/UiPatchBox.cpp|layout
+editor-d-note-unplaced|        patchNote_.setBounds(under);|        ;|plugin/Source/UiPatchBox.cpp|layout
+# The patch box's project (v601, moved with the box out of UiHeader.cpp with the three above): the arrows' steps, greys and
+# what follows the session's patch, and a project's patches by slot with a hidden file passed over.
+editor-d-box-step|const int to = *project_.at + by;|const int to = *project_.at - by;|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-unfollowed|    if (file == browsed_) return;|    if (true) return;|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-prev-grey|prev_.setEnabled(listed && at > 0);|prev_.setEnabled(listed);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-next-grey|next_.setEnabled(listed && at + 1 < count);|next_.setEnabled(listed);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-where|projectName(project_) + ", " + juce::String(at + 1)|projectName(project_) + ", " + juce::String(at)|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-loose|ProjectPatches p { inProject ? folder.getParentDirectory() : folder,|ProjectPatches p { folder.getParentDirectory(),|plugin/Source/PluginProject.cpp|layout
+# No plant takes ignoreHiddenFiles away: on a Mac it changes nothing, as NSFileManager's enumerator (JUCE's iterator)
+# never gives a "._" file (measured 2026-11-24); it holds on the systems whose iterators do.
+editor-d-box-unsorted|    out.sort();|    ;|plugin/Source/PluginProject.cpp|layout
 editor-d-face-early|    if (Controls::box(type_, state, names.typeId, attached_)) addAndMakeVisible(type_);|    type_.onChange = [this] { refresh(); };\n    if (Controls::box(type_, state, names.typeId, attached_)) addAndMakeVisible(type_);|plugin/Source/UiFacedPanel.cpp|layout
 editor-d-load-hidden|        c->setVisible(face() == model_.pcm);|        c->setVisible(false);|plugin/Source/UiOscPanel.cpp|layout
 editor-d-osc-one|    return Params::oscId(osc, name);|    return Params::oscId(0, name);|plugin/Source/UiOscPanel.cpp|layout

@@ -10,22 +10,18 @@
 
 namespace {
 // Where each part sits, left to right, in the drawing's units (UI_DESIGN.md, "The window")
-constexpr int kLeft = 16, kModeX = 176, kModeW = 64, kPatchW = 400, kPatchH = 32, kBrowseW = 76, kPatchTagW = 56;
+constexpr int kLeft = 16, kModeX = 176, kModeW = 64, kPatchW = 400, kPatchH = 32;
 constexpr int kTempoX = 812, kTempoLabelW = 46, kTempoW = 56, kEffectsW = 84, kRomStateW = 96, kRomW = 60;
-constexpr int kButtonH = 26, kNoteH = 11, kMicW = 84, kMicGap = 8;
+constexpr int kButtonH = 26, kMicW = 84, kMicGap = 8;
 constexpr int kModeGroup = 2002;   // the V-SYNTH/VC-2 pair's radio group
 constexpr int kVc2Tempo = 0x13a;   // [FW] the VC-2's Patch Tempo
 constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
 }
 
 Header::Header(VSynthEmuProcessor& p)
-    : processor_(p), effectsAtt_(p.apvts, Params::kFxOn, effects_) {
+    : processor_(p), patch_(p), effectsAtt_(p.apvts, Params::kFxOn, effects_) {
     Look::setTextLook(build_, Look::mono(10.0f), Look::muted, juce::Justification::centredLeft);
     build_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);
-    Look::setTextLook(patchName_, Look::sans(13.0f, "Semibold"), Look::text, juce::Justification::centredLeft);
-    Look::setTextLook(patchNote_, Look::sans(10.0f), Look::warning, juce::Justification::centredLeft);
-    patchNote_.setMinimumHorizontalScale(0.5f);
-    addChildComponent(patchNote_);
     Look::setTextLook(tempo_, Look::mono(11.0f), Look::text);
     Look::setTextLook(romState_, Look::sans(11.0f), Look::label, juce::Justification::centredRight);
     romState_.setMinimumHorizontalScale(0.5f);
@@ -34,12 +30,11 @@ Header::Header(VSynthEmuProcessor& p)
         button->onClick = [this, m = mode] { if (onMode) onMode(m); };
     }
     vc2Mode_.setTooltip("The VC-2 mode's pages; it plays nothing yet, until the VC-2 synth is in (step 4.3)");
-    browse_.onClick = [this] { choosePatch(); };
     rom_.onClick = [this] { chooseRom(); };
     mic_.onClick = [this] { if (onMic) onMic(); };
     addChildComponent(mic_);
-    const std::initializer_list<juce::Component*> parts = { &build_, &patchName_, &tempo_, &romState_, &synthMode_,
-                                                            &vc2Mode_, &browse_, &rom_, &effects_ };
+    const std::initializer_list<juce::Component*> parts = { &build_, &patch_, &tempo_, &romState_, &synthMode_,
+                                                            &vc2Mode_, &rom_, &effects_ };
     for (juce::Component* c : parts) addAndMakeVisible(c);
     setMode(PluginMode::vsynth);
 }
@@ -49,23 +44,14 @@ void Header::setMode(PluginMode mode) {
     synthMode_.setToggleState(mode == PluginMode::vsynth, juce::dontSendNotification);
     vc2Mode_.setToggleState(mode == PluginMode::vc2, juce::dontSendNotification);
     mic_.setVisible(mode == PluginMode::vc2);
+    patch_.setMode(mode);
     resized();
     refresh();
 }
 
 void Header::refresh() {
     const bool vc2 = mode_ == PluginMode::vc2;
-    const juce::String name = vc2 ? processor_.vc2PatchName() : processor_.getPatchName();
-    Look::showText(patchName_, name.isNotEmpty() ? name : juce::String("No patch loaded"),
-                   name.isNotEmpty() ? Look::text : Look::muted);
-    // What the patch asks for that isn't here (its waves, an OSC's external input), under its name, or nothing
-    const juce::String note = vc2 ? juce::String() : processor_.getPatchNote();
-    patchNote_.setText(note.isNotEmpty() ? "not here: " + note : juce::String(), juce::dontSendNotification);
-    if (note.isNotEmpty() != noted_) {
-        noted_ = note.isNotEmpty();
-        patchNote_.setVisible(noted_);
-        resized();
-    }
+    patch_.refresh();
     const juce::String tempoId = vc2 ? vc2HostParamId(kVc2Tempo, 0, 0) : juce::String("patchTempo");
     tempo_.setText(Controls::currentText(processor_.apvts, tempoId), juce::dontSendNotification);
     Look::showText(romState_, processor_.getStatusText(), processor_.hasRom() ? Look::ready : Look::warning);
@@ -86,12 +72,7 @@ void Header::resized() {
         mic_.setBounds(whole.removeFromRight(kMicW).withSizeKeepingCentre(kMicW, kButtonH));
         patchBox_ = whole.withTrimmedRight(kMicGap);
     }
-    auto box = patchBox_.reduced(4, 0);
-    browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));
-    box.removeFromLeft(kPatchTagW);
-    auto lines = box.withTrimmedRight(8).reduced(0, 2);
-    if (noted_) patchNote_.setBounds(lines.removeFromBottom(kNoteH));
-    patchName_.setBounds(lines);
+    patch_.setBounds(patchBox_);
     tempoBox_ = { kTempoX + kTempoLabelW, mid - 12, kTempoW, 24 };
     tempo_.setBounds(tempoBox_);
     auto right = getLocalBounds().withLeft(tempoBox_.getRight() + 12).withTrimmedRight(Look::inset);
@@ -106,23 +87,9 @@ void Header::paint(juce::Graphics& g) {
     g.setColour(Look::divider);
     g.fillRect(getLocalBounds().removeFromBottom(1));
     Ui::drawText(g, "V-SYNTH EMU", { kLeft, 7, kModeX - kLeft, 22 }, { Look::sans(15.0f, "Bold", 0.12f), Look::text });
-    Ui::fillRounded(g, patchBox_.toFloat(), Look::panel, 6.0f);
     Ui::fillRounded(g, tempoBox_.toFloat(), Look::panel, 4.0f);
-    Ui::drawText(g, "PATCH", patchBox_.withTrimmedLeft(12).withWidth(kPatchTagW), { Look::mono(11.0f), Look::muted });
     Ui::drawText(g, "Tempo", tempoBox_.translated(-kTempoLabelW, 0).withWidth(kTempoLabelW - 6),
                  { Look::sans(11.0f), Look::label, juce::Justification::centredRight });
-}
-
-// A patch of the mode's own: a .p00 for the V-Synth, a .p02 for the VC-2 (loadVc2Patch, v452)
-void Header::choosePatch() {
-    const bool vc2 = mode_ == PluginMode::vc2;
-    chooser_ = std::make_unique<juce::FileChooser>(vc2 ? "Load a VC-2 patch" : "Load a V-Synth patch",
-                                                   processor_.lastPatchFolder(), vc2 ? "*.p02" : "*.p00");
-    chooser_->launchAsync(kOpen, [this, vc2](const juce::FileChooser& fc) {
-        const juce::File file = fc.getResult();
-        if (file.existsAsFile()) vc2 ? (void)processor_.loadVc2Patch(file) : (void)processor_.loadPatch(file);
-        refresh();
-    });
 }
 
 void Header::chooseRom() {

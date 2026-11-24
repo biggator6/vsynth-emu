@@ -335,6 +335,19 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The patch box browses a project v601 (2026-11-24, on claude/vsynth-files after v600; research/UI_DESIGN.md, "The patch
+  box"; the user's choice: in the patch box, not a page). PatchBox (UiPatchBox.cpp) is the header's patch box moved out
+  as it stood, with the project added: the name's menu of the project's patches, ◀ ▶ the previous and next (grey at
+  the ends), the project and where in it under the name when nothing is missing, Browse… taking a project's folder.
+  A mode's patches are one table's row (kPatchKinds: .p00 and .p02), so the VC-2's projects browse too. PluginProject:
+  a patch's project (its Patch folder's parent) and its patches by slot, hidden "._" files passed over. The session
+  keeps the patch browsed (patchFile, vc2PatchFile). VSynthEmuEditorTest's patchBoxChecks (EditorPatchBoxTest.cpp, run
+  last), 5222/5222; the three plants on the moved code follow it to UiPatchBox.cpp, and 7 editor-d-box- plants. The
+  panel plants of v600's and v601's files (34): two of v600's had lost their text (lite-riff with isVSynthWave, now in
+  PluginPatchFiles.cpp; patch-wave-note's line), and follow it; box-unsorted was missed with three patches, whose hash
+  order on the Mac's enumerator came out sorted, so the test writes six; box-hidden can't be seen on a Mac (its
+  enumerator never gives a "._" file) and is taken out, said in panel_muts.txt.
+
 A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc0e3b7, numbered v600-v649 beside the
   VC-2 work; HARDWARE_FIRMWARE.md, "A project's wave links"; the user's ".w00 files", "proceed here"). A .w00 is a link
   file, 36 bytes: the preset wave's number in the V-Synth's library and its name; a project's slot NNN may link to any
