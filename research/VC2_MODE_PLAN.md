@@ -1159,6 +1159,10 @@ version against rom.4's routines with what it calls hooked:
          (HARDWARE_FIRMWARE.md, "Vc2Synth's tones"). Next, as the shared notes plan it: the note's reads
          (`Vc2SetReads`, `Vc2NoteParts`, `Vc2VoiceParts` from the part), then the tasks' OS model, the block, and the
          whole check against rom.4's three tasks.
+       - C's reads of the part's memory in the plugin (v341): SetPortParts' reads by address moved as
+         `Vc2SetMemoryReads`, the first half of the note's reads (HARDWARE_FIRMWARE.md, "C's reads of the part's memory
+         in the plugin"). Next: the part's reads on its own words (`Vc2SynthMemory`), C's children's routines, the
+         notes' and voices' parts.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

@@ -82,7 +82,7 @@ done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake
    "${SH4[@]}" -o "$O/xt_vc2synth" &
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
-   Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp \
+   Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp Vc2SetMemoryReads.cpp \
    $( [ -f Vc2SetCommonCheck.cpp ] && echo Vc2SetCommon.cpp Vc2SetCommonCheck.cpp ) \
    $( [ -f Vc2SetEnvelopeCheck.cpp ] && echo Vc2SetEnvelope.cpp Vc2SetEnvelopeTables.cpp Vc2SetEnvelopeCheck.cpp \
       Vc2LibMath.cpp Vc2LibMathTables.cpp ) \

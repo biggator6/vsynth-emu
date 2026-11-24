@@ -1546,6 +1546,26 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### C's reads of the part's memory in the plugin (2026-11-23, v341) {#vc2-set-memory-reads}
+
+Step 4.3's sixty-ninth version, Vc2Synth whole's second: a move. What C, M and C's children read past their own words
+is mostly the part's memory at rom.4's addresses:
+- the voice by a call, an object's first byte, K's channel state, a channel's bend and controllers;
+- the part's bytes by kind, the common's words, the envelopes', LFOs', mix's, TVA's and COSM inputs' tables;
+- M's controllers and bend, the TVA's globals, the clock object;
+- the OSC table, a glide key, a key table's Hold, the legato's bytes, Time Trip's moving word.
+xt_vc2sets' `SetPortParts` read those from rom.4's memory. Each read's address arithmetic now lives in the plugin
+once, `Vc2SetMemoryReads` (Vc2SetMemoryReads.h, .cpp), over a memory its deriving class gives. SetPortParts derives
+from it on rom.4's interpreter, and its constants are aliases of the plugin's, so its draws are untouched; the part's
+reads (next) derive from it on the part's own words. The reads that run rom.4's routines (a Matrix group's sums, the
+OSC groups, the pitch source, the velocity curve) and the children's routines stay each side's own.
+
+Results:
+- xt_vc2sets as its baseline (fcheck) and 0 different at 2024, 7 and 31337.
+- The plants: 33 new (vc2setmemory, each read's address or field moved), 0 missed. The one-line reads went into the
+  .cpp so each is planted; the tables' shared `partWords`, a header's, is planted through the reads that use it.
+- verify.sh green.
+
 ### Vc2Synth's tones (2026-11-23, v340) {#vc2-synth-tones}
 
 Step 4.3's sixty-eighth version, the first of Vc2Synth whole (VC2_MODE_PLAN.md, step 4.3's last item). Vc2Synth (v314)

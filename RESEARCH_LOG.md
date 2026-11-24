@@ -4192,3 +4192,5 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - v340 began Vc2Synth whole: the 24 tones' hosts as the part's, checked by making each tone on both sides. Its plan,
   in the shared notes, runs the part on one thread block by block, a wait in the notes' task rendering its block in
   place; the whole check against rom.4's three tasks will test that order.
+- v341 moved C's reads by address into the plugin, the sets check deriving from them: the part's reads will be the
+  same code on its own words, and the kit refused the copy it would otherwise have been.

@@ -124,6 +124,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2VoiceClass.cpp
     Source/Vc2NoteMatrix.cpp
     Source/Vc2Sets.cpp
+    Source/Vc2SetMemoryReads.cpp
     Source/Vc2SetCommon.cpp
     Source/Vc2SetEnvelope.cpp
     Source/Vc2SetEnvelopeTables.cpp

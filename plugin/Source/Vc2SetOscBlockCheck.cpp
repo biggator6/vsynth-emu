@@ -24,37 +24,9 @@ constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 } // namespace
 
-std::array<uint8_t, 32> SetPortParts::oscHeader(uint32_t part) { return bytesAt<32>(kOscTableAt + kOscPartRow * part); }
-
-std::array<uint8_t, 128> SetPortParts::oscRecord(uint32_t part, uint32_t kind, uint32_t osc) {
-    const uint32_t slot = kOscHeaderBytes + kOscKindRow * kind + kOscRecordBytes * osc;
-    return bytesAt<128>(kOscTableAt + kOscPartRow * part + slot);
-}
-
-std::array<uint8_t, 60> SetPortParts::oscSystems() { return bytesAt<60>(kOscSystemsAt); }
-
 uint16_t& SetPortParts::oscStep(uint32_t part, uint32_t kind, uint32_t osc) {
     return oscSteps.at(32 * part + 2 * kind + osc);
 }
-
-Vc2SetGlide SetPortParts::glideAt(uint32_t glide) {
-    const auto b = bytesAt<0x24>(glide);
-    Vc2SetGlide g;
-    std::memcpy(&g.table, b.data(), sizeof g.table);
-    g.prevPoly = b[0x1a];
-    g.prevPolyHeld = b[0x1b];
-    g.prevMono = b[0x20];
-    g.prevMonoHeld = b[0x21];
-    return g;
-}
-
-uint8_t SetPortParts::holdOf(uint32_t keys) { return fw_.cpu.rd8(keys + kOscHoldAt); }
-
-std::array<uint8_t, 2> SetPortParts::legatoOf(uint32_t word) {
-    return { fw_.cpu.rd8(word + 1), fw_.cpu.rd8(word + 2) };
-}
-
-int32_t SetPortParts::matrixBend(uint32_t matrix) { return static_cast<int32_t>(fw_.cpu.rd32(matrix + kOscBendAt)); }
 
 Vc2MatrixGroups SetPortParts::oscGroups(uint32_t, uint32_t osc) {
     Vc2MatrixGroups g;
@@ -65,10 +37,6 @@ Vc2MatrixGroups SetPortParts::oscGroups(uint32_t, uint32_t osc) {
 }
 
 float SetPortParts::pitchSource() { return std::bit_cast<float>(fw_.cpu.rd32(kOscSourceAt)); }
-
-uint32_t SetPortParts::tripMoving(uint8_t part) {
-    return fw_.cpu.rd32(fw_.cpu.rd32(kOscPartTableAt + 4u * part) + kOscTripMovingAt);
-}
 
 const Vc2WaveMemory& SetPortParts::waveMemory() {
     memory_.reads = 0;
