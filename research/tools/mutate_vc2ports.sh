@@ -183,6 +183,7 @@ VC2PORTS=(
     "vc2osmidihandler|Vc2OsMidiHandler.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2osmiditables|Vc2OsMidiTables.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2synth|Vc2Synth.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmemory|Vc2SynthMemory.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

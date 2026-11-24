@@ -1546,6 +1546,23 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's memory by address (2026-11-23, v342) {#vc2-synth-memory}
+
+Step 4.3's seventieth version, Vc2Synth whole's third: a move. C's reads of the part (v341's Vc2SetMemoryReads) need
+the part's own memory by rom.4's address. xt_vc2synth already had that map: every member at its address, the whole
+objects and the tables a field at a time (v314's start compare). It is the plugin's now, `vc2SynthRegions`
+(Vc2SynthMemory.h, .cpp), with writable regions and v340's two new members (the tones' buffers at 0x89998b20, the
+part mixer's frames at 0x89998e20). `Vc2SynthMemory` reads any address over it, each byte its region's, 0 where none
+holds it. The check calls the plugin's table, so the map is written once.
+
+Results:
+- xt_vc2synth 0 different at 2024, 7 and 31337, 135 regions now.
+- The plants: 3 new (a region's address moved), 0 missed. A region the start leaves 0 on both sides (the rings, a
+  tone's tail, the buffers) moved shows nowhere the check looks yet; three such were dropped. The part's reads, next,
+  read those regions and will catch them.
+- fcheck's baseline updated for the start line's count.
+- verify.sh green.
+
 ### C's reads of the part's memory in the plugin (2026-11-23, v341) {#vc2-set-memory-reads}
 
 Step 4.3's sixty-ninth version, Vc2Synth whole's second: a move. What C, M and C's children read past their own words

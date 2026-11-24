@@ -37,3 +37,9 @@ static-state-channel|        vc2ChannelSetUp(s, (uint8_t)channel);|        vc2Ch
 # address and tail), which no make reaches (host-number, every host tone 0, missed): the tasks' version's renders
 # and note-ons run them; a common's reference to another word builds no mutant (a temporary bound to it)
 host-chaos|freeLfos, chaos, tvas.step|freeLfos, rows.robot, tvas.step|vc2synth
+# v342: the part's memory by address (vc2synthmemory, Vc2SynthMemory.cpp: its region table, moved from the check, and
+# its read by address, which no part reads yet: the part's reads, next, run it).  A region the start leaves 0 on both
+# sides (the rings, the tones' tails, the buffers) moved shows nowhere yet (mem-region-ring, -tail, -buffers missed)
+mem-region-at|vc2SynthRegion(0x89998a14, r.bytes, "the part's bytes")|vc2SynthRegion(0x89998a18, r.bytes, "the part's bytes")|vc2synthmemory
+mem-region-step|vc2SynthRegion(Vc2SetTvas::kStepAt, s.tvas.step|vc2SynthRegion(Vc2SetTvas::kStepAt + 4, s.tvas.step|vc2synthmemory
+mem-region-counts|vc2SynthRegion(0x8993d02c, r.voiceCounts|vc2SynthRegion(0x8993d02e, r.voiceCounts|vc2synthmemory
