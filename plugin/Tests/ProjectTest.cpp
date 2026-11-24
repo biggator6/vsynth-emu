@@ -5,6 +5,7 @@
 // too.  A link past the library loads nothing and the patch's note says why.  The waves expected are read apart from the
 // plugin's reader: the disk image opened here, its library built, and each stream read from its bytes.
 // Run: VSynthEmuProjectTest <rom.2.bin>.  Exit 0 if every check holds.
+#include "ProjectTest.h"
 #include "TestChecks.h"
 #include "TestMain.h"
 #include "TestPatches.h"
@@ -116,6 +117,7 @@ int run(const juce::File& rom, const juce::File& work) {
     check(!r->hasFileLoaded(0), "a link past the library should load nothing");
     check(r->getPatchNote().contains("no wave " + juce::String(c->own) + ": no such preset wave"),
           "the patch's note should say why its wave is missing: " + r->getPatchNote().toStdString());
+    projectSaveChecks(q, rom, work.getChildFile("Saves"), check);   // v602
     return check.summary("patch " + c->patch.name + ", slot " + std::to_string(c->own) + " linked to preset "
                          + std::to_string(c->other));
 }

@@ -5,7 +5,9 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <mutex>
+#include <optional>
 
 namespace {
 int u16(const uint8_t* p) { return p[0] | p[1] << 8; }
@@ -116,6 +118,37 @@ bool xtEffectTypeIds(int block, int type, int& first, int& last) {
     first = t[2 * (size_t)type];
     last = t[2 * (size_t)type + 1];
     return true;
+}
+
+namespace {
+// [FW] each block's type ID and first slot, in xtEffectTypeIds' order: MFX, Chorus, Reverb, COSM
+struct TypedBlock {
+    int typeId, slots;
+};
+constexpr TypedBlock kTypedBlocks[] = {
+    { 0x177, kXtMfxSlots }, { 0x1fc, kXtChorusSlots }, { 0x230, kXtReverbSlots }, { 0x3e8, kXtCosmSlots }
+};
+
+// The block whose types have `id`
+std::optional<int> typedBlockOf(int id) {
+    for (int block = 0; block < static_cast<int>(std::size(kTypedBlocks)); ++block)
+        for (int type = 0, lo = 0, hi = 0; xtEffectTypeIds(block, type, lo, hi); ++type)
+            if (id >= lo && id <= hi) return block;
+    return std::nullopt;
+}
+} // namespace
+
+int xtTypedBaseOf(int id) {
+    const std::optional<int> block = typedBlockOf(id);
+    return block ? kTypedBlocks[*block].slots : 0;
+}
+
+bool xtTypedInStoredType(const std::vector<uint8_t>& store, int id, int zone, int cosm) {
+    const std::optional<int> block = typedBlockOf(id);
+    if (!block) return false;
+    int lo = 0, hi = 0;
+    const int type = xtPatchValue(store, kTypedBlocks[*block].typeId, zone, cosm);
+    return xtEffectTypeIds(*block, type, lo, hi) && id >= lo && id <= hi;
 }
 
 int xtPatchZones(const std::vector<uint8_t>& store) {

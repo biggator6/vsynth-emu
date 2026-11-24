@@ -294,3 +294,21 @@ editor-vc2-mode-unsaved|    setPluginMode(processor_.apvts.state, mode);|    ;|p
 editor-vc2-page-names|    setNames(vc2 ? pageNames(Blocks::kVc2Pages) : pageNames(Blocks::kPages));|    setNames(pageNames(Blocks::kPages));|plugin/Source/UiPageBar.cpp|layout
 editor-vc2-mic-input|p.hasInput() ? State::ok : State::silent|State::ok|plugin/Source/UiVc2Mic.cpp|layout
 editor-vc2-path-own|    return { Vc2Blocks::path(zone), vc2Setting, effects, vc2HostParamId(0x2d3, zone, 0),|    return { Vc2Blocks::path(zone), vc2Setting, effects, vc2HostParamId(0x2d3, 0, 0),|plugin/Source/UiVc2SynthPage.cpp|layout
+# A project's own files, by VSynthEmuProjectTest (v600, v602): a link followed to its preset wave by the plugin (the
+# image beside the firmware, a stream read alone, findWave by slot); a patch saved (each value where the store reads
+# otherwise, the system's IDs and other types' values left out, a Through COSM kept, the name, COSM 2's and the effects'
+# typed values), and Save As's next slot and the name it takes.
+project-presets-beside|parent_path() / kDiskImageName).string());|parent_path() / "none.bin").string());|plugin/Source/PluginPresetWaves.cpp|project
+project-presets-seek|return f.seekg(static_cast<std::streamoff>(w.at))|return f.seekg(0)|plugin/Source/PluginPresetWaves.cpp|project
+project-link-unfollowed|if (const auto link = xtWaveLinkRead(p, bytes.getSize())) return presetWaveRead(link->number, wave, why);|;|plugin/Source/PluginPatchFiles.cpp|project
+project-findwave-links|f.hasFileExtension("vpw;wav;w00")|f.hasFileExtension("vpw;wav")|plugin/Source/PluginPatchFiles.cpp|project
+save-through|keepingThrough(xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern), c, store);|xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern);|plugin/Source/PluginPatchSave.cpp|project
+save-system-ids|if ((s.id >= kXtDescIds) != typed \|\| !inPatch(s)) continue;|if ((s.id >= kXtDescIds) != typed) continue;|plugin/Source/PluginPatchSave.cpp|project
+save-other-types|if (typed && !xtTypedInStoredType(store, s.id, s.zone, s.cosm)) continue;|;|plugin/Source/PluginPatchSave.cpp|project
+save-every-value|if (storeRead(store, s) != value) changed.push_back(s);|changed.push_back(s);|plugin/Source/PluginPatchSave.cpp|project
+save-name|ids[kNameFirst + k] = static_cast<int>(padded[k]);|ids[kNameFirst + k] = static_cast<int>(padded[0]);|plugin/Source/PluginPatchSave.cpp|project
+save-cosm-zone|(cosm ? s.cosm : s.zone) = high;|s.zone = high;|plugin/Source/PluginPatchSave.cpp|project
+save-effects-typed|setChanged(store, merged(tone, effectIds(p, store, true)), true, why);|setChanged(store, tone, true, why);|plugin/Source/PluginPatchSave.cpp|project
+save-as-slot|juce::String(last + 1).paddedLeft('0', kSlotDigits)|juce::String(last).paddedLeft('0', kSlotDigits)|plugin/Source/UiPatchSave.cpp|project
+save-as-name|return fileSlot(file) ? n.substring(kSlotDigits + 1) : n;|return n;|plugin/Source/UiPatchSave.cpp|project
+editor-d-box-unsaving|    save_.setVisible(patchKindOf(mode_).save != nullptr);|    save_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout

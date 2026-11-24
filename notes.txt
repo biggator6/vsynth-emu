@@ -335,6 +335,20 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A patch saved v602 (2026-11-24, on claude/vsynth-files after v601; HARDWARE_FIRMWARE.md, "A patch saved"; the user's
+  choice: Save over the patch's file, asking first, and Save As). rom.2's own save path in the interpreter: the setters
+  0x894818b0 and (typed) 0x89481e20, the store's file layout 0x8947de90 (0x8947dae0's mirror: 825 of 825 full-length
+  files and every store back, 1,327 of 1,327) and the writer 0x8948fc30, its open/write/close hooked (XtFwPatchFile).
+  PluginPatchSave: the kept store, each value the plugin holds written where the store reads otherwise: the tone by
+  xtPatchIds (xt_tone's patchOf moved into the plugin as XtPatchIds.cpp, xt_tone adding its Wave Numbers; its three
+  tonepatchids plants caught there), the arpeggio's, the MSM's, the name, the effects', the typed values of the types the
+  store now holds alone (xtTypedInStoredType); the system's IDs left out; a COSM off and stored Through keeps its Type.
+  Save… in the patch box (UiPatchSave: the menu, the confirm, Save As's next slot and name), none in VC-2 mode. xt_files'
+  saved: line (512 back as their files, 1,481 + 1,131 values set, 0 otherwise; fcheck +1 line); VSynthEmuProjectTest
+  21/21 (the 512 through the processor, each kind moved landing alone); editor 5223/5223. Plants: 29 files (the 5
+  patchsave, patchstore and files for XtPatchStore.cpp's and XtFiles.cpp's change) caught; the panel's project- and
+  save- (kind project, new) and the box's.
+
 The patch box browses a project v601 (2026-11-24, on claude/vsynth-files after v600; research/UI_DESIGN.md, "The patch
   box"; the user's choice: in the patch box, not a page). PatchBox (UiPatchBox.cpp) is the header's patch box moved out
   as it stood, with the project added: the name's menu of the project's patches, ◀ ▶ the previous and next (grey at

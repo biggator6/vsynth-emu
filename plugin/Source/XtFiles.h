@@ -118,6 +118,11 @@ int xtStoreTyped(const XtStoreLayout& l, const std::vector<uint8_t>& store, int 
 // A type's IDs, first and last, from rom.2 (block 0 MFX, 1 Chorus, 2 Reverb, 3 COSM; the tables at 0x897a8218, 0x897a82e4, 0x897a8310, 0x897cebd8).  False past its types.
 bool xtEffectTypeIds(int block, int type, int& first, int& last);
 int xtEffectTypes(int block);
+// A typed ID's block's first slot (kXtMfxSlots, kXtChorusSlots, kXtReverbSlots, kXtCosmSlots: xtPatchTyped's base), 0
+// for an ID no type has; and whether the type the store holds for its block (zone `zone`'s COSM `cosm` for a COSM's)
+// is one that has it: a store keeps its own type's values alone, in slots the types share (v602, a patch's save)
+int xtTypedBaseOf(int id);
+bool xtTypedInStoredType(const std::vector<uint8_t>& store, int id, int zone = 0, int cosm = 0);
 // How many zones it has: the first whose Range Upper is 127 ends them.
 int xtPatchZones(const std::vector<uint8_t>& store);
 
@@ -170,4 +175,7 @@ int xtPatchCheckShort(const XtDiskImage& disk);
 // The preset wave at `at`, edited in its chunks, as a project's RIFF and LITE wave, and plain and short WAVs that aren't
 // waves (XtWaveFileCheck.cpp): prints its line, and gives how many came out wrong
 int xtWaveCheckOwn(const std::vector<uint8_t>& disk, size_t at);
+// A patch saved by the firmware's own routines (XtPatchSaveCheck.cpp, v602): the image's patches back as their files,
+// and values set by the firmware's setters read back by the port's reads; prints its line, gives how many came out wrong
+int xtPatchSaveCheck(const XtDiskImage& disk, bool first);
 #endif

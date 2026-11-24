@@ -94,6 +94,7 @@ public:
     juce::String getPatchName() const { return patchName_; }
     juce::String getPatchNote() const { return patchNote_; }
     juce::File lastPatchFolder() const;
+    std::vector<uint8_t> keptStore() const;   // the loaded patch's store, kept in the session (PluginZones.cpp); a save's
     XtSynth::Controls currentControls() const { return xtControls(); }
     // What zones 2…16 of the patch loaded last play, a line each, the first zone 1's and empty; none without a patch
     // (PluginZones.cpp, v195).  Message thread
@@ -223,7 +224,6 @@ private:
     void loadZones(const std::vector<uint8_t>& store, const juce::File& waveFolder, juce::StringArray& notes);
     // a session's zones back, what isn't there in notes; and its splits from its store if it has none (before v195)
     void restoreZones(juce::StringArray& notes, bool hadSplits);
-    std::vector<uint8_t> keptStore() const;
     void setZonePlays(const juce::StringArray& plays);
     std::atomic<int>         zonesGen_ { 0 }, patchZones_ { 1 };
     std::atomic<bool>        zonesReady_ { true };

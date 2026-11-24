@@ -3912,6 +3912,46 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### A patch saved (2026-11-24, v602) {#patch-saved}
+
+The user's request (2026-11-24): save patches; their choice: Save over the patch's own file, asking first, and Save As….
+A save runs rom.2's own save path in the interpreter, as a patch's read does (the rule for load-time firmware, its
+mirror). Found by the patch file's header strings, which sit in rom.2 as four-byte words a pool loads, not as one
+string: `SVD0` (0x897a7bf8), `PATa` (0x897a7c00), `KATE` (0x897a7c08):
+- **The writer** `0x8948fc30(path, fileLayout)`: open (`0x89484850`), a 16-byte head (`0x001e`, `SVD0`), 16 more
+  (`PATaKATE`, the data's offset 0x20 and its length `0x15 << 8 - 6` = 0x14fa, big-endian), the data, each through the
+  OS's write `0x89484930`; close `0x89486d80`, and on a short write the file removed (`0x89484a60`); 1 when all went.
+  Its one caller `0x89490e52` hands it bank patch n as `0x89480290` fetches it: the XT's bank holds the file layout.
+- **The store's file layout** `0x8947de90(file, store)`, `0x8947dae0(store, file)`'s mirror and its neighbour, called
+  from four places in the patch module. Run on the store read from each file: 825 of 825 full-length files (Internal.prj,
+  1stchoice, Emu_test, the user's Altered States) back byte for byte, and the store back from every written file, 1,327
+  of 1,327. 82 of 502 shorter (older) files differ from their own bytes: the read upgrades their layout, so the write
+  gives the new one, as the XT does.
+- **The setters**: `0x894818b0(section, desc, value)`, the value plus the centre, held to the descriptor's min and max
+  unless they're equal, compared unsigned (so a value under the range, past 0, comes out at its top), written by
+  `0x89481800`; `0x89481e20(section, slot descs, typed desc, value)` for the typed bank, held to the type's range, its
+  slot's descriptor by the typed one's byte +0, then as the first. `0x89481900` writes a run of descriptors' defaults.
+
+**The plugin** (`XtFwPatchFile`: `xtFwPatchSet`, `xtFwPatchFile`, the writer's OS calls hooked to keep the bytes;
+`PluginPatchSave`): the loaded patch's kept store (the firmware's default patch with none), each value the plugin holds
+written where the store's read differs: the tone by `xtPatchIds` (xt_tone's `patchOf`, moved into the plugin as it stood,
+`xt_tone` adding its own Wave Numbers), the arpeggio's and MSM's, the name, the effects' own, then the typed values of the
+types the store now holds alone (`xtTypedInStoredType`: a type's slots are shared, so another type's values would land
+on it). The controls' maps carry the system's IDs too (the assigns, Output Mode, Clock Source, Out Gain), which a patch
+doesn't hold: left out. A COSM off whose store says Through keeps its switch and Type, as the plugin plays Through as
+off and would otherwise give it a type (124 of the 512 moved before this). So an unchanged patch is its file byte for
+byte, zones 2…16 and each OSC's Wave Number stay the store's, and an edit lands alone.
+
+**The checks.** `xt_files`' `saved:` line: the 512 back as their files; 1,481 first-bank values set by the firmware's
+setter and 1,131 typed, in zone 1 and COSM 1 and again in zone 8 and COSM 2, read back by the port's reads (held to the
+firmware's own) with no byte past each field moved, 0 otherwise. Some IDs share bits (Patch Tempo's 0x11d with 0x11c,
+the scale tunes with those between), so the check holds the bytes, not the IDs either side. `VSynthEmuProjectTest`:
+the 512 applied and saved unchanged through the processor are their files; a tone knob, an effect knob, the MFX type's
+parameter and COSM 2's typed cutoff, each moved, land alone; a name saves; Save As's next slot and name. Plants:
+`files_muts.txt`'s `patchsave` and `mutate_panel.py`'s `save-`, `save-as-` (kind `project`).
+
+**Not done:** a VC-2 patch's save (rom.4's); waves (v603, a project's save).
+
 ### The patch box browses a project (2026-11-24, v601) {#patch-box-project}
 
 The user's request (2026-11-24): browse a project's patches. Their choice: in the header's patch box, not a page

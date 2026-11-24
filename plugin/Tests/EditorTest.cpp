@@ -101,7 +101,7 @@ void chrome(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& 
         return l.firstOf<juce::Label>([&text](juce::Label& x) { return x.getText() == text; });
     };
     check(seen(labelOf(build), ed), ("the build, " + build + ", isn't on the header").toStdString());
-    for (const char* text : { "Browse...", "ROM..." })
+    for (const char* text : { "Browse...", "Save...", "ROM..." })   // Save… from v602
         check(seen(l.buttonOf(text), ed), std::string(text) + " isn't on the header");
     for (int osc = 0; osc < Blocks::kOscs; ++osc) setParam(p, Params::oscId(osc, Params::kOscType), 1.0f);
     for (FacedPanel* panel : LayoutCheck::allOf<FacedPanel>(ed.drawing())) panel->refresh();   // as the timer does

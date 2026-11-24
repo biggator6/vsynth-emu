@@ -59,3 +59,8 @@ preset-sample|kMapSampleAt = 4,|kMapSampleAt = 2,|presetwaves
 preset-bytes|const size_t bytes = (next == streams.end() ? d.size() : *next) - at;|const size_t bytes = (next == streams.end() ? d.size() : *next) - at - 64;|presetwaves
 link-number|kLinkNumberAt = 8,|kLinkNumberAt = 12,|presetwaves
 link-trim|s.erase(s.find_last_not_of(' ') + 1);|;|presetwaves
+save-layout-order|c.call(kToFile, { kFile, kStore }, xtfw::kStack)|c.call(kToFile, { kStore, kFile }, xtfw::kStack)|patchsave
+save-writer-args|c.call(kWriter, { kPath, kFile }, xtfw::kStack)|c.call(kWriter, { kPath, kStore }, xtfw::kStack)|patchsave
+save-short-write|        s.ret(s.r[6]);\n    });|        s.ret(s.r[6] - 1);\n    });|patchsave
+save-typed-desc|static_cast<uint32_t>(typed ? v.base : v.id)|static_cast<uint32_t>(v.id)|patchsave
+save-typed-section|xtPatchSection(typed && t ? v.base + t->slot : v.id, v.zone, v.cosm)|xtPatchSection(v.id, v.zone, v.cosm)|patchsave

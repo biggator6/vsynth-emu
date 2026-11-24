@@ -1,18 +1,21 @@
 // D's patch box: see UiPatchBox.h (v601).
 #include "UiPatchBox.h"
+#include "PluginPatchSave.h"
 #include "UiLook.h"
 #include "UiParts.h"
+#include "UiPatchSave.h"
 #include <array>
 
 namespace {
 // Where each part sits, left to right, in the drawing's units (UI_DESIGN.md, "The patch box")
 constexpr int kBrowseW = 76, kPatchTagW = 56, kArrowW = 18, kArrowH = 14, kButtonH = 26, kNoteH = 11, kMarkW = 10;
+constexpr int kSaveW = 56;
 constexpr float kMark = 3.5f;   // the menu mark's half width
 constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                        | juce::FileBrowserComponent::canSelectDirectories;
 
 // A mode's patches: what Browse… asks for, their files' extension, where the session keeps the one browsed, the load,
-// and the name and note shown
+// the name and note shown, and the save (v602; none for the VC-2's, whose patches rom.4 writes)
 struct PatchKind {
     const char* title;
     const char* extension;
@@ -20,17 +23,18 @@ struct PatchKind {
     bool (*load)(VSynthEmuProcessor&, const juce::File&);
     juce::String (*name)(const VSynthEmuProcessor&);
     juce::String (*note)(const VSynthEmuProcessor&);
+    bool (*save)(const VSynthEmuProcessor&, const juce::String&, const juce::File&, std::string*);
 };
 // In PluginMode's order
 constexpr std::array<PatchKind, 2> kPatchKinds { {
     { "Load a V-Synth patch, or a project's folder", "p00", "patchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadPatch(f); },
       [](const VSynthEmuProcessor& p) { return p.getPatchName(); },
-      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); } },
+      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch },
     { "Load a VC-2 patch, or a project's folder", "p02", "vc2PatchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadVc2Patch(f); },
       [](const VSynthEmuProcessor& p) { return p.vc2PatchName(); },
-      [](const VSynthEmuProcessor&) { return juce::String(); } },
+      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr },
 } };
 
 const PatchKind& patchKindOf(PluginMode mode) { return kPatchKinds[static_cast<size_t>(mode)]; }
@@ -47,20 +51,43 @@ PatchBox::PatchBox(VSynthEmuProcessor& p)
     projectLine_.setMinimumHorizontalScale(0.5f);
     patchName_.setInterceptsMouseClicks(false, false);   // a click on the name is the box's: the project's menu
     browse_.onClick = [this] { choose(); };
+    save_.onClick = [this] { save(); };
     prev_.onClick = [this] { step(-1); };
     next_.onClick = [this] { step(1); };
     prev_.getProperties().set(Look::editorsOwn, true);   // the editor's own, no parameter's (LayoutCheck's walk)
     next_.getProperties().set(Look::editorsOwn, true);
     for (juce::Component* c : Parts { &patchNote_, &projectLine_ }) addChildComponent(c);
     for (juce::Component* c : Parts { &patchName_, &browse_, &prev_, &next_ }) addAndMakeVisible(c);
-    refresh();
+    addChildComponent(save_);
+    setMode(mode_);
 }
 
 void PatchBox::setMode(PluginMode mode) {
     mode_ = mode;
     browsed_ = juce::File();
     project_ = {};
+    save_.setVisible(patchKindOf(mode_).save != nullptr);
+    resized();
     refresh();
+}
+
+// The mode's save, from the menu Save… opens (UiPatchSave.h): over the browsed patch's file, or as a file chosen,
+// offered in its project's Patch folder; the file written becomes the patch browsed.  Told nothing once the box is gone.
+void PatchBox::save() {
+    const PatchKind& kind = patchKindOf(mode_);
+    if (!kind.save) return;
+    const juce::File folder = browsed_ != juce::File() ? browsed_.getParentDirectory() : processor_.lastPatchFolder();
+    const juce::Component::SafePointer<PatchBox> box(this);
+    PatchSaving s { browsed_, folder, kind.name(processor_), kind.extension,
+                    [box, save = kind.save](const juce::String& name, const juce::File& f, std::string* why) {
+                        return box != nullptr && save(box->processor_, name, f, why);
+                    },
+                    [box, property = kind.fileProperty](const juce::File& f) {
+                        if (box == nullptr) return;
+                        box->processor_.apvts.state.setProperty(property, f.getFullPathName(), nullptr);
+                        box->refresh();
+                    } };
+    showPatchSaveMenu(save_, s, chooser_);
 }
 
 // The patch the session says was browsed, and its project, listed again only when it changes
@@ -103,6 +130,7 @@ void PatchBox::refresh() {
 
 void PatchBox::resized() {
     auto box = getLocalBounds().reduced(4, 0);
+    if (save_.isVisible()) save_.setBounds(box.removeFromRight(kSaveW).withSizeKeepingCentre(kSaveW, kButtonH));
     browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));
     next_.setBounds(box.removeFromRight(kArrowW).withSizeKeepingCentre(kArrowW, kArrowH));
     prev_.setBounds(box.removeFromRight(kArrowW).withSizeKeepingCentre(kArrowW, kArrowH));

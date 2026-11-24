@@ -18,7 +18,7 @@ kept. Top to bottom, in the drawing's own units:
 
 | Region | y | Height | Holds |
 |---|---|---|---|
-| Header | 0 | 48 | the wordmark and the build under it; the mode switch, V-SYNTH and VC-2 (VC-2 greyed until the VC-2 mode is in); the patch box (the patch's name, under it in the warning colour what the patch asks for that isn't here, else its project and where in it; ◀ ▶ and a menu of the project's patches; Browse… to load a patch or a project, v601: "The patch box"); the tempo; the Effects switch; the ROM's state and the ROM… button |
+| Header | 0 | 48 | the wordmark and the build under it; the mode switch, V-SYNTH and VC-2 (VC-2 greyed until the VC-2 mode is in); the patch box (the patch's name, under it in the warning colour what the patch asks for that isn't here, else its project and where in it; ◀ ▶ and a menu of the project's patches; Browse… to load a patch or a project, v601; Save…, v602: "The patch box"); the tempo; the Effects switch; the ROM's state and the ROM… button |
 | Page bar | 48 | 34 | SYNTH, MODULATION, FX, PLAY, ZONES; a line saying what a click on a block does; the Keyboard switch at its right end (v201) |
 | Signal path | 82 | 52 | OSC 1, OSC 2, MOD, COSM 1, COSM 2, AMP as blocks to click, the selected one filled with the accent; MFX, CHORUS, REVERB with ON or OFF (a click opens its FX page); the Structure box |
 | Rack | 134 | 304 | 12 in from each side, 8 between: the Time Trip column (184 wide), OSC 1 and OSC 2 (310 each), and a column of COSM 1 (116 high), COSM 2 (116) and AMP (the rest) |
@@ -35,7 +35,10 @@ nothing under the header moves. Left to right: PATCH; the patch's name, with a m
 project's patches as a menu (the project's name over them, the patch ticked; one column, scrolling); under the name what
 the patch misses (the warning colour) or, missing nothing, the project's name and where the patch is in it ("Altered
 StatesXT.prj, 2 of 50", muted); ◀ and ▶, loading the previous and next patch, grey at the project's ends or with no
-project, their tooltip where the patch is; Browse…, which takes a patch or a project's folder (its first patch then).
+project, their tooltip where the patch is; Browse…, which takes a patch or a project's folder (its first patch then);
+and (v602, the user's choice: Save and Save As) Save…, a menu of Save over the patch's own file, asking first, and Save
+As…, a file to choose with the project's next free slot offered and the patch named after it (`UiPatchSave`); the
+file saved becomes the patch browsed. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save….
 A project is the XT's folder (`NAME.prj`, a VC-2's `NAME.vc2`) and its `Patch` folder's patches by slot
 (`PluginProject`); a patch outside a Patch folder is browsed with its own folder's. A mode's patches are a row of one
 table (`kPatchKinds`: the V-Synth's `.p00`, the VC-2's `.p02`, each load, name and note), so the VC-2's projects browse

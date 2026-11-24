@@ -189,6 +189,7 @@ ENV={
  'arp':{'_bin':'VSynthEmuArpTest'},   # XtSynth's arpeggiator heard: its router, ticks and what it sends (v189)
  'arpplugin':{'_bin':'VSynthEmuArpPluginTest'},   # its parameters, a patch's, a session's, through the processor (v190)
  'extin':{'_bin':'VSynthEmuExtInTest'},   # the outside input to the EXT IN OSC, the feed and the processor (v207)
+ 'project':{'_bin':'VSynthEmuProjectTest'},   # a project's own files: its wave links (v600), a patch saved (v602)
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event
  'stored':{'TEST_NOTE2':'64,30000','_file':'analysis/projects/Emu_test.prj/Wave/376 Synth014.wav','_mode':'auto'},

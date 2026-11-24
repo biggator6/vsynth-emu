@@ -32,7 +32,7 @@ tonefile() {
         tonefwcpp) echo XtToneFirmware.cpp ;;
         tonefwh) echo XtToneFirmware.h ;;
         tonecases) echo XtToneCases.cpp ;;
-        tonepatchids) echo XtTonePatchIds.cpp ;;
+        tonepatchids) echo XtPatchIds.cpp ;;   # XtTonePatchIds.cpp's IDs, the plugin's own from v602
         tonecarry) echo XtToneCarry.cpp ;;
         tonestart) echo XtSynthStart.cpp ;;
         toneoscstart) echo XtSynthOscStart.cpp ;;
