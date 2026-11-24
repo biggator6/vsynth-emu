@@ -302,13 +302,24 @@ project-presets-beside|parent_path() / kDiskImageName).string());|parent_path() 
 project-presets-seek|return f.seekg(static_cast<std::streamoff>(w.at))|return f.seekg(0)|plugin/Source/PluginPresetWaves.cpp|project
 project-link-unfollowed|if (const auto link = xtWaveLinkRead(p, bytes.getSize())) return presetWaveRead(link->number, wave, why);|;|plugin/Source/PluginPatchFiles.cpp|project
 project-findwave-links|f.hasFileExtension("vpw;wav;w00")|f.hasFileExtension("vpw;wav")|plugin/Source/PluginPatchFiles.cpp|project
-save-through|keepingThrough(xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern), c, store);|xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern);|plugin/Source/PluginPatchSave.cpp|project
+save-through|keepingThrough(xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern), c, store), p);|xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern), p);|plugin/Source/PluginPatchSave.cpp|project
 save-system-ids|if ((s.id >= kXtDescIds) != typed \|\| !inPatch(s)) continue;|if ((s.id >= kXtDescIds) != typed) continue;|plugin/Source/PluginPatchSave.cpp|project
 save-other-types|if (typed && !xtTypedInStoredType(store, s.id, s.zone, s.cosm)) continue;|;|plugin/Source/PluginPatchSave.cpp|project
 save-every-value|if (storeRead(store, s) != value) changed.push_back(s);|changed.push_back(s);|plugin/Source/PluginPatchSave.cpp|project
 save-name|ids[kNameFirst + k] = static_cast<int>(padded[k]);|ids[kNameFirst + k] = static_cast<int>(padded[0]);|plugin/Source/PluginPatchSave.cpp|project
 save-cosm-zone|(cosm ? s.cosm : s.zone) = high;|s.zone = high;|plugin/Source/PluginPatchSave.cpp|project
 save-effects-typed|setChanged(store, merged(tone, effectIds(p, store, true)), true, why);|setChanged(store, tone, true, why);|plugin/Source/PluginPatchSave.cpp|project
-save-as-slot|juce::String(last + 1).paddedLeft('0', kSlotDigits)|juce::String(last).paddedLeft('0', kSlotDigits)|plugin/Source/UiPatchSave.cpp|project
-save-as-name|return fileSlot(file) ? n.substring(kSlotDigits + 1) : n;|return n;|plugin/Source/UiPatchSave.cpp|project
+save-as-slot|juce::String(last + 1).paddedLeft('0', kSlotDigits)|juce::String(last).paddedLeft('0', kSlotDigits)|plugin/Source/PluginProject.cpp|project
+save-as-name|return slotOfFile(file) ? n.substring(kSlotDigits + 1) : n;|return n;|plugin/Source/PluginProject.cpp|project
 editor-d-box-unsaving|    save_.setVisible(patchKindOf(mode_).save != nullptr);|    save_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
+# A project saved, by VSynthEmuProjectTest (v603): its system files, patches and waves copied, a folder there refused, an
+# outside wave in at the next slot (any file holding a slot) with the patch on it and a plain one named to import, a
+# patch from no project at 001; and the save's Loop kept where the wave decides it (found with it, v602's save too).
+projsave-system|copyFiles(own, dest, "*.s00");|copyFiles(own, dest, "*.none");|plugin/Source/PluginProjectSave.cpp|project
+projsave-exists|if (dest.exists()) return fail(why, "the project's folder is there already");|;|plugin/Source/PluginProjectSave.cpp|project
+projsave-outside|if (o.oscType != kPcm \|\| !wave.existsAsFile()) continue;|if (true) continue;|plugin/Source/PluginProjectSave.cpp|project
+projsave-slot|        slots[osc] = slotOfFile(to);|        ;|plugin/Source/PluginProjectSave.cpp|project
+projsave-import|if (!isVSynthWave(wave)) report.toImport.add(to.getFileName());|;|plugin/Source/PluginProjectSave.cpp|project
+projsave-alone|"001 " + name + ".p00"|"002 " + name + ".p00"|plugin/Source/PluginProjectSave.cpp|project
+save-loop-kept|            ids.erase(kLoopSwitch + kOscStride * osc);|            ;|plugin/Source/PluginPatchSave.cpp|project
+save-slot-any-file|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false);|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false, "*." + extension);|plugin/Source/PluginProject.cpp|project

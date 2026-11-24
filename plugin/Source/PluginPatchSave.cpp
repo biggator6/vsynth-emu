@@ -1,5 +1,6 @@
 // A V-Synth patch saved: see PluginPatchSave.h (v602).
 #include "PluginPatchSave.h"
+#include "PluginPatchFiles.h"
 #include "PluginProcessor.h"
 #include "XtArpeggioPatch.h"
 #include "XtFirmware.h"
@@ -11,6 +12,7 @@ using xtfile::fail;
 
 namespace {
 constexpr int kNameFirst = 0x103, kNameChars = 12;   // [FW] the patch's name, a character an ID
+constexpr int kWaveNumber = 0x2be, kOscStride = 0x34;   // [FW] OSC 1's Wave Number, and OSC 2's IDs past OSC 1's
 constexpr int kKeyShift = 16;   // xtPatchIds' COSM 2 (kXtCosm2Ids) and xtArpPatchIds' pattern line, above the ID
 constexpr int kIdMask = (1 << kKeyShift) - 1;
 
@@ -78,6 +80,20 @@ XtPatchIds effectIds(const VSynthEmuProcessor& p, const std::vector<uint8_t>& st
     return ids;
 }
 
+// [FW] an OSC's Loop switch (OSC 1's; OSC 2's kOscStride past it).  A wave whose loop record says the switch doesn't
+// decide loops whatever it says (vplp +0x1a, the converter's tail 0x894e4030), and the plugin shows that by turning the
+// switch on (xtWaveOntoControls): so on such a wave the save keeps the patch's own switch, as the XT would (v603)
+constexpr int kLoopSwitch = 0x2d3;
+XtPatchIds keepingLoops(XtPatchIds ids, const VSynthEmuProcessor& p) {
+    for (int osc = 0; osc < 2; ++osc) {
+        XtWaveFile wave;
+        const juce::File file = oscWaveFile(p, osc);
+        if (file.existsAsFile() && readVSynthWave(file, wave) && !wave.loopSwitchDecides)
+            ids.erase(kLoopSwitch + kOscStride * osc);
+    }
+    return ids;
+}
+
 XtPatchIds nameIds(const juce::String& name) {
     XtPatchIds ids;
     const juce::String padded = name.substring(0, kNameChars).paddedRight(' ', kNameChars);
@@ -86,14 +102,26 @@ XtPatchIds nameIds(const juce::String& name) {
 }
 } // namespace
 
+juce::File oscWaveFile(const VSynthEmuProcessor& p, int osc) {
+    const juce::String path = p.apvts.state[osc ? "loadedFilePath2" : "loadedFilePath"].toString();
+    return path.isEmpty() ? juce::File() : juce::File(path);
+}
+
 bool patchFileOf(const VSynthEmuProcessor& p, const juce::String& name, std::vector<uint8_t>& file, std::string* why) {
+    return patchFileOf(p, name, PatchWaveSlots {}, file, why);
+}
+
+bool patchFileOf(const VSynthEmuProcessor& p, const juce::String& name, const PatchWaveSlots& slots,
+                 std::vector<uint8_t>& file, std::string* why) {
     if (!xtSynthRomReady()) return fail(why, "a patch needs the firmware image");
     std::vector<uint8_t> store = p.keptStore();
     const uint8_t none = 0;   // with no patch loaded, the firmware's default patch under no file's bytes
     if (store.empty() && !xtFwPatchStore(&none, 0, store)) return fail(why, "the firmware's default patch failed");
     const XtSynth::Controls c = p.currentControls();
-    const XtPatchIds tone =
-        keepingThrough(xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern), c, store);
+    XtPatchIds tone = keepingLoops(
+        keepingThrough(xtArpPatchIds(xtWithMsmIds(xtPatchIds(c), c.msm), c.arp, c.arpPattern), c, store), p);
+    for (size_t osc = 0; osc < slots.size(); ++osc)
+        if (slots[osc]) tone[kWaveNumber + kOscStride * static_cast<int>(osc)] = *slots[osc];
     // The first bank first, the types among it; then the typed values, by the types the store now holds
     const XtPatchIds first = merged(merged(tone, nameIds(name)), effectIds(p, store, false));
     const bool set = setChanged(store, first, false, why)

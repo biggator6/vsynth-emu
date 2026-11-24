@@ -29,6 +29,24 @@ inline std::vector<ImagePatch> imagePatches(const juce::File& rom) {
     return out;
 }
 
+// The first-bank IDs two stores read otherwise, zone 1 and both COSMs, as "ID was→is", the first few (v602, from
+// ProjectSaveTest.cpp when the project's save, v603, needed it too)
+inline std::string idsMoved(const std::vector<uint8_t>& was, const std::vector<uint8_t>& is) {
+    constexpr int kShown = 8;
+    std::string out;
+    int shown = 0;
+    for (const XtPatchSectionDef& s : xtPatchSections())
+        for (int id = s.first; id <= s.last && id < kXtDescIds && shown < kShown; ++id)
+            for (int cosm = 0; cosm < (xtPatchIsCosm(id) ? 2 : 1); ++cosm) {
+                const int a = xtPatchValue(was, id, 0, cosm), b = xtPatchValue(is, id, 0, cosm);
+                if (a == b || shown >= kShown) continue;
+                ++shown;
+                out += juce::String::toHexString(id).toStdString() + (cosm ? "/2 " : " ") + std::to_string(a) + "→"
+                       + std::to_string(b) + " ";
+            }
+    return out;
+}
+
 // `bytes` as `file`, its folder made
 inline void writeTestFile(const juce::File& file, const std::vector<uint8_t>& bytes) {
     file.getParentDirectory().createDirectory();

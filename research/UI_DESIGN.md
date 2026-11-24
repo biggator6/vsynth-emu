@@ -38,7 +38,9 @@ StatesXT.prj, 2 of 50", muted); ◀ and ▶, loading the previous and next patch
 project, their tooltip where the patch is; Browse…, which takes a patch or a project's folder (its first patch then);
 and (v602, the user's choice: Save and Save As) Save…, a menu of Save over the patch's own file, asking first, and Save
 As…, a file to choose with the project's next free slot offered and the patch named after it (`UiPatchSave`); the
-file saved becomes the patch browsed. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save….
+file saved becomes the patch browsed; and (v603) Save Project As…, a new project's folder to name, the project
+copied with the patch in its slot and its outside waves added, what it wrote said after, with the plain WAVs the XT
+must import. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save….
 A project is the XT's folder (`NAME.prj`, a VC-2's `NAME.vc2`) and its `Patch` folder's patches by slot
 (`PluginProject`); a patch outside a Patch folder is browsed with its own folder's. A mode's patches are a row of one
 table (`kPatchKinds`: the V-Synth's `.p00`, the VC-2's `.p02`, each load, name and note), so the VC-2's projects browse

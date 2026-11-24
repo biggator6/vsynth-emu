@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A project saved v603 (2026-11-24, on claude/vsynth-files after v602; HARDWARE_FIRMWARE.md, "A project saved"; the
+  user's choice: a plain WAV copied as it is, named for the XT to import). PluginProjectSave: Save Project As… makes a
+  new NAME.prj: the browsed project's .s00, patches and waves (links among them) copied byte for byte, each PCM OSC's
+  outside wave in at the next free slot (any file holds one) with the saved patch's Wave Number on it, a plain one named
+  to import, the current patch over its slot; from no project, the patch alone at 001. The slot helpers moved from
+  UiPatchSave.cpp to PluginProject.cpp (their plants with them); the Save… menu a table of choices. Found with it: a
+  wave whose loop record says the switch doesn't decide makes the plugin turn Loop on, and a save wrote that as the
+  patch's own (0x2d3): the save keeps the store's switch on such a wave (v602's Save too). VSynthEmuProjectTest 31/31;
+  editor 5223/5223.
+
 A patch saved v602 (2026-11-24, on claude/vsynth-files after v601; HARDWARE_FIRMWARE.md, "A patch saved"; the user's
   choice: Save over the patch's file, asking first, and Save As). rom.2's own save path in the interpreter: the setters
   0x894818b0 and (typed) 0x89481e20, the store's file layout 0x8947de90 (0x8947dae0's mirror: 825 of 825 full-length

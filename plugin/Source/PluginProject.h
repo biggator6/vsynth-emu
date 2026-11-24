@@ -18,3 +18,12 @@ ProjectPatches projectOf(const juce::File& patch, const juce::String& extension)
 ProjectPatches projectAt(const juce::File& folder, const juce::String& extension);
 // The project's name to show: its folder's, as the XT lists it
 juce::String projectName(const ProjectPatches& p);
+
+// A file's slot, its name's first three digits before a space ("002 HouseOfWax" gives 2); none for a file without one
+// (v602, moved here from UiPatchSave.cpp in v603 for a project's save)
+std::optional<int> slotOfFile(const juce::File& file);
+// A project folder's next free slot ("NNN name.ext", one past the highest any file there holds), the file Save As…
+// offers and a project's save gives an outside wave
+juce::File nextSlotFile(const juce::File& folder, const juce::String& name, const juce::String& extension);
+// A patch's or a wave's name from its file's ("002 HouseOfWax" gives "HouseOfWax"; a name with no slot is its own)
+juce::String patchNameOfFile(const juce::File& file);

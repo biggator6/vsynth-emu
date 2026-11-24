@@ -6,7 +6,7 @@
 #include "TestPatches.h"
 #include "../Source/PluginParamIds.h"
 #include "../Source/PluginPatchSave.h"
-#include "../Source/UiPatchSave.h"
+#include "../Source/PluginProject.h"
 #include "../Source/XtFiles.h"
 #include <algorithm>
 #include <functional>
@@ -23,23 +23,6 @@ int storeBytesMoved(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b
     int n = 0;
     for (size_t i = 0; i < std::min(a.size(), b.size()); ++i) n += a[i] != b[i];
     return n + static_cast<int>(std::max(a.size(), b.size()) - std::min(a.size(), b.size()));
-}
-
-// The first-bank IDs two stores read otherwise, zone 1 and both COSMs, as "ID was→is", the first few
-std::string idsMoved(const std::vector<uint8_t>& was, const std::vector<uint8_t>& is) {
-    constexpr int kShown = 8;
-    std::string out;
-    int shown = 0;
-    for (const XtPatchSectionDef& s : xtPatchSections())
-        for (int id = s.first; id <= s.last && id < kXtDescIds && shown < kShown; ++id)
-            for (int cosm = 0; cosm < (xtPatchIsCosm(id) ? 2 : 1); ++cosm) {
-                const int a = xtPatchValue(was, id, 0, cosm), b = xtPatchValue(is, id, 0, cosm);
-                if (a == b || shown >= kShown) continue;
-                ++shown;
-                out += juce::String::toHexString(id).toStdString() + (cosm ? "/2 " : " ") + std::to_string(a) + "→"
-                       + std::to_string(b) + " ";
-            }
-    return out;
 }
 
 // The patch as the processor would save it now, read back by the firmware's reader

@@ -23,7 +23,9 @@ Moved here as they stood from CLAUDE.md (2026-11-23, the user's "Yes, all five")
   that wave's own settings, not slot N's preset's; a link loads into an OSC by itself; a link past the library loads
   nothing and the patch's note says why. v602 (`ProjectSaveTest.cpp`): the image's 512 applied and saved
   unchanged are their files; a value of each kind moved lands alone; a name; Save As's next slot and name. Needs
-  the disk image beside the ROM. Its plants are `mutate_panel.py`'s kind `project`.
+  the disk image beside the ROM. v603 (`ProjectSaveAsTest.cpp`): a project saved unchanged is its files byte for
+  byte, its folder there refused, an outside plain WAV in at the next slot and named to import, the patch on it, a
+  patch from no project alone at 001. Its plants are `mutate_panel.py`'s kind `project`.
 - `buildid.sh`: the test, the AU and the VST3 this build made, the bundles in `build/plugin`'s artefacts that it installs, against this checkout's id and git (in `verify.sh`); `~/Library`'s AU and VST3 it names by whose build they are and fails on neither, as another checkout's build may install between this run's build and its check (2026-11-22). `buildid.sh --installed`: every copy found and which build it is, the way to answer "what's installed", as any checkout's build overwrites `~/Library`'s. `buildid_test.sh`: `BuildId.cmake` on a repository of its own, then `buildid.sh` on it as a checkout with planted copies: another build's in `~/Library`'s stand-in (`PLUGINS`) passes, a wrong id in its own build's fails (in `verify.sh`).
 - `env.sh`: the tools' paths, sourced by each; from bash or zsh (zsh, which has no BASH_SOURCE, by `$0`), and a REPO that isn't a checkout is refused rather than used (v178: from zsh REPO landed two folders up, with build/tools made there). `env_test.sh` (in `verify.sh`): sourced from both shells, from inside and outside the checkout, and with REPO given, on a copy in a scratch tree; `--plants` its two planted errors, when env.sh changes.
 - `build.sh`: all harnesses and the XtSynth CLI. `make_inputs.py`: the raw test inputs.
@@ -140,7 +142,8 @@ runners (`mutate_panel.py` by name, `mutate_files.py`, `mutate_fx.py`, `mutate_a
 - If `XtFwPatchFile.cpp`, `XtPatchSaveCheck.cpp` or `XtPatchStore.cpp` changed (v602): `mutate_files.py` with the
   `patchsave` names (and the `patchstore` ones for `XtPatchStore.cpp`). If `PluginPatchSave.cpp`, `UiPatchSave.cpp`,
   `PluginPresetWaves.cpp` or `PluginPatchFiles.cpp` changed: `mutate_panel.py` with the `project-`, `save-` and
-  `save-as-` names. If `XtPatchIds.cpp` changed: `mutate_tone.py` with the three `tonepatchids` names (a new file
+  `save-as-` names; for `PluginProjectSave.cpp` (v603) the `projsave-` ones, for `PluginProject.cpp` the box's and
+  `save-as-`, `save-slot-any-file`. If `XtPatchIds.cpp` changed: `mutate_tone.py` with the three `tonepatchids` names (a new file
   `--changed` can't see until it's committed).
 - If `UiPatchBox.cpp` or `PluginProject.cpp` changed (v601): `mutate_panel.py` with the `editor-d-box-` names and the
   three of the box's parts (`editor-d-browse-unplaced`, `editor-d-note-hidden`, `editor-d-note-unplaced`).

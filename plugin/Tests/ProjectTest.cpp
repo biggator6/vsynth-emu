@@ -118,6 +118,8 @@ int run(const juce::File& rom, const juce::File& work) {
     check(r->getPatchNote().contains("no wave " + juce::String(c->own) + ": no such preset wave"),
           "the patch's note should say why its wave is missing: " + r->getPatchNote().toStdString());
     projectSaveChecks(q, rom, work.getChildFile("Saves"), check);   // v602
+    projectSaveAsChecks(*p, project.getChildFile("Patch").getChildFile("001 Linked.p00"), rom,
+                        work.getChildFile("Projects"), check);   // v603
     return check.summary("patch " + c->patch.name + ", slot " + std::to_string(c->own) + " linked to preset "
                          + std::to_string(c->other));
 }

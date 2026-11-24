@@ -67,6 +67,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginPresetWaves.cpp
     Source/PluginProject.cpp
     Source/PluginPatchSave.cpp
+    Source/PluginProjectSave.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
@@ -245,7 +246,8 @@ vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Te
 # The output always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite
 vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # A project's own files (v600 on): a link to a preset wave followed to the wave it names
-vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/TestMain.cpp)
+vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
+             Tests/TestMain.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest

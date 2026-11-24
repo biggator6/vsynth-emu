@@ -15,7 +15,7 @@ constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserC
                        | juce::FileBrowserComponent::canSelectDirectories;
 
 // A mode's patches: what Browse… asks for, their files' extension, where the session keeps the one browsed, the load,
-// the name and note shown, and the save (v602; none for the VC-2's, whose patches rom.4 writes)
+// the name and note shown, the save (v602) and the project's (v603): none for the VC-2's, whose patches rom.4 writes
 struct PatchKind {
     const char* title;
     const char* extension;
@@ -24,17 +24,18 @@ struct PatchKind {
     juce::String (*name)(const VSynthEmuProcessor&);
     juce::String (*note)(const VSynthEmuProcessor&);
     bool (*save)(const VSynthEmuProcessor&, const juce::String&, const juce::File&, std::string*);
+    bool (*saveProject)(const VSynthEmuProcessor&, const juce::File&, const juce::File&, ProjectSaved&, std::string*);
 };
 // In PluginMode's order
 constexpr std::array<PatchKind, 2> kPatchKinds { {
     { "Load a V-Synth patch, or a project's folder", "p00", "patchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadPatch(f); },
       [](const VSynthEmuProcessor& p) { return p.getPatchName(); },
-      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch },
+      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch, saveProject },
     { "Load a VC-2 patch, or a project's folder", "p02", "vc2PatchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadVc2Patch(f); },
       [](const VSynthEmuProcessor& p) { return p.vc2PatchName(); },
-      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr },
+      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr, nullptr },
 } };
 
 const PatchKind& patchKindOf(PluginMode mode) { return kPatchKinds[static_cast<size_t>(mode)]; }
@@ -87,6 +88,11 @@ void PatchBox::save() {
                         box->processor_.apvts.state.setProperty(property, f.getFullPathName(), nullptr);
                         box->refresh();
                     } };
+    if (kind.saveProject)
+        s.saveProject = [box, save = kind.saveProject, own = browsed_](const juce::File& dest, ProjectSaved& r,
+                                                                         std::string* why) {
+            return box != nullptr && save(box->processor_, own, dest, r, why);
+        };
     showPatchSaveMenu(save_, s, chooser_);
 }
 

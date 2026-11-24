@@ -3912,6 +3912,29 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### A project saved (2026-11-24, v603) {#project-saved}
+
+The user's request (2026-11-24): save projects; their choice for a plain WAV in one: copy it as it is and say the XT
+must import it. No firmware is run past a patch's save (v602): a project is the XT's folder of files, and its waves go
+as they are. `PluginProjectSave`: Save Project As… makes a new `NAME.prj` (refused when it's there): the browsed
+project's `.s00` system files, its Patch folder's patches and its Wave folder's files (waves and links) copied byte for
+byte; each PCM OSC's wave from outside it copied in at the next free slot, one past the highest any file there holds (a
+`.w00` holds its slot as a `.wav` does), and the saved patch's Wave Number set to it; a wave in the project's own folder
+keeps its own slot; a plain WAV or AIFF (not a V-Synth wave by its chunks) named in the report as one the XT must import
+and encode itself; then the current patch saved over its slot. A patch from no project is saved alone at slot 001.
+
+**Found with it** (and so in v602's Save): a wave whose loop record says the switch doesn't decide (vplp +0x1a) loops
+whatever the OSC's Loop switch says, and the plugin shows that by turning the switch on (`xtWaveOntoControls`). A save
+wrote that back as the patch's own (ID 0x2d3, 0 to 1): v602's 512 were applied with no waves, so they couldn't show
+it. On such a wave the save now keeps the store's switch, as the XT holds it.
+
+**The checks** (`VSynthEmuProjectTest`, `ProjectSaveAsTest.cpp`, on the link test's project, a second patch and a
+system file beside it): saved unchanged, the new project's files are its own byte for byte (the patch among them, its
+link's wave loaded); its folder there again is refused; a plain WAV loaded into OSC 2 comes in at the link's slot plus
+one as it is, named to import, the saved patch's OSC 2 on it; a patch from no project saves alone at 001. 31 checks.
+Plants: `mutate_panel.py`'s `projsave-`, `save-loop-kept`, `save-slot-any-file`. The Save… menu's own glue (its items,
+the confirm, the choosers) is the UI's and no test presses it.
+
 ### A patch saved (2026-11-24, v602) {#patch-saved}
 
 The user's request (2026-11-24): save patches; their choice: Save over the patch's own file, asking first, and Save As….
