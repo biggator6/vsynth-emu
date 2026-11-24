@@ -897,7 +897,7 @@ xt_vc2midi: 0 different
 synth: the start, 97 of rom.4's initializers, 149 regions and the vocoder compared
 synth: 24 tones made through the part's hosts, their words compared, then given back
 synth load: the task's start, 16 cases (16 with a store), 320 events: 90 part reads, 79 dispatchers, 69 messages, 82 part messages
-synth notes: 16 cases, 640 events: 230 note-ons, 125 note-offs, 86 controllers, 25 bends, 26 poly pressures, 28 pressures, 28 programs, 47 parameters', 22 the part's, 23 resets; 200 voiced
+synth notes: 16 cases, 640 events: 179 note-ons, 121 note-offs, 72 controllers, 15 bends, 23 poly pressures, 40 pressures, 16 programs, 63 parameters', 20 the part's, 28 resets, 63 update passes; 144 voiced; 5 patches under a VOCODER's tone, 3 Types kept
 synth reads: 1 cases, 40 events: 17 memory reads, 100 readers, 8 getters, 5 sums, 600 placements; 0 bytes no region holds
 xt_vc2synth: 0 different
 == xt_vc2patch

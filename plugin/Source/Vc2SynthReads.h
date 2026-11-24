@@ -42,6 +42,8 @@ public:
     uint32_t firstUnheld() const { return memory_.firstUnheld(); }   // v347
     // v346: a word of the part's memory by rom.4's address (the OS MIDI's listeners' nodes)
     uint32_t wordAt(uint32_t at) { return rd32(at); }
+    // v349: the Matrix core's refresh (0x893a2230) on M at its address, its sources' state as its links stand
+    void refreshMatrix(uint32_t matrix);
 
 protected:
     void read(uint32_t at, void* to, size_t bytes) override { memory_.read(at, to, bytes); }
@@ -56,6 +58,7 @@ private:
     void onPool(const Vc2SetChild& c, F f);
     uint32_t* block(uint32_t noteAt);
     Vc2MatrixWords* matrixAt(uint32_t matrix);
+    Vc2MatrixSourceState stateOf(uint32_t matrix, Vc2MatrixWords* m);
     Vc2Synth& s_;
     Vc2SynthMemory memory_;
     Vc2MatrixChannel channel_ {};       // the channel state M names, read for its sources

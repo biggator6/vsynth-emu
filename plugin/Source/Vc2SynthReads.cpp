@@ -119,21 +119,37 @@ Vc2MatrixWords* Vc2SynthReads::matrixAt(uint32_t matrix) {
     return matrix == Vc2StaticMatrix::kAt ? &s_.staticM.m : nullptr;
 }
 
-// The reader's group on M, its sources on the channel state M's +0x168 names, G's assignments and the part's byte (the
+// M's sources' state as its links stand: the channel state M's +0x168 names, G's assignments and the part's byte (the
 // part table's record by M's +0x16c, its +0x24)
-const int16_t* Vc2SynthReads::matrixGroup(uint32_t reader, uint32_t matrix) {
-    const auto found = std::ranges::find(kVc2MatrixReaders, reader);
-    Vc2MatrixWords* m = matrixAt(matrix);
-    if (found == kVc2MatrixReaders.end() || m == nullptr) return none_.data();
+Vc2MatrixSourceState Vc2SynthReads::stateOf(uint32_t matrix, Vc2MatrixWords* m) {
     const auto links = value<Vc2MatrixLinks>(matrix + kLinksAt);
     read(links.channel, &channel_, sizeof channel_);
     Vc2MatrixSourceState state { m, &channel_, {}, 0 };
     std::memcpy(state.assigns.data(), s_.g.assigns, sizeof s_.g.assigns);
     const uint32_t record = rd32(kVc2OscPartTableAt + 4u * (uint32_t)(int32_t)links.part);
     state.partByte = rd8(record + kPartByteAt);
+    return state;
+}
+
+// The reader's group on M, its sources on M's state
+const int16_t* Vc2SynthReads::matrixGroup(uint32_t reader, uint32_t matrix) {
+    const auto found = std::ranges::find(kVc2MatrixReaders, reader);
+    Vc2MatrixWords* m = matrixAt(matrix);
+    if (found == kVc2MatrixReaders.end() || m == nullptr) return none_.data();
+    Vc2MatrixSourceState state = stateOf(matrix, m);
     Vc2MatrixSourceRoutines sources(state);
     Vc2MatrixCore core(sources);
     return vc2MatrixRead(*m, vc2MatrixGroups()[(size_t)(found - kVc2MatrixReaders.begin())], core);
+}
+
+// v349: the Matrix core's refresh on M at its address, its state read as its links stand then
+void Vc2SynthReads::refreshMatrix(uint32_t matrix) {
+    Vc2MatrixWords* m = matrixAt(matrix);
+    if (m == nullptr) return;
+    Vc2MatrixSourceState state = stateOf(matrix, m);
+    Vc2MatrixSourceRoutines sources(state);
+    Vc2MatrixCore core(sources);
+    core.refresh(*m);
 }
 
 // The sum `offset` bytes into the group the reader returns

@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's update task v349 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v348's a7d4336;
+  HARDWARE_FIRMWARE.md, "The part's update task"): the update task's pass on the part (Vc2SynthUpdate: a node's
+  update by what it is, the static M's M's init answering 1, a voice's by its class answering 0; the pitch source;
+  the voices' update on the sounding list, then the vocoder's glue), Vc2Synth::updatePass, M's refresh by address;
+  xt_vc2synth's notes part an update pass one event in 13, Part 1 receiving always, robot depth 0 one patch in 8.
+  Two findings: Part 1 Receive Switch off reads the boot flash (VC2_MODE_PLAN.md, step 4.5's [gap]); a sounding
+  VOCODER note's OSC Type changed to PCM makes rom.4's carrier NaN, the sides apart in its sign alone (deferred by
+  the user, step 4.3's [deferred]; the check keeps such a note's Type, vocoderTypesKept; the NaN sample to the host
+  step 4.5's [gap]). 0 different at 2024/7/31337; plants --synth --changed 74, all caught at the list's 40 cases (16
+  until now); fcheck's baseline updated; verify.sh green.
+
 The checks' region compare on a part word v348 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v347's
   0e421b1; HARDWARE_FIRMWARE.md, "The checks' region compare on a part word"): vc2FirstDifference's vectors take a
   region's bytes rounded up to words, so the sets' counts (6 bytes) are no longer written past and their third

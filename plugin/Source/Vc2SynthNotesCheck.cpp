@@ -1,6 +1,7 @@
 // xt_vc2synth's notes part (v346): the part's MIDI note path against rom.4's own, after the load part and before the
 // reads part, on the seed three after the run's.  [cases] cases (16 at the least), each a patch loaded on both sides
-// (a store of noise or none, the part's read, the system's dispatchers and part 0's message, its node the held class),
+// (a store of noise or none, the part's read, the system's dispatchers and part 0's message, its node the held class;
+// v349: a sounding tone's VOCODER OSC keeping its Type, vocoderTypesKept; robot human depth 0 one time in 8),
 // then 40 MIDI messages, each as rom.4 takes it: the OS MIDI's handler 0x89314e90 then the notes' task's dispatcher
 // 0x8938fed0, each given (0, the message, its word), on rom.4's side; `Vc2Synth::midiMessage` on the part's.  A
 // message: a note-on (two in five: a key of a few near the middle, a velocity 1…127, now and then 0), a note-off (a key
@@ -8,11 +9,15 @@
 // bend, either pressure or a program change; on source 1 mostly (2, 3 now and then), the channel part 0 receives on
 // mostly (any now and then); or one in six a parameters' message (0x40, 0x41: its word a kind 0…13, 3 with Out DC cut
 // one time in four, and a second byte) or the reset (0x70), the OS's routines these run on rom.4's side
-// (Vc2OsMidiParts::kOsRoutines) hooked as the part leaves them.  After each every region of the part, the vocoder, the
-// flags posted the notes' task and each tone's words.  XT_VC2SYNTH_MAIN only.
+// (Vc2OsMidiParts::kOsRoutines) hooked as the part leaves them; v349: one event in 13 an update pass instead
+// (updatePassEvent).  After each every region of the part, the vocoder, the flags posted the notes' task and each
+// tone's words.  XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
+#include "Vc2Params.h"
+#include "Vc2PatchStore.h"
 #include "Vc2SynthCheck.h"
 #include "Vc2SynthMidi.h"
+#include <cstdlib>
 
 namespace {
 constexpr uint32_t kHandler = 0x89314e90, kDispatcher = 0x8938fed0;   // [FW]
@@ -28,8 +33,16 @@ constexpr std::array<uint8_t, 24> kKindByDraw { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
 constexpr uint8_t kClasses[] = { 0x90, 0x80, 0xb0, 0xe0, 0xa0, 0xd0, 0xc0, 0x40, 0x41, 0x70 };   // [FW] by kind
 constexpr size_t kWordFrom = 7, kResetKind = 9;   // the kinds given a word, the reset's
 
+// [FW] v349: the update task's loop top (its wait's call), the ticks' word; the registers its prologue leaves (r8 the
+// OS's lock wait, r9 the interrupts' mask), the events its wait answers
+constexpr uint32_t kUpdateLoopAt = 0x89395310, kTicksAt = 0x8993d080, kLockWait = 0x893018b0;
+constexpr uint32_t kInterruptMask = 0xffffff0f, kUpdateEvent = 1, kTimerEvent = 2;
+constexpr uint32_t kUpdateOneIn = 13, kTicksPast = 8;   // an event an update pass one time in 13; its ticks' step
+
 struct NotesCounts {
     long events = 0, voiced = 0;   // voiced: the messages after which a note's age is new (a voice started)
+    long updates = 0;              // v349: the update passes among the events
+    long under = 0, kept = 0;   // v349: the patches drawn under a VOCODER's tone, the Types kept (vocoderTypesKept)
     std::array<long, std::size(kClasses)> byKind {};
 };
 
@@ -56,42 +69,133 @@ Drawn messageDrawn(std::mt19937& rng, NotesCounts& n, uint8_t receiving) {
     return d;
 }
 
+// [FW] v349: OSC 1's Type (OSC 2's 52 IDs on), its VOCODER, and the kind an OSC voice of VOCODER holds; robot human
+// depth (the part's block)
+constexpr int kOscTypeId = 0x2e5, kOscTypeStep = 52, kOscs = 2, kRobotId = 0x1a3;
+constexpr uint32_t kVocoderType = 3, kVocoderKind = 5, kRobotZeroOneIn = 8;
+
+// An ID's bits in the store at a zone set to `raw`, where xtStoreRaw reads them (its value raw less the centre)
+void rawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw) {
+    const XtParamDesc* d = vc2ParamDesc(id);
+    const int section = xtStoreSection(vc2Store(), id, zone);
+    if (d == nullptr || section < 0) return;
+    const int width = std::abs(d->width), total = width + d->bit, bytes = (total + 7) / 8, at = section + d->offset;
+    if (at < 0 || at + bytes > (int)store.size() || width >= 32) return;
+    const int shift = bytes * 8 - total;
+    const uint32_t mask = ((1u << width) - 1) << shift;
+    uint32_t v = 0;
+    for (int k = 0; k < bytes; ++k) v = v << 8 | store[(size_t)(at + k)];
+    v = (v & ~mask) | (raw << shift & mask);
+    for (int k = bytes - 1; k >= 0; --k, v >>= 8) store[(size_t)(at + k)] = (uint8_t)v;
+}
+
+// v349's steer, the user's call (2026-11-24, "Defer it"; VC2_MODE_PLAN.md's [deferred] item on the VOCODER's NaN
+// sign): a new patch keeps an OSC's Type at VOCODER in the kind of a tone on the sounding list (its id's high half)
+// whose OSC voice there is VOCODER's (kind 5), and is a store then.  Changed under such a tone (to PCM), the update
+// pass converts its note's block by the new type, PCM's converter writing −1 at P+0x48 (the block's +0xf8), which kind
+// 5's update 0x893afff0 reads as its balance envelope depth: a NaN whose sign the interpreter's FSUB keeps and
+// xtf::sub flips.  Every other type change, and every other note, is drawn as before.  Whether such a tone sounds;
+// `changed` counts the Types it set back to VOCODER
+bool vocoderTypesKept(Vc2Synth& s, std::vector<uint8_t>& store, long& changed) {
+    bool under = false;
+    int n = 0;
+    for (uint32_t at = s.lists.sounding; at != 0 && n < Vc2TonePool::kTones; at = s.tones.at(at).head.next, ++n) {
+        const int kind = (int)(s.tones.at(at).head.id >> 16);
+        for (int osc = 0; osc < kOscs; ++osc) {
+            if (s.hostOf(at).oscs[(size_t)osc].kind() != kVocoderKind) continue;
+            const int id = kOscTypeId + kOscTypeStep * osc;
+            under = true;
+            if (xtStoreValue(vc2Store(), store, id, kind) == (int)kVocoderType) continue;
+            const XtParamDesc* d = vc2ParamDesc(id);
+            rawPut(store, id, kind, kVocoderType + (uint32_t)(d ? d->centre : 0));
+            ++changed;
+        }
+    }
+    return under;
+}
+
+// v349: robot human depth 0 one time in 8, so that the pitch source's post (0x89394a60) is seen on Auto Note's On
+// Switch alone, its depth 0 (the depth is read with an EXTIN OSC, Auto Note's switch too; noise gives 0 one time in 128)
+void robotDepthDrawn(std::vector<uint8_t>& store, std::mt19937& rng) {
+    if (rng() % kRobotZeroOneIn != 0) return;
+    const XtParamDesc* d = vc2ParamDesc(kRobotId);
+    rawPut(store, kRobotId, 0, (uint32_t)(d ? d->centre : 0));
+}
+
 // The channel part 0's node of source 1 receives on (0 when none, or every one): where the notes go mostly
 uint8_t receivingOf(const Vc2Synth& s) {
     const int8_t c = s.nodes.of(1, 0).channel;
     return c < 0 ? 0 : (uint8_t)c;
 }
 
-// One message on both sides, then what differs: every region, the vocoder, the events, each tone's words
+// After a step: every region, the vocoder, the events, each tone's words
+std::string partStepDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts) {
+    std::string d = vc2SynthStepDifference(fw, s, posts);
+    for (int tone = 0; tone < Vc2TonePool::kTones && d.empty(); ++tone) d = vc2SynthToneDifference(fw, s, tone);
+    return d;
+}
+
+// One message on both sides, then what differs
 std::string partMidiEvent(Vc2Fw& fw, Vc2Synth& s, const Drawn& m, const Vc2SynthPosts& posts) {
     fw.cpu.write(kMessageAt, &m.m, sizeof m.m);
     fw.cpu.wr32(kWordAt, m.word);
     if (!fw.call(kHandler, { 0, kMessageAt, kWordAt })) return "the OS MIDI's handler faults: " + fw.cpu.error();
     if (!fw.call(kDispatcher, { 0, kMessageAt, kWordAt })) return "the dispatcher faults: " + fw.cpu.error();
     s.midiMessage(m.m, m.word);
-    std::string d = vc2SynthStepDifference(fw, s, posts);
-    for (int tone = 0; tone < Vc2TonePool::kTones && d.empty(); ++tone) d = vc2SynthToneDifference(fw, s, tone);
-    return d;
+    return partStepDifference(fw, s, posts);
+}
+
+// v349: one update pass on both sides, then what differs: the ticks a few past the last, the events its wait answers
+// (each half the time); rom.4's loop body from its top until it comes back there (v309's way), with the registers
+// its prologue leaves
+std::string updatePassEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
+    posts.updateEvents = (rng() % 2 ? kUpdateEvent : 0) | (rng() % 2 ? kTimerEvent : 0);
+    s.ticks = s.time.last + rng() % kTicksPast;
+    fw.cpu.wr32(kTicksAt, s.ticks);
+    fw.cpu.r[8] = kLockWait;
+    fw.cpu.r[9] = kInterruptMask;
+    fw.cpu.r[12] = Vc2UpdateQueue::kAt;
+    uint32_t back = 0;
+    int entries = 0;
+    fw.cpu.hook(kUpdateLoopAt, [&back, &entries](Sh4& m) {
+        if (entries++ == 0) back = m.pr;
+        else m.pc = back;
+    });
+    const bool ran = fw.call(kUpdateLoopAt, {});
+    fw.cpu.unhook(kUpdateLoopAt);
+    if (!ran) return "the update pass faults: " + fw.cpu.error();
+    s.updatePass(posts.updateEvents);
+    return partStepDifference(fw, s, posts);
 }
 } // namespace
 
-long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthPosts& posts) {
+long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts) {
     NotesCounts n;
     const auto oneCase = [&](std::mt19937& rng, std::vector<uint8_t>& store) {
-        std::string d = vc2SynthPatchLoaded(fw, s, store, rng, posts);
+        const auto kept = [&s, &n, &rng](std::vector<uint8_t>& bytes) {
+            robotDepthDrawn(bytes, rng);
+            const bool k = vocoderTypesKept(s, bytes, n.kept);
+            n.under += k ? 1 : 0;
+            return k;
+        };
+        std::string d = vc2SynthPatchLoaded(fw, s, store, rng, posts, kept);
         for (int e = 0; e < kEvents && d.empty(); ++e) {
             ++n.events;
             const uint32_t age = s.voices.ages;
-            d = partMidiEvent(fw, s, messageDrawn(rng, n, receivingOf(s)), posts);
+            const bool update = rng() % kUpdateOneIn == 0;
+            n.updates += update ? 1 : 0;
+            d = update ? updatePassEvent(fw, s, rng, posts)
+                       : partMidiEvent(fw, s, messageDrawn(rng, n, receivingOf(s)), posts);
             n.voiced += s.voices.ages != age && s.voices.ages != 0 ? 1 : 0;
         }
         return d;
     };
     const long different = vc2SynthCases(fw, s, run, 3, "the notes", oneCase);
     std::printf("synth notes: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
-                "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets; %ld voiced\n",
+                "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets, %ld update "
+                "passes; %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept\n",
                 vc2SynthCaseCount(run), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3], n.byKind[4],
-                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.voiced);
+                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.updates, n.voiced, n.under, n.kept);
     return different;
 }
 #endif

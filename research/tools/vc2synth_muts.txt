@@ -166,3 +166,22 @@ ss-has-system|&& s_.hasSystem) return vc2SystemValue|&& !s_.hasSystem) return vc
 smem-os-parts|vc2SynthRegion(Vc2OsMidi::kPartObjectsAt, s.midi.partObjects,|vc2SynthRegion(Vc2OsMidi::kPartObjectsAt + 8, s.midi.partObjects,|vc2synthmemory
 smem-system|out.push_back({ a.at, s.system.bytes.data() + a.from,|out.push_back({ a.at + 1, s.system.bytes.data() + a.from,|vc2synthmemory
 smem-legato-own|"the legato's struct", true },|"the legato's struct", false },|vc2synthmemory
+# v349: the update task on the part (vc2synthupdate, Vc2SynthUpdate.cpp: a node's update by what it is, the pitch
+# source, the voices' update; vc2synth, the pass; vc2synthreads, M's refresh by address), by xt_vc2synth's notes part's
+# update passes.  Not planted: the tones' +0x30 and +0x3c and the free LFOs' clock, the schedule's (the notes' task's,
+# not yet run).  upd-glue's period is the tracker's 0 plus 100: the check renders nothing, so the tracker's period
+# stays 0 and its ratio's quotient infinite, where any period below about 50 (A440's 100.227 over it above 2) clamps
+# the same way
+upd-stays|constexpr uint32_t kStays = 1;|constexpr uint32_t kStays = 0;|vc2synthupdate
+upd-pitch-event|constexpr uint32_t kPitchEvent = 0x100;|constexpr uint32_t kPitchEvent = 0x200;|vc2synthupdate
+upd-static-init|        s_.settings->setup.init(s_.staticM.m, s_.staticM.links, s_.g, refresh);\n|        (void)refresh;\n|vc2synthupdate
+upd-voice-class|.vtable == Vc2Assigner::kNoteVtable) s_.classes.update|.vtable != Vc2Assigner::kNoteVtable) s_.classes.update|vc2synthupdate
+upd-pitch-depth|    s_.pitch.depth = s_.rows.robot;|    s_.pitch.depth = 0.0f;|vc2synthupdate
+upd-pitch-switch|if (s_.autoNote.w.onSwitch != 0 \|\| s_.rows.robot > 0.0f)|if (s_.rows.robot > 0.0f)|vc2synthupdate
+upd-pitch-robot|\|\| s_.rows.robot > 0.0f)|\|\| s_.rows.robot >= 0.0f)|vc2synthupdate
+upd-sounding-next|at = s_.tones.at(at).head.next) {|at = 0) {|vc2synthupdate
+upd-tone-update|.update(n, s_.hosts[(size_t)index_]); }|.update(n + 1, s_.hosts[(size_t)index_]); }|vc2synthupdate
+upd-glue|s_.vocoder.glue(carried, s_.tracker.period());|s_.vocoder.glue(carried, s_.tracker.period() + 100.0f);|vc2synthupdate
+upd-refresh|{ reads_.refreshMatrix(Vc2StaticMatrix::kAt); }|{}|vc2synthupdate
+syn-update-events|    vc2UpdateTaskPass(w, events);|    vc2UpdateTaskPass(w, events & 1);|vc2synth
+srd-refresh|    core.refresh(*m);\n}|}|vc2synthreads

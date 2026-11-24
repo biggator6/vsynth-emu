@@ -1546,6 +1546,82 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's update task (2026-11-24, v349) {#vc2-synth-update}
+
+Step 4.3's seventy-seventh version, Vc2Synth whole's ninth. The update task's pass (v310's `vc2UpdateTaskPass`) now
+runs on the part (`Vc2Synth::updatePass`, `Vc2SynthUpdate`):
+- **A node's update by what it is.** The static M's node has the class `0x898cd460`. Its +0x0c is M's init
+  `0x893a2ee0`, with the object adjusted by −0x170 to the static M. M's init makes M from its part's record and G's
+  channel word, then writes the levels (Matrix group 2's sums × 1/127) to `0x89997290`, the static M's levels and the
+  part mixer's offsets, then the mixer's targets (`0x893b1ee0`). It answers 1, so the static M stays on the queue.
+  Its refresh is the Matrix core's on the static M, reading its sources as M's links stand once M's init has set
+  them. A voice's update goes by its class. The note voice's (`0x893970b0`, Vc2VoiceClass) refreshes, updates and
+  copies its set and updates its note's blocks, and answers 0. The plain voice's (`0x89391730`) answers 0.
+- **The pitch source** `0x89394a60` on `0x89989748`: its +8 takes the robot depth (`0x89997fdc`). Then, with Auto
+  Note's On Switch (`0x8993fe50`) set or the depth above 0, `0x89391e40` posts the notes' task 0x100.
+- **The voices' update** `0x893b16a0` is v311's `Vc2PartMixer::updateTones`. It runs on the sounding list's tones in
+  the list's order (each a `Vc2MixerTone` of the pool's tone on its host), then the vocoder's glue (`0x893f07a0`)
+  with the tracker's period (`0x893ee010`).
+- The queue's lock is the OS's, nothing on one thread.
+
+The note class's update always answers 0 (`0x8939711a`), so a voice leaves the queue after each update.
+
+**The check.** xt_vc2synth's notes part gives one event in 13 to an update pass. The ticks are drawn a few past the
+last, and the events its wait answers each half the time. rom.4's loop body runs from its top (`0x89395310`) until it
+comes back there, with the registers its prologue leaves (r8 the OS's lock wait, r9 the interrupts' mask, r12 the
+queue). The OS's event wait now answers the update task's mask (3) with the drawn events, and the fade's (0x1000) as
+before. After each pass come every region, the vocoder, the events and the tones' words. The notes part's patches set
+robot human depth (0x1a3) to 0 one time in 8, so the pitch source's post is seen on Auto Note's On Switch alone: both
+are read only with an EXTIN OSC, and noise gives a depth of 0 one time in 128. Not reached: the tracker's period is 0
+throughout, as the check renders nothing, so the glue's ratio by pitch is checked with its quotient infinite only.
+
+**Found: Part 1 Receive Switch off** (an open [gap] in VC2_MODE_PLAN.md, step 4.5). rom.4's system defaults
+(`0x89328d60`, through `0x89319e10`) set it on (ID 0x47 = 1); a user's own system setting turns it off. With it off,
+G's channel word is rom.4's `0x8999738c`, which nothing writes (0). M's init on the static M then gives M a channel
+state of 0, and the Matrix sources (`0x893a1df0`) read [0 + 0x84 + a byte]: low addresses, on an XT the boot flash.
+rom.0 isn't the bytes there (it starts with 0xff). The interpreter faults on them, and the part reads zeros (its step
+fails on a read no region holds). The notes part draws Part 1 receiving always; the read isn't ported.
+
+**Found: the VOCODER's balance NaN** (a [deferred] item in VC2_MODE_PLAN.md, step 4.3; the user, 2026-11-24: "Defer
+it"). C's convert picks an OSC block's converter by the record's type at each convert (Vc2SetOscKinds' `waysOf`:
+type − 1 → PCM, EXTIN, VOCODER; else the analog's). So when a patch changes a sounding VOCODER-OSC note's OSC Type to
+PCM (a patch change, or an OSC Type edit under the note), the next update pass converts that note's block with PCM's
+converter. It writes PCM's words from +0xb0, −1 (0xffffffff) at +0xf8 (P+0x48), while the block's head kind (+0, the
+start's) stays 5 and the tone's OSC voice stays kind 5. Kind 5's update (`0x893afff0`) reads that −1 as its balance
+envelope depth, so the carrier's balance and its noise gain, clamp01((2 − balance) × noise level), are NaN. This is
+rom.4's own code on an in-range patch: with every store field held in its range, the same words and the same
+difference came at all three seeds. An analog (type 0) convert over a kind-5 block was also seen, a finite but
+foreign P+0x48.
+
+The limit, said once: the interpreter's FSUB keeps a NaN's sign (0xffffffff); `xtf::sub` (sum2(a, −b)) flips it
+(0x7fffffff); a real SH-4 takes 0xffffffff as an sNaN and gives the quiet 0x7fbfffff. None of the three agree, and an
+XT reaches it as above. XtFloat.h is unchanged, as `xtf::sub` is rom.2's ports' too. The notes part's patch draw is
+steered instead (`vocoderTypesKept`): a new patch keeps an OSC's Type at VOCODER in the kind (its id's high half) of a
+tone on the sounding list whose OSC voice there is kind 5, and is a store then. Every other type change and every other
+note is drawn as before. As the notes part never renders, tones stay on the sounding list across cases, so the steer
+holds often: VOCODER's share of the four OSC Types drawn goes from 23–25% to 41–44% (seed 7: 367 to 653 of 1600).
+
+What the NaN does to the audio (an open [gap] in VC2_MODE_PLAN.md, step 4.5): `vc2Clamp01` passes a NaN through, as
+both its compares are false, so the carrier's render gives a NaN noise scale. Its noise low-pass state goes NaN and
+stays so until the carrier's next init (a note-on), and every sample the OSC gives is NaN. With them go the tone's mix,
+COSMs and TVA, and the part's bus, on both sides. The plugin must never hand the host a NaN sample.
+
+Results:
+- xt_vc2synth 0 different at 2024 (40 cases), 7 and 31337 (400): 136, 1256 and 1284 update passes; 350, 3627 and
+  3170 messages voicing; 13, 274 and 285 patches drawn under a VOCODER's tone, 9, 333 and 347 Types kept. Before the
+  steer, 1 different at each seed (an OSC voice's +0xac0, the carrier's noise gain: the NaN's sign). VOCODER's share
+  of the OSC Types, measured with the steer alone: 41 to 92 of 160, 367 to 653 and 395 to 700 of 1600.
+- Plants: --synth --changed 74, all caught but the reads' part table (sr-part-table, sr-part-byte), which the list's
+  16 cases missed at v348 too, and which 40 catch. Two new plants missed at first: upd-glue, as the tracker's period
+  is 0 (its replacement now that period plus 100), and upd-pitch-switch, Auto Note never on with a depth of 0 (the
+  depth's draw above). The list now runs 40 cases (`mutate_vc2.py`, a run 1.5 s). v347's missed plants by name:
+  ss-receiving, ss-system-d, sys-d-base, svo-block-mix, svo-legato, svo-reload, svo-ended and ss-levels-static are
+  caught; ss-levels-mixer and ss-levels-targets at 400 cases at 7 and 31337 (the levels move in a pass about 9
+  times in 1,250: a controller must move one of the static M's sources between the patch's read and the pass).
+  Still missed: svo-block-cosm, svo-noteon-back, svo-destroy-end, -note and -updated, svo-prepare-plain and
+  svo-keyoff-plain (the notes' task's ended scan, the renders and the plain class, later versions').
+- fcheck: xt_vc2synth's notes line alone differed (its update passes, its counts), the baseline updated.
+
 ### The checks' region compare on a part word (2026-11-24, v348) {#vc2-rig-part-word}
 
 Step 4.3's seventy-sixth version, a fix in the check rig that the v550 sanitizer sweep found (claude/vc2-sanitize-4e66c9,

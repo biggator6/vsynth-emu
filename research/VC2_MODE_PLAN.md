@@ -1196,6 +1196,22 @@ version against rom.4's routines with what it calls hooked:
          so xt_vc2sets' sets' counts (6 bytes) are no longer written past and their third halfword is compared (the
          v550 sweep's finding; HARDWARE_FIRMWARE.md, "The checks' region compare on a part word"). The update task on
          the part, planned as v348, is v349.
+       - The part's update task (v349): `Vc2SynthUpdate` (a node's update by what it is: the static M's M's init
+         answering 1, a voice's by its class answering 0; the pitch source; the voices' update on the sounding list,
+         then the vocoder's glue), `Vc2Synth::updatePass`; xt_vc2synth's notes part with an update pass one event in
+         13 (HARDWARE_FIRMWARE.md, "The part's update task"). Next: the notes' task's events (the ended scan, the
+         schedule), the block (mixer, renders, vocoder, tracker, Auto Note), the OS model and the whole check.
+       - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
+         sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
+         update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
+         convert): PCM's converter writes −1 (0xffffffff) at P+0x48, the block's +0xf8, while the block's head kind
+         stays 5, and kind 5's update `0x893afff0` reads it as the balance envelope depth, so the carrier's balance and
+         noise gain are NaN. The two sides then differ in the NaN's sign alone: the interpreter's FSUB keeps it
+         (0xffffffff), `xtf::sub` (sum2(a, −b)) flips it (0x7fffffff), and a real SH-4 gives a third answer, 0x7fbfffff
+         (the sNaN quieted). Deferred because only a NaN's sign differs, and matching the interpreter would change
+         `xtf::sub`, which rom.2's ports share; XtFloat.h is unchanged and there is no VC-2-only subtract. Meanwhile
+         xt_vc2synth's notes part keeps a sounding VOCODER OSC's Type in a new patch (`vocoderTypesKept`,
+         Vc2SynthNotesCheck.cpp). What the NaN does to the audio: step 4.5's [gap], "A NaN sample to the host".
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
@@ -1277,6 +1293,21 @@ version against rom.4's routines with what it calls hooked:
       "A .p02 onto the VC-2's parameters"). With it the first half is done.
    4. The second half: the mode switch's audio, the wiring to Vc2Synth, the VC-2 pages and cards, the plugin test of a
       played block.
+   Open for the second half, found in step 4.3 (v349):
+   - [gap] Part 1 Receive Switch off, among the system settings. rom.4's system defaults (`0x89328d60`, run by
+     `0x89319e10`) set it on (ID 0x47 = 1); a user's own system setting turns it off. With it off, G's channel word is
+     rom.4's `0x8999738c`, which nothing writes (0), so M's init on the static M (`0x893a2ee0`, on the update task's
+     pass) gives M a channel state of 0, and the Matrix sources (`0x893a1df0`) read [0 + 0x84 + a byte]: low addresses,
+     on an XT the boot flash. rom.0 isn't the bytes there (it starts with 0xff). The interpreter faults on them and the
+     part reads zeros (its step fails on a read no region holds); xt_vc2synth's notes part draws Part 1 receiving always.
+     Step 4.5 decides between starting the plugin with Receive on and finding the boot flash's bytes; the read isn't
+     ported.
+   - [gap] A NaN sample to the host. In step 4.3's [deferred] state (the VOCODER's balance NaN), the carrier's noise
+     gain is NaN on both sides, and `vc2Clamp01` passes a NaN through (both compares false). So the carrier's render
+     (Vc2Carrier.cpp) gives a NaN noise scale, its noise low-pass state goes NaN and stays so until the carrier's next
+     init (a note-on), and every sample the OSC gives is NaN, the saw's added to it; with them the tone's mix, COSMs
+     and TVA, and the part's bus. Whatever rom.4 does, the plugin must never hand the host a NaN sample: step 4.5 puts
+     a guard where the VC-2's audio leaves the part, and the plugin test holds it. Not fixed in v349.
 
 ### 5. Against the machine
 

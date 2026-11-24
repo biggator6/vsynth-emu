@@ -182,6 +182,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SynthSettings.cpp
     Source/Vc2SynthMidi.cpp
     Source/Vc2SystemStore.cpp
+    Source/Vc2SynthUpdate.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

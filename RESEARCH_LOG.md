@@ -4217,3 +4217,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
   Part 1's receive on.
 - v348 took the sanitizer sweep's finding in the rig, red first: xt_vc2sets passed at -O2 while ASan saw 32,000
   writes past one region. A compare that passes can still be reading the wrong bytes; the sanitizers see that.
+- v349 ran the update task on the part, and two of its findings went to the user. With Part 1 Receive Switch off,
+  M's init reads below 0x200 (an XT's boot flash), which nothing here holds; the check draws Receive on and step 4.5
+  decides. And a patch that changes a sounding VOCODER note's OSC Type to PCM makes rom.4's own carrier NaN, the
+  sides then differing in the NaN's sign alone. A steer on the check's draw was asked for only if the word came from
+  the draw; a run with every field in range showed it didn't, so it went to the user, who deferred it. The check now
+  keeps such a note's Type, and the plugin's guard against NaN samples is step 4.5's.

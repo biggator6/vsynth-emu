@@ -24,15 +24,18 @@ std::string vc2SynthToneDifference(Vc2Fw& fw, Vc2Synth& s, int tone);
 struct Vc2SynthPosts {
     uint32_t notes = 0;
     bool others = false;
+    uint32_t updateEvents = 0;   // v349: what the update task's wait (0x893017f0 on mask 3) answers
 };
 void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts);
 // After a step: every region, the vocoder, and the flags each side posted the notes' task
 std::string vc2SynthStepDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts);
+// v349: what steers a store's draw: given its bytes before either side has them, whether it must be a store (not none)
+using Vc2SynthSteer = std::function<bool(std::vector<uint8_t>&)>;
 // A patch loaded on both sides: a store of noise (none one time in four) given each, then the part's read, the
 // system's, assignments' and calibration's dispatchers and part 0's message (kind 0: its node the held class); what
 // differs after
 std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
-                                const Vc2SynthPosts& posts);
+                                const Vc2SynthPosts& posts, const Vc2SynthSteer& steer);
 // The store taken away on both sides (rom.4's part 0 entry none), before the store's bytes go
 void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s);
 // A part's cases (v346): as many as the run's, 16 at the least, on the seed `offset` after the run's, each `one` given
@@ -47,7 +50,7 @@ long vc2SynthCases(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, uint32_t offset, c
 long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthPosts& posts);
 // The notes part (v346, Vc2SynthNotesCheck.cpp): cases of a patch loaded, then MIDI messages through the OS MIDI's
 // handler and the dispatcher on both sides; how many differ
-long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthPosts& posts);
+long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts);
 
 // The reads part (v343): the regions apart; every read of C's over its arguments reaching only the part's regions; then
 // `run.cases` cases, each the part's memory read by address against rom.4's after noise in drawn regions, the Matrix's

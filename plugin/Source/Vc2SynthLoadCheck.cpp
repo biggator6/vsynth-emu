@@ -63,23 +63,29 @@ std::string taskStart(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
 }
 
 // v347: a system on both sides: rom.4's defaults half the time, else its three areas noise, Part 1 Receive Switch on
-// three times in four of those
-void systemDrawn(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng) {
+// three times in four of those (v349: always where `receives`, as the update task's passes need: with it off, G's
+// channel word is rom.4's 0x8999738c, 0, and M's init on the static M reads its sources at 0x84 on, an XT's boot
+// flash, which the part has none of)
+void systemDrawn(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, bool receives) {
     Vc2System system = *vc2SystemDefaults();
     if (rng() % 2 == 0) {
         for (uint8_t& b : system.bytes) b = (uint8_t)rng();
         const XtParamDesc* on = vc2ParamDesc(kReceiveSwitch);
-        if (rng() % 4) system.bytes[(size_t)(Vc2System::kRecord + on->offset)] |= (uint8_t)(0x80 >> on->bit);
+        const size_t at = (size_t)(Vc2System::kRecord + on->offset);
+        if (receives || rng() % 4) system.bytes[at] |= (uint8_t)(0x80 >> on->bit);
     }
     for (const Vc2System::Area& a : Vc2System::kAreas) fw.cpu.write(a.at, system.bytes.data() + a.from, a.size);
     s.giveSystem(system);
 }
 
-// A store's bytes drawn for both sides, or none, with a system drawn: whether a store was
-bool storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng) {
-    systemDrawn(fw, s, rng);
-    const bool none = rng() % 4 == 0;
+// A store's bytes drawn for both sides, or none, with a system drawn: whether a store was; v349: the bytes given
+// `steer` before either side has them, a store where it says so
+bool storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng, bool receives = false,
+                const Vc2SynthSteer& steer = {}) {
+    systemDrawn(fw, s, rng, receives);
+    bool none = rng() % 4 == 0;
     for (uint8_t& b : store) b = (uint8_t)rng();
+    if (steer && steer(store)) none = false;
     fw.cpu.write(kStoreAt, store.data(), store.size());
     fw.cpu.wr8(kEntryAt, none ? 0 : 1);
     fw.cpu.wr32(kEntryAt + kEntryStore, kStoreAt);
@@ -155,11 +161,12 @@ void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts) {
         fw.cpu.hook(at, [](Sh4& c) { c.ret(0); });
     }
     // v347: the OS's event wait, which a truncate-and-wait (0x893b3bc0) calls on the TVA's fade with its tone in r12:
-    // the fade rendered at once, as the part's waitFade has it (its TVA's +0x64, the tone's +0x1a54, 0)
-    constexpr uint32_t kOsWait = 0x893017f0, kFadeEvent = 0x1000, kFadeAt = 0x19f0 + 0x64;   // [FW]
-    fw.cpu.hook(kOsWait, [](Sh4& c) {
+    // the fade rendered at once, as the part's waitFade has it (its TVA's +0x64, the tone's +0x1a54, 0); v349: the
+    // update task's (mask 3) answered the events drawn for its pass
+    constexpr uint32_t kOsWait = 0x893017f0, kFadeEvent = 0x1000, kFadeAt = 0x19f0 + 0x64, kUpdateMask = 3;   // [FW]
+    fw.cpu.hook(kOsWait, [&posts](Sh4& c) {
         if (c.r[4] == kFadeEvent) c.wr32(c.r[12] + kFadeAt, 0);
-        c.ret(0);
+        c.ret(c.r[4] == kUpdateMask ? posts.updateEvents : 0);
     });
 }
 
@@ -180,8 +187,8 @@ void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s) {
 }
 
 std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
-                                const Vc2SynthPosts& posts) {
-    storeDrawn(fw, s, store, rng);
+                                const Vc2SynthPosts& posts, const Vc2SynthSteer& steer) {
+    storeDrawn(fw, s, store, rng, true, steer);   // v349: Part 1 receiving, for the update task's passes
     std::string d = partRead(fw, s);
     for (const Dispatcher& k : kDispatchers) {
         if (d.empty()) d = dispatched(fw, s, k);

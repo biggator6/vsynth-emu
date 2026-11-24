@@ -116,8 +116,9 @@ HARNESSES = {
                '40'),
     '--midi': (mutlist.Harness('mutate_vc2', 'xt_vc2midi', 'vc2midi_muts.txt', ('vc2osmidi', '2024'),
                                'XT_VC2MIDI_STOP'), '40'),
+    # v349: 40 cases, not 16: the reads' part table and the Matrix levels' copy are seen from about 40 (1.5 s a run)
     '--synth': (mutlist.Harness('mutate_vc2', 'xt_vc2synth', 'vc2synth_muts.txt', ('vc2synth', '2024'),
-                                'XT_VC2SYNTH_STOP'), '1'),
+                                'XT_VC2SYNTH_STOP'), '40'),
     '--sets': (mutlist.Harness('mutate_vc2', 'xt_vc2sets', 'vc2sets_muts.txt', ('vc2sets', '2024'), 'XT_VC2SETS_STOP'),
                '40'),
     '--settings': (mutlist.Harness('mutate_vc2', 'xt_vc2settings', 'vc2settings_muts.txt', ('vc2settings', '2024'),

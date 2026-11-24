@@ -60,6 +60,7 @@ class Vc2SynthVoices;
 class Vc2SynthControls;
 class Vc2SynthSettings;
 class Vc2SynthMidi;
+class Vc2SynthUpdate;
 
 // [FW] v345: the notes' task's event object and what the part posts it through the OS (0x89301830): the ended scan's
 // (the notes' hook word's routine 0x893901a0), all notes off (0x89391e30) and the held note's (0x89391e50); where the
@@ -101,6 +102,9 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     void taskStart();
     // v346: a MIDI message (its four bytes and word) as rom.4 takes it: the OS MIDI's handler, then the dispatcher
     void midiMessage(const Vc2MidiMessage& m, uint32_t word);
+    // v349: the update task's pass (vc2UpdateTaskPass) on the events its wait answers (0x2 the timer's, 0x1 the
+    // update's), the ticks as `ticks` stands
+    void updatePass(uint32_t events);
     // v345: a tone of the pool made (0x893b2db0(0, id)) through the host of the tone it takes, its address, 0 none
     uint32_t makeTone(uint32_t id);
     Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }
@@ -202,4 +206,5 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     std::unique_ptr<Vc2SynthControls> controls;
     std::unique_ptr<Vc2SynthSettings> settings;
     std::unique_ptr<Vc2SynthMidi> midiParts;   // v346
+    std::unique_ptr<Vc2SynthUpdate> updateParts;   // v349
 };

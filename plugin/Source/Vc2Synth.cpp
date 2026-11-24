@@ -5,6 +5,7 @@
 #include "Vc2SynthMidi.h"
 #include "Vc2SynthReads.h"
 #include "Vc2SynthSettings.h"
+#include "Vc2SynthUpdate.h"
 #include "Vc2SynthVoices.h"
 #include "Vc2ToneLfo.h"
 #include "Vc2WaveBoot.h"
@@ -55,6 +56,12 @@ Vc2Synth::Vc2Synth() {
     controls = std::make_unique<Vc2SynthControls>(*this);
     settings = std::make_unique<Vc2SynthSettings>(*this);
     midiParts = std::make_unique<Vc2SynthMidi>(*this);   // v346
+    updateParts = std::make_unique<Vc2SynthUpdate>(*this);   // v349
+}
+
+void Vc2Synth::updatePass(uint32_t events) {
+    Vc2UpdateTaskWorld w { queue, voices, time, ticks, *updateParts };
+    vc2UpdateTaskPass(w, events);
 }
 
 void Vc2Synth::midiMessage(const Vc2MidiMessage& m, uint32_t word) { midiParts->message(m, word); }
