@@ -4194,3 +4194,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
   place; the whole check against rom.4's three tasks will test that order.
 - v341 moved C's reads by address into the plugin, the sets check deriving from them: the part's reads will be the
   same code on its own words, and the kit refused the copy it would otherwise have been.
+- v342 and v343 put those reads on the part's own memory. The first thing v343's check asked, that no two regions
+  share a byte, found the part mixer's offsets inside the static M (its levels, 0x89997290): three ports keep one
+  rom.4 memory, which the block's wiring has to make one. A planted error that the drawn placements reached only by
+  chance at the list's one case made the placements a sweep.

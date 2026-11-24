@@ -1,7 +1,9 @@
 // The VC-2's part as one object: see Vc2Synth.h (v314).  The start in rom.4's order: C startup's words, then the static
 // initializers by the table's rows.
 #include "Vc2Synth.h"
+#include "Vc2SynthReads.h"
 #include "Vc2ToneLfo.h"
+#include "Vc2WaveBoot.h"
 #include <bit>
 #include <cstring>
 
@@ -39,9 +41,21 @@ Vc2Synth::Vc2Synth() {
     queue.setNode(kVc2StaticNodeAt, staticM.node);
     const Vc2ToneCommon common { tones, lists, rings, freeLfos, chaos, tvas.step, pools, frames.data(), math };
     for (int tone = 0; tone < Vc2TonePool::kTones; ++tone) hosts.emplace_back(tone, common, *this);
+    reads = std::make_unique<Vc2SynthReads>(*this);   // v343: on every member, so last
+}
+
+Vc2Synth::~Vc2Synth() = default;
+
+void Vc2Synth::giveWaves(const Vc2LoadedWaves& w) {
+    waves = &w;
+    store = &w.store;
+    waveSets = w.sets;
 }
 
 void Vc2Synth::start() {
+    for (uint32_t k = 0; k < partTable.size(); ++k) {   // [FW] .data: each part's trip record
+        partTable[k] = Vc2TripRecords::kAt + (uint32_t)sizeof(Vc2TripRecord) * k;
+    }
     rows.voiceCounts = kVoiceCounts;
     tvas.step = std::bit_cast<float>(kTvaStep);
     time.elapsed = kElapsed;

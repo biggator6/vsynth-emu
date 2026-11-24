@@ -105,9 +105,7 @@ void Vc2SetOscBlocks::construct(const Vc2SetChildCall& c, uint32_t* block, Vc2Se
     w.legatoKey = legato[1];
     w.legato = legato[0];
     const uint32_t part = reads.firstByte(v.part);
-    uint16_t& step = reads.oscStep(part, w.kind, w.osc);
-    w.step = step;
-    step = static_cast<uint16_t>(step + 1);
+    w.step = reads.nextOscStep(part, w.kind, w.osc);
     w.part = static_cast<uint8_t>(part);
     recordOf(w, part, reads);
     const Header h = reads.oscHeader(part);

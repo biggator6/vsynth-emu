@@ -76,7 +76,7 @@ VSYN=()
 while read -r f; do
   [[ "$NOT_SYN" == *" $f "* ]] || VSYN+=("$f")
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake)
-[ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2SynthCheck.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
+[ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2Synth*Check.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
    XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
    $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) $( [ -f Vc2OscAnalogRender.cpp ] && echo XtAnalog.cpp ) \
    "${SH4[@]}" -o "$O/xt_vc2synth" &

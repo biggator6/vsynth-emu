@@ -24,8 +24,9 @@ constexpr uint32_t kGetters[] = { 0x893a23b0, 0x893a2440, 0x893a26b0, 0x893a28b0
 constexpr uint32_t kRoutines[] = { 0x8939fdd0, 0x8939fe00, 0x893a0000, 0x893a0040, 0x893a0250, 0x893a0310, 0x893a0150 };
 } // namespace
 
-uint16_t& SetPortParts::oscStep(uint32_t part, uint32_t kind, uint32_t osc) {
-    return oscSteps.at(32 * part + 2 * kind + osc);
+uint16_t SetPortParts::nextOscStep(uint32_t part, uint32_t kind, uint32_t osc) {
+    uint16_t& step = oscSteps.at(32 * part + 2 * kind + osc);
+    return step++;
 }
 
 Vc2MatrixGroups SetPortParts::oscGroups(uint32_t, uint32_t osc) {

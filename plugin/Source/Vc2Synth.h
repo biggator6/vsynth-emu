@@ -26,9 +26,11 @@
 #include "Vc2PartStartUp.h"
 #include "Vc2PartVoices.h"
 #include "Vc2SetCommon.h"
+#include "Vc2SetCosmInput.h"
 #include "Vc2SetEnvelope.h"
 #include "Vc2SetLfo.h"
 #include "Vc2SetMix.h"
+#include "Vc2SetOscBlock.h"
 #include "Vc2SetTva.h"
 #include "Vc2Sets.h"
 #include "Vc2StaticMatrix.h"
@@ -42,7 +44,12 @@
 #include "Vc2TrackerAnalysis.h"
 #include "Vc2UpdateTask.h"
 #include "Vc2Vocoder.h"
+#include "Vc2WaveSets.h"
 #include <deque>
+#include <memory>
+
+struct Vc2LoadedWaves;
+class Vc2SynthReads;
 
 // What the reload objects reach: the OS's timer queue (0x8994fc24) and the part's reader.  Nothing reaches them at the
 // start; the tasks' wiring gives them their work
@@ -55,10 +62,14 @@ public:
 
 struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2Synth();
+    ~Vc2Synth();
     Vc2Synth(const Vc2Synth&) = delete;   // its tones' hosts hold the part
     Vc2Synth& operator=(const Vc2Synth&) = delete;
     // rom.4's start: C startup's .data and .bss, then the static initializers in its table's order
     void start();
+    // v343: the waves the process has loaded (vc2Waves()): their memory and store, the sets copied, as the part's
+    // lookups write their buffers
+    void giveWaves(const Vc2LoadedWaves& w);
     // v340: the tones' world.  The tail's routines, the truncation's wait and the OS's event are the tasks' version's:
     // until it, the events are kept and a wait ends the fade
     const Vc2ToneHost& host(int tone) override { return hosts[(size_t)tone]; }
@@ -84,6 +95,8 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2SetLfos lfos {};                    // 0x899962b0 (v283)
     Vc2SetMixes mixes {};                  // 0x89996c34 (v284)
     Vc2SetTvas tvas {};                    // 0x89997c04, its step 0x8993eb08 (v285)
+    Vc2SetOscBlocks oscBlocks {};          // 0x89e34060, Random Pitch's seed 0x89996f4c (v391, v343)
+    Vc2SetCosmInputs cosmInputs {};        // 0x899955a8 (v390, v343)
     Vc2PartRows rows {};                   // the part's settings' tables, each at its own address (v286…)
     Vc2MatrixSettings g {};                // 0x89997398 (v247)
     Vc2StaticMatrix staticM {};            // 0x89997108 (v295)
@@ -93,6 +106,8 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2SynthReloads reloadParts {};
     Vc2PartReloads reloads { held, reloadParts };   // 0x89996120 (v300)
     Vc2TripRecords trips {};               // 0x89989408, 0x899996a4 (v306)
+    std::array<uint32_t, 16> partTable {};   // 0x8993d040: a part's trip record by number, .data (v343)
+    std::array<uint8_t, 0x4c> clockObject {};   // 0x8995cb40: the OS's clock object, as far as C reads it (v343)
     Vc2PartStartWords startWords {};       // 0x899893f8… (v304)
     Vc2PitchSource pitch {};               // 0x89989748 (v226)
     int32_t noteGate = 0;                  // 0x89981904: no note-on while set (v308)
@@ -125,4 +140,10 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2OscSamples samples {};
     uint32_t events = 0;
     std::deque<Vc2SynthTone> hosts;
+    // v343: the wave store given (an empty one, none given) and the part's copy of the sets (0x8993448c, 0x89973084,
+    // 0x89989754), then C's reads on all of it
+    Vc2WaveStore noStore {};
+    const Vc2WaveStore* store = &noStore;
+    Vc2WaveSets waveSets {};
+    std::unique_ptr<Vc2SynthReads> reads;
 };

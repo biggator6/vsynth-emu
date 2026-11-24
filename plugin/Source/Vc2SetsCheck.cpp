@@ -194,10 +194,7 @@ long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
     return children + kinds + vc2SetOscBlockPart(s, run);
 }
 
-uint32_t* setsPortWords(SetSides& s, uint32_t at) {
-    auto* notes = reinterpret_cast<uint8_t*>(s.notes.notes.data());
-    return reinterpret_cast<uint32_t*>(notes + (at - Vc2Notes::kNotesAt));
-}
+uint32_t* setsPortWords(SetSides& s, uint32_t at) { return s.notes.wordsAt(at); }
 
 Vc2SetCall setsCallAt(SetSides& s, uint32_t at) {
     Vc2SetCall call;

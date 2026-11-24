@@ -1166,6 +1166,11 @@ version against rom.4's routines with what it calls hooked:
        - The part's memory by address (v342): `Vc2SynthMemory`, xt_vc2synth's region table the plugin's
          (HARDWARE_FIRMWARE.md, "The part's memory by address"). Next: `Vc2SynthReads` on it, the Matrix's reads by
          their readers' groups (`vc2MatrixRead`), C's children by their rows to the part's pools.
+       - C's reads in the part (v343): `Vc2SynthReads`, the children by row to the part's pools (the OSC blocks' and
+         COSM inputs' in Vc2Synth now), a Matrix group by its reader on M by address, `nextOscStep`, the waves given;
+         xt_vc2synth's reads part (HARDWARE_FIRMWARE.md, "C's reads in the part"). The mixer's offsets are the static
+         M's levels, one memory to give it when the block is wired. Next: `Vc2NoteParts` and `Vc2VoiceParts` from the
+         part, the tasks' OS model, the block, the whole check (which runs the children's other routines).
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

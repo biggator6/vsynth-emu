@@ -106,7 +106,7 @@ public:
     // The OSC blocks' (v391, Vc2SetOscBlockCheck.cpp): the step counts the port's own (`oscSteps`), the groups and the
     // pitch source unlogged, a kind's routine not ported logged (from v397 none: the wave store's routines PCM's start
     // calls, logged, answered and filling the wave's words from the answers, as their hooks do)
-    uint16_t& oscStep(uint32_t part, uint32_t kind, uint32_t osc) override;
+    uint16_t nextOscStep(uint32_t part, uint32_t kind, uint32_t osc) override;
     Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
     float pitchSource() override;
     // v398: the store the port's own (`store`, written into rom.4's memory with the blocks before each event), the

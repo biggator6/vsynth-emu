@@ -1546,6 +1546,57 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### C's reads in the part (2026-11-23, v343) {#vc2-synth-reads}
+
+Step 4.3's seventy-first version, Vc2Synth whole's fourth. `Vc2SynthReads` (Vc2SynthReads.h, .cpp) is C's reads and
+its children's routines on the part itself, as xt_vc2sets' `SetPortParts` is on rom.4's memory:
+- **Memory by address**: v341's reads over v342's `Vc2SynthMemory`, which now also writes and counts the bytes no
+  region holds.
+- **The children's routines by row**: the row's place in rom.4's table (`Vc2Sets::children()`) picks the part's pool:
+  the common, the OSC blocks, the mix, the envelopes, the LFOs, the COSM inputs, the TVA. Vc2Synth gains the OSC blocks'
+  pool (0x89e34060, Random Pitch's seed 0x89996f4c) and the COSM inputs' (0x899955a8). A child's block is the note W's
+  at the address C gives (`Vc2Notes::wordsAt`). Every end is a bare return in rom.4. C passes a child of none (0) on to
+  every kind but the common; no make leaves one, since every placement gives an object, so the part ignores it.
+- **A Matrix group by its reader**: `vc2MatrixRead` with the Matrix core, on M by address (a note's in the pool or the
+  static M). Its sources read the channel state M's +0x168 names, G's seven assignments, and the part's byte: the
+  part table 0x8993d040 by M's +0x16c, then that record's +0x24. The readers' list is the plugin's now
+  (`kVc2MatrixReaders`, Vc2Matrix.h, xt_vc2matrix's until v343). The OSC's four getters are readers 0, 1 (its group),
+  4 and 6 (its LFO's). A sum is the group's halfword at the byte offset given.
+- **The step count**: `nextOscStep` gives the count and adds one where it lies (0x89989c84 + 64 × part + 4 × kind +
+  2 × OSC). It replaces v391's `uint16_t& oscStep`, because the part's row of step counts sits at an odd offset in
+  `Vc2PartRows`. In rom.4 a part past 0 writes into the update queue, and the part does the same through its memory.
+- **The rest**: the pitch source's ratio is Auto Note's (0x89394a40 on 0x89989748). The velocity curve and the shared
+  routines come from Vc2ToneMath. The waves are what the part is given (`giveWaves`: their memory and store, and the
+  sets copied, since the part's lookups write their buffers). With none given, the part has an empty store and a
+  memory of 0s.
+
+New regions in the part:
+- the part table 0x8993d040: .data in rom.4, each part's trip record (0x89989408 + 0x34 × part), which the start sets;
+- the OS's clock object 0x8995cb40, as far as C reads it (0x4c bytes, 0 after the start);
+- the wave sets' counts, tables and buffers (0x8993448c, 0x89973084, 0x89989754).
+
+**One memory, three ports.** The part mixer's offsets (0x89997290, v227), the Matrix setup's `levelsOut` (v247) and
+the static M's levels (+0x188, v295) are the same three floats in rom.4. The region table now holds one owner for
+every byte, which the reads part checks. The static M's region holds these bytes. The mixer's copy is given them when
+the settings and the block are wired in.
+
+Results:
+- xt_vc2synth's reads part (Vc2SynthReadsCheck.cpp) checks, first, that the regions don't overlap; that is how the
+  shared memory above was found. Then every read C makes over its arguments must reach only bytes the part's regions
+  hold: 0 bytes outside. Then [cases] cases of 40 events: the part's bytes by address against rom.4's after noise in
+  drawn regions; the ten readers in a drawn order on drawn Ms (sums' place and M after each), the getters, a sum; a
+  child's placement against its row's allocator.
+- xt_vc2synth 0 different at 2024 (40 cases), 7 and 31337 (400; 16,000 events, about 26,000 readers each), 142
+  regions now.
+- xt_vc2sets 0 different at the same seeds with `nextOscStep`.
+- The plants: 20 new (17 `sr-` on the reads, two regions, the part table's start), the synth list's changed 54
+  caught. Two (`sr-pool-mix`, `sr-pool-lfo`) were missed at first: at the list's one case, the drawn placements didn't
+  reach those rows. The placements are now a sweep of every row, voice and index (600). xt_vc2sets' changed 76 were
+  caught, three of them re-aimed at `nextOscStep`. Not planted: the step count's own count and the children's other
+  routines, which the reads part doesn't reach; the whole check through the notes' task does.
+- fcheck's baseline updated (the region count, the reads line).
+- verify.sh green.
+
 ### The part's memory by address (2026-11-23, v342) {#vc2-synth-memory}
 
 Step 4.3's seventieth version, Vc2Synth whole's third: a move. C's reads of the part (v341's Vc2SetMemoryReads) need

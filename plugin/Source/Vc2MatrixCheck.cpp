@@ -11,9 +11,8 @@
 
 namespace {
 constexpr uint32_t kRefresh = 0x893a2230, kGetter = 0x893a2350, kChoice = 0x893a1c70;   // [FW]
-// [FW] each group's reader, in vc2MatrixGroups()' order; the assignments the sources read
-constexpr std::array<uint32_t, 10> kReaders { 0x893a23b0, 0x893a2440, 0x893a24d0, 0x893a2550, 0x893a26b0, 0x893a2750,
-                                              0x893a28b0, 0x893a2960, 0x893a2aa0, 0x893a2bf0 };
+// Each group's reader, in vc2MatrixGroups()' order (the plugin's from v343); the assignments the sources read
+constexpr const auto& kReaders = kVc2MatrixReaders;
 constexpr uint32_t kAssigns = 0x89997398 + 0x848;   // [FW]
 constexpr int kParts = 4, kEvents = 60;
 

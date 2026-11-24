@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+C's reads in the part v343 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v342's 0bfeb1f; HARDWARE_FIRMWARE.md,
+  "C's reads in the part"): Vc2SynthReads, C's reads and its children's routines on the part (the children by row to
+  the part's pools, with the OSC blocks' and COSM inputs' now in Vc2Synth; a Matrix group by its reader on M by
+  address; the getters; nextOscStep for v391's reference; the waves given); the part table, clock object and wave sets
+  as regions; the mixer's offsets found to be the static M's levels (one owner now). xt_vc2synth's reads part; 0
+  different at 2024/7/31337, xt_vc2sets too; plants --synth --changed 54 and --sets --changed 76, 0 missed;
+  fcheck's baseline updated; verify.sh green.
+
 The part's memory by address v342 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v341's 32413db;
   HARDWARE_FIRMWARE.md, "The part's memory by address"): a move. xt_vc2synth's region table is the plugin's
   (vc2SynthRegions, Vc2SynthMemory, a read by address over it), the check calling it; v340's buffers and frames in it.

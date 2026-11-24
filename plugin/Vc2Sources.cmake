@@ -177,6 +177,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Synth.cpp
     Source/Vc2SynthTone.cpp
     Source/Vc2SynthMemory.cpp
+    Source/Vc2SynthReads.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

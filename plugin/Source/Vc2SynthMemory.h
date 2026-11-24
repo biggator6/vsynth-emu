@@ -29,10 +29,17 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s);
 class Vc2SynthMemory {
 public:
     explicit Vc2SynthMemory(Vc2Synth& s);
-    // `bytes` of the part at rom.4's address `at`, each byte its region's, 0 where none holds it
-    void read(uint32_t at, void* to, size_t bytes) const;
+    // `bytes` of the part at rom.4's address `at`, each byte its region's, 0 where none holds it (v343: counted)
+    void read(uint32_t at, void* to, size_t bytes);
+    // v343: `bytes` into the part at `at`, each byte into its region's, none where none holds it (counted)
+    void write(uint32_t at, const void* from, size_t bytes);
+    // How many bytes read or written so far that no region holds
+    long unheld() const { return unheld_; }
 
 private:
+    // The byte of the part at `at`, none (counted) where no region holds it
+    uint8_t* byteAt(uint32_t at);
     const Vc2SynthRegion* holding(uint32_t at) const;
     std::vector<Vc2SynthRegion> regions_;   // by address
+    long unheld_ = 0;
 };

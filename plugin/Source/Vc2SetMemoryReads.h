@@ -34,6 +34,8 @@ inline constexpr uint32_t kVc2OscKindRow = 0x100, kVc2OscRecordBytes = 0x80, kVc
 inline constexpr uint32_t kVc2OscSystemsAt = kVc2OscTableAt + kVc2OscTableParts * kVc2OscPartRow;
 inline constexpr uint32_t kVc2OscHoldAt = 0x11c, kVc2OscBendAt = 0x174;
 inline constexpr uint32_t kVc2OscPartTableAt = 0x8993d040, kVc2OscTripMovingAt = 8;
+// [FW] the OSCs' step counts (v343: the part's reads write one): 64 bytes a part, 4 a kind, 2 an OSC
+inline constexpr uint32_t kVc2OscStepsAt = 0x89989c84, kVc2OscStepsPart = 64;
 
 class Vc2SetMemoryReads : public Vc2SetParts {
 public:

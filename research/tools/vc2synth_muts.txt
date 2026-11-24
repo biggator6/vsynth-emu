@@ -43,3 +43,27 @@ host-chaos|freeLfos, chaos, tvas.step|freeLfos, rows.robot, tvas.step|vc2synth
 mem-region-at|vc2SynthRegion(0x89998a14, r.bytes, "the part's bytes")|vc2SynthRegion(0x89998a18, r.bytes, "the part's bytes")|vc2synthmemory
 mem-region-step|vc2SynthRegion(Vc2SetTvas::kStepAt, s.tvas.step|vc2SynthRegion(Vc2SetTvas::kStepAt + 4, s.tvas.step|vc2synthmemory
 mem-region-counts|vc2SynthRegion(0x8993d02c, r.voiceCounts|vc2SynthRegion(0x8993d02e, r.voiceCounts|vc2synthmemory
+# v343: C's reads of the part (vc2synthreads, Vc2SynthReads.cpp), by xt_vc2synth's reads part: a child's row to the
+# part's pool (the placements), a Matrix group by its reader on M by address (the readers, the getters, the sums), the
+# sources' world (M's channel, G's assignments, the part's byte); the step count and the children's other routines
+# reach nothing in the reads part (the whole check's); the new regions and the part table's start (the start's)
+sr-pool-mix|    case kMix: f(s_.mixes); break;|    case kMix: f(s_.tvas); break;|vc2synthreads
+sr-pool-lfo|    case kLfo: f(s_.lfos); break;|    case kLfo: f(s_.envelopes); break;|vc2synthreads
+sr-pool-cosm|    case kCosmInput: f(s_.cosmInputs); break;|    case kCosmInput: f(s_.lfos); break;|vc2synthreads
+sr-pool-osc|    case kOscBlock: f(s_.oscBlocks); break;|    case kOscBlock: f(s_.cosmInputs); break;|vc2synthreads
+sr-place-common|            object = p.addressOf(number);|            object = p.addressOf(number + 1);|vc2synthreads
+sr-place-index|            object = p.placeOf(number, index);|            object = p.placeOf(number, 0);|vc2synthreads
+sr-static-m|    return matrix == Vc2StaticMatrix::kAt ? &s_.staticM.m : nullptr;|    return nullptr;|vc2synthreads
+sr-pool-m|        return &s_.sets.matrices.items[from / Ms::kBytes].m;|        return &s_.sets.matrices.items[from / Ms::kBytes / 2].m;|vc2synthreads
+sr-links|value<Vc2MatrixLinks>(matrix + kLinksAt);|value<Vc2MatrixLinks>(matrix + kLinksAt + 2);|vc2synthreads
+sr-channel|    read(links.channel, &channel_, sizeof channel_);|    read(links.channel + 2, &channel_, sizeof channel_);|vc2synthreads
+sr-assigns|    std::memcpy(state.assigns.data(), s_.g.assigns, sizeof s_.g.assigns);\n||vc2synthreads
+sr-part-table|kVc2OscPartTableAt + 4u * (uint32_t)(int32_t)links.part|kVc2OscPartTableAt + 4u * (uint32_t)(int32_t)(links.part + 1)|vc2synthreads
+sr-part-byte|    state.partByte = rd8(record + kPartByteAt);|    state.partByte = rd8(record + kPartByteAt + 1);|vc2synthreads
+sr-group|vc2MatrixGroups()[(size_t)(found - kVc2MatrixReaders.begin())]|vc2MatrixGroups()[(size_t)(found - kVc2MatrixReaders.begin()) / 2]|vc2synthreads
+sr-sum-offset|reinterpret_cast<const uint8_t*>(sums) + offset, sizeof sum);|reinterpret_cast<const uint8_t*>(sums) + offset + 2, sizeof sum);|vc2synthreads
+sr-getter-osc|matrixGroup(kVc2OscGetters[second], matrix)|matrixGroup(kVc2OscGetters[0], matrix)|vc2synthreads
+sr-getter-lfo|matrixGroup(kVc2LfoGetters[second], matrix)|matrixGroup(kVc2LfoGetters[1 - second], matrix)|vc2synthreads
+mem-region-table|vc2SynthRegion(0x8993d040, s.partTable|vc2SynthRegion(0x8993d044, s.partTable|vc2synthmemory
+mem-region-seed|vc2SynthRegion(Vc2SetOscBlocks::kSeedAt, s.oscBlocks.seed|vc2SynthRegion(Vc2SetOscBlocks::kSeedAt + 2, s.oscBlocks.seed|vc2synthmemory
+host-part-table|        partTable[k] = Vc2TripRecords::kAt + (uint32_t)sizeof(Vc2TripRecord) * k;|        partTable[k] = Vc2TripRecords::kAt + (uint32_t)sizeof(Vc2TripRecord) * (k + 1);|vc2synth

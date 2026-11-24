@@ -468,9 +468,9 @@ osc-made-kind|w.kind = static_cast<uint8_t>(c.kind);|w.kind = static_cast<uint8_
 osc-made-osc|w.osc = static_cast<uint8_t>(c.index);|w.osc = static_cast<uint8_t>(c.kind);|vc2setoscblock
 osc-made-legato-key|w.legatoKey = legato[1];|w.legatoKey = legato[0];|vc2setoscblock
 osc-made-legato|w.legato = legato[0];|w.legato = legato[1];|vc2setoscblock
-osc-made-step|    w.step = step;\n|\n|vc2setoscblock
-osc-made-count|    step = static_cast<uint16_t>(step + 1);\n|\n|vc2setoscblock
-osc-made-step-which|reads.oscStep(part, w.kind, w.osc);|reads.oscStep(part, w.osc, w.kind);|vc2setoscblock
+osc-made-step|    w.step = reads.nextOscStep(part, w.kind, w.osc);|    reads.nextOscStep(part, w.kind, w.osc);|vc2setoscblock
+osc-made-count|    w.step = reads.nextOscStep(part, w.kind, w.osc);\n|    w.step = reads.nextOscStep(part, w.kind, w.osc);\n    reads.nextOscStep(part, w.kind, w.osc);\n|vc2setoscblock
+osc-made-step-which|reads.nextOscStep(part, w.kind, w.osc);|reads.nextOscStep(part, w.osc, w.kind);|vc2setoscblock
 osc-made-part|    w.part = static_cast<uint8_t>(part);\n|\n|vc2setoscblock
 osc-made-start|    w.startKey = madeStartKey(w, h, v, reads);\n|\n|vc2setoscblock
 osc-made-dispatch|    vc2SetOscStart(w, block, reads);\n    vc2SetOscConvert|    vc2SetOscConvert|vc2setoscblock

@@ -9,6 +9,7 @@
 #include "Vc2CheckRig.h"
 #include "Vc2CheckWords.h"
 #include "Vc2Synth.h"
+#include "Vc2SynthCheck.h"    // v343
 #include "Vc2SynthMemory.h"   // v342: the part's regions
 #include "Vc2AutoNoteTables.h"
 #include "Vc2CarrierTables.h"
@@ -48,25 +49,13 @@ std::vector<SynthRegion> synthRegions(Vc2Synth& s) { return vc2SynthRegions(s); 
 template <class T>
 SynthRegion region(uint32_t at, T& mine, const char* what) { return vc2SynthRegion(at, mine, what); }
 
-std::string bytesDifference(Vc2Fw& fw, const SynthRegion& r) {
-    std::vector<uint8_t> theirs(r.bytes);
-    fw.cpu.read(r.at, theirs.data(), r.bytes);
-    const auto* ours = static_cast<const uint8_t*>(r.mine);
-    for (size_t k = 0; k < r.bytes; ++k) {
-        if (theirs[k] == ours[k]) continue;
-        char t[160];
-        std::snprintf(t, sizeof t, "%s, byte 0x%08x: %02x, against %02x", r.what, r.at + (uint32_t)k, ours[k],
-                      theirs[k]);
-        return t;
-    }
-    return "";
-}
+std::string bytesDifference(Vc2Fw& fw, const SynthRegion& r) { return vc2SynthBytesDifference(fw, r); }
 
 // What differs: the regions in order, then the vocoder's engines, stages, engine word and hook word
 std::string synthDifference(Vc2Fw& fw, Vc2Synth& s) {
-    for (const SynthRegion& r : synthRegions(s))
-        if (std::string d = bytesDifference(fw, r); !d.empty()) return d;
-    std::string d = vc2HiresoDifference(fw, kHiresoAt, s.vocoder.hireso);
+    std::string d = vc2SynthRegionsDifference(fw, s);
+    if (!d.empty()) return d;
+    d = vc2HiresoDifference(fw, kHiresoAt, s.vocoder.hireso);
     if (d.empty()) d = vc2LegacyDifference(fw, kLegacyAt, s.vocoder.legacy);
     if (d.empty()) d = vc2UnvoicedDifference(fw, s.vocoder.stage);
     if (d.empty() && fw.cpu.rd32(kEngineWord) != 0) d = "the vocoder's engine word";
@@ -162,6 +151,26 @@ bool synthLoadTables(const char* path) {
 }
 } // namespace
 
+std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r) {
+    std::vector<uint8_t> theirs(r.bytes);
+    fw.cpu.read(r.at, theirs.data(), r.bytes);
+    const auto* ours = static_cast<const uint8_t*>(r.mine);
+    for (size_t k = 0; k < r.bytes; ++k) {
+        if (theirs[k] == ours[k]) continue;
+        char t[160];
+        std::snprintf(t, sizeof t, "%s, byte 0x%08x: %02x, against %02x", r.what, r.at + (uint32_t)k, ours[k],
+                      theirs[k]);
+        return t;
+    }
+    return "";
+}
+
+std::string vc2SynthRegionsDifference(Vc2Fw& fw, Vc2Synth& s) {
+    for (const SynthRegion& r : synthRegions(s))
+        if (std::string d = vc2SynthBytesDifference(fw, r); !d.empty()) return d;
+    return "";
+}
+
 int main(int argc, char** argv) {
     Vc2Fw fw;
     const auto run = vc2Start(argc, argv, fw, "xt_vc2synth", synthLoadTables);
@@ -179,7 +188,8 @@ int main(int argc, char** argv) {
     std::string tones = what.empty() ? makeTones(fw, *synth, rng, made) : "";
     if (!tones.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the tones made: %s\n", tones.c_str());
     std::printf("synth: %d tones made through the part's hosts, their words compared\n", made);
-    std::printf("xt_vc2synth: %d different\n", (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1));
+    const long reads = what.empty() && tones.empty() ? vc2SynthReadsPart(fw, *synth, *run) : 0;   // v343
+    std::printf("xt_vc2synth: %ld different\n", (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1) + reads);
     return 0;
 }
 #endif

@@ -29,6 +29,14 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(Vc2SetMixes::kAt, s.mixes.items, "C's mixes"),
         vc2SynthRegion(Vc2SetTvas::kAt, s.tvas.items, "C's TVAs"),
         vc2SynthRegion(Vc2SetTvas::kStepAt, s.tvas.step, "the TVA's step"),
+        vc2SynthRegion(Vc2SetOscBlocks::kAt, s.oscBlocks.items, "C's OSC blocks"),               // v343
+        vc2SynthRegion(Vc2SetOscBlocks::kSeedAt, s.oscBlocks.seed, "Random Pitch's seed"),       // v343
+        vc2SynthRegion(Vc2SetCosmInputs::kAt, s.cosmInputs.items, "C's COSM inputs"),            // v343
+        vc2SynthRegion(0x8993d040, s.partTable, "the part table"),                               // v343
+        vc2SynthRegion(0x8995cb40, s.clockObject, "the clock object"),                           // v343
+        vc2SynthRegion(Vc2WaveSets::kCountsAt, s.waveSets.counts, "the wave sets' counts"),      // v343
+        vc2SynthRegion(Vc2WaveSets::kTablesAt, s.waveSets.tables, "their tables"),               // v343
+        vc2SynthRegion(Vc2WaveSets::kBuffersAt, s.waveSets.buffers, "their buffers"),            // v343
         vc2SynthRegion(0x89997090, r.commons, "the commons' table"),
         vc2SynthRegion(0x89e2765c, r.envelopes, "the envelopes' table"),
         vc2SynthRegion(0x89e2f85c, r.lfos, "the LFOs' table"), vc2SynthRegion(0x89e32a60, r.mixes, "the mixes' table"),
@@ -77,7 +85,7 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(0x8993eac4, s.mixer.w, "the mixer's words"),
         vc2SynthRegion(0x8999f1d0, s.mixer.b, "its buffers"),
         vc2SynthRegion(0x89934550, s.mixer.bypass, "its bypass"),
-        vc2SynthRegion(0x89997290, s.mixer.offsets, "its offsets"),
+        // v343: its offsets (0x89997290) are the static M's levels (+0x188), the static M's region holds them
         vc2SynthRegion(kVc2SynthVocoderAt, s.vocoder.w, "the vocoder's words"),
         vc2SynthRegion(kVc2SynthEditAt, s.vocoder.edit, "its edit words"),
         vc2SynthRegion(0x899d9b70, s.tracker.s, "the tracker"),
@@ -113,11 +121,26 @@ const Vc2SynthRegion* Vc2SynthMemory::holding(uint32_t at) const {
     return at - r.at < r.bytes ? &r : nullptr;
 }
 
-void Vc2SynthMemory::read(uint32_t at, void* to, size_t bytes) const {
+uint8_t* Vc2SynthMemory::byteAt(uint32_t at) {
+    const Vc2SynthRegion* r = holding(at);
+    if (r == nullptr) {
+        ++unheld_;
+        return nullptr;
+    }
+    return static_cast<uint8_t*>(r->mine) + (at - r->at);
+}
+
+void Vc2SynthMemory::read(uint32_t at, void* to, size_t bytes) {
     auto* out = static_cast<uint8_t*>(to);
     for (size_t k = 0; k < bytes; ++k) {
-        const uint32_t byte = at + (uint32_t)k;
-        const Vc2SynthRegion* r = holding(byte);
-        out[k] = r != nullptr ? static_cast<const uint8_t*>(r->mine)[byte - r->at] : 0;
+        const uint8_t* b = byteAt(at + (uint32_t)k);
+        out[k] = b != nullptr ? *b : 0;
+    }
+}
+
+void Vc2SynthMemory::write(uint32_t at, const void* from, size_t bytes) {
+    const auto* in = static_cast<const uint8_t*>(from);
+    for (size_t k = 0; k < bytes; ++k) {
+        if (uint8_t* b = byteAt(at + (uint32_t)k)) *b = in[k];
     }
 }
