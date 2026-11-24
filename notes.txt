@@ -335,6 +335,12 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The band waves' segments distinct v338 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after the merge 8ab70ab;
+  HARDWARE_FIRMWARE.md, "The band waves' segments distinct"): v332's band wave draw took front() of a segment with
+  no records when two drawn starts fell alike (undefined behaviour; an AddressSanitizer build faulted at seed 7);
+  bandSegments' starts distinct now. -O2's draws unchanged (fcheck as baseline, the 400-case counts as v337's);
+  under AddressSanitizer both checks 0 different, no error; verify.sh green.
+
 The VC-2's analog renders v337 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v336's 31c5019;
   HARDWARE_FIRMWARE.md, "The VC-2's analog renders"): step 4.3's sixty-fifth version. The analog OSC's 19 renders
   (0x893c2230…0x893c60e0) the voice's own: rom.2's code with the object's words four bytes up from +0x94 and HQ's

@@ -4185,3 +4185,5 @@ Round-2 recordings.  First build-out after that: real-time granular port
   analog output past full scale sent FM's delay index out of the mix's rings (a crash), which on the XT reads the rings
   beside it, and drawn words gave analog states no XT has (NaNs whose sign xtf and the interpreter carry differently);
   the check keeps an analog render's words an XT's, or gives the block the check's render.
+- v338: the AddressSanitizer build that measured v337's coverage also found v332's band draw reading the first
+  of an empty list; its draws differ from -O2's (other float arithmetic), so it reaches states the -O2 seeds don't.

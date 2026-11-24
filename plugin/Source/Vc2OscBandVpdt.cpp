@@ -84,9 +84,11 @@ int32_t periodAfter(int32_t last, std::mt19937& rng) {
 // entries, a last one never reached, then each segment's records and four short ones for the last entry.  Band k's
 // records are 16…215 samples × 2^min(k, 4), twice its read's step at the pitch's most at least, as an encoder's grow
 // with its band's decimation: a step past a whole record makes the repeat at an end wrap its position to near 2^31
-// (0x8950f50a's), and rom.4's reads leave its memory
+// (0x8950f50a's), and rom.4's reads leave its memory.  v338: the starts distinct, as an encoder's segments are: two
+// draws alike gave a segment no record, whose entry then read the first of none
 std::vector<OscBandSegment> bandSegments(BandBytes& v, const OscVpdtLayout& l, int frames, int k, std::mt19937& rng) {
-    const std::vector<int32_t> starts = bandPositions(frames, (int)(rng() % 3), false, rng);
+    std::vector<int32_t> starts = bandPositions(frames, (int)(rng() % 3), false, rng);
+    starts.erase(std::unique(starts.begin(), starts.end()), starts.end());
     std::vector<OscBandSegment> segs;
     const uint32_t entries = v.grow(kEntryBytes * (uint32_t)(starts.size() + 1));
     int32_t before = 0;   // v335: the record before, a wave of periods' (across its segments)

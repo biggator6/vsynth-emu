@@ -1546,6 +1546,21 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The band waves' segments distinct (2026-11-23, v338) {#vc2-osc-band-segments-distinct}
+
+Step 4.3's sixty-sixth version, a fault in the checks' draws (v332's), not a port's. A band wave's segments start
+at 0 and at up to two drawn places inside the wave (`bandPositions`, Vc2OscBandVpdt.cpp). Two equal draws gave two
+segments at one place; the first then had no records, and its entry read the first of none (`front()` of an empty
+list, undefined behaviour). -O2's draws at the checks' seeds never draw two alike, but an AddressSanitizer or -O0
+build's float arithmetic gives other draws from the players' part on, and at seed 7 those faulted (the red test:
+xt_vc2osc under AddressSanitizer, seed 7, 400 cases). `bandSegments` now takes its starts distinct, as an encoder's
+segments are; a wave with no equal draws is drawn as before.
+
+Results:
+- Under AddressSanitizer: xt_vc2osc 0 different at 7, 31337 and 2024, xt_vc2tone at 7, with no error.
+- At -O2 the draws are unchanged: fcheck as its baseline, both checks' counts at 7 and 31337 as v337's, 0 different.
+- No port changed, so no plant to run; verify.sh green.
+
 ### The VC-2's analog renders (2026-11-23, v337) {#vc2-osc-analog-renders}
 
 Step 4.3's sixty-fifth version: the analog OSC's 19 renders, the routines the installs write by the waveform's code

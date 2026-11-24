@@ -1147,6 +1147,9 @@ version against rom.4's routines with what it calls hooked:
          passes full scale, as an analog OSC's Impact takes it, into the rings around it (rom.4's A and B rings end to
          end): `Vc2ToneMixRings` one array, a read beside a ring as rom.4's (the port's had left its array). Item 6's
          installs were v248's, so item 6 is done. Next: Vc2Synth's 24 hosts.
+       - The band waves' segments distinct (v338): the checks' band wave draw (v332's) no longer gives a segment no
+         records when two drawn starts fall alike, which an AddressSanitizer build reached (HARDWARE_FIRMWARE.md, "The
+         band waves' segments distinct").
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
