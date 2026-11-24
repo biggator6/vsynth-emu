@@ -7,6 +7,7 @@
 // so the run is one case whatever [cases] says.  XT_VC2SYNTH_FIRST=1 says what differs.  XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
 #include "Vc2CheckRig.h"
+#include "Vc2CheckVocoder.h"   // v345
 #include "Vc2CheckWords.h"
 #include "Vc2Synth.h"
 #include "Vc2SynthCheck.h"    // v343
@@ -25,6 +26,7 @@
 #include "Vc2PartMixerTables.h"
 #include "Vc2PartSettingsTables.h"
 #include "Vc2PartVoicesTables.h"
+#include "Vc2Params.h"   // v345
 #include "Vc2RampTables.h"
 #include "Vc2SetEnvelopeTables.h"
 #include "Vc2ToneMixTables.h"
@@ -40,8 +42,6 @@ namespace {
 constexpr uint32_t kRowsAt = 0x898c5cc0, kRowBytes = 12, kRowRoutine = 4;   // [FW] the part's rows: {0, routine, 0}
 constexpr uint32_t kFirstOutside = 0x893f5070;                              // [FW] row 95's routine, not the part's
 constexpr uint32_t kMidiRows[] = { 0x893179d0, 0x89317db0 };                 // [FW] the OS MIDI's rows, earlier
-constexpr uint32_t kVocoderAt = kVc2SynthVocoderAt, kHiresoAt = kVocoderAt + 0x24, kLegacyAt = kVocoderAt + 0x2d94;
-constexpr uint32_t kEngineWord = kVocoderAt + 0x20, kHookWord = 0x899d9d8c, kLegacyHook = 0x893f0480;   // [FW]
 
 // v342: the part's regions are the plugin's (Vc2SynthMemory.h, moved from here)
 using SynthRegion = Vc2SynthRegion;
@@ -51,17 +51,7 @@ SynthRegion region(uint32_t at, T& mine, const char* what) { return vc2SynthRegi
 
 std::string bytesDifference(Vc2Fw& fw, const SynthRegion& r) { return vc2SynthBytesDifference(fw, r); }
 
-// What differs: the regions in order, then the vocoder's engines, stages, engine word and hook word
-std::string synthDifference(Vc2Fw& fw, Vc2Synth& s) {
-    std::string d = vc2SynthRegionsDifference(fw, s);
-    if (!d.empty()) return d;
-    d = vc2HiresoDifference(fw, kHiresoAt, s.vocoder.hireso);
-    if (d.empty()) d = vc2LegacyDifference(fw, kLegacyAt, s.vocoder.legacy);
-    if (d.empty()) d = vc2UnvoicedDifference(fw, s.vocoder.stage);
-    if (d.empty() && fw.cpu.rd32(kEngineWord) != 0) d = "the vocoder's engine word";
-    if (d.empty() && fw.cpu.rd32(kHookWord) != kLegacyHook) d = "the vocoder's hook word";
-    return d;
-}
+std::string synthDifference(Vc2Fw& fw, Vc2Synth& s) { return vc2SynthDifference(fw, s); }
 
 // rom.4's start: the OS MIDI's rows, then the part's, each called in turn; how many, or what faulted
 std::string runRows(Vc2Fw& fw, int& rows) {
@@ -130,10 +120,10 @@ std::string makeTones(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, int& made) {
     }
     for (int k = 0; k < Vc2TonePool::kTones; ++k) {
         const uint32_t id = rng() % kIds;
-        const int next = s.tones.head == 0 ? 0 : s.tones.indexOf(s.tones.head);
         if (!fw.call(kMakeAt, { 0, id })) return "the make faults: " + fw.cpu.error();
-        const Vc2Tone* mine = s.tones.make(id, s.hosts[(size_t)next]);
-        if (mine == nullptr || fw.cpu.r[0] != s.tones.addressOf(next)) return "the make's tone";
+        const uint32_t mine = s.makeTone(id);   // v345: the part's own pick of the tone
+        if (mine == 0 || fw.cpu.r[0] != mine) return "the make's tone";
+        const int next = s.tones.indexOf(mine);
         ++made;
         std::string d = bytesDifference(fw, region(0x8993fb48, s.tones.head, "the tone pool's head"));
         if (d.empty()) d = bytesDifference(fw, region(0x89999668, s.chaos, "the chaos generator"));
@@ -147,7 +137,7 @@ bool synthLoadTables(const char* path) {
     return vc2LoadAll<vc2LoadPartVoices, vc2LoadKeys, vc2LoadOsMidi, vc2LoadPartSettings, vc2LoadUnvoiced,
                       vc2LoadLegacy, vc2LoadHireso, vc2LoadVocoder, vc2LoadCarrier, vc2LoadTracker, vc2LoadAutoNote,
                       vc2LoadKind6, vc2LoadMixer, vc2LoadCosm, vc2LoadToneMix, vc2LoadSetEnvelopes, vc2LoadMatrix,
-                      vc2LoadLibMath, vc2LoadOsc, vc2LoadRamp, vc2LoadTva>(path);   // v340: the tones' parts' too
+                      vc2LoadLibMath, vc2LoadOsc, vc2LoadRamp, vc2LoadTva, vc2LoadParams>(path);   // v340, v345
 }
 } // namespace
 
@@ -171,6 +161,12 @@ std::string vc2SynthRegionsDifference(Vc2Fw& fw, Vc2Synth& s) {
     return "";
 }
 
+// v345: the vocoder by the checks' shared compare (its engine's and hook's words by the port's engine)
+std::string vc2SynthDifference(Vc2Fw& fw, Vc2Synth& s) {
+    const std::string d = vc2SynthRegionsDifference(fw, s);
+    return d.empty() ? vc2VocoderDifference(fw, s.vocoder) : d;
+}
+
 int main(int argc, char** argv) {
     Vc2Fw fw;
     const auto run = vc2Start(argc, argv, fw, "xt_vc2synth", synthLoadTables);
@@ -188,8 +184,10 @@ int main(int argc, char** argv) {
     std::string tones = what.empty() ? makeTones(fw, *synth, rng, made) : "";
     if (!tones.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the tones made: %s\n", tones.c_str());
     std::printf("synth: %d tones made through the part's hosts, their words compared\n", made);
-    const long reads = what.empty() && tones.empty() ? vc2SynthReadsPart(fw, *synth, *run) : 0;   // v343
-    std::printf("xt_vc2synth: %ld different\n", (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1) + reads);
+    const bool sound = what.empty() && tones.empty();
+    const long load = sound ? vc2SynthLoadPart(fw, *synth, *run) : 0;    // v345
+    const long reads = sound ? vc2SynthReadsPart(fw, *synth, *run) : 0;   // v343: after the load, its noise last
+    std::printf("xt_vc2synth: %ld different\n", (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1) + load + reads);
     return 0;
 }
 #endif

@@ -1,7 +1,10 @@
 // The VC-2's part as one object: see Vc2Synth.h (v314).  The start in rom.4's order: C startup's words, then the static
 // initializers by the table's rows.
 #include "Vc2Synth.h"
+#include "Vc2SynthControls.h"
 #include "Vc2SynthReads.h"
+#include "Vc2SynthSettings.h"
+#include "Vc2SynthVoices.h"
 #include "Vc2ToneLfo.h"
 #include "Vc2WaveBoot.h"
 #include <bit>
@@ -18,20 +21,21 @@ constexpr Vc2PitchSource kNoSource = { -1, 0, 0.0f };   // row 12, 0x89394a90
 constexpr uint32_t kNotesUnread = 0x3c199999;           // row 17, 0x89396970: 0.009375
 constexpr float kRobotStart = 1.0f;                     // row 42, 0x893a7650
 
-// What the static M's static initializer reaches: its own channel state's set-up, v313's on its bytes
+// What the static M's initializers reach: its own channel state's set-up, v313's on its bytes, and (the part's init's,
+// v345) its node onto the update queue
 class StaticParts final : public Vc2StaticMatrixParts {
 public:
-    explicit StaticParts(Vc2StaticMatrix& m) : m_(m) {}
+    explicit StaticParts(Vc2Synth& s) : s_(s) {}
     void channelStateInit(uint32_t, int32_t channel) override {
-        Vc2ChannelState s;
-        std::memcpy(&s, m_.state.data(), sizeof s);
-        vc2ChannelSetUp(s, (uint8_t)channel);
-        std::memcpy(m_.state.data(), &s, sizeof s);
+        Vc2ChannelState c;
+        std::memcpy(&c, s_.staticM.state.data(), sizeof c);
+        vc2ChannelSetUp(c, (uint8_t)channel);
+        std::memcpy(s_.staticM.state.data(), &c, sizeof c);
     }
-    void enqueue(uint32_t, uint32_t) override {}   // the part's init's (0x893a2fe0), which the start doesn't run
+    void enqueue(uint32_t, uint32_t node) override { s_.queue.enqueue(node, s_.voices, *s_.voiceParts); }
 
 private:
-    Vc2StaticMatrix& m_;
+    Vc2Synth& s_;
 };
 } // namespace
 
@@ -42,9 +46,43 @@ Vc2Synth::Vc2Synth() {
     const Vc2ToneCommon common { tones, lists, rings, freeLfos, chaos, tvas.step, pools, frames.data(), math };
     for (int tone = 0; tone < Vc2TonePool::kTones; ++tone) hosts.emplace_back(tone, common, *this);
     reads = std::make_unique<Vc2SynthReads>(*this);   // v343: on every member, so last
+    noteParts = std::make_unique<Vc2SynthNotes>(*this);   // v345
+    voiceParts = std::make_unique<Vc2SynthVoices>(*this);
+    controls = std::make_unique<Vc2SynthControls>(*this);
+    settings = std::make_unique<Vc2SynthSettings>(*this);
 }
 
 Vc2Synth::~Vc2Synth() = default;
+
+// [FW] the tone the pool's take gives: its head, the first when the pool was never taken from (any host past its end)
+uint32_t Vc2Synth::makeTone(uint32_t id) {
+    const uint32_t taken = tones.head == 0 ? tones.addressOf(0) : tones.head;
+    Vc2SynthTone& h = hosts[tones.holds(taken) ? (size_t)tones.indexOf(taken) : 0];
+    return tones.make(id, h) != nullptr ? taken : 0;
+}
+
+// [FW] the tail's two routines, the notes' (0x893964d0, 0x893964e0) as a note's constructor gives them
+void Vc2Synth::ended(int tone) {
+    if (tones.tones[(size_t)tone].tail.ended == Vc2Notes::kEndedRoutine) notes.ended(tones.addressOf(tone), *noteParts);
+}
+
+void Vc2Synth::truncated(int tone) {
+    if (tones.tones[(size_t)tone].tail.truncated == Vc2Notes::kTruncatedRoutine) {
+        notes.truncated(tones.addressOf(tone), *noteParts);
+    }
+}
+
+void Vc2Synth::taskStart() {
+    notes.staticInit();
+    notes.hook = kVc2SynthEndedHook;
+    Vc2PartInitWorld init { rows, nodes, keys, numbers };
+    StaticParts parts { *this };
+    Vc2PartStartWorld w { init, startWords, voices, reloads, staticM, parts };
+    vc2PartStartUp(w);
+    noteGate = 0;
+}
+
+bool Vc2SynthReloads::readPart(int part) { return s_.settings->readPart(part); }
 
 void Vc2Synth::giveWaves(const Vc2LoadedWaves& w) {
     waves = &w;
@@ -71,7 +109,7 @@ void Vc2Synth::start() {
     queue.staticInit();       // row 14, 0x89395280
     notes.unread = kNotesUnread;   // row 17
     reloads.staticInit();     // row 26, 0x8939b350
-    StaticParts parts { staticM };
+    StaticParts parts { *this };
     staticM.staticInit(parts);     // row 37, 0x893a3020
     rows.robot = kRobotStart;      // row 42
     pools.init();             // row 45, 0x893ab550

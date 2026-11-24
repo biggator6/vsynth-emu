@@ -4201,3 +4201,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - v344 ported the three voice loops the settings call out. Its part came after the voice class's, which had unhooked
   the queue's wait and the note voice's virtuals to run them as rom.4's own: the first runs differed (a wait logged on
   one side) and then faulted in rom.4's queue on drawn links, until the part put the earlier hooks back.
+- v345 wired the part's settings and voices. Its load part passed at once, but at the plant list's one case it saw
+  little, because a read of an unchanged store changes nothing; drawing part of the store again before each event,
+  and at least 16 cases, made 15 of 21 plants visible. The other six (the Matrix levels' copy, All Sound Off, the
+  receiving channel) need a note sounding or a system store, which the load has neither of.

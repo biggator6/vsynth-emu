@@ -61,6 +61,10 @@ struct Vc2PartNumbers {
     void changed(int32_t number, int source, int32_t channel, int32_t value, Vc2NumberWorld& w) const;
 };
 
+// v345: All Sound Off to a source's channel as the mode row makes it: a message of class 7 (0x89393c00, on the stack)
+// handed on to its handler 0x89393ba0 with a value of 0
+void vc2NumbersSoundOff(int source, int32_t channel, Vc2NumberWorld& w);
+
 // What the part's init reaches
 struct Vc2PartInitWorld {
     Vc2PartRows& t;

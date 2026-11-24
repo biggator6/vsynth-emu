@@ -11,6 +11,12 @@
 std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r);
 // The first region of the part that differs, said; none
 std::string vc2SynthRegionsDifference(Vc2Fw& fw, Vc2Synth& s);
+// v345: the regions, then the vocoder's engines, stages, engine word and hook word (the start's compare)
+std::string vc2SynthDifference(Vc2Fw& fw, Vc2Synth& s);
+
+// The load part (v345, Vc2SynthLoadCheck.cpp): the notes' task's start, then `run.cases` cases of a drawn store (or
+// none) and 20 events of the part's readers and messages against rom.4's; how many differ
+long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run);
 
 // The reads part (v343): the regions apart; every read of C's over its arguments reaching only the part's regions; then
 // `run.cases` cases, each the part's memory read by address against rom.4's after noise in drawn regions, the Matrix's

@@ -1175,6 +1175,11 @@ version against rom.4's routines with what it calls hooked:
          `Vc2Assigner`, the +0x48 virtual's answer through `Vc2AssignParts::changed`; xt_vc2voices' eighth part
          (HARDWARE_FIRMWARE.md, "The part's voices' stops and truncations"). Next: the part's patch load (its parameters
          by read object, the defaults with no store; the settings' readers and calls out on the part).
+       - The part's settings and voices wired (v345): the notes' task's start, the parameters by read object (the
+         defaults with no store), the readers and messages, and the voices', notes' and controllers' parts on the
+         part's ports; xt_vc2synth's load part (HARDWARE_FIRMWARE.md, "The part's settings and voices wired"). Next:
+         the notes' task's pass on the part (MIDI through the dispatcher and channel to the assigner, the notes, C and
+         the tones), then the update task, the block and the whole check.
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:

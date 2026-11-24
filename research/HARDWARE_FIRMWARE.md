@@ -1546,6 +1546,61 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's settings and voices wired (2026-11-23, v345) {#vc2-synth-wired}
+
+Step 4.3's seventy-third version, Vc2Synth whole's sixth. The part now runs its own notes' task start and settings,
+and its voices', notes' and controllers' parts call its own ports:
+- **The notes' task's start** (`Vc2Synth::taskStart`): the parts of `0x8938fc00` before its loop that the part has.
+  These are the notes' init (`0x89396960`), the hook word set to the notes' task's routine (`0x893901a0`, which posts
+  the ended scan's event), the start-up (`0x89392ab0`: the part's init, the voices' and lists' inits, the reload
+  object, the static M's part init with its node onto the update queue), and the note-on gate opened. The rest is
+  the OS's: the MIDI queue, the timers, the task's own objects.
+- **The parameters** (`Vc2SynthSettings`, a `Vc2PartParams` and `Vc2MatrixParams`). With a store given, an ID is read
+  as xt_vc2patch reads one: the kind's blocks are its zone's, a COSM's typed IDs by its Type (`vc2StoreTyped`). With
+  none, and on the system's blocks, an ID reads its default less its centre. That is rom.4's getter `0x89324350` on a
+  read object never set up (`0x8932b340` → `0x89328780`: the 12-byte descriptor's +6 less its +4); a typed ID reads its
+  typed default (`0x8932b530` → `0x89328d10`: the 8-byte descriptor's +2). After the start every read object is 0,
+  because the store object `0x89961250` and the part entries `0x899612a8` are .bss. So a part that is never given a
+  patch plays the parameters' defaults. Part 0's entry: +0 is 1 with a store, and +8 points at the store.
+- **The readers and messages** (`Vc2PartSettings` on the part's tables, with the Matrix's set-up). The calls out go
+  to the part's ports: the mixer's setters and targets, Auto Note's switches, the vocoder's mode, settings and pedal,
+  the voices' budget and reserve, the controller, the reload objects, and the receive channel and routing reset. The
+  truncations and stop are v344's. All Sound Off is made as rom.4 makes it, a class-7 number object on the stack
+  handed to its handler (`vc2NumbersSoundOff`). The held note and all notes off are posted to the notes' task. The
+  set-up's levels (0x89997290) are the static M's: each move gives the mixer's offsets the same three floats, then
+  the mixer's targets.
+- **The voices' and notes' parts** (`Vc2SynthVoices`, `Vc2SynthNotes`) route a voice's virtuals by its class. The note
+  voice's (`0x898cd3dc`) go to `Vc2VoiceClass`. The plain voice's (`0x898cd1a8`) are six small routines, here as rom.4
+  has them: update `0x89391730` and the change test `0x89391720` answer 0, the retune `0x893916c0` is a bare return,
+  the destroy `0x893916d0` ends its note and clears +0x4c and +0x30, the key-off `0x893916f0` releases its note, and the
+  prepare `0x89391710` clears +0x30. C's routines run on the part's reads (v343). A note's tone is the pool's, with the
+  part's host. The OS's locks and semaphores do nothing on one thread. The legato's struct a prepare gives C (rom.4's on
+  the notes' task's stack) is the part's own, at a word of its own. The tail's two routines are the notes'. The retune
+  word `0x8953fb2c` is a rodata word, 0, now a table word.
+- **The controllers' parts** (`Vc2SynthControls`): the number objects' handlers on the part's world, a part's trip by
+  the part table, the release path over a key table's voices, the vocoder's pedal, and the sounding tones' Time Trip
+  steps.
+- The vocoder's compare in the checks (`Vc2CheckVocoder.h`, xt_vc2vocoder's until now) compares the engine's and the
+  hook's words by the port's engine. xt_vc2synth's start compare had assumed none; with a patch's vocoder settings,
+  one plays.
+
+Results:
+- xt_vc2synth's load part (Vc2SynthLoadCheck.cpp), on the seed two after the run's, after the tones: rom.4's pieces
+  of the task's start against the part's, then at least 16 cases. Each case has a store of noise (none one time in
+  four) and 20 events: the part's read, the three system dispatchers, a parameters' message, the part's message.
+  Before each event, half the time, up to 512 bytes of the store are drawn again. After the start and each event:
+  every region, the vocoder, and the flags posted to the notes' task. The OS's event post is hooked and logged, its
+  timers, locks and clock answer 0.
+- 0 different at 2024 (40 cases, 800 events), 7 and 31337 (400; 8,000 events each). xt_vc2vocoder, xt_vc2voices and
+  xt_vc2settings 0 different too.
+- The plants: 21 new. At first, at the list's one case, 11 were missed: a read of an unchanged store changes nothing.
+  Drawing part of the store again before each event, and at least 16 cases, brought that to 6. Those six are seen
+  only with a note sounding or a system store: the Matrix levels' copy (the Matrix's init is the update task's and a
+  note's), All Sound Off over empty key tables, and the receiving channel (Part 1 Receive Switch's default is off).
+  The notes' part is to catch them. Changed plants: the synth list's 52 of 58 caught (the six), with two older plants
+  re-aimed at the static M's parts; the voices' 8, settings' 63 and vocoder's whole 45 all caught.
+- fcheck's baseline updated (the region count, the load line, the reads' draws). verify.sh green.
+
 ### The part's voices' stops and truncations (2026-11-23, v344) {#vc2-voices-stops}
 
 Step 4.3's seventy-second version, Vc2Synth whole's fifth. The part's settings call out three routines over the

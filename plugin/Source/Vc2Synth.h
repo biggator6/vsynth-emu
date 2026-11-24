@@ -10,6 +10,7 @@
 // sound yet.  Bit for bit: xt_vc2synth.  HARDWARE_FIRMWARE.md, "The VC-2 part as one object: Vc2Synth's start".
 // v340: the 24 tones' hosts (Vc2SynthTone) on the part's words, with the tones' render buffers, the part mixer's
 // frames and the shared routines; the part is their world (HARDWARE_FIRMWARE.md, "Vc2Synth's tones").
+#include "Vc2Assigner.h"
 #include "Vc2AutoNote.h"
 #include "Vc2CosmPools.h"
 #include "Vc2FreeLfos.h"
@@ -44,20 +45,38 @@
 #include "Vc2TrackerAnalysis.h"
 #include "Vc2UpdateTask.h"
 #include "Vc2Vocoder.h"
+#include "Vc2VoiceClass.h"
 #include "Vc2WaveSets.h"
 #include <deque>
 #include <memory>
+#include <vector>
 
 struct Vc2LoadedWaves;
+struct Vc2Synth;
 class Vc2SynthReads;
+class Vc2SynthNotes;
+class Vc2SynthVoices;
+class Vc2SynthControls;
+class Vc2SynthSettings;
 
-// What the reload objects reach: the OS's timer queue (0x8994fc24) and the part's reader.  Nothing reaches them at the
-// start; the tasks' wiring gives them their work
+// [FW] v345: the notes' task's event object and what the part posts it through the OS (0x89301830): the ended scan's
+// (the notes' hook word's routine 0x893901a0), all notes off (0x89391e30) and the held note's (0x89391e50); where the
+// part keeps the legato's struct a voice's prepare gives C (rom.4's on the notes' task's stack)
+inline constexpr uint32_t kVc2SynthNotesTask = 0x8994fec8, kVc2SynthEndedHook = 0x893901a0;
+inline constexpr uint32_t kVc2SynthEndedEvent = 0x004, kVc2SynthAllNotesOff = 0x080, kVc2SynthHeldNoteEvent = 0x200;
+inline constexpr uint32_t kVc2SynthLegatoAt = 0x8C0FFF00;
+
+// What the reload objects reach: the OS's timer queue (0x8994fc24), which the tasks' wiring gives its work, and from
+// v345 the part's read (0x8939b170, Vc2SynthSettings)
 class Vc2SynthReloads final : public Vc2ReloadParts {
 public:
+    explicit Vc2SynthReloads(Vc2Synth& s) : s_(s) {}
     void post(uint32_t) override {}
     void unpost(uint32_t) override {}
-    bool readPart(int) override { return true; }
+    bool readPart(int part) override;
+
+private:
+    Vc2Synth& s_;
 };
 
 struct Vc2Synth final : Vc2SynthToneWorld {
@@ -70,12 +89,24 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     // v343: the waves the process has loaded (vc2Waves()): their memory and store, the sets copied, as the part's
     // lookups write their buffers
     void giveWaves(const Vc2LoadedWaves& w);
-    // v340: the tones' world.  The tail's routines, the truncation's wait and the OS's event are the tasks' version's:
-    // until it, the events are kept and a wait ends the fade
+    // v345: the patch store the part's parameters read (Vc2PatchStore's bytes), none for every ID's default
+    void givePatch(const std::vector<uint8_t>* store) { patch = store; }
+    // v345: the notes' task's start to its loop (0x8938fc00…0x8938fc66) as the part has it: the notes' init
+    // (0x89396960), the hook word the notes' task's, the start-up (0x89392ab0), the note-on gate open
+    void taskStart();
+    // v345: a tone of the pool made (0x893b2db0(0, id)) through the host of the tone it takes, its address, 0 none
+    uint32_t makeTone(uint32_t id);
+    Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }
+    // v345: an OS event set on its object (0x89301830): the notes' task's the part keeps
+    void post(uint32_t object, uint32_t flags) {
+        if (object == kVc2SynthNotesTask) notesEvents |= flags;
+    }
+    // v340: the tones' world.  The tail's routines the notes' (v345), the OS's event posted; the truncation's wait the
+    // tasks' version's: until it, a wait ends the fade
     const Vc2ToneHost& host(int tone) override { return hosts[(size_t)tone]; }
-    void osEvent(uint32_t event, uint32_t) override { events |= event; }
-    void ended(int) override {}
-    void truncated(int) override {}
+    void osEvent(uint32_t event, uint32_t flags) override { post(event, flags); }
+    void ended(int tone) override;
+    void truncated(int tone) override;
     void waitFade(int tone) override { hosts[(size_t)tone].tva.w.fade = 0.0f; }
     int32_t osClock() override { return clock; }
     Vc2MicRing& micRing() override { return ring; }
@@ -103,7 +134,7 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2PartNodes nodes {};                 // 0x899888d0, 0x899890d0, 0x899888bd, 0x8998246c (v293)
     Vc2PartNumbers numbers {};             // 0x89988cd0, 0x899891e0 (v302)
     Vc2HeldFlags held {};                  // 0x8993d0c0 (v300)
-    Vc2SynthReloads reloadParts {};
+    Vc2SynthReloads reloadParts { *this };
     Vc2PartReloads reloads { held, reloadParts };   // 0x89996120 (v300)
     Vc2TripRecords trips {};               // 0x89989408, 0x899996a4 (v306)
     std::array<uint32_t, 16> partTable {};   // 0x8993d040: a part's trip record by number, .data (v343)
@@ -138,7 +169,7 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     const int32_t* input = nullptr;
     const Vc2WaveMemory* waves = nullptr;
     Vc2OscSamples samples {};
-    uint32_t events = 0;
+    uint32_t notesEvents = 0;   // v345: the flags posted the notes' task's event object (0x8994fec8)
     std::deque<Vc2SynthTone> hosts;
     // v343: the wave store given (an empty one, none given) and the part's copy of the sets (0x8993448c, 0x89973084,
     // 0x89989754), then C's reads on all of it
@@ -146,4 +177,14 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     const Vc2WaveStore* store = &noStore;
     Vc2WaveSets waveSets {};
     std::unique_ptr<Vc2SynthReads> reads;
+    // v345: rom.4's code on the voices (the note voice's class, the assigner), the legato's struct a prepare gives C,
+    // the patch store given (none: every ID its default), then the parts on all of it
+    Vc2VoiceClass classes {};
+    Vc2Assigner assigner {};
+    std::array<uint8_t, 4> legato {};
+    const std::vector<uint8_t>* patch = nullptr;
+    std::unique_ptr<Vc2SynthNotes> noteParts;
+    std::unique_ptr<Vc2SynthVoices> voiceParts;
+    std::unique_ptr<Vc2SynthControls> controls;
+    std::unique_ptr<Vc2SynthSettings> settings;
 };

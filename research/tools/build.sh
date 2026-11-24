@@ -68,10 +68,10 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # The OS MIDI task's handler and the channel states (v313) against rom.4's own, the OS's listeners and routines hooked
 [ -f Vc2OsMidiCheck.cpp ] && cc -DXT_VC2MIDI_MAIN Vc2OsMidiCheck.cpp Vc2OsMidiEvents.cpp Vc2OsMidi.cpp \
    Vc2OsMidiHandler.cpp Vc2OsMidiTables.cpp Vc2KeysTables.cpp "${SH4[@]}" -o "$O/xt_vc2midi" &
-# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but rom.4's parameter tables, and
-# the patch store and .p02 reader (v450) that read with them, and rom.4's own load of the waves (v503)
-NOT_SYN=" Vc2Params.cpp Vc2PatchStore.cpp Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp "
-NOT_SYN+=" Vc2WavesInUse.cpp "
+# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the .p02 reader (v450) and rom.4's
+# own load of the waves (v503); from v345 rom.4's parameter tables and the patch store, which the part reads, with theirs
+NOT_SYN=" Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp Vc2WavesInUse.cpp "
+SYNX=(XtFxValueText.cpp XtPatchStore.cpp XtSoloVoice.cpp "${FW[@]}")
 VSYN=()
 while read -r f; do
   [[ "$NOT_SYN" == *" $f "* ]] || VSYN+=("$f")
@@ -79,7 +79,7 @@ done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake
 [ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2Synth*Check.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
    XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
    $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) $( [ -f Vc2OscAnalogRender.cpp ] && echo XtAnalog.cpp ) \
-   "${SH4[@]}" -o "$O/xt_vc2synth" &
+   "${SYNX[@]}" "${SH4[@]}" -o "$O/xt_vc2synth" &
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
    Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp Vc2SetMemoryReads.cpp \
