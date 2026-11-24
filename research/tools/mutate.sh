@@ -67,7 +67,6 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
     [ "${TONE_MODE:-}" = extin ] && ARGS=("$C" "${SEED:-2024}" "$WORK/inputs") && C=extin
 elif [ "$PORT" = solo ]; then      # XtSoloVoice, on the solocmp cases of fcheck's baseline; [cases] is not used
     F=XtSoloVoice.cpp; D=XT_FW_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
-    L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [ "$PORT" = fx ]; then        # XtFxChip against the reference; [cases] is its samples per type, and XT_FX_STOP stops at the first difference
     F=XtFxChip.cpp
     fxParts XtFxControl XtFxUnit XtFxImage XtFxValueText XtFxInput XtExtIn
@@ -109,7 +108,6 @@ elif [[ "$PORT" =~ ^vc2 ]]; then   # rom.4's ports, on rom.4 (mutate_vc2ports.sh
     vc2Port "$PORT"
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
-    L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then
     # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), with PORT=diskimage XtDiskImage (the firmware's disk
     # image), with PORT=patchstore XtPatchStore (the store's layout), against fcheck's baseline of xt_files; [cases] is
@@ -126,7 +124,6 @@ elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then
         [ "$f" = "$F" ] || L+=("$S/$f")
     done
     L+=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
-    L+=("$S/Sh4Setup.cpp")   # the interpreter's setup, its own file from v197
 elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's routines for them
     F=XtFirmware.cpp; D=XT_FILES_MAIN
     OBJ="$M/files_obj"; mkdir -p "$OBJ"
@@ -149,9 +146,11 @@ elif [ "$PORT" = analogfw ]; then
 else
     F=XtCosm.cpp; D=XT_COSM_MAIN; L=("$S/XtOsc.cpp" "$S/XtEnvelope.cpp" "$S/Sh4Interp.cpp")
 fi
-# The machine XtFirmware's routines run on (v175) is built wherever they are; the tone port has it among its PARTS
+# The machine XtFirmware's routines run on (v175) and the interpreter's setup they call (its own file from v197) are
+# built wherever they are, the setup unless a port lists it; the tone port has both among its PARTS
 if [ -z "$TF" ] && { [ "$F" = XtFirmware.cpp ] || [[ " ${L[*]} " == *"/XtFirmware.cpp "* ]]; }; then
     L+=("$S/XtFwMachine.cpp")
+    [[ " ${L[*]} " == *"/Sh4Setup.cpp "* ]] || L+=("$S/Sh4Setup.cpp")
 fi
 # A header's plant (PORT=tonefwh, wirefwmsm; v193) goes into a copy of the sources
 OUT="$M/$N.cpp"
