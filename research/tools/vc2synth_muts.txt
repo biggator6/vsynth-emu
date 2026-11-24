@@ -179,8 +179,6 @@ upd-voice-class|.vtable == Vc2Assigner::kNoteVtable) s_.classes.update|.vtable !
 upd-pitch-depth|    s_.pitch.depth = s_.rows.robot;|    s_.pitch.depth = 0.0f;|vc2synthupdate
 upd-pitch-switch|if (s_.autoNote.w.onSwitch != 0 \|\| s_.rows.robot > 0.0f)|if (s_.rows.robot > 0.0f)|vc2synthupdate
 upd-pitch-robot|\|\| s_.rows.robot > 0.0f)|\|\| s_.rows.robot >= 0.0f)|vc2synthupdate
-upd-sounding-next|at = s_.tones.at(at).head.next) {|at = 0) {|vc2synthupdate
-upd-tone-update|.update(n, s_.hosts[(size_t)index_]); }|.update(n + 1, s_.hosts[(size_t)index_]); }|vc2synthupdate
 upd-glue|s_.vocoder.glue(carried, s_.tracker.period());|s_.vocoder.glue(carried, s_.tracker.period() + 100.0f);|vc2synthupdate
 upd-refresh|{ reads_.refreshMatrix(Vc2StaticMatrix::kAt); }|{}|vc2synthupdate
 syn-update-events|    vc2UpdateTaskPass(w, events);|    vc2UpdateTaskPass(w, events & 1);|vc2synth
@@ -197,4 +195,40 @@ smi-reset-status|constexpr uint8_t kResetStatus = 0x70;|constexpr uint8_t kReset
 smi-reset-source|{ kResetStatus, 0, 0, (uint8_t)source }|{ kResetStatus, 0, 0, (uint8_t)(source + 1) }|vc2synthmidi
 smi-schedule|void Vc2SynthMidi::schedule() { s_.updateParts->schedule(); }|void Vc2SynthMidi::schedule() {}|vc2synthmidi
 smi-release|void Vc2SynthMidi::autoNoteRelease() { s_.autoNote.askRelease(); }|void Vc2SynthMidi::autoNoteRelease() {}|vc2synthmidi
-upd-schedule|s_.mixer.scheduleTones({ listed_.data(), sounding() }, *this);|s_.mixer.scheduleTones({ listed_.data(), 0 }, *this);|vc2synthupdate
+upd-schedule|s_.mixer.scheduleTones(s_.toneParts->tasksTones(), *this);|s_.mixer.scheduleTones({}, *this);|vc2synthupdate
+upd-voices-tones|s_.mixer.updateTones(s_.toneParts->tasksTones(), *this);|s_.mixer.updateTones({}, *this);|vc2synthupdate
+# v351: the part's block (vc2synthtones, Vc2SynthTones.cpp: the sounding tones as the mixer takes them, v349's
+# upd-sounding-next and upd-tone-update moved here as tns-sounding-next and tns-update; vc2synthblock,
+# Vc2SynthBlock.cpp: the mixer's parts and Auto Note's host; vc2synth, the block and the audio task's start), by
+# xt_vc2synth's notes part's blocks and the load part's start.  Not planted: the node's row (source 3's and source 4's
+# part 0 nodes on one channel throughout, as the system's receive channels set them).  Missed until the check gives the
+# part waves: tns-count (an OSC voice's count moves only where a VariPhrase player asks it, kCounts)
+tns-sounding-next|at = s_.tones.at(at).head.next) {|at = 0) {|vc2synthtones
+tns-update|tone().update(n, host());|tone().update(n + 1, host());|vc2synthtones
+tns-clock|tone().clock(seconds, host());|tone().clock(seconds + seconds, host());|vc2synthtones
+tns-count|tone().count(x, host());|tone().count(x + 1, host());|vc2synthtones
+tns-carrier|return tone().sounds(host());|return !tone().sounds(host());|vc2synthtones
+tns-render-carrier|tone().renderWhole(&frames->left, s_.buffers, host());|tone().render(&frames->left, s_.buffers, host());|vc2synthtones
+tns-held|return tone().held(host());|return false;|vc2synthtones
+tns-render|{ tone().render(&frames->left, s_.buffers, host()); }|{ tone().renderWhole(&frames->left, s_.buffers, host()); }|vc2synthtones
+tns-tasks|tasks_[n] = &t;|tasks_[n] = &tones_[0];|vc2synthtones
+blk-input|second, kBlockSamples, s_.pitch|second, kBlockSamples - 1, s_.pitch|vc2synthblock
+blk-ring|s_.ring.write(mic, s_.tracker.period());|s_.ring.write(mic, s_.tracker.period() + 1.0f);|vc2synthblock
+blk-engine|return s_.vocoder.engine != nullptr;|return s_.vocoder.engine == nullptr;|vc2synthblock
+blk-unvoiced|{ s_.vocoder.stage.block(mic); }|{}|vc2synthblock
+blk-ring-block|return s_.vocoder.stage.micBlock();|return s_.vocoder.stage.micBlock() + 1;|vc2synthblock
+blk-vocoder-ring|s_.vocoder.block(ring, &frames->left|s_.vocoder.block(ring + 1, &frames->left|vc2synthblock
+blk-vocoder-level|kStereo, s_.mixer.offsets.level);|kStereo, s_.mixer.offsets.mfx);|vc2synthblock
+blk-reset-tracker|{ s_.tracker.reset(); }|{}|vc2synthblock
+blk-reset-unvoiced|{ s_.vocoder.stage.reset(); }|{}|vc2synthblock
+blk-reset-ring|{ s_.ring.reset(); }|{}|vc2synthblock
+blk-keys-source|constexpr uint32_t kKeysSource = 2;|constexpr uint32_t kKeysSource = 1;|vc2synthblock
+blk-channel|s_.nodes.nodes[kAutoNoteNode].channel;|s_.nodes.nodes[kAutoNoteNode].channel + 1;|vc2synthblock
+blk-keys-held|kLowKey, kHighKey) >= 0) return false;|kLowKey + 64, kHighKey) >= 0) return false;|vc2synthblock
+blk-on-key|s_.autoNoteKeys[0] = (uint32_t)(note + kOctave);|s_.autoNoteKeys[0] = (uint32_t)(note + kOctave + 1);|vc2synthblock
+blk-on-event|kNoteOnEvent);\n    return true;|kNoteOffEvent);\n    return true;|vc2synthblock
+blk-off-key|s_.autoNoteKeys[1] = (uint32_t)(note + kOctave);|s_.autoNoteKeys[1] = (uint32_t)(note + kOctave + 1);|vc2synthblock
+blk-off-event|s_.post(kVc2SynthNotesTask, kNoteOffEvent);|s_.post(kVc2SynthNotesTask, kNoteOnEvent);|vc2synthblock
+syn-block-input|input != nullptr ? input : kSilence.data()|kSilence.data()|vc2synth
+syn-block-frames|frames.data(), toneParts->voices()|frames.data() + 8, toneParts->voices()|vc2synth
+syn-audio-start|void Vc2Synth::audioStart() { mixer.reset(*blockParts); }|void Vc2Synth::audioStart() {}|vc2synth

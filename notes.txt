@@ -335,6 +335,16 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's block v351 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v350's 2be3ae0;
+  HARDWARE_FIRMWARE.md, "The part's block"): the part mixer's block on the part (Vc2Synth::block), its voices the
+  sounding tones (Vc2SynthTones, the update's and schedule's adapters moved there), its parts the tracker's input
+  stage with Auto Note, the mic ring, the detector and the vocoder's driver (Vc2SynthBlock, with Auto Note's host
+  0x89391dc0 and 0x89391e20); the audio task's start, the mixer's reset 0x893b1680 (Vc2Synth::audioStart), whose
+  absence left the tracker's period 0 and kind 6 rendering NaN. xt_vc2synth's notes part a block one event in 13;
+  the tasks' steps in their own file (Vc2SynthTasksCheck.cpp). 0 different at 2024/7/31337, about 80% of the blocks
+  sounding, none not finite; plants --synth --changed 87 at the list's now 400 cases, all caught but tns-count
+  (needs waves) and upd-glue (400 cases at 7, 31337); fcheck's baseline updated; verify.sh green.
+
 The part's notes' task v350 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v349's 66d2c16;
   HARDWARE_FIRMWARE.md, "The part's notes' task"): v309's pass on the part (Vc2Synth::notesPass), its parts the
   part's MIDI parts (Vc2SynthMidi: the queue's drain none, as the part dispatches a message as it comes; the ended

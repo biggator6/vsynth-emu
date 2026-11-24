@@ -1546,6 +1546,53 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's block (2026-11-24, v351) {#vc2-synth-block}
+
+Step 4.3's seventy-ninth version, Vc2Synth whole's eleventh. The part mixer's block (v227's `Vc2PartMixer::block`,
+rom.4's `0x893b1820`) now runs on the part (`Vc2Synth::block`). It takes the input frames given and writes the part's
+frames (`0x89998e20`):
+- **Its voices** are the sounding list's tones (`Vc2SynthTones`), each asked by its vtable. If +0x54 answers true
+  (`Vc2Tone::sounds`, the TVA's level above 0), +0x18 renders the whole tone into the carriers' buffer: OSC 2, OSC 1,
+  the mix, COSM 1, then the TVA. Otherwise, unless the EXTIN flag is set, the mixer asks +0x60 (held), and +0x24
+  renders OSC 1 and the TVA into the other buffer. The update's and the schedule's tone adapters (v349, v350) are the
+  same objects now.
+- **Its parts** (`Vc2SynthBlock`) are the input stage `0x893ebb00` (`Vc2AutoNote::block`: the tracker's block, then
+  Auto Note) on the frames' +0x14 words, kind 6's mic ring `0x893ec820` with the tracker's period, the unvoiced
+  detector `0x893ed040` when no engine plays, the detector's mic block `0x893ed410`, and the vocoder's stereo driver
+  `0x893f0580` with the output stage's word (`0x89997298`, the tone generator's third level).
+- **Auto Note's host**, ported here. Its note-on `0x89391dc0` posts nothing and answers 0 while source 3's key table
+  on source 4's part 0 node's channel (`0x899888d0` + 0x30d) holds a key (`0x89392670` over 0…127). Otherwise it
+  writes the note + 12 at `0x8993d034`, posts the notes' task 0x020 and answers 1; the level is unread. Its note-off
+  `0x89391e20` writes the note + 12 at `0x8993d038` and posts 0x040.
+- **The audio task's start** (`0x89395ac0`…`0x89395b1c`) makes the OS's set-ups (`0x89300ab0`, `0x89300b10`),
+  registers the DMA's interrupts 6 and 7 (`0x88008240`) and sets up the DMA's buffers (`0x89395fe0`), all the
+  plugin's processBlock. Its last call before the loop is the part mixer's reset `0x893b1680` (the tracker's
+  `0x893ee040`, the detector's `0x893ecf60`, the ring's `0x893ec7d0`), that reset's only caller.
+  `Vc2Synth::audioStart` is the reset.
+
+**Found: the audio task's start.** Without it, the tracker's period stays 0, since its reset is what sets its mode's
+period. Kind 6 then renders NaN, and the two sides part on the NaN's sign in kind 6's +0x2c (sinceGrain): v349's
+limit, `xtf::sub` against the interpreter's FSUB. The carriers' buffer then differed, 0 against NaN. An XT runs the
+reset before its first block, so the check now does too (both sides', at the load part's start), and the NaN doesn't
+arise.
+
+**The check.** xt_vc2synth's notes part gives one event in 13 to a block. The input frames are drawn: silence one time
+in four, else noise shifted down 0…11 bits. rom.4's `0x893b1820` runs into `0x89998e20` with its input pointer
+(`0x8993eadc`) at them, and the part's block on the same frames, its mixer's pointer word set to rom.4's. After it come
+every region, the vocoder, the events and the tones' words. The run counts the blocks whose frames aren't all 0 and
+those with a word not finite. The three tasks' steps have their own file now (`Vc2SynthTasksCheck.cpp`).
+
+Results:
+- First runs: 1 different, kind 6's NaN as above; with the audio task's start, 0 different.
+- xt_vc2synth 0 different at 2024 (40 cases), 7 and 31337 (400): 142, 1267 and 1212 blocks, of which 68, 997 and 987
+  sounded (a frame word not 0) and none held a word not finite; 3779 and 3667 messages voicing at 7 and 31337.
+- Plants: v351's 31 lines (v349's two tone plants moved with their code), --synth --changed 87, all caught but two: tns-count
+  (an OSC voice's count moves only where a VariPhrase player asks it, and xt_vc2synth gives the part no waves) and
+  v349's upd-glue (caught at 400 cases at 7 and 31337). Auto Note's key test, the tones' LFO clock and the pitch
+  source's switch showed only from 400 cases, so the --synth list now runs 400 (`mutate_vc2.py`, 8 s a run). Not
+  planted: Auto Note's node row, as source 3's and source 4's part 0 nodes sit on one channel throughout.
+- fcheck: xt_vc2synth's notes line alone differed (its blocks, its counts), the baseline updated.
+
 ### The part's notes' task (2026-11-24, v350) {#vc2-synth-notes-task}
 
 Step 4.3's seventy-eighth version, Vc2Synth whole's tenth. The notes' task's pass (v309's `vc2NotesTaskPass`) now

@@ -3,6 +3,7 @@
 #include "Vc2Synth.h"
 #include "Vc2SynthReads.h"
 #include "Vc2SynthSettings.h"
+#include "Vc2SynthTones.h"
 #include "Vc2SynthVoices.h"
 
 namespace {
@@ -20,19 +21,6 @@ private:
 };
 } // namespace
 
-Vc2SynthUpdate::Vc2SynthUpdate(Vc2Synth& s) : s_(s) {
-    tones_.reserve(Vc2TonePool::kTones);
-    for (int k = 0; k < Vc2TonePool::kTones; ++k) tones_.emplace_back(s, k);
-}
-
-void Vc2SynthUpdate::Tone::update(int32_t n) { s_.tones.tones[(size_t)index_].update(n, s_.hosts[(size_t)index_]); }
-
-void Vc2SynthUpdate::Tone::clock(float seconds) {
-    s_.tones.tones[(size_t)index_].clock(seconds, s_.hosts[(size_t)index_]);
-}
-
-void Vc2SynthUpdate::Tone::count(uint32_t x) { s_.tones.tones[(size_t)index_].count(x, s_.hosts[(size_t)index_]); }
-
 // [FW] the static M's node M's init on the static M (kStays); a voice's its class's +0x0c, the plain one's a bare 0
 uint32_t Vc2SynthUpdate::nodeUpdate(uint32_t node, uint32_t) {
     if (node == kVc2StaticNodeAt) {
@@ -49,17 +37,9 @@ void Vc2SynthUpdate::pitchSource() {
     if (s_.autoNote.w.onSwitch != 0 || s_.rows.robot > 0.0f) s_.post(kVc2SynthNotesTask, kPitchEvent);
 }
 
-size_t Vc2SynthUpdate::sounding() {
-    size_t n = 0;
-    for (uint32_t at = s_.lists.sounding; at != 0 && n < listed_.size(); at = s_.tones.at(at).head.next) {
-        listed_[n++] = &tones_[(size_t)s_.tones.indexOf(at)];
-    }
-    return n;
-}
+void Vc2SynthUpdate::voicesUpdate() { s_.mixer.updateTones(s_.toneParts->tasksTones(), *this); }
 
-void Vc2SynthUpdate::voicesUpdate() { s_.mixer.updateTones({ listed_.data(), sounding() }, *this); }
-
-void Vc2SynthUpdate::schedule() { s_.mixer.scheduleTones({ listed_.data(), sounding() }, *this); }   // v350
+void Vc2SynthUpdate::schedule() { s_.mixer.scheduleTones(s_.toneParts->tasksTones(), *this); }   // v350
 
 void Vc2SynthUpdate::freeLfosClock(float seconds) { s_.freeLfos.clock(seconds); }
 

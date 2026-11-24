@@ -61,6 +61,8 @@ class Vc2SynthControls;
 class Vc2SynthSettings;
 class Vc2SynthMidi;
 class Vc2SynthUpdate;
+class Vc2SynthTones;
+class Vc2SynthBlock;
 
 // [FW] v345: the notes' task's event object and what the part posts it through the OS (0x89301830): the ended scan's
 // (the notes' hook word's routine 0x893901a0), all notes off (0x89391e30) and the held note's (0x89391e50); where the
@@ -108,6 +110,12 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     // v350: the notes' task's pass (vc2NotesTaskPass) on the events its wait answers (mask 0x3fe: the queue, the ended
     // scan, the reset, the schedule, Auto Note's three, the poly pressure and the held note's)
     void notesPass(uint32_t events);
+    // v351: a block, the part mixer's (0x893b1820): the input frames given (32 of 8 int32; none, silence) into
+    // `frames`, its voices the sounding tones
+    void block();
+    // v351: the audio task's start to its loop (0x89395ac0…0x89395b1c) as the part has it: its interrupts and DMA the
+    // plugin's, then the part mixer's reset (0x893b1680: the tracker's, the detector's and the mic ring's)
+    void audioStart();
     // v345: a tone of the pool made (0x893b2db0(0, id)) through the host of the tone it takes, its address, 0 none
     uint32_t makeTone(uint32_t id);
     Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }
@@ -209,5 +217,7 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     std::unique_ptr<Vc2SynthControls> controls;
     std::unique_ptr<Vc2SynthSettings> settings;
     std::unique_ptr<Vc2SynthMidi> midiParts;   // v346
+    std::unique_ptr<Vc2SynthTones> toneParts;     // v351
     std::unique_ptr<Vc2SynthUpdate> updateParts;   // v349
+    std::unique_ptr<Vc2SynthBlock> blockParts;     // v351
 };

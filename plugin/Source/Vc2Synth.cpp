@@ -5,6 +5,8 @@
 #include "Vc2SynthMidi.h"
 #include "Vc2SynthReads.h"
 #include "Vc2SynthSettings.h"
+#include "Vc2SynthBlock.h"
+#include "Vc2SynthTones.h"
 #include "Vc2SynthUpdate.h"
 #include "Vc2SynthVoices.h"
 #include "Vc2ToneLfo.h"
@@ -56,7 +58,9 @@ Vc2Synth::Vc2Synth() {
     controls = std::make_unique<Vc2SynthControls>(*this);
     settings = std::make_unique<Vc2SynthSettings>(*this);
     midiParts = std::make_unique<Vc2SynthMidi>(*this);   // v346
+    toneParts = std::make_unique<Vc2SynthTones>(*this);    // v351
     updateParts = std::make_unique<Vc2SynthUpdate>(*this);   // v349
+    blockParts = std::make_unique<Vc2SynthBlock>(*this);   // v351
 }
 
 void Vc2Synth::updatePass(uint32_t events) {
@@ -65,6 +69,13 @@ void Vc2Synth::updatePass(uint32_t events) {
 }
 
 void Vc2Synth::midiMessage(const Vc2MidiMessage& m, uint32_t word) { midiParts->message(m, word); }
+
+void Vc2Synth::block() {   // v351
+    static constexpr std::array<int32_t, Vc2PartMixer::kBlock * Vc2PartMixer::kFrameWords> kSilence {};
+    mixer.block(input != nullptr ? input : kSilence.data(), frames.data(), toneParts->voices(), *blockParts);
+}
+
+void Vc2Synth::audioStart() { mixer.reset(*blockParts); }   // v351
 
 void Vc2Synth::notesPass(uint32_t events) {   // v350
     Vc2NotesTaskWorld w { noteGate, pitch, scheduled, autoNoteKeys[0], autoNoteKeys[1], nodes, *midiParts };

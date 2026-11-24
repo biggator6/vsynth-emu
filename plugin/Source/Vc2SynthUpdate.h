@@ -10,16 +10,13 @@
 // (0x893f07a0) with the tracker's period.  The queue's lock is the OS's, nothing on one thread.  Bit for bit:
 // xt_vc2synth's notes part's update passes.  HARDWARE_FIRMWARE.md, "The part's update task".  The update task.
 #include "Vc2PartMixer.h"
-#include "Vc2Tone.h"
 #include "Vc2UpdateTask.h"
-#include <array>
-#include <vector>
 
 struct Vc2Synth;
 
 class Vc2SynthUpdate final : public Vc2UpdateTaskParts, public Vc2MixerTaskParts {
 public:
-    explicit Vc2SynthUpdate(Vc2Synth& s);
+    explicit Vc2SynthUpdate(Vc2Synth& s) : s_(s) {}
     // The queue's lock: the OS's
     void wait(uint32_t) override {}
     void signal(uint32_t) override {}
@@ -35,21 +32,5 @@ public:
     void glue(float carried) override;
 
 private:
-    // A tone of the pool as the mixer's tasks take it: its +0x0c, +0x30 and +0x3c on its host
-    class Tone final : public Vc2MixerTone {
-    public:
-        Tone(Vc2Synth& s, int index) : s_(s), index_(index) {}
-        void update(int32_t n) override;
-        void clock(float seconds) override;
-        void count(uint32_t x) override;
-
-    private:
-        Vc2Synth& s_;
-        int index_;
-    };
-    // The sounding list's tones in its order (0x899996d0's, by their +0 links); how many
-    size_t sounding();
-    Vc2Synth& s_;
-    std::vector<Tone> tones_;   // one a tone of the pool, made with the part
-    std::array<Vc2MixerTone*, Vc2TonePool::kTones> listed_ {};
+    Vc2Synth& s_;   // its tones the sounding list's (Vc2SynthTones, v351)
 };

@@ -17,6 +17,8 @@
 #include "Vc2PatchStore.h"
 #include "Vc2SynthCheck.h"
 #include "Vc2SynthMidi.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 namespace {
@@ -33,27 +35,14 @@ constexpr std::array<uint8_t, 24> kKindByDraw { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
 constexpr uint8_t kClasses[] = { 0x90, 0x80, 0xb0, 0xe0, 0xa0, 0xd0, 0xc0, 0x40, 0x41, 0x70 };   // [FW] by kind
 constexpr size_t kWordFrom = 7, kResetKind = 9;   // the kinds given a word, the reset's
 
-// [FW] v349: the update task's loop top (its wait's call), the ticks' word; the registers its prologue leaves (r8 the
-// OS's lock wait, r9 the interrupts' mask), the events its wait answers
-constexpr uint32_t kUpdateLoopAt = 0x89395310, kTicksAt = 0x8993d080, kLockWait = 0x893018b0;
-constexpr uint32_t kInterruptMask = 0xffffff0f, kUpdateEvent = 1, kTimerEvent = 2;
-constexpr uint32_t kPassOneIn = 13, kTicksPast = 8;   // an event each task's pass one time in 13; the ticks' step
-
-// [FW] v350: the notes' task's loop top (its wait's call), its wait's mask, its events' bits; the registers its
-// prologue leaves (r8…r12: source 4's nodes' offset, the nodes, the schedule, the interrupts' mask, the task), the
-// MIDI queue on its stack (v309's check's); the note-on gate's word and the schedule's count (each the part's region)
-constexpr uint32_t kNotesLoopAt = 0x8938fc66, kNotesMask = 0x3fe, kNotesFirstBit = 0x002, kNotesLastBit = 0x200;
-constexpr uint32_t kNotesQueueAt = 0x89981918, kDrainAt = 0x893110b0;   // the MIDI queue and its drain, the OS's
-constexpr uint32_t kNotesRegisters[5] = { 0x300, 0x899888d0, 0x893b1710, kInterruptMask, 0x8998190c };
-constexpr uint32_t kGateAt = 0x89981904, kScheduledAt = 0x89981b60, kAutoNoteKeysAt = 0x8993d034;
-constexpr uint32_t kScheduledMost = 4;   // the schedule's count drawn 0…3
-constexpr uint32_t kAutoNoteAt = 0x8993fe3c;   // [FW] Auto Note's words: its note, its period (the block's)
-constexpr uint32_t kPeriodFrom = 50, kPeriods = 350;   // a sounding note's period drawn, in samples
+constexpr uint32_t kPassOneIn = 13;   // an event each task's step one time in 13 (v349…v351, Vc2SynthTasksCheck.cpp)
 
 struct NotesCounts {
     long events = 0, voiced = 0;   // voiced: the messages after which a note's age is new (a voice started)
-    long updates = 0;              // v349: the update passes among the events
-    long notesPasses = 0;          // v350: the notes' task's passes among them
+    // v349…v351: the update passes, the notes' task's passes and the blocks among the events, by their ways' order
+    std::array<long, 3> passes {};
+    Vc2SynthInput input {};   // v351: a block's input frames, the part given them for it
+    long sounding = 0, unfinite = 0;   // v351: the blocks whose frames weren't all 0, held a word not finite
     long under = 0, kept = 0;   // v349: the patches drawn under a VOCODER's tone, the Types kept (vocoderTypesKept)
     std::array<long, std::size(kClasses)> byKind {};
 };
@@ -141,13 +130,6 @@ uint8_t receivingOf(const Vc2Synth& s) {
     return c < 0 ? 0 : (uint8_t)c;
 }
 
-// After a step: every region, the vocoder, the events, each tone's words
-std::string partStepDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts) {
-    std::string d = vc2SynthStepDifference(fw, s, posts);
-    for (int tone = 0; tone < Vc2TonePool::kTones && d.empty(); ++tone) d = vc2SynthToneDifference(fw, s, tone);
-    return d;
-}
-
 // One message on both sides, then what differs
 std::string partMidiEvent(Vc2Fw& fw, Vc2Synth& s, const Drawn& m, const Vc2SynthPosts& posts) {
     fw.cpu.write(kMessageAt, &m.m, sizeof m.m);
@@ -155,78 +137,37 @@ std::string partMidiEvent(Vc2Fw& fw, Vc2Synth& s, const Drawn& m, const Vc2Synth
     if (!fw.call(kHandler, { 0, kMessageAt, kWordAt })) return "the OS MIDI's handler faults: " + fw.cpu.error();
     if (!fw.call(kDispatcher, { 0, kMessageAt, kWordAt })) return "the dispatcher faults: " + fw.cpu.error();
     s.midiMessage(m.m, m.word);
-    return partStepDifference(fw, s, posts);
+    return vc2SynthEventDifference(fw, s, posts);
 }
 
-// A task's loop body on rom.4's side, from its top until it comes back there (v309's way), with the registers its
-// prologue left already set; whether it ran without a fault
-bool loopBodyRan(Vc2Fw& fw, uint32_t top) {
-    uint32_t back = 0;
-    int entries = 0;
-    fw.cpu.hook(top, [&back, &entries](Sh4& m) {
-        if (entries++ == 0) back = m.pr;
-        else m.pc = back;
-    });
-    const bool ran = fw.call(top, {});
-    fw.cpu.unhook(top);
-    return ran;
-}
-
-// v349: one update pass on both sides, then what differs: the ticks a few past the last, the events its wait answers
-// (each half the time); rom.4's loop body with the registers its prologue leaves
-std::string updatePassEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
-    posts.updateEvents = (rng() % 2 ? kUpdateEvent : 0) | (rng() % 2 ? kTimerEvent : 0);
-    s.ticks = s.time.last + rng() % kTicksPast;
-    fw.cpu.wr32(kTicksAt, s.ticks);
-    fw.cpu.r[8] = kLockWait;
-    fw.cpu.r[9] = kInterruptMask;
-    fw.cpu.r[12] = Vc2UpdateQueue::kAt;
-    if (!loopBodyRan(fw, kUpdateLoopAt)) return "the update pass faults: " + fw.cpu.error();
-    s.updatePass(posts.updateEvents);
-    return partStepDifference(fw, s, posts);
-}
-
-// v350: one notes' task's pass on both sides, then what differs: the events its wait answers (what each side posted
-// the task, which the wait takes, and each bit half the time besides); the note-on gate set one time in four for the pass alone (the front's routines set it, 0x8942d686 among
-// them, which the part has none of), the schedule's count 0…3 (a timer's), Auto Note's two keys and its note with its
-// period (its block's) drawn; rom.4's loop body with the registers its prologue leaves and the MIDI queue on its stack,
-// its drain (the OS's mailbox) a bare return as the part's
-std::string notesPassEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
-    posts.notesWaited = posts.notes & kNotesMask;   // the wait takes what each side posted the task (equal)
-    posts.notes &= ~kNotesMask;
-    s.notesEvents &= ~kNotesMask;
-    for (uint32_t bit = kNotesFirstBit; bit <= kNotesLastBit; bit <<= 1) posts.notesWaited |= rng() % 2 ? bit : 0;
-    s.noteGate = rng() % 4 == 0 ? 1 : 0;
-    s.scheduled = rng() % kScheduledMost;
-    for (uint32_t& key : s.autoNoteKeys) key = rng() % 128;
-    const bool sounding = rng() % 2 != 0;   // Auto Note sounding a note, its period C4's (else −1 and 0)
-    s.autoNote.w.note = sounding ? (int32_t)(rng() % 128) : -1;
-    s.autoNote.w.period = sounding ? (float)(kPeriodFrom + rng() % kPeriods) : 0.0f;
-    fw.cpu.wr32(kGateAt, s.noteGate);
-    fw.cpu.wr32(kScheduledAt, s.scheduled);
-    fw.cpu.write(kAutoNoteKeysAt, s.autoNoteKeys.data(), sizeof s.autoNoteKeys);
-    fw.cpu.write(kAutoNoteAt, &s.autoNote.w, sizeof s.autoNote.w);
-    fw.cpu.wr32(kVc2Sp, kNotesQueueAt);
-    for (size_t k = 0; k < std::size(kNotesRegisters); ++k) fw.cpu.r[8 + k] = kNotesRegisters[k];
-    fw.cpu.hook(kDrainAt, [](Sh4& c) { c.ret(0); });   // the OS's mailbox: the part has none, as its drainQueue
-    const bool ran = loopBodyRan(fw, kNotesLoopAt);
-    fw.cpu.unhook(kDrainAt);
-    if (!ran) return "the notes' task's pass faults: " + fw.cpu.error();
-    s.notesPass(posts.notesWaited);
-    std::string d = partStepDifference(fw, s, posts);
-    s.noteGate = 0;
-    fw.cpu.wr32(kGateAt, 0);
+// An event of the notes part: an update pass, a notes' task's pass or a block one time in 13 each, else a message
+struct NotesStep {
+    Vc2Fw& fw;
+    Vc2Synth& s;
+    std::mt19937& rng;
+    Vc2SynthPosts& posts;
+    NotesCounts& n;
+};
+using PassWay = std::string (*)(NotesStep&);
+std::string updateWay(NotesStep& t) { return vc2SynthUpdatePass(t.fw, t.s, t.rng, t.posts); }
+std::string notesWay(NotesStep& t) { return vc2SynthNotesTaskPass(t.fw, t.s, t.rng, t.posts); }
+std::string blockWay(NotesStep& t) {
+    std::string d = vc2SynthMixerBlock(t.fw, t.s, t.rng, t.n.input, t.posts);
+    const auto heard = [](float x) { return x != 0.0f; };
+    const auto unfinite = [](float x) { return !std::isfinite(x); };
+    t.n.sounding += std::ranges::any_of(t.s.frames, heard) ? 1 : 0;
+    t.n.unfinite += std::ranges::any_of(t.s.frames, unfinite) ? 1 : 0;
     return d;
 }
+constexpr PassWay kPassWays[] = { updateWay, notesWay, blockWay };   // NotesCounts::passes' order
 
-// An event of the notes part: an update pass or a notes' task's pass one time in 13 each, else a message
-std::string notesStepEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts, NotesCounts& n) {
-    const uint32_t pick = rng() % kPassOneIn;
-    n.updates += pick == 0 ? 1 : 0;
-    n.notesPasses += pick == 1 ? 1 : 0;
-    if (pick == 0) return updatePassEvent(fw, s, rng, posts);
-    if (pick == 1) return notesPassEvent(fw, s, rng, posts);
-    return partMidiEvent(fw, s, messageDrawn(rng, n, receivingOf(s)), posts);
+std::string notesStepEvent(NotesStep& t) {
+    const uint32_t pick = t.rng() % kPassOneIn;
+    if (pick >= std::size(kPassWays)) {
+        return partMidiEvent(t.fw, t.s, messageDrawn(t.rng, t.n, receivingOf(t.s)), t.posts);
+    }
+    ++t.n.passes[pick];
+    return kPassWays[pick](t);
 }
 } // namespace
 
@@ -240,10 +181,11 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
             return k;
         };
         std::string d = vc2SynthPatchLoaded(fw, s, store, rng, posts, kept);
+        NotesStep step { fw, s, rng, posts, n };
         for (int e = 0; e < kEvents && d.empty(); ++e) {
             ++n.events;
             const uint32_t age = s.voices.ages;
-            d = notesStepEvent(fw, s, rng, posts, n);
+            d = notesStepEvent(step);
             n.voiced += s.voices.ages != age && s.voices.ages != 0 ? 1 : 0;
         }
         return d;
@@ -251,10 +193,13 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
     const long different = vc2SynthCases(fw, s, run, 3, "the notes", oneCase);
     std::printf("synth notes: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
                 "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets, %ld update "
-                "passes, %ld notes' task's passes; %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept\n",
+                "passes, %ld notes' task's passes, %ld blocks (%ld sounding, %ld not finite); %ld voiced; %ld patches "
+                "under a "
+                "VOCODER's tone, %ld "
+                "Types kept\n",
                 vc2SynthCaseCount(run), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3], n.byKind[4],
-                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.updates, n.notesPasses, n.voiced,
-                n.under, n.kept);
+                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.passes[0], n.passes[1],
+                n.passes[2], n.sounding, n.unfinite, n.voiced, n.under, n.kept);
     return different;
 }
 #endif

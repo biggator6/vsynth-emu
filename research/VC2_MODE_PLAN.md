@@ -1207,6 +1207,12 @@ version against rom.4's routines with what it calls hooked:
          part with a notes' task's pass one event in 13 (HARDWARE_FIRMWARE.md, "The part's notes' task"). The ended
          scan frees nothing yet: a tone's TVA ends in the renders. Next: the block (mixer, renders, vocoder, tracker,
          Auto Note), the OS model and the whole check.
+       - The part's block (v351): `Vc2Synth::block`, the part mixer's block on the part, its voices the sounding
+         tones (`Vc2SynthTones`, shared with the update and schedule), its parts the tracker's input stage with Auto
+         Note, the mic ring, the detector and the vocoder's driver (`Vc2SynthBlock`, with Auto Note's host
+         0x89391dc0 and 0x89391e20); the audio task's start, the mixer's reset (`Vc2Synth::audioStart`);
+         xt_vc2synth's notes part with a block one event in 13 (HARDWARE_FIRMWARE.md, "The part's block"). Next: the
+         OS model (the three tasks in their order a block, by the events each is posted) and the whole check.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each

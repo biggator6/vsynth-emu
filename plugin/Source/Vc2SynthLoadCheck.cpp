@@ -21,6 +21,7 @@
 
 namespace {
 constexpr uint32_t kNotesInit = 0x89396960, kStartUp = 0x89392ab0, kGateAt = 0x89981904;   // [FW]
+constexpr uint32_t kMixerReset = 0x893b1680;   // [FW] v351: the audio task's start's last call before its loop
 constexpr uint32_t kReadPart = 0x8939b170, kMessages = 0x89392890, kPartMessages = 0x89392830;   // [FW]
 constexpr uint32_t kOsEvent = 0x89301830;   // [FW] the OS's event post
 // [FW] the OS's timer queue's post and remove, its locks, semaphores and clock, each answered 0
@@ -58,6 +59,9 @@ std::string taskStart(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
     if (!fw.call(kStartUp, {})) return "the start-up faults: " + fw.cpu.error();
     fw.cpu.wr32(kGateAt, 0);
     s.taskStart();
+    // v351: the audio task's start as the part has it, its interrupts' and DMA's set-up left: the mixer's reset
+    if (!fw.call(kMixerReset, {})) return "the mixer's reset faults: " + fw.cpu.error();
+    s.audioStart();
     const std::string d = loadDifference(fw, s, posts);
     return d.empty() ? "" : "the task's start: " + d;
 }

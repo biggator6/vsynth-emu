@@ -4226,3 +4226,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - v350 ran the notes' task's pass on the part. A plant of v349's that the list had caught went unseen again, and the
   cause was the check: the flags each side posted the task only gathered, so after the first 0x100 a missing one could
   not show. An XT's wait takes them; the check's now does. A check that only accumulates can stop seeing.
+- v351 rendered the part's tones in a block against rom.4's. The first block that sounded differed, both sides
+  making the same NaN in kind 6 and parting on its sign; the cause was a start the check had skipped: an XT resets the
+  tracker in the audio task's prologue, so its period is never 0 when kind 6 renders. A NaN in a check is a question
+  about state before it is one about arithmetic.

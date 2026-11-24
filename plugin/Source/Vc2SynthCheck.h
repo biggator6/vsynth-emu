@@ -53,6 +53,16 @@ long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthP
 // handler and the dispatcher on both sides; how many differ
 long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts);
 
+// The tasks' steps (Vc2SynthTasksCheck.cpp, v351), each on both sides, then what differs: after a step every region,
+// the vocoder, the events and each tone's words; an update pass (v349); a notes' task's pass (v350); a block on input
+// frames drawn into `input` (v351)
+using Vc2SynthInput = std::array<int32_t, 32 * 8>;
+std::string vc2SynthEventDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts);
+std::string vc2SynthUpdatePass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
+std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
+std::string vc2SynthMixerBlock(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthInput& input,
+                               const Vc2SynthPosts& posts);
+
 // The reads part (v343): the regions apart; every read of C's over its arguments reaching only the part's regions; then
 // `run.cases` cases, each the part's memory read by address against rom.4's after noise in drawn regions, the Matrix's
 // ten readers, the OSC's getters and a sum on drawn Ms against rom.4's, and the children's placements; how many differ
