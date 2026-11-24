@@ -1228,6 +1228,12 @@ version against rom.4's routines with what it calls hooked:
          event services"). Next: the OS model on the part (its tasks' passes on Vc2Kernel at their levels, the 1 ms
          tick with the update task's alarm and cyclic handler and the clock's tempo ticks, the block's DMA), then the
          whole check against rom.4's three tasks on rom.1's kernel.
+       - The part's clock and tempo timers (v354): the clock object built as rom.4's row 20 builds it (the part's copy
+         was 0), its ms and the clock task's pass (`Vc2SynthClock`, XtTempoTicks' counting), the tempo timers' ring
+         (`Vc2TempoTimers`, the ring one template with the arpeggio's, `XtRing.h`) with the notes' schedule on it;
+         xt_vc2synth's notes part with clock events (HARDWARE_FIRMWARE.md, "The part's clock and tempo timers"). Next:
+         the part's tasks on Vc2Kernel (the audio, clock, notes and update tasks at their levels; the 1 ms tick with
+         the update task's alarm and cyclic handler and the clock's ms; the block's DMA), then the whole check.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
@@ -1335,6 +1341,11 @@ version against rom.4's routines with what it calls hooked:
      init (a note-on), and every sample the OSC gives is NaN, the saw's added to it; with them the tone's mix, COSMs
      and TVA, and the part's bus. Whatever rom.4 does, the plugin must never hand the host a NaN sample: step 4.5 puts
      a guard where the VC-2's audio leaves the part, and the plugin test holds it. Not fixed in v349.
+   - [gap] The MIDI input's start, continue and stop (v354). The MIDI input's real-time byte handler (`0x89313cb0`)
+     posts the clock task 0x40, whose pass then runs `0x89313d50` and `0x89313e10` on its MIDI clock object
+     (`0x8995cc08`); the part's MIDI takes channel messages only, so neither is ported. With them comes Clock Source
+     EXTERNAL's F8 (the object's +0x40 path, ported in the ms but fed nothing). Step 4.5 decides whether the plugin's
+     host transport stands in for them, as XtSynth's does for the V-Synth.
 
 ### 5. Against the machine
 

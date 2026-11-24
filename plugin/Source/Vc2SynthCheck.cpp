@@ -1,6 +1,7 @@
 // xt_vc2synth <rom.4> (v314): Vc2Synth's start against rom.4's.  On a fresh image (C startup's .data and .bss), rom.4's
-// own static initializers run in the interpreter in its table's order: the whole table's three OS MIDI rows (0x893179d0,
-// 0x89317db0, v347's 0x89318140), then the part's rows from 0x898c5cc0 to the one before 0x893f5070 (a task's that
+// own static initializers run in the interpreter in its table's order: the whole table's OS rows (v354's row 20, the
+// clock object; the three OS MIDI rows 0x893179d0, 0x89317db0, v347's 0x89318140), then the part's rows from
+// 0x898c5cc0 to the one before 0x893f5070 (a task's that
 // isn't the part's); from v347 the system's start after them (the store object, the record's and D's defaults).
 // Then Vc2Synth built and started, and every member compared with rom.4's memory at its address, byte for byte: the
 // whole objects, the tables a field at a time, the tone pool's tones by the words a tone holds (its head and tail),
@@ -50,8 +51,9 @@
 namespace {
 constexpr uint32_t kRowsAt = 0x898c5cc0, kRowBytes = 12, kRowRoutine = 4;   // [FW] the part's rows: {0, routine, 0}
 constexpr uint32_t kFirstOutside = 0x893f5070;                              // [FW] row 95's routine, not the part's
-// [FW] the OS MIDI's rows, earlier: its ports, its states, (v347) its part objects
-constexpr uint32_t kMidiRows[] = { 0x893179d0, 0x89317db0, 0x89318140 };
+// [FW] the OS's rows, earlier, in the table's order: (v354) row 20's clock object, which the part's tempo reads; the OS
+// MIDI's rows 26…28: its ports, its states, (v347) its part objects
+constexpr uint32_t kOsRows[] = { 0x893133d0, 0x893179d0, 0x89317db0, 0x89318140 };
 
 // v342: the part's regions are the plugin's (Vc2SynthMemory.h, moved from here)
 using SynthRegion = Vc2SynthRegion;
@@ -63,9 +65,9 @@ std::string bytesDifference(Vc2Fw& fw, const SynthRegion& r) { return vc2SynthBy
 
 std::string synthDifference(Vc2Fw& fw, Vc2Synth& s) { return vc2SynthDifference(fw, s); }
 
-// rom.4's start: the OS MIDI's rows, then the part's, each called in turn; how many, or what faulted
+// rom.4's start: the OS's rows, then the part's, each called in turn; how many, or what faulted
 std::string runRows(Vc2Fw& fw, int& rows) {
-    std::vector<uint32_t> routines(std::begin(kMidiRows), std::end(kMidiRows));
+    std::vector<uint32_t> routines(std::begin(kOsRows), std::end(kOsRows));
     for (uint32_t at = kRowsAt; fw.cpu.rd32(at + kRowRoutine) != kFirstOutside; at += kRowBytes)
         routines.push_back(fw.cpu.rd32(at + kRowRoutine));
     for (const uint32_t routine : routines) {

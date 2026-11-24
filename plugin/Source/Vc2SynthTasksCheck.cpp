@@ -76,13 +76,13 @@ std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2
     s.notesEvents &= ~kNotesMask;
     for (uint32_t bit = kNotesFirstBit; bit <= kNotesLastBit; bit <<= 1) posts.notesWaited |= rng() % 2 ? bit : 0;
     s.noteGate = rng() % 4 == 0 ? 1 : 0;
-    s.scheduled = rng() % kScheduledMost;
+    s.schedule.count = rng() % kScheduledMost;
     for (uint32_t& key : s.autoNoteKeys) key = rng() % 128;
     const bool sounding = rng() % 2 != 0;   // Auto Note sounding a note, its period C4's (else −1 and 0)
     s.autoNote.w.note = sounding ? (int32_t)(rng() % 128) : -1;
     s.autoNote.w.period = sounding ? (float)(kPeriodFrom + rng() % kPeriods) : 0.0f;
     fw.cpu.wr32(kGateAt, s.noteGate);
-    fw.cpu.wr32(kScheduledAt, s.scheduled);
+    fw.cpu.wr32(kScheduledAt, s.schedule.count);
     fw.cpu.write(kAutoNoteKeysAt, s.autoNoteKeys.data(), sizeof s.autoNoteKeys);
     fw.cpu.write(kAutoNoteAt, &s.autoNote.w, sizeof s.autoNote.w);
     fw.cpu.wr32(kVc2Sp, kNotesQueueAt);
@@ -113,6 +113,59 @@ std::string vc2SynthMixerBlock(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2Syn
     s.input = input.data();
     s.block();
     s.input = nullptr;
+    return vc2SynthEventDifference(fw, s, posts);
+}
+
+namespace {
+// [FW] v354: the clock's ms on its object (0x89312f50); the clock task's loop top (its wait's call) and the registers its
+// prologue leaves: r8 the clock object, r9 a task's own alarm, r10 the take, r11 its wait's mask, r12 its MIDI clock's
+// object, r13 the wait
+constexpr uint32_t kClockMsAt = 0x89312f50, kClockLoopAt = 0x89313c36, kClockAt = 0x8995cb40;
+constexpr uint32_t kClockRegisters[6] = { kClockAt, 0x89301800, 0x89312fd0, Vc2SynthClock::kMask, 0x8995cc08,
+                                          0x893017f0 };
+constexpr uint32_t kMostMs = 3, kSixMost = 300, kTempoFrom = 100, kTempos = 2900, kTicksAhead = 60;
+
+// The clock's state drawn now and then on both sides: the clocks from outside (one time in four: the switch, its count
+// by six clocks and the ms since, the ramp, the clocks seen), the clocks out's switch and counts, the tempo, and the
+// ticks run ahead of the take, so the schedule fires often. No waiter: its event would go to a task not the part's.
+void clockDrawn(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng) {
+    Vc2ClockObject& o = s.clockObject;
+    if (rng() % 4 == 0) {
+        o.external = (uint8_t)(rng() % 2);
+        o.sync = rng() % 4 == 0 ? 1 : 0;
+        o.six = (uint16_t)(1 + rng() % kSixMost);
+        o.since = (uint16_t)(rng() % (o.six + 20u));
+        o.ramp = (uint16_t)rng();
+        o.seen = (int8_t)(rng() % 8 - 1);
+    }
+    if (rng() % 4 == 0) {
+        o.sendOut = (uint16_t)(rng() % 2);
+        o.outCount = (int8_t)(1 + rng() % 20);
+        o.outPending = (uint16_t)(rng() % 3);
+    }
+    if (rng() % 8 == 0) o.quarterMs = (int32_t)(kTempoFrom + rng() % kTempos);
+    if (rng() % 4 == 0) o.ticks += rng() % kTicksAhead;
+    fw.cpu.write(kClockAt, &o, sizeof o);
+}
+} // namespace
+
+// v354: the clock's state drawn now and then, one to three of its ms on both sides, then the clock task's pass: rom.4's
+// loop body with the registers its prologue leaves, its wait taking what each side raised on it (its own alarm's
+// event besides half the time), against Vc2Synth::clockPass
+std::string vc2SynthClockEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
+    clockDrawn(fw, s, rng);
+    for (uint32_t k = 1 + rng() % kMostMs; k > 0; --k) {
+        if (!fw.call(kClockMsAt, {})) return "the clock's ms faults: " + fw.cpu.error();
+        s.clockMs();
+    }
+    const std::string raised = vc2SynthStepDifference(fw, s, posts);   // what each side raised, before the wait
+    if (!raised.empty()) return "after the clock's ms: " + raised;
+    posts.clockWaited = (posts.clock & Vc2SynthClock::kMask) | (rng() % 2 ? Vc2SynthClock::kAlarmEvent : 0);
+    posts.clock &= ~Vc2SynthClock::kMask;
+    s.clockEvents &= ~Vc2SynthClock::kMask;
+    for (size_t k = 0; k < std::size(kClockRegisters); ++k) fw.cpu.r[8 + k] = kClockRegisters[k];
+    if (!loopBodyRan(fw, kClockLoopAt)) return "the clock task's pass faults: " + fw.cpu.error();
+    s.clockPass(posts.clockWaited);
     return vc2SynthEventDifference(fw, s, posts);
 }
 #endif

@@ -18,15 +18,21 @@
 #include "Vc2SynthCheck.h"
 #include "Vc2SynthSettings.h"
 #include <algorithm>
+#include <cstddef>
 
 namespace {
 constexpr uint32_t kNotesInit = 0x89396960, kStartUp = 0x89392ab0, kGateAt = 0x89981904;   // [FW]
 constexpr uint32_t kMixerReset = 0x893b1680;   // [FW] v351: the audio task's start's last call before its loop
 constexpr uint32_t kReadPart = 0x8939b170, kMessages = 0x89392890, kPartMessages = 0x89392830;   // [FW]
 constexpr uint32_t kOsEvent = 0x89301830;   // [FW] the OS's event post
-// [FW] the OS's timer queue's post and remove, its locks, semaphores and clock, each answered 0
+// [FW] the OS's timer queue's post and remove, its locks, semaphores and clock, each answered 0; v354: a task's own
+// alarm (0x89301800, the kernel's) and the MIDI clock out (0x89311780: none goes, as the part sends none)
 constexpr uint32_t kAnswered[] = { 0x893004a0, 0x89300640, 0x893018a0, 0x893018b0, 0x893018c0, 0x893018d0,
-                                   0x893018e0, 0x893018f0 };
+                                   0x893018e0, 0x893018f0, 0x89301800, 0x89311780 };
+constexpr uint32_t kOsRaise = 0x89301840;   // [FW] v354: the OS's event set from an interrupt
+// [FW] v354: the notes' task's start's arming of the schedule (0x8938fc50…0x8938fc62): its count 0, its next time 20
+// on from the tempo timers' clock, and the timer set then (0x8930f050)
+constexpr uint32_t kTimerSet = 0x8930f050, kScheduleStep = 20;
 constexpr uint32_t kEntryAt = 0x899612a8, kEntryStore = 8;   // [FW] part 0's store entry: +0 1 with a store, +8 it
 constexpr uint32_t kStoreAt = 0x8C150000, kMessageAt = 0x8C160000;   // in Vc2Fw's RAM: a drawn store, a message
 constexpr int kEvents = 20, kKinds = 14;
@@ -58,6 +64,10 @@ std::string taskStart(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
     fw.cpu.wr32(Vc2Notes::kHookAt, kVc2SynthEndedHook);
     if (!fw.call(kStartUp, {})) return "the start-up faults: " + fw.cpu.error();
     fw.cpu.wr32(kGateAt, 0);
+    const uint32_t at = fw.cpu.rd32(Vc2TempoList::kAt + 4) + kScheduleStep;   // v354: the schedule armed
+    fw.cpu.wr32(Vc2ScheduleTimer::kAt + offsetof(Vc2ScheduleTimer, count), 0);
+    fw.cpu.wr32(Vc2ScheduleTimer::kAt + offsetof(Vc2ScheduleTimer, at), at);
+    if (!fw.call(kTimerSet, { Vc2ScheduleTimer::kAt, at })) return "the schedule's set faults: " + fw.cpu.error();
     s.taskStart();
     // v351: the audio task's start as the part has it, its interrupts' and DMA's set-up left: the mixer's reset
     if (!fw.call(kMixerReset, {})) return "the mixer's reset faults: " + fw.cpu.error();
@@ -158,6 +168,12 @@ void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts) {
         }
         c.ret(0);
     });
+    fw.cpu.hook(kOsRaise, [&posts](Sh4& c) {   // v354: the clock task's kept, any other's as the post's
+        if (c.r[4] == Vc2SynthClock::kTask) posts.clock |= c.r[5];
+        if (c.r[4] == kVc2SynthNotesTask) posts.notes |= c.r[5];
+        if (c.r[4] != Vc2SynthClock::kTask && c.r[4] != kVc2SynthNotesTask) posts.others = true;
+        c.ret(0);
+    });
     for (const uint32_t at : kAnswered) {
         fw.cpu.hook(at, [](Sh4& c) { c.ret(0); });
     }
@@ -169,9 +185,10 @@ void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts) {
     // update task's (mask 3) answered the events drawn for its pass; v350: the notes' task's (mask 0x3fe) its
     constexpr uint32_t kOsWait = 0x893017f0, kFadeEvent = 0x1000, kFadeAt = 0x19f0 + 0x64, kUpdateMask = 3;   // [FW]
     constexpr uint32_t kNotesMask = 0x3fe;   // [FW]
-    fw.cpu.hook(kOsWait, [&posts](Sh4& c) {
+    fw.cpu.hook(kOsWait, [&posts](Sh4& c) {   // v354: the clock task's (mask 0x47) its drawn events
         if (c.r[4] == kFadeEvent) c.wr32(c.r[12] + kFadeAt, 0);
-        const uint32_t waited = c.r[4] == kNotesMask ? posts.notesWaited : 0;
+        const uint32_t notes = c.r[4] == kNotesMask ? posts.notesWaited : 0;
+        const uint32_t waited = c.r[4] == Vc2SynthClock::kMask ? posts.clockWaited : notes;
         c.ret(c.r[4] == kUpdateMask ? posts.updateEvents : waited);
     });
 }
@@ -179,6 +196,7 @@ void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts) {
 std::string vc2SynthStepDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts) {
     std::string d = vc2SynthDifference(fw, s);
     if (d.empty() && (posts.notes != s.notesEvents || posts.others)) d = "the notes' task's events";
+    if (d.empty() && posts.clock != s.clockEvents) d = "the clock task's events";   // v354
     if (d.empty() && s.reads->unheld() != 0) {   // v347: a read that reaches past the part's memory
         char t[80];
         std::snprintf(t, sizeof t, "the part read bytes no region holds, from 0x%08x", s.reads->firstUnheld());

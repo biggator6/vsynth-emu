@@ -1546,6 +1546,70 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's clock and tempo timers (2026-11-24, v354) {#vc2-synth-clock}
+
+Step 4.3's eighty-second version, Vc2Synth whole's fourteenth. The part now has rom.4's tempo clock and its timers,
+which give the notes' task its schedule (event 0x10) at each MIDI clock.
+
+**Found: the clock object is built at the start.** rom.4's static initializer row 20 (`0x893133d0`) builds the clock
+object `0x8995cb40`. Vc2Synth's start ran only the part's rows (from `0x898c5cc0`) and the OS MIDI's, so the part's
+copy stayed 0 (v343: "0 after the start"). On an XT it holds 20 ticks a clock (+0x10), 500 ms a quarter (+0x14, 120
+BPM), the units' rate 0x4000 (+0x38), no clock seen (+0x41 = −1), 20 ticks to a clock out (+0x42) and 125 ms over six
+clocks (+0x48); its class is `0x898c821c`. C's tempo reads it (v282: 30000 × +0x10 / +0x14 with +0x40 clear), so the
+part's tempo-synced rates now read 120 BPM where they read the object's zeros. Nothing in rom.4 calls the tempo's
+setter (`0x8930ef50`), so 120 BPM stands. Vc2Synth's start builds it (`Vc2SynthClock::build`), and xt_vc2synth's start
+runs row 20 before the OS MIDI's rows, in the table's order.
+
+**The clock's millisecond** (`0x89313000`, from TMU0's application handler `0x89313be0` on each OS tick, by
+`0x89312f50`) is rom.2's `0x894710e0` halfword for halfword (200 of 200), and its take (`0x89312fd0`) is rom.2's
+`0x894710b0`. So the counting is XtTempoTicks' (v189), on the object's words (`Vc2ClockObject`, 0x50 bytes):
+- with +0xe clear and +0x40 set, the outside clock's ramp (`msExternal`, by +0x48 and +0x46);
+- otherwise 24 units a ms into ticks at 20 a clock over the quarter's ms (`msInternal`). While +0x4c is set, each
+  tick then counts +0x42 down by 20s and +0x44 up, and +0x44 is sent as MIDI clocks (`0x89311780(0xf8)`) while one
+  goes; the part sends none;
+- then a task waiting at +0x3c is given event 0x8000 once the ticks reach +0x30; +0x46 counts ms since a clock from
+  outside while +0x41 isn't −1, back to −1 and 0 after 65,535; and event 2 is raised on the clock task (`0x8994fdf8`).
+
+**The clock task's pass** (`0x89313c00`, level 3, its loop from `0x89313c36` on mask 0x47): 2 takes the ticks since
+the last (+0x28 − +0x34) into the tempo timers; 1 turns its own alarm off (the kernel's, v355). 0x40 runs
+`0x89313d50` and `0x89313e10`, posted by the MIDI input's start and stop bytes (`0x89313cb0`), which the part doesn't
+take; it isn't ported ([gap] in VC2_MODE_PLAN.md, step 4.5).
+
+**The tempo timers** (`Vc2TempoTimers`; rom.4's `0x8930f000`…, rom.2's library): a ring of timers at `0x8992e328`
+(.data: its head, the ticks given so far, the soonest due, 0x7fffffff when none), each timer 0x1c bytes (+8 its time,
+0x7fffffff off the ring and 0x7ffffffe fired; +0xc when it fired; +0x10, +0x14 its links; +0x18 its class). The set
+(`0x8930f050`) moves a timer only sooner, putting it on the ring at its end if it was off. The advance (`0x8930f140`)
+adds the ticks and returns while the soonest is later; otherwise it walks the ring once from its head, firing each
+due timer (its time kept as when it fired, then marked fired) through its class and keeping the soonest of the rest.
+Times compare signed. The ring is the arpeggio's key ring of v188 (rom.2's `0x893040a0`, `0x893040c0`), now one
+template, `XtRing.h`, for both.
+
+**The schedule** (`0x89981b40`, built by the part's first row `0x893903b0` as a timer of class `0x898cd118`): the
+notes' task's start sets its count (+0x20) to 0 and its next time (+0x1c) to the ring's ticks + 20, and sets it there
+(`0x8938fc50`…`0x8938fc62`). Each firing (`0x8938fea0`) counts one, posts the notes' task 0x10, and sets it 20 ticks
+on: a schedule each MIDI clock, about every 20.8 ms at 120 BPM. On 0x10 the notes' task takes the count and runs the
+voices' schedule that many times (v350).
+
+**The check.** xt_vc2synth's start runs row 20; the start's compare and every step's now cover the clock object's 0x50
+bytes, the ring's words and the schedule's whole timer (the count was its only word before). The notes part gives one
+event in 13 to a clock event: the clock's state drawn now and then on both sides (one time in four the outside clock
+with its six, since, ramp and clocks seen; one in four the clocks out's switch and counts; one in eight the tempo;
+one in four the ticks run up to 59 ahead of the take, so the schedule fires often), one to three ms (rom.4's
+`0x89312f50`, its event set from an interrupt `0x89301840` kept by object), then the clock task's loop body with the
+registers its prologue leaves, its wait taking what each side raised on it and its own alarm's event half the time.
+
+Results:
+- xt_vc2synth 0 different at 2024 (40 cases), 7 and 31337 (400): 127, 1,224 and 1,226 clock events, the schedule
+  firing 58, 547 and 475 times.
+- Plants: --synth --changed (the plants of Vc2Synth.cpp and Vc2SynthMemory.cpp, and v354's lines on vc2synthclock,
+  vc2tempotimers and vc2synth) 94, all caught. On the first run three were missed. clk-raise was the check's: its
+  clock event cleared what each side raised on the clock task before comparing it, and it now compares after the ms.
+  Two of the advance's couldn't be told apart with the schedule alone on the ring, and went to the list's note. The
+  arpeggio's ring moved into XtRing.h: mutate_arp.py's whole list, 92, all caught, its two ring plants on the new port
+  arpring (XtRing.h, a header planted as the tone's are; mutate.sh and mutate_arp.py).
+- fcheck: xt_vc2synth's start, notes and reads lines (98 initializers, 150 regions; the notes part's events), the
+  baseline updated; xt_arp's as it was.
+
 ### The kernel's event services (2026-11-24, v353) {#vc2-kernel}
 
 Step 4.3's eighty-first version, Vc2Synth whole's thirteenth. `Vc2Kernel` is rom.1's event services hand-ported, as

@@ -90,7 +90,7 @@ ss-part-message|settings.partParameters(w, kind, part);|settings.partParameters(
 ss-message|settings.parameters(w, kind, byte1);|settings.parameters(w, kind, 0);|vc2synthsettings
 ss-routing|return settings.routing(w, on);|return settings.routing(w, false);|vc2synthsettings
 syn-task-hook|    notes.hook = kVc2SynthEndedHook;|    notes.hook = 0;|vc2synth
-syn-task-gate|    noteGate = 0;\n}|    noteGate = 1;\n}|vc2synth
+syn-task-gate|    noteGate = 0;\n    tempoClock()|    noteGate = 1;\n    tempoClock()|vc2synth
 syn-make-tone|return tones.make(id, h) != nullptr ? taken : 0;|return tones.make(id, h) != nullptr ? taken + 4 : 0;|vc2synth
 syn-static-enqueue|override { s_.queue.enqueue(node, s_.voices, *s_.voiceParts); }|override {}|vc2synth
 syn-reload-read|{ return s_.settings->readPart(part); }|{ return part == 0; }|vc2synth
@@ -232,3 +232,46 @@ blk-off-event|s_.post(kVc2SynthNotesTask, kNoteOffEvent);|s_.post(kVc2SynthNotes
 syn-block-input|input != nullptr ? input : kSilence.data()|kSilence.data()|vc2synth
 syn-block-frames|frames.data(), toneParts->voices()|frames.data() + 8, toneParts->voices()|vc2synth
 syn-audio-start|void Vc2Synth::audioStart() { mixer.reset(*blockParts); }|void Vc2Synth::audioStart() {}|vc2synth
+# v354: the part's clock and tempo timers (vc2synthclock, Vc2SynthClock.cpp: the clock object as row 20 builds it, its
+# ms, the clock task's pass, the schedule's firing and arming; vc2tempotimers, Vc2TempoTimers.cpp: the list's set and
+# advance; vc2synth, the start's and the notes' task's start's calls), by the start's compare and xt_vc2synth's notes
+# part's clock events.  Not planted: the waiter (+0x3c, its event a task's not the part's, never drawn), the since
+# count's end (65535 ms, past what the draws reach), the arming's count of 0 (0 from the start already), a fired timer
+# marked off rather than fired (with the schedule alone on the list, set links it to itself again just the same), the
+# firing's class test (the schedule alone on the list), and two of the advance's that the schedule alone can't tell
+# apart: its early return a tick later (the walk then finds nothing due and keeps the same soonest) and its soonest of
+# those not due (the schedule alone is due whenever the walk runs).
+clk-class|o.klass = kClockClass;|o.klass = kClockClass + 4;|vc2synthclock
+clk-perclock|o.perClock = kPerClock;|o.perClock = kPerClock + 1;|vc2synthclock
+clk-quarter|o.quarterMs = kQuarterMs;|o.quarterMs = kQuarterMs + 1;|vc2synthclock
+clk-speed|o.speed = kSpeed;|o.speed = kSpeed + 1;|vc2synthclock
+clk-seen|    o.seen = kNoneSeen;\n    o.outCount|    o.seen = 0;\n    o.outCount|vc2synthclock
+clk-outcount|o.outCount = kOutCount;\n    o.six|o.outCount = kOutCount - 1;\n    o.six|vc2synthclock
+clk-six|o.six = kSix;|o.six = kSix + 1;|vc2synthclock
+clk-schedule-class|t.timer.klass = Vc2ScheduleTimer::kClass;|t.timer.klass = 0;|vc2synthclock
+clk-external|if (o.sync == 0 && o.external != 0) {|if (o.external != 0) {|vc2synthclock
+clk-out-switch|if (ticks != 0 && o.sendOut != 0) {|if (ticks != 0) {|vc2synthclock
+clk-out-wrap|left > 0 ? left : left + kOutCount);|left > 0 ? left : left + kOutCount - 1);|vc2synthclock
+clk-out-pending|(left > 0 ? 0 : 1));|(left > 0 ? 0 : 2));|vc2synthclock
+clk-out-send|if (o.outPending != 0 && parts.sendClock()) --o.outPending;|if (o.outPending != 0) --o.outPending;|vc2synthclock
+clk-since|o.since = (uint16_t)(was + 1);|o.since = (uint16_t)(was + 2);|vc2synthclock
+clk-since-seen|if (o.seen >= 0) {   // 0x8931319e|if (o.seen > 0) {   // 0x8931319e|vc2synthclock
+clk-raise|parts.raise(kTask, kTakeEvent);|parts.raise(kTask, 4);|vc2synthclock
+clk-fire-count|++schedule.count;|schedule.count += 2;|vc2synthclock
+clk-fire-post|parts.post(kNotesTask, kScheduleEvent);|parts.post(kNotesTask, 0x20);|vc2synthclock
+clk-fire-step|schedule.at += kScheduleStep;|schedule.at += kScheduleStep + 1;|vc2synthclock
+clk-take-event|if ((events & kTakeEvent) == 0) return;|if ((events & kAlarmEvent) == 0) return;|vc2synthclock
+clk-take-store|    store(object, t);\n    if (ticks != 0) timers()|    if (ticks != 0) timers()|vc2synthclock
+clk-arm-at|schedule.at = list.clock + kScheduleStep;|schedule.at = list.clock + kScheduleStep + 1;|vc2synthclock
+clk-ramp-read|    t.ramp = o.ramp;\n    return t;|    return t;|vc2synthclock
+clk-remainder-kept|    o.remainder = t.remainder;\n|\n|vc2synthclock
+tt-later|return (int32_t)a > (int32_t)b;|return (int32_t)a >= (int32_t)b;|vc2tempotimers
+tt-set-due|    if (later(list.nextDue, time)) list.nextDue = time;\n}|}|vc2tempotimers
+tt-advance-clock|list.clock += (uint32_t)ticks;|list.clock += (uint32_t)ticks + 1;|vc2tempotimers
+tt-advance-reset|    list.nextDue = Vc2TempoTimer::kOff;\n    const uint32_t first|    const uint32_t first|vc2tempotimers
+tt-advance-fired|t.fired = t.time;|t.fired = list.clock;|vc2tempotimers
+syn-clock-built|    Vc2SynthClock::build(clockObject);        // v354|    // v354|vc2synth
+syn-schedule-built|    Vc2SynthClock::buildSchedule(schedule);   // and|    // and|vc2synth
+syn-schedule-armed|    tempoClock().armSchedule();   // v354|    // v354|vc2synth
+syn-clock-ms|void Vc2Synth::clockMs() { tempoClock().ms(); }|void Vc2Synth::clockMs() {}|vc2synth
+syn-schedule-count|noteGate, pitch, schedule.count,|noteGate, pitch, schedule.at,|vc2synth

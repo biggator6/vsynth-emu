@@ -186,6 +186,8 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SynthTones.cpp
     Source/Vc2SynthBlock.cpp
     Source/Vc2Kernel.cpp
+    Source/Vc2TempoTimers.cpp
+    Source/Vc2SynthClock.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

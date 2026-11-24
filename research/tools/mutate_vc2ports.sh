@@ -39,7 +39,7 @@
 # Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its records and chunks (vc2waverecords, v502) under
 # xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's answers (vc2wavekernel) and its files
 # (vc2bootfiles) under its fourth part; rom.1's kernel's event services (vc2kernel, v353) under xt_vc2kernel, on rom.1
-# beside rom.4.
+# beside rom.4; the part's clock (vc2synthclock, v354) and the tempo timers (vc2tempotimers) under xt_vc2synth.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -196,6 +196,8 @@ VC2PORTS=(
     "vc2synthtones|Vc2SynthTones.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthblock|Vc2SynthBlock.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2kernel|Vc2Kernel.cpp|XT_VC2KERNEL_MAIN|vc2kernel_obj|VC2KERNEL"
+    "vc2synthclock|Vc2SynthClock.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2tempotimers|Vc2TempoTimers.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

@@ -26,6 +26,8 @@ struct Vc2SynthPosts {
     bool others = false;
     uint32_t updateEvents = 0;   // v349: what the update task's wait (0x893017f0 on mask 3) answers
     uint32_t notesWaited = 0;    // v350: and the notes' task's (on mask 0x3fe)
+    uint32_t clock = 0;          // v354: what rom.4 raised on the clock task (0x89301840 on 0x8994fdf8)
+    uint32_t clockWaited = 0;    // v354: and what the clock task's wait (on mask 0x47) answers
 };
 void vc2SynthInstallOs(Vc2Fw& fw, Vc2SynthPosts& posts);
 // After a step: every region, the vocoder, and the flags each side posted the notes' task
@@ -62,6 +64,8 @@ std::string vc2SynthUpdatePass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2Syn
 std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
 std::string vc2SynthMixerBlock(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthInput& input,
                                const Vc2SynthPosts& posts);
+// v354: one to three of the clock's ms (0x89312f50), then the clock task's pass (its loop body from 0x89313c36)
+std::string vc2SynthClockEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
 
 // The reads part (v343): the regions apart; every read of C's over its arguments reaching only the part's regions; then
 // `run.cases` cases, each the part's memory read by address against rom.4's after noise in drawn regions, the Matrix's

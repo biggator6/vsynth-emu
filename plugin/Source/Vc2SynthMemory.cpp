@@ -74,7 +74,8 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(Vc2PartStartWords::kRemainAt, s.startWords.remain, "the settings object's word"),
         vc2SynthRegion(0x89989748, s.pitch, "the pitch source"),
         vc2SynthRegion(0x89981904, s.noteGate, "the note-on gate"),
-        vc2SynthRegion(0x89981b60, s.scheduled, "the schedule's count"),
+        vc2SynthRegion(Vc2ScheduleTimer::kAt, s.schedule, "the schedule's timer"),   // v354: its count +0x20
+        vc2SynthRegion(Vc2TempoList::kAt, s.tempo, "the tempo timers' list"),          // v354
         vc2SynthRegion(0x8993d034, s.autoNoteKeys, "Auto Note's keys"),
         vc2SynthRegion(0x8993d080, s.ticks, "the ticks"),
         vc2SynthRegion(0x8993d084, s.time, "the time struct"),

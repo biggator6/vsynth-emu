@@ -335,6 +335,17 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's clock and tempo timers v354 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v353's 5ef5045;
+  HARDWARE_FIRMWARE.md, "The part's clock and tempo timers"): found, the clock object 0x8995cb40 is built by rom.4's
+  row 20 (0x893133d0), which the part's start didn't run (its copy 0; C's tempo read zeros): now 120 BPM as on an XT.
+  Vc2SynthClock (its ms 0x89313000 by XtTempoTicks on the object's words, the clocks out's count, the waiter, the
+  since count, event 2 to the clock task; the clock task's take into the tempo timers), Vc2TempoTimers (the ring at
+  0x8992e328, set and advance) with the notes' schedule 0x89981b40 (each MIDI clock: its count, the notes' 0x10), the
+  ring one template with the arpeggio's (XtRing.h). xt_vc2synth: row 20 in the start, the clock object's 0x50 bytes,
+  the ring and the schedule's timer in the regions, a clock event in the notes part; 0 different at 2024/7/31337.
+  Plants: --synth --changed 94, all caught; mutate_arp.py 92, all caught, the ring's two on port arpring (XtRing.h).
+  fcheck's baseline updated; verify.sh green.
+
 The kernel's event services v353 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v352's 403a6a9;
   HARDWARE_FIRMWARE.md, "The kernel's event services"): Vc2Kernel, rom.1's services hand-ported (the TCBs' words,
   readyQueue by level, the wait, the event sets from a task and an interrupt, the put-off dispatch and the watchdog's

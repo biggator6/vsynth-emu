@@ -78,9 +78,13 @@ void Vc2Synth::block() {   // v351
 void Vc2Synth::audioStart() { mixer.reset(*blockParts); }   // v351
 
 void Vc2Synth::notesPass(uint32_t events) {   // v350
-    Vc2NotesTaskWorld w { noteGate, pitch, scheduled, autoNoteKeys[0], autoNoteKeys[1], nodes, *midiParts };
+    Vc2NotesTaskWorld w { noteGate, pitch, schedule.count, autoNoteKeys[0], autoNoteKeys[1], nodes, *midiParts };
     vc2NotesTaskPass(w, events);
 }
+
+void Vc2Synth::clockMs() { tempoClock().ms(); }   // v354
+
+void Vc2Synth::clockPass(uint32_t events) { tempoClock().pass(events); }   // v354
 
 void Vc2Synth::giveSystem(const Vc2System& given) {
     std::memcpy(system.bytes.data(), given.bytes.data(), system.bytes.size());
@@ -115,6 +119,7 @@ void Vc2Synth::taskStart() {
     Vc2PartStartWorld w { init, startWords, voices, reloads, staticM, parts };
     vc2PartStartUp(w);
     noteGate = 0;
+    tempoClock().armSchedule();   // v354: 0x8938fc50…0x8938fc62
 }
 
 bool Vc2SynthReloads::readPart(int part) { return s_.settings->readPart(part); }
@@ -135,6 +140,8 @@ void Vc2Synth::start() {
     midi.receiveProgram = midi.receiveBank = kReceiveOn;
     sysexOn = kSysexOn;
     for (Vc2PartNode& n : nodes.nodes) n.channel = 0;   // .bss: the part's init gives them none
+    Vc2SynthClock::build(clockObject);        // v354: the OS's row 20, 0x893133d0, which the part's tempo reads
+    Vc2SynthClock::buildSchedule(schedule);   // and the part's first row's timer (0x893903b0)
 
     midi.staticInitPorts();   // the whole table's 0x893179d0
     midi.staticInitStates();  // and 0x89317db0

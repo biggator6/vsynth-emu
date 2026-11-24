@@ -35,6 +35,7 @@
 #include "Vc2SetTva.h"
 #include "Vc2Sets.h"
 #include "Vc2StaticMatrix.h"
+#include "Vc2SynthClock.h"
 #include "Vc2SynthTone.h"
 #include "Vc2SystemStore.h"
 #include "Vc2TimeTrip.h"
@@ -84,7 +85,7 @@ private:
     Vc2Synth& s_;
 };
 
-struct Vc2Synth final : Vc2SynthToneWorld {
+struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     Vc2Synth();
     ~Vc2Synth();
     Vc2Synth(const Vc2Synth&) = delete;   // its tones' hosts hold the part
@@ -120,9 +121,20 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     uint32_t makeTone(uint32_t id);
     Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }
     // v345: an OS event set on its object (0x89301830): the notes' task's the part keeps
-    void post(uint32_t object, uint32_t flags) {
+    void post(uint32_t object, uint32_t flags) override {
         if (object == kVc2SynthNotesTask) notesEvents |= flags;
     }
+    // v354: one from an interrupt (0x89301840): the clock task's the part keeps as well; no MIDI clock goes out
+    void raise(uint32_t object, uint32_t flags) override {
+        if (object == Vc2SynthClock::kTask) clockEvents |= flags;
+        post(object, flags);
+    }
+    bool sendClock() override { return false; }
+    // v354: the clock's millisecond (0x89313000, TMU0's handler's), and the clock task's pass on the events its wait
+    // took (mask 0x47: 2 its take into the tempo timers)
+    void clockMs();
+    void clockPass(uint32_t events);
+    Vc2SynthClock tempoClock() { return { clockObject, tempo, schedule, *this }; }
     // v340: the tones' world.  The tail's routines the notes' (v345), the OS's event posted; the truncation's wait the
     // tasks' version's: until it, a wait ends the fade
     const Vc2ToneHost& host(int tone) override { return hosts[(size_t)tone]; }
@@ -160,11 +172,13 @@ struct Vc2Synth final : Vc2SynthToneWorld {
     Vc2PartReloads reloads { held, reloadParts };   // 0x89996120 (v300)
     Vc2TripRecords trips {};               // 0x89989408, 0x899996a4 (v306)
     std::array<uint32_t, 16> partTable {};   // 0x8993d040: a part's trip record by number, .data (v343)
-    std::array<uint8_t, 0x4c> clockObject {};   // 0x8995cb40: the OS's clock object, as far as C reads it (v343)
+    Vc2ClockObject clockObject {};         // 0x8995cb40: the OS's clock object (v343; v354 built, row 20)
     Vc2PartStartWords startWords {};       // 0x899893f8… (v304)
     Vc2PitchSource pitch {};               // 0x89989748 (v226)
     uint32_t noteGate = 0;                 // 0x89981904: no note-on while set (v308)
-    uint32_t scheduled = 0;                // 0x89981b60: the schedule's count (v309)
+    Vc2ScheduleTimer schedule {};          // 0x89981b40: the schedule's timer, its count +0x20 (v309; v354 whole)
+    Vc2TempoList tempo {};                 // 0x8992e328: the OS's tempo timers' list (v354)
+    uint32_t clockEvents = 0;              // v354: the flags raised on the clock task's event object (0x8994fdf8)
     std::array<uint32_t, 2> autoNoteKeys {};   // 0x8993d034, 0x8993d038: Auto Note's note-on and note-off keys (v309)
     // v346: the audio task's object (0x8998a480, .bss, row 16's 0x89396470: +8 its class, +0x18 the stereo source's
     // flag, +0x24 Out DC cut for TG; past it, 0x8998a4b4…, the block's), SysEx's flag (0x8992e3d1, .data 1)

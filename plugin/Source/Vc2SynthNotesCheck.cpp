@@ -39,8 +39,10 @@ constexpr uint32_t kPassOneIn = 13;   // an event each task's step one time in 1
 
 struct NotesCounts {
     long events = 0, voiced = 0;   // voiced: the messages after which a note's age is new (a voice started)
-    // v349…v351: the update passes, the notes' task's passes and the blocks among the events, by their ways' order
-    std::array<long, 3> passes {};
+    // v349…v351: the update passes, the notes' task's passes and the blocks among the events, by their ways' order;
+    // v354: the clock events, and the schedule's firings in them
+    std::array<long, 4> passes {};
+    long fired = 0;
     Vc2SynthInput input {};   // v351: a block's input frames, the part given them for it
     long sounding = 0, unfinite = 0;   // v351: the blocks whose frames weren't all 0, held a word not finite
     long under = 0, kept = 0;   // v349: the patches drawn under a VOCODER's tone, the Types kept (vocoderTypesKept)
@@ -159,7 +161,13 @@ std::string blockWay(NotesStep& t) {
     t.n.unfinite += std::ranges::any_of(t.s.frames, unfinite) ? 1 : 0;
     return d;
 }
-constexpr PassWay kPassWays[] = { updateWay, notesWay, blockWay };   // NotesCounts::passes' order
+std::string clockWay(NotesStep& t) {   // v354
+    const uint32_t before = t.s.schedule.count;
+    std::string d = vc2SynthClockEvent(t.fw, t.s, t.rng, t.posts);
+    t.n.fired += t.s.schedule.count - before;
+    return d;
+}
+constexpr PassWay kPassWays[] = { updateWay, notesWay, blockWay, clockWay };   // NotesCounts::passes' order
 
 std::string notesStepEvent(NotesStep& t) {
     const uint32_t pick = t.rng() % kPassOneIn;
@@ -193,13 +201,11 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
     const long different = vc2SynthCases(fw, s, run, 3, "the notes", oneCase);
     std::printf("synth notes: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
                 "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets, %ld update "
-                "passes, %ld notes' task's passes, %ld blocks (%ld sounding, %ld not finite); %ld voiced; %ld patches "
-                "under a "
-                "VOCODER's tone, %ld "
-                "Types kept\n",
+                "passes, %ld notes' task's passes, %ld blocks (%ld sounding, %ld not finite), %ld clock events (%ld "
+                "schedules); %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept\n",
                 vc2SynthCaseCount(run), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3], n.byKind[4],
                 n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.passes[0], n.passes[1],
-                n.passes[2], n.sounding, n.unfinite, n.voiced, n.under, n.kept);
+                n.passes[2], n.sounding, n.unfinite, n.passes[3], n.fired, n.voiced, n.under, n.kept);
     return different;
 }
 #endif
