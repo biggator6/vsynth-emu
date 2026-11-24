@@ -38,7 +38,8 @@
 # xt_vc2patch; the wave index's parse (vc2waveindex, v500) and the sets' data read by address (vc2wavesetsdata,
 # Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its records and chunks (vc2waverecords, v502) under
 # xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's answers (vc2wavekernel) and its files
-# (vc2bootfiles) under its fourth part.
+# (vc2bootfiles) under its fourth part; rom.1's kernel's event services (vc2kernel, v353) under xt_vc2kernel, on rom.1
+# beside rom.4.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -194,6 +195,7 @@ VC2PORTS=(
     "vc2synthupdate|Vc2SynthUpdate.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthtones|Vc2SynthTones.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthblock|Vc2SynthBlock.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2kernel|Vc2Kernel.cpp|XT_VC2KERNEL_MAIN|vc2kernel_obj|VC2KERNEL"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

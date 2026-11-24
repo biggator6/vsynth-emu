@@ -120,6 +120,9 @@ HARNESSES = {
     # v351: 400, as Auto Note's key test, the tones' LFO clock and the pitch source's switch are seen from there (8 s)
     '--synth': (mutlist.Harness('mutate_vc2', 'xt_vc2synth', 'vc2synth_muts.txt', ('vc2synth', '2024'),
                                 'XT_VC2SYNTH_STOP'), '400'),
+    # v353: rom.1's event services, 400 cases (a fraction of a second), as the round robin's rotations are rare
+    '--kernel': (mutlist.Harness('mutate_vc2', 'xt_vc2kernel', 'vc2kernel_muts.txt', ('vc2kernel', '2024'),
+                                 'XT_VC2KERNEL_STOP'), '400'),
     '--sets': (mutlist.Harness('mutate_vc2', 'xt_vc2sets', 'vc2sets_muts.txt', ('vc2sets', '2024'), 'XT_VC2SETS_STOP'),
                '40'),
     '--settings': (mutlist.Harness('mutate_vc2', 'xt_vc2settings', 'vc2settings_muts.txt', ('vc2settings', '2024'),

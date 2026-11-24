@@ -57,6 +57,7 @@ VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEve
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
+VC2KERNEL=(Vc2Kernel Vc2KernelRig Vc2KernelCheck)   # v353: rom.1's event services
 # xt_vc2synth's (v314): every VC-2 port the plugin's build lists but the .p02 reader (v450) and rom.4's own load of the
 # waves and its files (v503), which runs at the start, not in the part (from v345 rom.4's parameter tables and the patch
 # store, which the part reads); then the rom.2 ports they lean on, the shared compares and the check

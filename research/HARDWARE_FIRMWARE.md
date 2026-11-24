@@ -1546,6 +1546,69 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The kernel's event services (2026-11-24, v353) {#vc2-kernel}
+
+Step 4.3's eighty-first version, Vc2Synth whole's thirteenth. `Vc2Kernel` is rom.1's event services hand-ported, as
+the user's decision of v352 has it. What each service does is v352's "The event services, read in rom.1". These are the
+rules the port holds that v352 gives only in brief:
+- **A ready queue is last in, first out.** A task made ready goes to its queue's head (`0x8800fa40`) with its round
+  robin's count at 1 when it has a quantum, not at the quantum, so the next tick turns it if it is the head.
+- **Every switch has one tail.** Each switch site (the wait, the event set's `0x8800fad0`, the put-off dispatch
+  `0x8800fb00`, the restart, the first dispatch) runs the same code after the switch on the task now running. That
+  task takes its waited events (tcbEvent loses tcbEvent & tcbWait) and tcbWait goes to 0; what it took is what its wait
+  answers.
+- **The wait.** With the dispatch held or locked out, it answers 0 at once and doesn't wait. With an event of its mask
+  set and no task behind it in its queue, it takes them and answers at once. With one behind, it goes to its queue's
+  end, keeping the mask, and the head runs. With none set, it leaves its queue.
+- **The event set.** From a task, the test after the OR is the task's events against its mask. From an interrupt
+  (`0x88010190`) it is the bits set against its mask. A task already ready stays where it is in its queue. From a task,
+  a woken task at the running task's level or above runs at once (the same level switches too). With the dispatch held
+  or locked out, a task's event set goes the interrupt's way.
+- **The put-off dispatch.** A task woken from an interrupt becomes freezTask, unless one at its level or above already
+  is, and the watchdog is started for one count of Pφ/32 (WTCSR 0xa580, WTCNT 0x5aff). Its interrupt (INTEVT 0x560,
+  `0x8800fb60`) stops it and, unless the dispatch is held or locked out, dispatches. freezTask is cleared, and if it was
+  at the running task's level or above, the first ready task from its level runs. Releasing the last hold
+  (`0x880102d0`) or ending the lock-out (`0x88010320`) dispatches the same way once the lock reaches 0.
+- **The tick** (`0x8800fdf0`). sysTime goes up by 1. The round robin turns roundLevel's queue (16) unless the dispatch
+  is held or locked out: the head's count drops by 1; at 0 it is reloaded with the quantum and, with a task behind, the
+  head goes to the end. If the head was running, the put-off dispatch goes to the task behind, unless one is pending at
+  that task's level or above. Then each alarm due now gets event 1 as from an interrupt and goes back on the list at
+  sysTime + tcbItvl; the list is kept in time order, a new alarm before any due at the same time. Last, each of the 16
+  cyclic records that is on (bit 0) and due runs its handler and is due again an interval on.
+- **A task's own alarm** (`0x880101e0`): event 1 cleared, tcbItvl kept, the task taken off the list, and put back on at
+  sysTime + n when n is above 0. Taking it off leaves its link and time as they were.
+- **A cyclic record** is made (`0x88010810`) from a spec {handler, on, interval}, the running task its owner, then
+  switched on or off (`0x88010890`): with no handler nothing changes; on, it is due an interval on; off, at 0. A spec of
+  −1 clears the record.
+
+**The check** (xt_vc2kernel). rom.1 runs in the interpreter, read from beside rom.4 (`Vc2KernelRig`): its image, .data
+and .bss by its start-up's words, and the hardware hooked (TMU0's set-up and acknowledgement, the watchdog's start and
+stop). The context switch (`0x88011c30`, given both TCBs; it adds tcbSP's 0x2c itself) is hooked to record which task
+it switched to and what that task's tail takes, then returns, so each service comes back to the check. Each case runs
+the kernel's own start (`0x88010ba0`), takes the kernel's own tasks out of readyQueue (`0x8800fa70`), and makes two to
+six drawn tasks and an idle one at level 31 as rom.4's start makes its own: each TCB by the kernel's reset
+(`0x8800ff50`) from its entry, all made ready last first, then the first dispatch (`0x88010ef0`). Then come 200 drawn
+services:
+- waits by the running task, never the idle one's, half of them on a mask that meets its pending events;
+- event sets, on the running task one time in four;
+- event sets from interrupts, the watchdog's interrupt after them when started, one time in four after a tick;
+- ticks whose four cyclic handlers each set a drawn task's events, as rom.4's handlers do;
+- a task's own alarm, the records made, cleared and switched, the dispatch's holds and its lock-out.
+After each, every TCB word, readyQueue, the system's words, the 16 records, the watchdog and the switch are compared.
+
+Results:
+- First runs: the switch's hook took its arguments for each TCB's +0x2c, and the maker's clear is a spec of −1, not 0.
+  Both were the check's own errors. With them fixed, 0 different.
+- xt_vc2kernel is 0 different at 2024, 7 and 31337: 400 cases and 80,000 services each, with 5,944, 5,760 and 5,938
+  switches.
+- Plants: `vc2kernel_muts.txt`'s 42 are all caught but one, kn-rr-freeze. It is the round robin's tie with a put-off
+  dispatch pending for a task of its own level, and it needs three ready tasks at 16 arranged just so (a task that
+  rotated behind the running one in its wait, then woken from an interrupt, a tick before the watchdog's interrupt).
+  The draws don't reach that in 4,000 cases. The part's model can't either: its tasks run to their waits between
+  interrupts, so none is ready at a tick. Four more aren't
+  planted, since no state the services reach tells them apart; the list says which.
+- fcheck: xt_vc2kernel's section added at 40 cases, the baseline updated.
+
 ### rom.1, the kernel (2026-11-24, v352) {#rom1-kernel}
 
 Step 4.3's eightieth version, Vc2Synth whole's twelfth. **The user's decision (2026-11-24): "Load rom.1".** The

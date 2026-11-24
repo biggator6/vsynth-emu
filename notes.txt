@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The kernel's event services v353 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v352's 403a6a9;
+  HARDWARE_FIRMWARE.md, "The kernel's event services"): Vc2Kernel, rom.1's services hand-ported (the TCBs' words,
+  readyQueue by level, the wait, the event sets from a task and an interrupt, the put-off dispatch and the watchdog's
+  interrupt, the tick's round robin, alarms and cyclic handlers, a task's own alarm, the holds and lock-out).
+  xt_vc2kernel (new): rom.1 in the interpreter beside rom.4 (Vc2KernelRig, its switch hooked), 200 drawn services a
+  case on drawn tasks, every word compared after each; 0 different at 2024/7/31337 (400 cases). Plants --kernel 42,
+  all caught but kn-rr-freeze (not reached by the draws; not reachable in the part). build.sh's part checks moved to
+  build_vc2part.sh (its size). fcheck's baseline gains the section; verify.sh green.
+
 rom.1, the kernel v352 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v351's 3596c4d; the user's "Load
   rom.1"; HARDWARE_FIRMWARE.md, "rom.1, the kernel"): what rom.1 is, by research/tools/kernelmap.py on its bytes at
   run time: it runs at 0x88000000 (the VBR its reset code sets, its vectors there, its jump into itself), its .data

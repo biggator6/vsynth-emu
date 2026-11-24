@@ -34,7 +34,7 @@ V4=($(vc2Tables . .cpp))
 BUILT=(xt_osc xt_cosm xt_lfo xt_env xt_fw xt_enc xt_analog xt_synth xt_tone xt_fx xt_files xt_arp xt_msm xt_vc2params
        xt_vc2in xt_vc2legacy xt_vc2hireso xt_vc2vocoder xt_vc2carrier xt_vc2tracker xt_vc2kind6 xt_vc2autonote
        xt_vc2mixer xt_vc2tone xt_vc2osc classifier_test rd xt_vc2tva xt_vc2cosm xt_vc2libm xt_vc2voices xt_vc2notes
-       xt_vc2keys xt_vc2sets xt_vc2settings xt_vc2midi xt_vc2synth xt_vc2patch xt_vc2waves)
+       xt_vc2keys xt_vc2sets xt_vc2settings xt_vc2midi xt_vc2synth xt_vc2patch xt_vc2waves xt_vc2kernel)
 for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # rom.4's patch store and its .p02 reader (v450) against rom.4's own routines, on the disk image's patches
 [ -f Vc2PatchStoreCheck.cpp ] && cc -DXT_VC2PATCH_MAIN Vc2PatchStoreCheck.cpp Vc2PatchFileCheck.cpp Vc2PatchStore.cpp \
@@ -47,39 +47,8 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
    $( [ -f Vc2WaveRecords.cpp ] && echo Vc2WaveRecords.cpp Vc2WaveRecordsCheck.cpp ) \
    $( [ -f Vc2WaveBoot.cpp ] && echo Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp Vc2BootFiles.cpp Vc2WaveBootCheck.cpp \
       Vc2WaveLookupCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2waves" &
-# The part's voices and their lists (v272) against rom.4's own routines, the destroys, end test and cost hooked
-[ -f Vc2PartVoicesCheck.cpp ] && cc -DXT_VC2VOICES_MAIN Vc2PartVoicesCheck.cpp Vc2PartVoicesEvents.cpp \
-   Vc2PartVoicesFakes.cpp Vc2PartVoices.cpp Vc2PartVoicesTables.cpp \
-   $( [ -f Vc2AssignCheck.cpp ] && echo Vc2AssignCheck.cpp Vc2AssignEvents.cpp Vc2Assigner.cpp ) \
-   $( [ -f Vc2AssignReleaseCheck.cpp ] && echo Vc2AssignReleaseCheck.cpp Vc2AssignReleaseEvents.cpp \
-      Vc2AssignRelease.cpp Vc2AssignNotes.cpp Vc2Keys.cpp Vc2KeysTables.cpp ) \
-   $( [ -f Vc2VoiceClassCheck.cpp ] && echo Vc2VoiceClassCheck.cpp Vc2VoiceClassEvents.cpp Vc2VoiceClass.cpp \
-      Vc2VoiceQueue.cpp Vc2VoiceQueueCheck.cpp ) \
-   $( [ -f Vc2AssignListenersCheck.cpp ] && echo Vc2AssignListenersCheck.cpp ) \
-   $( [ -f Vc2UpdateTask.cpp ] && echo Vc2UpdateTask.cpp Vc2UpdateTaskCheck.cpp ) \
-   "${SH4[@]}" -o "$O/xt_vc2voices" &
-# The part's notes W (v275) against rom.4's own routines, every tone method they reach hooked
-[ -f Vc2NotesCheck.cpp ] && cc -DXT_VC2NOTES_MAIN Vc2NotesCheck.cpp Vc2NotesEvents.cpp Vc2NotesFakes.cpp \
-   Vc2Notes.cpp "${SH4[@]}" -o "$O/xt_vc2notes" &
-# The part's keys (v276) against rom.4's own routines, the OS clock hooked
-[ -f Vc2KeysCheck.cpp ] && cc -DXT_VC2KEYS_MAIN Vc2KeysCheck.cpp Vc2KeysEvents.cpp Vc2Keys.cpp Vc2KeysTables.cpp \
-   $( [ -f Vc2PartNodesCheck.cpp ] && echo Vc2PartNodes.cpp Vc2PartNodesCheck.cpp ) \
-   "${SH4[@]}" -o "$O/xt_vc2keys" &
-# The OS MIDI task's handler and the channel states (v313) against rom.4's own, the OS's listeners and routines hooked
-[ -f Vc2OsMidiCheck.cpp ] && cc -DXT_VC2MIDI_MAIN Vc2OsMidiCheck.cpp Vc2OsMidiEvents.cpp Vc2OsMidi.cpp \
-   Vc2OsMidiHandler.cpp Vc2OsMidiTables.cpp Vc2KeysTables.cpp "${SH4[@]}" -o "$O/xt_vc2midi" &
-# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the .p02 reader (v450) and rom.4's
-# own load of the waves (v503); from v345 rom.4's parameter tables and the patch store, which the part reads, with theirs
-NOT_SYN=" Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp Vc2WavesInUse.cpp "
-SYNX=(XtFxValueText.cpp XtPatchStore.cpp XtSoloVoice.cpp "${FW[@]}")
-VSYN=()
-while read -r f; do
-  [[ "$NOT_SYN" == *" $f "* ]] || VSYN+=("$f")
-done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake)
-[ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2Synth*Check.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
-   XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
-   $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) $( [ -f Vc2OscAnalogRender.cpp ] && echo XtAnalog.cpp ) \
-   "${SYNX[@]}" "${SH4[@]}" -o "$O/xt_vc2synth" &
+# The part's voices, notes, keys, OS MIDI and the part whole, and rom.1's kernel: build_vc2part.sh (its own file, v353)
+source "$REPO/research/tools/build_vc2part.sh"
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
    Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp Vc2SetMemoryReads.cpp \

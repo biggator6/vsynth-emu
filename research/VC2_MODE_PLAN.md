@@ -1223,6 +1223,11 @@ version against rom.4's routines with what it calls hooked:
          as a higher priority; the update task's 0x1 is its own 10-tick alarm (HARDWARE_FIRMWARE.md, "rom.1, the
          kernel"). Next: the kernel's event services ported and checked against rom.1's in the interpreter, then the OS
          model on the part and the whole check.
+       - The kernel's event services (v353): `Vc2Kernel`, rom.1's scheduler as the part runs on it, against rom.1's own
+         in the interpreter (xt_vc2kernel, rom.1 beside rom.4, its switch hooked; HARDWARE_FIRMWARE.md, "The kernel's
+         event services"). Next: the OS model on the part (its tasks' passes on Vc2Kernel at their levels, the 1 ms
+         tick with the update task's alarm and cyclic handler and the clock's tempo ticks, the block's DMA), then the
+         whole check against rom.4's three tasks on rom.1's kernel.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
