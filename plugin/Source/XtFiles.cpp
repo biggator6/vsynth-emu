@@ -51,11 +51,13 @@ std::string xtPatchName(const uint8_t* file, size_t size) {
 
 // ── The check ────────────────────────────────────────────────────────────────
 // xt_files <rom>: on the firmware's disk image, beside the ROM: every preset wave against the firmware's whole-wave routines
-// (0x89529c20, 0x89529ce0), and every patch's values against the firmware's reads (0x894817b0, 0x89484310).
+// (0x89529c20, 0x89529ce0), every patch's values against the firmware's reads (0x894817b0, 0x89484310), and (v600) every
+// link file of Internal.prj against the preset wave it reaches.
 //   xt_files <rom> wave <file.vpw> [out.raw]    what a wave holds, and its audio
 //   xt_files <rom> patch <file.p00> [lo hi]     a patch's name, and the parameters lo..hi (hex) that aren't their defaults
 //   xt_files <rom> extract <n> <out.vpw>        the disk image's nth preset wave as a file
 #ifdef XT_FILES_MAIN
+#include "XtPresetWaves.h"
 #include <fstream>
 #include <iterator>
 
@@ -228,6 +230,7 @@ int main(int argc, char** argv) {
     patches.different += xtWaveCheckOwn(diskImage.bytes(), waves[0]);   // XtWaveFileCheck.cpp; with the patches', as it was
     xtPatchCheckPrint(patches);
     const int shortBad = xtPatchCheckShort(diskImage);
-    return (wavesWrong || patches.different || shortBad) ? 1 : 0;
+    const int linksWrong = xtPresetWavesCheck(diskImage, first);   // XtPresetWavesCheck.cpp, v600
+    return (wavesWrong || patches.different || shortBad || linksWrong) ? 1 : 0;
 }
 #endif

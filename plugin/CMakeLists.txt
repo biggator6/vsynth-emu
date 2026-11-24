@@ -64,6 +64,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginMsm.cpp
     Source/PluginZones.cpp
     Source/PluginPatchFiles.cpp
+    Source/PluginPresetWaves.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
     Source/PluginState.cpp
@@ -154,6 +155,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtPatchStore.cpp
     Source/XtWaveFile.cpp
     Source/XtDiskImage.cpp
+    Source/XtPresetWaves.cpp
     Source/XtPatch.cpp
     Source/XtFxChip.cpp
     Source/XtFxControl.cpp
@@ -235,9 +237,11 @@ vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp T
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)
 # The output always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite
 vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
+# A project's own files (v600 on): a link to a preset wave followed to the wave it names
+vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
                  VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
-                 VSynthEmuExtInTest VSynthEmuOutputTest)
+                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest)

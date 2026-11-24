@@ -335,6 +335,21 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc0e3b7, numbered v600-v649 beside the
+  VC-2 work; HARDWARE_FIRMWARE.md, "A project's wave links"; the user's ".w00 files", "proceed here"). A .w00 is a link
+  file, 36 bytes: the preset wave's number in the V-Synth's library and its name; a project's slot NNN may link to any
+  preset wave (the user's Altered States: slot 002 to preset 46), and a patch's Wave Number is the slot (39 of 39 PCM
+  OSCs there on a slot the folder has). Library wave n -> map n -> sample n -> the nth stream on a sector past the
+  partition, on two sources: the samples' kind bytes are the streams' types, 224/224 in order (111 shuffled), and
+  1stchoice's 224 byte-equal waves name the same instruments. XtPresetWaves (the link, the library, the streams; no JUCE),
+  PluginPresetWaves (once a process, the image beside rom.2 then rom.4, a stream read alone when a link asks);
+  readVSynthWave follows a link, findWave takes .w00, isVSynthWave moved to PluginPatchFiles.cpp, the OSC chooser offers
+  *.w00, a "no wave N" note says why. xt_files' links: line, 224 links 0 wrong, every wave read whole (fcheck baseline
+  +1 line, the only difference); mutate_files.py's 7 presetwaves plants and the 24 wavefile ones caught, 0 missed;
+  mutate_tone.py --changed: 1 of 1; wlflib.py checks the kind bytes in order (seen red shifted, 26 differ).
+  VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
+  slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
+
 The plugin's output always numbers v454 (2026-11-24, on vc2-mode ab50a1c; HARDWARE_FIRMWARE.md, "The plugin's output
   always numbers"; the user's "ok, fix the NaN at the output"). OutputFinite (PluginOutputFinite.h), made at the top of
   processBlock, sets a sample that isn't a finite number to 0 on every way out, so no NaN or infinity reaches the host

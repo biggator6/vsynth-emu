@@ -3912,6 +3912,54 @@ The results:
   law at ±32 and its byte casts within ±32, the curve's test at 7), and one, a flag set right after a TVA row's last
   read, showed the flip landed on small read counts too seldom; a third of the flips now land within 16 reads.
 
+### A project's wave links (2026-11-24, v600) {#wave-links}
+
+The user's request (2026-11-24): read `.w00` files. On the XT these are not waves: they are **link files**, 36 bytes, a
+`link` chunk of 4 bytes holding a wave's number in the V-Synth's wave library and a `name` chunk of 16, its name padded
+with spaces. A project's `Wave` folder holds them beside its own waves (`.wav`, `.vpw`), each file named by its slot
+number. `Internal.prj` links slot n to preset wave n, 224 of them; a user's project links any slot to any preset wave:
+the user's *Altered States* (`Altered StatesXT.prj`, outside the repo) has 30 links and 15 waves of
+its own, slot 002 linking to preset 46 `SYN-PWMosc`, 003 to 70 `SFX-Fallen`, slots 001, 031 and 038 to preset 1, 3 and
+3 again. A patch's Wave Number (IDs 0x2be, 0x2f2; 0 to 999, default 1) is the slot: of the 50 patches' OSCs of type
+PCM (0x2a5, 0x2d9 = 1), 39 of 39 land on a slot the folder has (30 links, 9 waves); every number past 045 there is an
+ANALOG OSC's (the type's default, 0), left over.
+
+**A link to its stream.** The library is `"V-Synth Wave.bin"` (research/VC2_VOCAL_DESIGNER.md, "The wave libraries,
+read"): WLF08 at 0x3810200 past the partition, its first version `1.00VSYN2W050316`. Wave n's one split names map n,
+map n's one split names sample n, and sample n's path is `VPW\__nnn_<name>.vpw`, for all 224. A sample is then a file of
+the preset drive `D:\`, which a kernel serves; its directory is in no image (searched: rom.0 to rom.4, MI004 and the
+disk image for `__001_DLP`, found only in the library's own path; no `D:\` literal in rom.2, whose `0x8949a810`
+builds it). So **sample n is the nth stream starting on a sector past the partition** rests on two sources, which agree:
+- [FW] the library's own: each sample entry's byte after its 32-byte path (the kind byte; on the VC-2 rom.4's sample
+  reader's out+0, and the stream's vpsc type, `wlflib.py samples VC2`) is the encode type of the nth such stream, 224
+  of 224 in order. The noise floor: 111 with the kinds shuffled, 198 shifted by one, as kinds come in runs (77 SOLO, 134
+  BACKING, 13 ENSEMBLE). `wlflib.py` now checks it (seen red: streams shifted by one, 26 differences, the first at
+  sample 18).
+- [COR] 1stchoice's 250 waves (`Vsynth_Software/1stchoice`): 224 have a `data` chunk byte for byte one of these streams,
+  one each, and the name each carries is the same instrument as the library's sample in that slot: 191 by their names
+  (`DLP-Crenshaw`, `PRC-UduPot`), the other 33 renamed (`TR Snare` for `SN-AnalogSn1`, `Voco Kick` for `EPRC-Voco1`,
+  `TR Hat` for `CYM-eHat1`, `ElecLiteSnr2` for `SN-LiteSn1`). 1stchoice's own numbering is its own (0 of 224 match).
+
+**The plugin** (`XtPresetWaves`, no JUCE): `xtWaveLinkRead` reads a link; `XtPresetWaves::build` walks the library as
+`wlflib.py` does (its sections by their numbers, as rom.4's parser takes the VC-2's) and keeps each wave's name, kind
+byte and its stream's place and length (to the next stream), refusing a wave or map of more than one split, a number
+outside its section, and a stream whose vpsc type (`xtWaveEncodeType`, `xtWaveRead`'s own chunk walk) isn't its kind.
+`PluginPresetWaves` holds it once a process, the image found beside rom.2 then rom.4 and read once, and reads a wave's
+stream alone from the file when a link asks. `readVSynthWave` follows a link, so a patch's load, its zones, an OSC's
+file and a session's restore all do; `findWave` takes `.w00` by slot; `isVSynthWave` (moved from PluginProcessor.cpp)
+takes a link; the OSC's chooser offers `*.w00`; a patch's "no wave N" note says why.
+
+**The checks.** `xt_files`' `links:` line: the library built from the image, 224 preset waves, 77 SOLO, 134 BACKING, 13
+ENSEMBLE, 9,556,574 frames, the last `PRC-UduPot` at 0x218b200; Internal.prj's 224 link files naming all 224, 0 wrong;
+each wave read whole from its stream's bytes alone, 0 unread; a hash of the places and samples. `files_muts.txt`'s 7
+`presetwaves` plants. `VSynthEmuProjectTest` (new, in `verify.sh`): an image patch whose OSC 1 plays slot N, in a
+project whose slot N links to another preset M (`Da 'V' Code`, slot 117 to preset 224), loads M's own settings onto
+OSC 1, not N's preset's (seen red: the slot taken for the preset, 3 checks fail); a link loads into an OSC by itself; a
+link past the library loads nothing and the note says why. 11 checks.
+
+**Not done:** rom.2's own link and library readers (`0x8949a088…`, `0x8949a810`) aren't run; the preset drive's
+directory isn't found.
+
 ### The plugin's output always numbers (2026-11-24, v454) {#output-finite}
 
 What processBlock hands the host never holds a NaN or an infinity: a sample that isn't a finite number becomes 0, on

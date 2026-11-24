@@ -11,7 +11,8 @@
 # still says 0 different missed the error: either the check is too weak, or
 # the change is exact (e.g. a product of powers of two regrouped).
 # PORT=wavefile: XtWaveFile.cpp (a wave's chunks) under xt_files, as PORT=files; PORT=tonewave: XtWaveFile.cpp under xt_tone.
-# PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files.
+# PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files; PORT=presetwaves:
+# XtPresetWaves.cpp (a project's links and the preset waves they reach, v600), the same.
 # PORT=patchstore: XtPatchStore.cpp (the patch store's layout and the descriptors' reads, v187) under xt_files, as
 # PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone; PORT=tonearp: XtSynthArp.cpp under xt_tone (v189).
 # PORT=arp: XtArpeggio.cpp (the arpeggiator's keys and settings, v188), PORT=arpstep: XtArpeggioStep.cpp (its timer and
@@ -108,7 +109,7 @@ elif [[ "$PORT" =~ ^vc2 ]]; then   # rom.4's ports, on rom.4 (mutate_vc2ports.sh
     vc2Port "$PORT"
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
-elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then
+elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore|presetwaves)$ ]]; then
     # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), with PORT=diskimage XtDiskImage (the firmware's disk
     # image), with PORT=patchstore XtPatchStore (the store's layout), against fcheck's baseline of xt_files; [cases] is
     # not used.  The others, xt_files' checks among them, are built as they are.
@@ -116,11 +117,13 @@ elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore)$ ]]; then
         wavefile) F=XtWaveFile.cpp ;;
         diskimage) F=XtDiskImage.cpp ;;
         patchstore) F=XtPatchStore.cpp ;;
+        presetwaves) F=XtPresetWaves.cpp ;;
         *) F=XtFiles.cpp ;;
     esac
     D=XT_FILES_MAIN
     L=()
-    for f in XtFiles.cpp XtWaveFile.cpp XtDiskImage.cpp XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp; do
+    for f in XtFiles.cpp XtWaveFile.cpp XtDiskImage.cpp XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp \
+             XtPresetWaves.cpp XtPresetWavesCheck.cpp; do
         [ "$f" = "$F" ] || L+=("$S/$f")
     done
     L+=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
@@ -129,7 +132,7 @@ elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's ro
     OBJ="$M/files_obj"; mkdir -p "$OBJ"
     [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.cpp" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.h" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFirmware.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FILES_MAIN -I"$S" -c "$S/XtFiles.cpp" -o "$OBJ/XtFiles_main.$$.o" && mv "$OBJ/XtFiles_main.$$.o" "$OBJ/XtFiles_main.o"; }
     L=("$OBJ/XtFiles_main.o" "$S/XtWaveFile.cpp" "$S/XtDiskImage.cpp" "$S/XtPatchStore.cpp" "$S/XtPatchStoreCheck.cpp"
-       "$S/XtWaveFileCheck.cpp" "$S/XtMultiBandPlayer.cpp"
+       "$S/XtWaveFileCheck.cpp" "$S/XtPresetWaves.cpp" "$S/XtPresetWavesCheck.cpp" "$S/XtMultiBandPlayer.cpp"
        "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
@@ -189,7 +192,7 @@ if [ "$PORT" = solo ]; then
     cat "$T"/* | grep -E "$P"
     exit
 fi
-if [[ "$PORT" =~ ^(files|filesfw|wavefile|diskimage|patchstore)$ ]]; then
+if [[ "$PORT" =~ ^(files|filesfw|wavefile|diskimage|patchstore|presetwaves)$ ]]; then
     # the baseline's whole xt_files section, as xt_files gains lines (v148, v155): a line the run prints that isn't in it differs, and one of it the run doesn't print
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; awk '/^== /{s = ($0 == "== xt_files"); next} s' "$B" > "$T"
     "$M/$N" "$ROM" 2>/dev/null > "$M/$N.all"; st=$?

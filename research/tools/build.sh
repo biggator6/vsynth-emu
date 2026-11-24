@@ -11,9 +11,11 @@ cd "$S" || exit 1
 FW=(XtFirmware.cpp $( [ -f XtFwMachine.cpp ] && echo XtFwMachine.cpp ))   # the routines and their machine (v175 on)
 SH4=(Sh4Interp.cpp $( [ -f Sh4Setup.cpp ] && echo Sh4Setup.cpp ))   # the interpreter and its setup (v197 on)
 # V-Synth's files: patches, a wave's chunks, and the firmware's disk image (its own file from v177 on); the patch store's
-# layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on)
+# layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on); the preset waves a
+# project's link reaches, and their check (v600)
 VF=(XtFiles.cpp XtWaveFile.cpp $( [ -f XtDiskImage.cpp ] && echo XtDiskImage.cpp )
-    $( [ -f XtPatchStore.cpp ] && echo XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp ))
+    $( [ -f XtPatchStore.cpp ] && echo XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp )
+    $( [ -f XtPresetWaves.cpp ] && echo XtPresetWaves.cpp XtPresetWavesCheck.cpp ))
 # The arpeggiator in XtSynth (v189): the router and what it sends, the engine (v188), the tempo ticks and a patch's reads
 SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp \
       XtTempoTicks.cpp ))

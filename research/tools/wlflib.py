@@ -35,6 +35,7 @@ import wlfbank
 img = diskls.img
 SECTOR = 512
 PATH_BYTES = 32   # a sample entry's path, before its kind byte
+STREAM_HEAD = 0x400   # a stream's bytes enough for its vpfl and vpsc chunks
 
 
 @dataclass
@@ -144,9 +145,18 @@ def vc2_bank_problems(lib):
 
 
 def vsynth_bank_problems(lib):
+    """The V-Synth's samples against the streams that start on a sector: as many, and (v600) sample n the nth of them,
+    each sample's kind byte its stream's vpsc type in order (the firmware's side of the mapping; 1stchoice's names are
+    the corpus's, HARDWARE_FIRMWARE.md, "A project's wave links")."""
     aligned = [s for s in streams() if s % SECTOR == 0]
     print(f'  streams on a sector: {len(aligned)}, {aligned[0]:#x}…{aligned[-1]:#x}, against {len(lib.paths)} samples')
-    return [] if len(aligned) == len(lib.paths) else [f'{len(aligned)} streams on a sector, {len(lib.paths)} samples']
+    if len(aligned) != len(lib.paths):
+        return [f'{len(aligned)} streams on a sector, {len(lib.paths)} samples']
+    types = [wlfbank.vpsc_type(img[at:at + STREAM_HEAD]) for at in aligned]
+    differ = [f'sample {n} {path!r}: kind {kind}, the stream at {at:#x} vpsc type {t}'
+              for n, (path, kind, at, t) in enumerate(zip(lib.paths, lib.kinds, aligned, types), 1) if t != kind]
+    print(f'  kind bytes against the streams in order: {len(aligned) - len(differ)} of {len(aligned)} the same')
+    return differ
 
 
 # Each library's link files and its samples' bank, by its version tag

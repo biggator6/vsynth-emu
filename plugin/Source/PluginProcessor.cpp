@@ -62,18 +62,7 @@ void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 void VSynthEmuProcessor::releaseResources() {}
 
 // ─── File Loading ─────────────────────────────────────────────────────────────
-
-// A V-Synth wave by its first chunks: a .vpw, or a project's .wav, the same chunks in a RIFF.  A LITE wave in a project is a RIFF with no
-// vpfl, its vpsc after the fmt chunk.
-static bool isVSynthWave(const juce::File& file) {
-    juce::FileInputStream in(file);
-    char head[64] = {};
-    const int n = in.openedOk() ? in.read(head, (int)sizeof head) : 0;
-    if (n >= 4 && !std::memcmp(head, "vpfl", 4)) return true;
-    if (n < 12 || std::memcmp(head, "RIFF", 4) || std::memcmp(head + 8, "WAVE", 4)) return false;
-    for (int i = 12; i + 4 <= n; ++i) if (!std::memcmp(head + i, "vpfl", 4) || !std::memcmp(head + i, "vpsc", 4)) return true;
-    return false;
-}
+// A V-Synth wave known by its first chunks: isVSynthWave, PluginPatchFiles.cpp (v600)
 
 // The wave's own settings to OSC `osc`'s parameters.
 void VSynthEmuProcessor::waveToParameters(const XtWaveFile& wave, int osc) {
@@ -203,7 +192,7 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
         files[k] = findWave(waveFolder, number);
         std::string why;
         if (files[k].existsAsFile() && readVSynthWave(files[k], waves[k], &why)) { found[k] = true; xtWaveOntoControls(waves[k], o); }
-        else notes.add("no wave " + juce::String(number));
+        else notes.add("no wave " + juce::String(number) + (why.empty() ? juce::String() : ": " + juce::String(why)));
     }
     setPatchControls(c);   // and the Multi Step Modulator stopped, as the XT's patch load does (PluginMsm.cpp, v193)
     for (int k = 0; k < 2; ++k)

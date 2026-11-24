@@ -52,3 +52,10 @@ vpdt-solo-stride|kSolo { 10, 16, 8 }|kSolo { 16, 10, 8 }|wavefile
 vpdt-band-first|kBand { 0x2e, 0x58, 14 }|kBand { 0x2e, 0x58, 16 }|wavefile
 vpdt-count|const uint32_t nev = le32(vpdt + 8) >> 16;|const uint32_t nev = (le32(vpdt + 8) >> 16) - 1;|wavefile
 vpdt-lite|{ nullptr, &kSolo, nullptr, &kBand, nullptr, &kBand }|{ nullptr, nullptr, nullptr, &kBand, nullptr, &kBand }|wavefile
+preset-order|const size_t at = onSector[sample - 1];|const size_t at = onSector[sample % onSector.size()];|presetwaves
+preset-version|kVSynthVersion = "VSYN2W"|kVSynthVersion = "VC2W"|presetwaves
+preset-section|out[number - 1u]|out[number % kSections]|presetwaves
+preset-sample|kMapSampleAt = 4,|kMapSampleAt = 2,|presetwaves
+preset-bytes|const size_t bytes = (next == streams.end() ? d.size() : *next) - at;|const size_t bytes = (next == streams.end() ? d.size() : *next) - at - 64;|presetwaves
+link-number|kLinkNumberAt = 8,|kLinkNumberAt = 12,|presetwaves
+link-trim|s.erase(s.find_last_not_of(' ') + 1);|;|presetwaves

@@ -4,6 +4,7 @@
 // time.  HARDWARE_FIRMWARE.md, "V-Synth's files".  Needs xtFwOpen.  Not for the audio thread.
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -58,6 +59,9 @@ struct XtWaveFile {
 // A .vpw's chunks, or a preset wave's in the disk image, with its RDAC audio unpacked; or a project's .wav, the same chunks in a RIFF
 // with the audio as plain samples.  False (and why) for anything else, a WAV with no vpsc among them.
 bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* why = nullptr);
+// Its encode type alone, vpsc's byte 1, by the same chunks and without its audio (v600: a preset wave against its sample's
+// kind byte, XtPresetWaves); none when there's no vpsc
+std::optional<int> xtWaveEncodeType(const uint8_t* file, size_t size);
 
 // ── A patch ──────────────────────────────────────────────────────────────────
 constexpr int kXtPatchBytes = 0x14fa;

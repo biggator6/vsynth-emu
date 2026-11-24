@@ -188,7 +188,7 @@ void OscPanel::paintDisplay(juce::Graphics& g) const {
 
 void OscPanel::chooseWave() {
     chooser_ = std::make_unique<juce::FileChooser>("Load a wave into OSC " + juce::String(osc_ + 1), juce::File(),
-                                                   processor_.getFormatManager().getWildcardForAllFormats());
+                                                   processor_.getFormatManager().getWildcardForAllFormats() + ";*.w00");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                           [this](const juce::FileChooser& fc) {
                               const juce::File file = fc.getResult();

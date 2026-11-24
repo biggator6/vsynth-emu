@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <optional>
 
 using xtfile::fail;
 using xtfile::le32;
@@ -140,4 +141,11 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
     readLoops(c.at[Lp], c.bytes[Lp], out);
     readEvents(c, out);
     return readSamples(c, linear, out, why);
+}
+
+std::optional<int> xtWaveEncodeType(const uint8_t* file, size_t size) {
+    Chunks c;
+    size_t end = 0;
+    if (!findChunks(file, size, c, end, nullptr) || !c.at[Sc] || c.bytes[Sc] < 2) return std::nullopt;
+    return c.at[Sc][1];
 }
