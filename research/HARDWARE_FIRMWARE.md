@@ -1546,6 +1546,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The plain voice and the drain's flag: out of the part's reach (2026-11-25, v359) {#vc2-synth-plain-voice}
+
+Step 4.3's eighty-seventh version. Six of the plants xt_vc2synth missed, shown out of reach and taken out of
+`vc2synth_muts.txt`. No code changed.
+
+**The plain voice's routines** (`svo-destroy-end`, `-note`, `-updated`, `svo-prepare-plain`, `svo-keyoff-plain`;
+missed since v346). A voice's virtuals go by its class at +0x10: the note voice's (`0x898cd3dc`) or the plain voice's
+(`0x898cd1a8`: +0x14 `0x89391730`, retune `0x893916c0`, destroy `0x893916d0`, key-off `0x893916f0`, prepare
+`0x89391710`, the change test `0x89391720`). On rom.4 no voice of the plain class is ever on a list's walk or
+destroyed:
+- the plain vtable is written by the voices' init (`0x89391ba0`, once, from the notes' task's start at `0x89392af2`)
+  and as the first store of the two builds' constructor chains (`0x89396a0c`, `0x89396be6`), each followed at once by
+  the note class's (`0x89396a16`, `0x89396bf0`);
+- the destroy-on-leave word (`0x89391740`) is written only by those two builds (`0x89396a20`, `0x89396bfa`), so a
+  plain voice is never destroyed;
+- a voice reaches the sounding and prepared lists, where prepare, key-off, retune and the change test are called,
+  only through the take that the build follows.
+
+Results:
+- Counting hooks on both classes' six routines in every rom.4 xt_vc2synth runs (the load, notes and reads parts and
+  each pair of the whole part), at 400 cases on 2024, 7 and 31337: the plain class's 0 calls, the note class's
+  thousands (prepare 9,644, 11,441 and 8,257; key-off 2,583, 2,550 and 2,311).
+- The control: at the notes part's last case, a sounding voice made plain on both sides (+0x10, its +0x30 set), then
+  rom.4's plain prepare, key-off and destroy each against the port's, every region and tone compared after each.
+  Clean: 0 different. With each of the five plants: different there (destroy-end the tone pool's head, -note +0x4c,
+  -updated and prepare-plain +0x30, keyoff-plain the tone's envelope).
+
+**The drain's flag** (`mp-empty-draining`, missed since v355). The wait for the OS MIDI task's queue to empty
+(`0x89311070`) tests the queue's draining flag, set only inside its task's drain (`0x893110b0`, level 12). The drain
+neither waits nor posts a sender, so a sender (the input task, level 1; the front, 27) can test the flag set only if an
+interrupt is taken inside the drain. That is the XT's own timing: a MIDI byte arriving mid-drain. Neither the check's
+events, taken at the model's waits, nor the plugin's, which come between the model's passes, can give it, so the plant
+changes nothing either can play.
+
+Results:
+- The draws: the flag was set at none of the tests (24,413 at 2024, 32,426 at 7, 20,028 at 31337).
+- The control: the flag set on both sides (rom.4's queue +0x2c in the part's words), then a MIDI IN note-on given. Clean:
+  the same. With the plant: its sender goes on while rom.4's waits, and the keys differ.
+
+Both taken out with their notes; the list holds 322 plants. The plants of the other eight misses (v360 on) are as they
+were.
+
 ### The round robin's tie with a put-off dispatch (2026-11-25, v358) {#vc2-kernel-rr-tie}
 
 Step 4.3's eighty-sixth version, the first of the plants the firmware checks still missed after the merge's whole

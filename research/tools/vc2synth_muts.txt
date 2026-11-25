@@ -129,14 +129,17 @@ svo-block-env|t.setEnvelopeBlock(row.n, block, h); break;|t.setEnvelopeBlock(0, 
 svo-block-lfo|t.setLfoBlock(row.n, block, h); break;|t.setLfoBlock(0, block, h); break;|vc2synthvoices
 svo-block-tva|    case Vc2NoteBlock::tva: t.setTvaBlock(block, h); break;\n|\n|vc2synthvoices
 svo-ended|if (routine == kVc2SynthEndedHook) s_.post(|if (routine != kVc2SynthEndedHook) s_.post(|vc2synthvoices
-svo-destroy-end|    s_.notes.end(n.note, *s_.noteParts);\n|\n|vc2synthvoices
-svo-destroy-note|    n.note = 0;\n    n.updated = 0;|    n.updated = 0;|vc2synthvoices
-svo-destroy-updated|    n.note = 0;\n    n.updated = 0;|    n.note = 0;|vc2synthvoices
+# v359: the plain voice's routines taken out (svo-destroy-end, -note, -updated, svo-prepare-plain, svo-keyoff-plain),
+# none reached on rom.4: the plain vtable 0x898cd1a8 is written by the voices' init (0x89391ba0, once, from the
+# notes' task's start 0x89392af2) and as the first store of the two builds' constructor chains (0x89396a0c,
+# 0x89396be6), each followed at once by the note class's 0x898cd3dc; the destroy-on-leave word 0x89391740 only by
+# those builds; a voice reaches a list's walks only through the take that builds it. Hooked on rom.4 in every part
+# at 400 cases on 2024, 7 and 31337: the plain class's six routines 0 calls, the note class's thousands. Forced on a
+# sounding voice made plain on both sides, rom.4's prepare, key-off and destroy against the port's: 0 different,
+# and each of the five plants differs there
 svo-legato|s_.legato = { legato.found, legato.marked, legato.onByte, 0 };|s_.legato = { legato.found, legato.found, legato.onByte, 0 };|vc2synthvoices
-svo-prepare-plain|        s_.voices.at(voice).updated = 0;\n        return;|        return;|vc2synthvoices
 svo-prepare-kind|kVc2SynthLegatoAt, call.passed, call.kind };|kVc2SynthLegatoAt, call.passed, 0 };|vc2synthvoices
 svo-retune|s_.classes.retune(voice, message, value,|s_.classes.retune(voice, message, 0,|vc2synthvoices
-svo-keyoff-plain|    if (note != 0) s_.notes.release(note, *s_.noteParts);|    (void)note;|vc2synthvoices
 svo-changed|? s_.classes.changed(voice, s_.voices, *this) : 0;|? 0 : 0;|vc2synthvoices
 svo-table|/ sizeof(Vc2KeyGlide)].table;|/ sizeof(Vc2KeyGlide) + 1].table;|vc2synthvoices
 svo-reload|(uint32_t)sizeof(Vc2Reload) * part);|(uint32_t)sizeof(Vc2Reload) * (part + 1));|vc2synthvoices
@@ -390,7 +393,12 @@ mp-os-classes|kOsClasses[] = { 0x01, 0x70, 0xa0,|kOsClasses[] = { 0x01, 0x72, 0x
 mp-os-kinds|kOsKinds[] = { 0, 4, 5 };|kOsKinds[] = { 0, 4 };|vc2synthmidipath
 mp-notes-classes|kNotesClasses[] = { 0x01, 0x40, 0x41, 0x70,|kNotesClasses[] = { 0x01, 0x40, 0x70,|vc2synthmidipath
 mp-notes-owner|    s_.midiPath.notes.w.owner = kNotesTcb;   // 0x89390216\n|\n|vc2synthmidipath
-mp-empty-draining|if (p.osMidi.w.draining != 0 \|\| !vc2QueueEmpty(p.osMidi.w)) {|if (!vc2QueueEmpty(p.osMidi.w)) {|vc2synthmidipath
+# v359: mp-empty-draining taken out: the OS MIDI queue's draining flag is set only inside its task's drain
+# (0x893110b0, level 12), which neither waits nor posts a sender, so a sender (the input task, level 1; the front,
+# 27) tests it set only if an interrupt is taken inside the drain: the XT's timing, which neither the check's events
+# (taken at the model's waits) nor the plugin's give. The draws: the flag set at none of the tests (24,413 at 2024,
+# 32,426 at 7, 20,028 at 31337). Forced on both sides at a MIDI IN message's test: the same; with the plant, the
+# keys differ
 mp-ring-node|    if (t.node == Path::kHubNodeAt) {|    if (t.node == Path::kClockAt) {|vc2synthmidipath
 mp-drain-two|if (vc2QueueMessageWords((uint8_t)message) == 2 && !vc2QueueTake|if (vc2QueueMessageWords((uint8_t)message) == 3 && !vc2QueueTake|vc2synthmidipath
 mp-front-way|front_ = Sender { Os::kFront, Stage::emptyWait,|front_ = Sender { Os::kFront, Stage::hubListener,|vc2synthmidipath
