@@ -1408,11 +1408,13 @@ version against rom.4's routines with what it calls hooked:
      host wait (v355): each message goes, as its bytes, into MIDI IN's or USB's receive ring (2048 words,
      preallocated, as rom.4's row 15 builds it), and a full ring drops its backlog for the full marker, as rom.4's does
      (`0x89311e90`); the input task's wait for room is the task's own state, not the audio thread's.
-   - [gap] A player's read past the waves (v362). rom.4's players walk past a wave's samples in some states
-     (xt_vc2synth's far reads, at physical 0x07959e08, 0x08704e30, 0x09085420 and 0x0ca1e0e8), and a factory patch
-     reaches it: with the factory patches in xt_vc2synth's notes part, 31337's notes case 69 reads 0xaca1e0e8. On an XT
-     that read takes whatever is there, and the port plays 0. xt_vc2synth gives rom.4 zeros there and holds the two
-     sides' counts equal (HARDWARE_FIRMWARE.md, "The part given the disk image's waves").
+   - [gap] A player's interpolated sample loads past its wave (rom.4's 46 sample-load pcs) read rom.4's own memory on
+     an XT: its .text (e.g. 0xa93220b0) or .bss (e.g. 0xa9d5a518), as sample values. Factory patches reach it: 8 reads
+     in the 2024 factory run, 32 in 31337's. The port plays 0. The .text part could match by reading rom.4's image at
+     those addresses; the .bss part would need the part's memory as rom.4 lays it out. Not done: the check gives rom.4
+     zeros there (v363; HARDWARE_FIRMWARE.md, "Sample loads past the waves"). The walk past the wave reaches unmapped
+     memory too (physical 0x07959e08, 0x08704e30, 0x09085420, 0x0ca1e0e8; 31337's factory notes case 69 reads
+     0xaca1e0e8), where an XT reads whatever is there, and the port plays 0 (v362).
    - [gap] A LITE voice reused across kinds reads its loop record through a stale pointer (0x893c859a); on an XT that
      read lands in area 7's on-chip registers (P4), whose values the port doesn't model; the port reads 0. Reached by
      seed 3's noise draws (xt_vc2synth's notes case 28, through 0x3ea7ffcb), by no factory patch in the runs at 2024, 7

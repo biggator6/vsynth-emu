@@ -1546,6 +1546,67 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Sample loads past the waves: zeros wherever they land, the factory patches' cases (2026-11-25, v363) {#vc2-synth-sample-loads}
+
+Step 4.3's ninetieth version, the coordinator's call (A) on v362's far reads in mapped memory.
+
+**What v362 left.** With the disk image's waves on both sides, some of a player's interpolated sample loads past its
+wave land in memory rom.4 maps. Some land in its own .text (0xa93220b0, mid-routine; 0xa942db90, 0xa98caa30,
+0xa9713c88), others in its .bss (0xa9d5a518, 0xa9e6cca8, 0xaa0be768). rom.4 reads its code or state there as samples,
+as an XT would; the port reads 0. Both compute the same addresses. Seeds 4 and 5 have 4 such reads each at 400 cases;
+the factory patches' runs have 8 (2024) and 32 (31337). The renders' other loads past the pool are table reads, which
+both sides model.
+
+**The call (A).** The standing model for rom.2's reads past a wave (`xtFwHookBandReads`) is that the port plays 0
+there, so rom.4 is given zeros there too: a render's sample load past the pool is skipped with its register 0 and
+counted, against the port's reads past its samples. The counts are printed every run and held equal.
+- Only the sample loads. They're found from rom.4's code, not listed: a render's (0x893c6000…0x893c8000) indexed
+  halfword loads (`mov.w @(r0,Rm),Rn`), but those whose address lies within 0x100 past their own pc (`kTableReach`).
+  Those are the renders' own tables: 0x893c6402 reads +0x10, 0x893c6730 +0x10…+0x1c, 0x893c7d70 +0x20 and +0x24.
+  The rule is stated once, in the code beside the renders' span. The kit's lesson check refused a literal table of the
+  46 pcs ("[no-rom-table-literal] … Regenerate it from its formula, with a tolerance test"; refusal 33a11b18, marked
+  wrong: addresses are facts, not ROM bytes; workflow-bugs.md's [gap]). The table reads' count is printed on a line of
+  its own and held by fcheck's baseline, the rule's tolerance test (2,684 at 2024, 16 cases). The
+  46 loads xt_vc2synth's runs saw read the pool are: 0x893c64a4, 64ac, 68e0, 68e4, 68ee, 68fe, 6938, 693c, 694c, 6954,
+  69b0, 69b4, 69c4, 69cc, 6a0c, 6a12, 6a20, 6a26, 6c0e, 6c12, 6c1c, 6c2c, 6c6a, 6c6e, 6c7e, 6c86, 6ce6, 6cea, 6cfa,
+  6d02, 6d46, 6d4c, 6d5a, 6d60, 7a2e, 7a36, 7a44, 7a4c, 7a70, 7a78, 7a86, 7a8e, 7bc8, 7bd0, 7bde and 7be6: each
+  render's two interpolated pairs, none in a delay slot. The formula's far-read counts equal that table's at the six
+  seeds and 16, 40 and 400 cases.
+- Wherever they land. Mapped memory (rom.4's image, its .bss) and unmapped memory alike. v362's zero pages for areas
+  1 to 3 are withdrawn (marked so in place in v362's section): once the skip gave every such load 0 they changed
+  nothing, the runs identical with and without them at the six seeds and 16, 40 and 400 cases. They went, about
+  150 MB less a machine, and any other load past mapped memory faults, as before v362 (the coordinator's yes).
+- Plants: `wav-sample-pc` (0x893c6a0c taken as a table read, so rom.4 reads its own code there as samples,
+  uncounted) fails the check, 53 against the port's 56 at 2024. `wav-mapped-skip` (the skip removed, the load still
+  counted) fails at seed 5, whose notes case 395 plays one. `wav-zero-pages` left the list with the pages.
+
+**The factory patches' cases** (`vc2SynthNotesPart` with the factory patches, `vc2SynthFactoryPatches`). The disk
+image's 128 patches in `Internal.vc2/Patch` are read by rom.4's .p02 reader (`vc2PatchRead`; `Vc2PatchFile.cpp` is
+now linked into xt_vc2synth). Each is the store of a case of the notes part, run a second time: as it is, but for a
+sounding VOCODER OSC's Type kept (v349's deferral). There's at least a case for each patch, so fcheck runs all 128,
+on seeds of their own (the run's 17, 25 and 27 after).
+
+Red first: with the factory cases and without (A), 2024 at fcheck's count is 1 different, the far reads rom.4 4
+against the port's 16 (the factory cases' 12 into mapped memory). With (A): the six seeds 0 different at 16 and 40
+cases, the counts equal; at 400 cases all but seed 4, whose notes case 315 is v364's (2024 56/56, 7 28/28, 31337
+44/44, 3 96/96 with records 1/1, 5 48/48).
+
+**No v365.** 31337's factory notes case 258 (the vocoder object's word 0x8999cef0, 00000000 against 494afe99) was one
+of these reads: a player reading rom.4's code as samples moved the vocoder's analysis. It goes with (A).
+
+The far walk is step 4.5's [gap] (VC2_MODE_PLAN.md, the coordinator's wording): the port plays 0 where an XT reads
+its own memory. The .text part could match by reading rom.4's image there; the .bss part would need the part's
+memory as rom.4 lays it out.
+
+Results:
+- fcheck `--update` moved xt_vc2synth's lines alone: the factory patches' count, the factory cases' summary, the
+  waves' counts, and the table reads' line.
+- `mutate_vc2.py --synth`, the whole list, clean first: 329 planted, 329 caught, 0 errors (54 minutes). After the
+  rule's comment and the table reads' own line, the plants of what changed (`--changed`, the waves check's four): 4 of
+  4 caught.
+- The other lists `--changed`: no plant of theirs changed.
+- `verify.sh`: clean (fcheck as baseline, every test holding, auval).
+
 ### The part given the disk image's waves: two wiring faults, tns-count caught (2026-11-25, v362) {#vc2-synth-waves}
 
 Step 4.3's eighty-ninth version. Until now xt_vc2synth gave the part no waves. PCM's start then leaves the OSC kind 0,
@@ -1565,7 +1626,9 @@ counts, and unequal counts are a difference:
 - A player's sample read past the waves. Areas 1 to 3's pages that nothing maps become zeros; area 0, where an XT's
   boot flash lies, stays unmapped, so a read there still faults. rom.4's halfword loads in the players' renders
   (`mov.w @(r0,Rm),Rn`, 0x893c6000…0x893c8000) that land in those pages are counted. The port counts its reads outside
-  its samples (`Vc2OscSamples::far`, a check's pointer, none in the plugin).
+  its samples (`Vc2OscSamples::far`, a check's pointer, none in the plugin). **Withdrawn in v363:** the zero pages
+  went once (A)'s skip gave every sample load past the waves 0, wherever it lands. With the skip the runs are
+  identical with and without them, and any other load past mapped memory now faults ("Sample loads past the waves").
 - LITE's loop record read through a pointer that leaves mapped memory, a stale word on a voice reused across kinds
   (0x893c859a, through 0x3ea7ffcb). Its loads through r14 (`mov.l @(disp,r14)`, `mov.w @(disp,r14),r0`,
   0x893c7f00…0x893c8700) are given a zero record there (0x8C1FE000) and counted. The port counts its loop records at an
@@ -1613,7 +1676,7 @@ The files: the check's `Vc2SynthWavesCheck.cpp` (new), `Vc2SynthCheck.cpp` and `
 Plants (vc2synth_muts.txt; two new ports, vc2synthtone for Vc2SynthTone.cpp and vc2synthwaves for the check's own
 hooks), each caught first in a scratch build: syn-waves-samples (v455's count 0), stn-bound-waves (the waves' word 0
 again), stn-records-count (at seed 3, the records' count cut), wav-zero-pages (rom.4 faults at a8704e30, pc
-893c6a0c), wav-far-count (rom.4's count cut), wav-zero-record (at seed 3: rom.4 faults at notes case 28, read32 at
+893c6a0c; withdrawn with the pages in v363), wav-far-count (rom.4's count cut), wav-zero-record (at seed 3: rom.4 faults at notes case 28, read32 at
 3ea7ffcb, pc 893c859a). `Vc2OscVoice.h`'s count isn't planted: a header's plant builds from the unplanted sources.
 
 Results:

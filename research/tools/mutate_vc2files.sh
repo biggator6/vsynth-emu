@@ -58,11 +58,11 @@ VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
 VC2KERNEL=(Vc2Kernel Vc2KernelRig Vc2KernelWords Vc2KernelCheck)   # v353: rom.1's event services; v355 its words
-# xt_vc2synth's (v314): every VC-2 port the plugin's build lists but the .p02 reader (v450) and the waves in use (v504)
-# (from v345 rom.4's parameter tables and the patch store, which the part reads; v362 rom.4's own load of the waves and
-# its files, v503, which give both sides the disk image's waves); then the rom.2 ports they lean on, the shared compares
-# and the check
-NOT_SYN=" Vc2PatchFile Vc2WavesInUse "
+# xt_vc2synth's (v314): every VC-2 port the plugin's build lists but the waves in use (v504) (from v345 rom.4's
+# parameter tables and the patch store, which the part reads; v362 rom.4's own load of the waves and its files, v503,
+# which give both sides the disk image's waves; v363 the .p02 reader, v450, for the factory patches); then the rom.2
+# ports they lean on, the shared compares and the check
+NOT_SYN=" Vc2WavesInUse "
 VC2SYNTH=()
 while read -r f; do
     [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")

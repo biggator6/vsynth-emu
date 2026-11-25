@@ -24,10 +24,11 @@
 # rom.1's kernel's event services (v353) against rom.1's own, rom.1 beside rom.4, its switch and timers hooked
 [ -f Vc2KernelCheck.cpp ] && cc -DXT_VC2KERNEL_MAIN Vc2KernelCheck.cpp Vc2KernelRig.cpp Vc2KernelWords.cpp \
    Vc2Kernel.cpp "${SH4[@]}" -o "$O/xt_vc2kernel" &
-# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the .p02 reader (v450) and the
-# waves in use (v504); from v345 rom.4's parameter tables and the patch store, which the part reads, with theirs; v362
-# rom.4's own load of the waves (v503) and the disk image they're read from, which both sides are given
-NOT_SYN=" Vc2PatchFile.cpp Vc2WavesInUse.cpp "
+# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the waves in use (v504); from
+# v345 rom.4's parameter tables and the patch store, which the part reads, with theirs; v362 rom.4's own load of the
+# waves (v503) and the disk image they're read from, which both sides are given; v363 the .p02 reader (v450), for the
+# factory patches
+NOT_SYN=" Vc2WavesInUse.cpp "
 SYNX=(XtFxValueText.cpp XtPatchStore.cpp XtSoloVoice.cpp "${FW[@]}")
 VSYN=()
 while read -r f; do

@@ -18,10 +18,14 @@ std::string vc2SynthRomStart(Vc2Fw& fw, int& rows, std::span<const uint32_t> osR
 struct Vc2LoadedWaves;
 struct Vc2SynthPast {
     long romFar = 0, portFar = 0, romRecords = 0, portRecords = 0;
+    long romTables = 0;   // v363: the renders' loads of their own tables, which aren't samples
 };
 // The waves loaded by rom.4's own loaders from the disk image beside `rom4`, written into `fw` and given `s`; false,
 // said, when they can't be
 bool vc2SynthWavesBoth(const char* rom4, Vc2Fw& fw, Vc2Synth& s, Vc2LoadedWaves& w, Vc2SynthPast& past);
+// v363: the factory patches (the disk image's Internal.vc2/Patch, by rom.4's .p02 reader) as stores; false, said, when
+// they can't be read
+bool vc2SynthFactoryPatches(const char* rom4, std::vector<std::vector<uint8_t>>& out);
 // The waves' bytes into a machine's memory at their addresses, the zero pages past them, rom.4's reads there counted
 void vc2SynthWavesWritten(Sh4& c, const Vc2LoadedWaves& w, Vc2SynthPast& past);
 // The waves given the part (giveWaves), its reads past the samples counted
@@ -94,7 +98,10 @@ long vc2SynthCases(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, uint32_t offset, c
 long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthPosts& posts);
 // The notes part (v346, Vc2SynthNotesCheck.cpp): cases of a patch loaded, then MIDI messages through the OS MIDI's
 // handler and the dispatcher on both sides; how many differ
-long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts);
+// v363: with `factory`, its cases each on the next of the factory patches (at least one each), on seeds of their own
+using Vc2SynthPatches = std::vector<std::vector<uint8_t>>;
+long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts,
+                       const Vc2SynthPatches* factory = nullptr);
 
 // The tasks' steps (Vc2SynthTasksCheck.cpp, v351), each on both sides, then what differs: after a step every region,
 // the vocoder, the events and each tone's words; an update pass (v349); a notes' task's pass (v350); a block on input

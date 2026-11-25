@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Sample loads past the waves v363 (2026-11-25, on claude/v358-plant-reach after v362; HARDWARE_FIRMWARE.md, "Sample
+  loads past the waves: zeros wherever they land, the factory patches' cases"): the coordinator's call (A). A render's
+  sample load past the waves, wherever it lands (rom.4's .text and .bss, unmapped memory), skipped with its register 0
+  and counted on both sides; the sample loads found from rom.4's code (all but the renders' own tables just past
+  them; the lesson check refused a literal table); v362's zero pages gone with it. The 128 factory patches as the notes
+  part's own cases on seeds of their own (Vc2PatchFile linked in). Red first: 2024 with the factory cases, far reads 4
+  against 16. 31337 factory's vocoder word goes with it: no v365.
+
 The part given the disk image's waves v362 (2026-11-25, on claude/v358-plant-reach after v361; HARDWARE_FIRMWARE.md,
   "The part given the disk image's waves: two wiring faults, tns-count caught"): xt_vc2synth gives both sides the disk
   image's waves, rom.4's own load (v503) at run time; rom.4's reads past them given zeros, counted on both sides and

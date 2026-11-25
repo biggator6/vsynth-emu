@@ -902,11 +902,14 @@ xt_vc2kernel: 0 different
 synth: the start, 99 of rom.4's initializers, 167 regions and the vocoder compared
 synth: 24 tones made through the part's hosts, their words compared, then given back
 synth: the disk image's waves on both sides, the pool's 33554456 bytes at 8dffffe8
+synth: the disk image's 128 factory patches
 synth load: the task's start, 16 cases (16 with a store), 320 events: 90 part reads, 79 dispatchers, 69 messages, 82 part messages
 synth notes: 16 cases, 640 events: 153 note-ons, 87 note-offs, 52 controllers, 20 bends, 17 poly pressures, 25 pressures, 19 programs, 36 parameters', 14 the part's, 19 resets, 55 update passes, 46 notes' task's passes, 49 blocks (13 sounding, 0 not finite), 48 clock events (16 schedules); 161 voiced; 5 patches under a VOCODER's tone, 2 Types kept; v360: 5 patches on the fix-up's case, 4 with their COSMs' types kept, 7 cases with the receive switch off
+synth factory's: 128 cases, 5120 events: 1192 note-ons, 773 note-offs, 435 controllers, 128 bends, 159 poly pressures, 138 pressures, 144 programs, 286 parameters', 143 the part's, 143 resets, 399 update passes, 380 notes' task's passes, 420 blocks (417 sounding, 0 not finite), 380 clock events (172 schedules); 1076 voiced; 0 patches under a VOCODER's tone, 0 Types kept; v360: 0 patches on the fix-up's case, 0 with their COSMs' types kept, 17 cases with the receive switch off
 synth reads: 1 cases, 40 events: 16 memory reads, 60 readers, 10 getters, 8 sums, 600 placements; 0 bytes no region holds
 synth whole: the start on both OSes; 16 cases on 1 pairs, 1920 events: 6899 blocks (5606 ticks, 376 sounding), 7163 messages (5 bursts, 1 floods); 15 waits in a pass, 0 cut; 2 patches under a VOCODER's tone, 2 Types kept; on rom.1 52727 contexts loaded, 111 suspends, 16909 semaphore waits; the senders' 42 waits for room, 862 for empty; markers 0 0 1 0 3; v360: 888 lead-ins' events, 1 compares at MIDI IN's full ring, 9 cases on a pitch
-synth waves: the reads past them, given zeros: far reads rom.4 0, the port 0; records past rom.4 0, the port 0
+synth waves: the reads past them, given zeros: far reads rom.4 16, the port 16; records past rom.4 0, the port 0
+synth waves: the renders' own table reads 2684 (v363: the sample loads' rule)
 xt_vc2synth: 0 different
 == xt_vc2patch
 sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)

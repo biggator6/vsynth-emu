@@ -270,6 +270,8 @@ int main(int argc, char** argv) {
     const auto waves = std::make_unique<Vc2LoadedWaves>();   // v362: the disk image's waves on both sides
     Vc2SynthPast past;
     if (!vc2SynthWavesBoth(argv[1], fw, *synth, *waves, past)) return 1;
+    Vc2SynthPatches factory;   // v363
+    if (!vc2SynthFactoryPatches(argv[1], factory)) return 1;
     // v355: with XT_VC2SYNTH_STOP, the parts after the first that differs left (a plant's run)
     long tally = (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1);
     const bool stop = xtSwitch("XT_VC2SYNTH_STOP") != nullptr;
@@ -279,6 +281,7 @@ int main(int argc, char** argv) {
     if (tally == 0) {
         next([&] { return vc2SynthLoadPart(fw, *synth, *run, posts); });    // v345
         next([&] { return vc2SynthNotesPart(fw, *synth, *run, posts); });   // v346
+        next([&] { return vc2SynthNotesPart(fw, *synth, *run, posts, &factory); });   // v363: on the factory patches
         next([&] { return vc2SynthReadsPart(fw, *synth, *run); });          // v343: after the load, its noise last
         next([&] { return vc2SynthWholePart(argv[1], *run, *waves, past); });   // v355: a fresh pair, on their OSes
     }

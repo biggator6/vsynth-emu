@@ -12,7 +12,9 @@
 // (Vc2OsMidiParts::kOsRoutines) hooked as the part leaves them; v349: one event in 13 an update pass instead
 // (updatePassEvent).  After each every region of the part, the vocoder, the flags posted the notes' task and each
 // tone's words.  v360: two patch steers on a generator of their own (NotesSteers), and after a case the receive
-// switch's case (vc2SynthReceiveOff, Vc2SynthTasksCheck.cpp) on another.  XT_VC2SYNTH_MAIN only.
+// switch's case (vc2SynthReceiveOff, Vc2SynthTasksCheck.cpp) on another.  v363: run a second time on the factory
+// patches, each case's store the next of them, a case for each at the least, on seeds of their own (the run's 17, 25
+// and 27 after).  XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
 #include "Vc2Params.h"
 #include "Vc2PatchStore.h"
@@ -36,6 +38,7 @@ constexpr std::array<uint8_t, 24> kKindByDraw { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
 constexpr uint8_t kClasses[] = { 0x90, 0x80, 0xb0, 0xe0, 0xa0, 0xd0, 0xc0, 0x40, 0x41, 0x70 };   // [FW] by kind
 constexpr size_t kWordFrom = 7, kResetKind = 9;   // the kinds given a word, the reset's
 
+constexpr uint32_t kFactorySeeds = 14;   // v363: the factory's cases' seeds, the notes' 14 after theirs
 constexpr uint32_t kPassOneIn = 13;   // an event each task's step one time in 13 (v349…v351, Vc2SynthTasksCheck.cpp)
 
 struct NotesCounts {
@@ -222,6 +225,13 @@ struct NotesSteers {
         last = bytes;
     }
 };
+
+// v363: a factory patch for a case's store, as it is but for a sounding VOCODER OSC's Type kept (v349's deferral)
+bool factoryGiven(Vc2Synth& s, std::vector<uint8_t>& bytes, const std::vector<uint8_t>& patch, NotesCounts& n) {
+    bytes = patch;
+    n.under += vocoderTypesKept(s, bytes, n.kept) ? 1 : 0;
+    return true;
+}
 } // namespace
 
 Vc2SynthDrawn vc2SynthMessageDrawn(std::mt19937& rng, const Vc2Synth& s) { return messageDrawn(rng, receivingOf(s)); }
@@ -235,12 +245,17 @@ bool vc2SynthSteered(Vc2Synth& s, std::vector<uint8_t>& bytes, std::mt19937& rng
     return k;
 }
 
-long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts) {
+long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts,
+                       const Vc2SynthPatches* factory) {
+    const uint32_t own = factory != nullptr ? kFactorySeeds : 0;   // v363: the factory's cases on seeds of their own
+    const Vc2Run cases { factory != nullptr ? std::max(run.cases, (int)factory->size()) : run.cases, run.seed };
     NotesCounts n;
-    NotesSteers steers { std::mt19937((uint32_t)run.seed + 13), {}, n };   // v360
-    std::mt19937 receiveOwn((uint32_t)run.seed + 11);                       // v360: the receive switch's case's
+    NotesSteers steers { std::mt19937((uint32_t)run.seed + 13 + own), {}, n };   // v360
+    std::mt19937 receiveOwn((uint32_t)run.seed + 11 + own);                       // v360: the receive switch's case's
+    size_t next = 0;
     const auto oneCase = [&](std::mt19937& rng, std::vector<uint8_t>& store) {
-        const auto kept = [&s, &n, &rng, &steers](std::vector<uint8_t>& bytes) {
+        const auto kept = [&s, &n, &rng, &steers, factory, &next](std::vector<uint8_t>& bytes) {
+            if (factory != nullptr) return factoryGiven(s, bytes, (*factory)[next++ % factory->size()], n);
             const bool k = vc2SynthSteered(s, bytes, rng, n.under, n.kept);
             steers.steer(s, bytes);
             return k;
@@ -256,14 +271,16 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
         if (d.empty()) d = vc2SynthReceiveOff(fw, s, posts, receiveOwn, n.offCases);   // v360
         return d;
     };
-    const long different = vc2SynthCases(fw, s, run, 3, "the notes", oneCase);
-    std::printf("synth notes: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
+    const char* what = factory != nullptr ? "factory's" : "notes";
+    const long different = vc2SynthCases(fw, s, cases, 3 + own, factory != nullptr ? "the factory's" : "the notes",
+                                         oneCase);
+    std::printf("synth %s: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
                 "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets, %ld update "
                 "passes, %ld notes' task's passes, %ld blocks (%ld sounding, %ld not finite), %ld clock events (%ld "
                 "schedules); %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept; v360: %ld patches on the "
                 "fix-up's case, %ld with their COSMs' types kept, %ld cases with the receive switch off\n",
-                vc2SynthCaseCount(run), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3], n.byKind[4],
-                n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.passes[0], n.passes[1],
+                what, vc2SynthCaseCount(cases), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3],
+                n.byKind[4], n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.passes[0], n.passes[1],
                 n.passes[2], n.sounding, n.unfinite, n.passes[3], n.fired, n.voiced, n.under, n.kept, n.fixups,
                 n.cosmsKept, n.offCases);
     return different;
