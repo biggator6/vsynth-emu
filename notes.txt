@@ -676,6 +676,15 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The system's parameters to the VC-2 part v457 (2026-11-25, after v456; HARDWARE_FIRMWARE.md, "The system's parameters
+  to the VC-2 part"): Clock Source and External In Type (system B's area) and the controller assigns (the system's)
+  kept over rom.4's system defaults and given at a block's edge with the front's system (kind 4) and assignments (5)
+  messages; a part made again starts on them. Their defaults are now rom.4's system's (the 14 assigns' were their
+  descriptors' 0). Master Level and Output Gain stay the effects'. VSynthEmuVc2PlayTest 94/94, the system moved in the
+  burst bit for bit, the dispatchers' tables the direct part's (rom.4's stop after the messages stops no voice there,
+  so the sound alone doesn't show them), the 16 read as the part's readers read them (Vc2PlaySystem.cpp). Plants: 9
+  vc2play-system-, all caught (a tenth, the centre left out, equivalent: every centre is 0).
+
 The VC-2 part's view in the editor v456 (2026-11-25, after v455; HARDWARE_FIRMWARE.md, "The VC-2 part's view in the
   editor"): Vc2PartView, written by the player after each block (the input stage's peak and voiced flag, the tracker's
   period and lock, Auto Note's note, the voices sounding, the output's peak, the frames since the input was last above

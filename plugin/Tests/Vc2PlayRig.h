@@ -46,3 +46,10 @@ inline float vc2PlayInput(int frame, int side) {
 int vc2PlayTime(const juce::File& rom, const juce::File& work, const juce::StringArray& rest);
 // v456: the part's view as the editor reads it, on a processor that has played (Vc2PlayView.cpp)
 void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::string& name);
+// v457: on a part just made, the system parameters at their defaults, rom.4's as the part reads them; on a processor that
+// has played beside `direct`, the part reading its parameters' values and its readers' tables the direct part's, and a
+// part made from its session reading the same (Vc2PlaySystem.cpp)
+class Vc2PlayDirect;
+void vc2PlaySystemDefaults(TestChecks& check, VSynthEmuProcessor& p, const std::string& name);
+void vc2PlaySystemChecks(TestChecks& check, VSynthEmuProcessor& p, const Vc2PlayDirect& direct,
+                         const std::string& name);

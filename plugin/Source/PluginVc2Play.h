@@ -4,7 +4,9 @@
 // to the audio thread, and the patch it plays.  That patch is a store: the .p02 loaded last, or a session's (PluginVc2Patch),
 // or with neither, every ID its default; the VC-2's parameters written over it as they move (vc2PatchPut), on the control
 // thread, and the store given to the part at the next block's edge.  The store written is kept as the session's, so a
-// session holds what the part played.  The system's parameters don't reach the part yet: it plays rom.4's system defaults.
+// session holds what the part played.  v457: the system's parameters the part reads (Clock Source, External In Type, the
+// controller assigns) written over rom.4's system defaults the same way, and given with the front's messages for them
+// (Vc2PartPlayer::systemGiven); Master Level and Output Gain are the effects', not the part's.
 #include "PluginMode.h"
 #include "PluginVc2Patch.h"
 #include "Vc2PartPlayer.h"
@@ -66,32 +68,51 @@ private:
         std::atomic<float>* value;
         int def;
     };
+    // v457: a system parameter the part reads: its ID, its value, the system's area it's read on
+    struct SystemParam {
+        const Vc2HostParam* h;
+        std::atomic<float>* value;
+        Vc2SystemArea area;
+    };
+    static constexpr size_t kSystemAreas = 2;   // system B's and the system's, the areas SystemParam's are on
     // The store as the control thread writes it: the part's patch, none for every ID's default; each parameter as last
-    // written or taken; the patch's generation it started from; its number
+    // written or taken; the patch's generation it started from; its number.  v457: the system beside it (rom.4's defaults,
+    // the system parameters written over them), each as last taken, its number, and the number each area last moved at
     struct Keeper {
         std::vector<uint8_t> work;
         bool none = true;
         std::vector<int> last;
         long gen = -1;
         uint64_t seq = 0;
+        Vc2System system;
+        bool hasSystem = false;
+        std::vector<int> systemLast;
+        uint64_t systemSeq = 0;
+        std::array<uint64_t, kSystemAreas> areaSeq {};
     };
-    // A store on its way to the audio thread, three of them (the control thread's, the newest, the audio thread's)
+    // A store on its way to the audio thread, three of them (the control thread's, the newest, the audio thread's), and
+    // v457 the system with it
     struct Posted {
         uint64_t seq = 0;
         bool none = true;
         std::array<uint8_t, kVc2StoreBytes> bytes {};
+        uint64_t systemSeq = 0;
+        std::array<uint64_t, kSystemAreas> areaSeq {};
+        Vc2System system;
     };
     static constexpr int kFresh = 4, kSlot = 3;
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property) override;
     void valueTreeRedirected(juce::ValueTree&) override { readMode(); }
     void readMode();
     void keepStore();
+    void keepSystem();   // v457
     void post();
     const Posted* taken();   // audio thread: the newest posted since, or none
     void made();             // the part made again
     juce::AudioProcessorValueTreeState& apvts_;
     PluginVc2Patch& patch_;
     std::vector<Param> params_;
+    std::vector<SystemParam> system_;   // v457
     Keeper keeper_;
     std::mutex controlLock_;   // the control thread's and prepare's
     double rate_ = 44100.0;

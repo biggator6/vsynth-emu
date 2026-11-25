@@ -1351,10 +1351,15 @@ version against rom.4's routines with what it calls hooked:
         (`Vc2PartPlayer`), the VC-2's parameters written over the .p02's store and given at a block's edge
         (`PluginVc2Play`), the played-block test bit for bit against the part driven directly, in verify.sh
         (`VSynthEmuVc2PlayTest`; HARDWARE_FIRMWARE.md, "The VC-2 in the plugin"). Not yet: the system's parameters to
-        the part, the effects (rom.4's unit) with the Effects switch on, the pages' live views of the part.
+        the part (v457), the effects (rom.4's unit) with the Effects switch on, the pages' live views of the part (v456).
       - done (v456): the pages' view of the part: `Vc2PartView`, written after each block, the mic's checks (NO MIC, NO
         NOTE) and the MIC IN card's state lines from it (HARDWARE_FIRMWARE.md, "The VC-2 part's view in the editor").
         Not yet: the VOCODER card's bands (d-14).
+      - done (v457): the system's parameters to the part: Clock Source, External In Type and the controller assigns
+        kept over rom.4's system defaults on the areas their readers read, given at a block's edge with the front's
+        system and assignments messages, a part made again on them; their defaults rom.4's system's (the assigns' were
+        their descriptors' 0). Master Level and Output Gain are the effects' (HARDWARE_FIRMWARE.md, "The system's
+        parameters to the VC-2 part").
       - Before it, done (v550): the VC-2's firmware checks under AddressSanitizer, UBSan and libc++'s bounds
         (`XT_SANITIZE=1 build.sh`), the 21 step 4.3 isn't changing at 40 and 400 cases, three seeds: the voices' noise
         drawn as an XT's keys; the check rig's compare passed to step 4.3 (HARDWARE_FIRMWARE.md, "The VC-2 checks under
@@ -1384,7 +1389,12 @@ version against rom.4's routines with what it calls hooked:
      before the guard, 5/5 checks after (HARDWARE_FIRMWARE.md, "The plugin's output always numbers"). When the
      VC-2's audio reaches processBlock (this step's second half), it passes the same guard; the plugin test of a
      played block then also holds it on the VC-2's own path.
-   - [gap] The MIDI input's real-time bytes (v354; v355). v354 took `0x89313cb0` for their handler; it is the clock
+   - [deferred] The MIDI input's real-time bytes (v354; v355). [deferred] the coordinator, 2026-11-25: needs rom.4's
+     receive parser's real-time branch and the clock object's F8, start and stop ported and checked in a harness
+     first; after step 4.5's second half, in step 4.3's numbers; until then Clock Source INT, the patch's tempo. The
+     host-transport stand-in decided earlier (below) waits on that port too. Found at v457: the part takes no
+     real-time byte (`Vc2MidiReceive.cpp`'s parser drops them, "not ported"), and the clock object's F8 path is ported
+     in the ms but fed nothing, so the plugin has nothing to hand them to. Was: v354 took `0x89313cb0` for their handler; it is the clock
      task's listener on the OS MIDI's hub, of the parameters' messages, and v355 ports it with the clock task's 0x40
      pass (`0x89313d50`, `0x89313e10`: Clock Source, Clock Out, the patch's tempo). With Clock Source MIDI the clock
      object goes on the MIDI IN ring (`0x899598a0`), whose listeners the input task tells each message it takes (its
@@ -1395,9 +1405,9 @@ version against rom.4's routines with what it calls hooked:
      with Clock Source MIDI, through the V-Synth's own host-transport path (the one XtSynth's HOST reads), so the VC-2
      reads the one clock the V-Synth does: no second clock, and no play head read in a VC-2 file. v455's state: the
      plugin takes no system or real-time bytes (PluginVc2Play's Block::message), and the part plays rom.4's system
-     defaults, Clock Source INT, since the system's parameters don't reach it yet; this stays open until they do. If
-     step 4.5's second half ends without them: [deferred] "the coordinator, 2026-11-25: the host's transport stands in
-     for MIDI clock with Clock Source MIDI, as XtSynth's HOST; until the system parameters reach the part".
+     defaults, Clock Source INT, since the system's parameters don't reach it yet; this stays open until they do.
+     v457: they do, so Clock Source MIDI is the host's to set; with it the part's clock is fed nothing until the port
+     above and the host's transport standing in.
    - [gap] The part's input frames (v455). The plugin fills each block's input frames from the host's input by one rule
      in one place (Vc2PartPlayer.h: `vc2InputWord`, `kMicWord`, `kTrackerWord`): the mean of L and R into word 1 (+4,
      the mic, kind 6's ring) and word 5 (+0x14, the tracker), the rest 0; silence gives exactly 0 there. A stand-in, the

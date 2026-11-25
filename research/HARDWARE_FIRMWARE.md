@@ -1546,6 +1546,58 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The system's parameters to the VC-2 part (2026-11-25, v457) {#vc2-plugin-system}
+
+Step 4.5's second half, its third version. Of the system's 18 parameters (v451), the part reads 16. Each is read on the
+area of rom.4's system store that its reader reads (`vc2SystemAreaOf`, Vc2SystemStore.h):
+- Clock Source (0x43): the clock's, `0x89324350` on system B's block `0x89320760` (`Vc2Synth::systemBValue`).
+- External In Type (0x7a): the system dispatcher's (`0x8939b0d0`), its OSC trailer's third byte, system B's.
+- The controller assigns, Beam 1 L to Knob 2 (0x89…0x96): the system's block `0x89320790`. The assignments' dispatcher
+  (`0x8939b110`) reads Beam 2 and 3 into the Matrix's beams and Beam 4 to Knob 2 into its assigns, and Time Trip's reads
+  0x93 and 0x94. Beam 1 (0x89, 0x8a) sits beside them, and no reader of the part reads it.
+
+Master Level (0x40) and Output Gain (0x78) aren't the part's. The effects' system reader `0x8935feb0` reads them: rom.4's
+unit, not in the VC-2 mode yet.
+
+**The keeper.** `PluginVc2Play` keeps a system beside the store. It starts as rom.4's defaults (`vc2SystemDefaults`), the
+first pass writes each of the 16 parameters that stands apart from them, and after that each one that moves
+(`vc2SystemPut`, the value plus its centre, as `vc2PatchPut` writes a patch's). The store's loop and the system's are now
+one (`keepMoved`). A move posts the system with the store. Each of the two areas carries the number of the post it last
+moved in, so a post the audio thread passes over still tells it which areas moved.
+
+**Giving it.** At the next block's edge the audio thread gives the system before the patch, so that a patch given with it
+reads it (`Vc2PartPlayer::systemGiven`). The system goes into the part (`Vc2Synth::giveSystem`), then the front's
+messages for what moved go through the OS MIDI task before the next block, as at the start:
+- the system's (kind 4: its dispatcher, part 1's receive channel, Patch Remain) if system B's area moved;
+- the assignments' (kind 5: theirs, part 0's reload, Time Trip's) if the system's did.
+
+Each kind ends in rom.4's own stop of part 0's node's voices (`0x89392720`). Which messages rom.4's front sends on a
+system edit isn't traced: these are the stand-in's, as its start messages are. A part made again (stuck, or the waves
+come) starts on the kept system, not rom.4's defaults (`Vc2PartPlayer`'s constructor takes it).
+
+**The defaults.** rom.4's defaults routines don't leave the assigns at their descriptors' default of 0: Beam 1 L to Knob 2
+start at 16, 48, 17, 49, 18, 50, 19, 51, 80, 81, 82, 83, 16, 34. Clock Source and External In Type do match their
+descriptors. So each of the 16 parameters now defaults to rom.4's system default (`vc2SystemDefault`, `hostRange`), and
+an untouched session gives the part rom.4's system as v455 did. This changes v451's defaults for the 14 assigns, as
+intended; VSynthEmuArpPluginTest's VC-2 part holds them to it.
+
+**The check.** VSynthEmuVc2PlayTest moves Clock Source, External In Type and Knob 1 Assign at the 150th host block, in the
+burst. The direct reference does the same (`Vc2PlayDirect::systemEdit`), and every sample matches on all four patches.
+The run gives 96 messages, two more than v456's. The sound alone doesn't show those two messages. rom.4's stop at their
+end (`stopPart`) stops only the voices whose settings it finds changed (`changed(voice, word)`), and these three moves
+change nothing a sounding voice reads. So `Vc2PlaySystem.cpp` checks what the dispatchers wrote. After the run, the
+part's settings' tables (`Vc2PartRows`: the LFOs' system byte, the OSC trailer, the TVA's, Time Trip's assigns) and the
+Matrix's settings (`g`: the beams, the assigns) must be the direct part's. It also reads each of the 16 as the part's
+readers read it (`Vc2SynthSettings::value` on its reader's block), not through the plugin's own map of the areas:
+- on a part just made, each at its default, that default what a part given rom.4's defaults alone reads;
+- after the run, each at its parameter's value, and the same in a part made from the session;
+- 16 mapped, and Master Level and Output Gain not among them.
+
+94 checks. 9 plants (`vc2play-system-`), all caught: the system not given, either message dropped, a move not kept, an
+area wrong or missing, the descriptors' defaults, a part made again or started on rom.4's defaults. The two messages were
+missed until the tables' check came in. A tenth plant, the centre left out of `vc2SystemPut`, is equivalent: all 16
+have a centre of 0.
+
 ### The VC-2 part's view in the editor (2026-11-25, v456) {#vc2-plugin-view}
 
 Step 4.5's second half, its second version: the VC-2 pages' state that waited for Vc2Synth (v453; research/UI_DESIGN_VC2.md,
@@ -1615,7 +1667,8 @@ The store written is the session's (the patch's generation guards a load's again
 thread, given the store, and handed to the audio thread by an atomic pointer; the last one goes once no block holds it.
 The VC-2 mode wants rom.2's tables in as well as rom.4's: the part's ports read rom.2's (XtOsc's curves, the envelopes',
 LFOs', COSMs', band players' and analog's). The system's parameters (the controller assigns, Master Level, Output Gain,
-Clock Source, External In Type) don't reach the part yet: it plays rom.4's system defaults.
+Clock Source, External In Type) don't reach the part yet: it plays rom.4's system defaults. (v457: all but Master Level
+and Output Gain, the effects', do: "The system's parameters to the VC-2 part".)
 
 **Found on the way.**
 - rom.4's system defaults weren't loaded in the plugin, only by xt_vc2synth's own table list: the part read Part 1

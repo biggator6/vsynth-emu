@@ -15,13 +15,13 @@ constexpr uint8_t kMidiIn = 1;   // [FW] a message's source: MIDI IN
 constexpr size_t kRoomSlack = 4 * Vc2PartPlayer::kBlock;   // past a second, the blocks in flight as the room fills
 } // namespace
 
-Vc2PartPlayer::Vc2PartPlayer(const Vc2LoadedWaves* waves, double hostRate)
+Vc2PartPlayer::Vc2PartPlayer(const Vc2LoadedWaves* waves, double hostRate, const Vc2System* system)
     : waves_(waves), part_(std::make_unique<Vc2Synth>()) {
     store_.assign((size_t)kVc2StoreBytes, 0);
     prepare(hostRate);   // first: the start's blocks, if a wait in it takes any, count from the input's start
     Vc2Synth& s = *part_;
     s.start();
-    if (const Vc2System* system = vc2SystemDefaults()) s.giveSystem(*system);
+    if (const Vc2System* given = system != nullptr ? system : vc2SystemDefaults()) s.giveSystem(*given);
     if (waves_ != nullptr) s.giveWaves(*waves_);
     s.sink = this;
     s.runOnOs([this](Vc2PartEvent& e) { return next(e); });
@@ -46,18 +46,25 @@ void Vc2PartPlayer::patchGiven(const uint8_t* store) {
     part_->patchGiven(&store_);
 }
 
+void Vc2PartPlayer::systemGiven(const Vc2System& system, bool systemB, bool assigns) {   // v457
+    part_->giveSystem(system);
+    if (systemB) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, kVc2SystemRead);
+    if (assigns) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, kVc2AssignsRead);
+}
+
 bool Vc2PartPlayer::message(uint8_t status, uint8_t data1, uint8_t data2) {
+    return queue({ status, data1, data2, kMidiIn }, 0);
+}
+
+// A message in the queue, its word beside it (a parameters' message's kind); with the queue full, dropped and counted
+bool Vc2PartPlayer::queue(const Vc2MidiMessage& m, uint32_t word) {
     if (tail_ - head_ >= kMessages) {
         ++counts_.dropped;
         return false;
     }
-    queue({ status, data1, data2, kMidiIn }, 0);
-    return true;
-}
-
-void Vc2PartPlayer::queue(const Vc2MidiMessage& m, uint32_t word) {
     words_[tail_ % kMessages] = word;
     queue_[tail_++ % kMessages] = m;
+    return true;
 }
 
 bool Vc2PartPlayer::stuck() const { return part_->osTasks->os.stuck(); }

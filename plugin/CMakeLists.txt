@@ -247,8 +247,10 @@ vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp T
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)
 # The output always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite
 vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
-# The VC-2 mode's audio (v455): the processor against the part driven directly, bit for bit, nothing allocated
-vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp Tests/TestMain.cpp)
+# The VC-2 mode's audio (v455): the processor against the part driven directly, bit for bit, nothing allocated; the
+# part's view (v456) and the system's parameters (v457)
+vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp
+             Tests/Vc2PlaySystem.cpp Tests/TestMain.cpp)
 # A project's own files (v600 on): a link to a preset wave followed to the wave it names
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
              Tests/TestMain.cpp Tests/TestWave.cpp)

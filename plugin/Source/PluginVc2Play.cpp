@@ -9,17 +9,40 @@
 
 namespace {
 constexpr uint8_t kChannelFirst = 0x80, kSystemFirst = 0xf0, kClassBits = 0xf0;   // [FW] MIDI's status bytes
+
+// The parameters of `params` that moved since `last` (each of them on a `base` pass), each written into the kept copy
+// (`put`) unless it holds the value already (`holds`); true when one was written
+template <class P, class Holds, class Put>
+bool keepMoved(const std::vector<P>& params, std::vector<int>& last, bool base, Holds holds, Put put) {
+    bool moved = false;
+    for (size_t i = 0; i < params.size(); ++i) {
+        const P& p = params[i];
+        const int v = (int)std::lround(p.value->load());
+        if (!base && v == last[i]) continue;
+        last[i] = v;
+        if (holds(p, v)) continue;
+        put(p, v);
+        moved = true;
+    }
+    return moved;
 }
+} // namespace
 
 PluginVc2Play::PluginVc2Play(juce::AudioProcessorValueTreeState& apvts, PluginVc2Patch& patch)
     : apvts_(apvts), patch_(patch) {
     for (const Vc2HostParam& h : vc2HostParams()) {
         juce::RangedAudioParameter* r = apvts.getParameter(h.paramId);
-        if (r == nullptr || h.id < kVc2FirstStored) continue;   // the system's, which no store holds
+        Vc2SystemArea area {};
+        if (r == nullptr) continue;
+        if (h.id < kVc2FirstStored) {   // the system's, which no store holds: v457, the system's areas those the part reads
+            if (vc2SystemAreaOf(h.id, area)) system_.push_back({ &h, apvts.getRawParameterValue(h.paramId), area });
+            continue;
+        }
         const int def = (int)std::lround(r->convertFrom0to1(r->getDefaultValue()));
         params_.push_back({ &h, apvts.getRawParameterValue(h.paramId), def });
     }
     keeper_.last.assign(params_.size(), 0);
+    keeper_.systemLast.assign(system_.size(), 0);
     readMode();
     apvts_.state.addListener(this);
 }
@@ -43,6 +66,7 @@ void PluginVc2Play::tick() {
     const std::lock_guard<std::mutex> hold(controlLock_);
     if (!vc2_.load() || !xtSynthVc2RomReady() || !xtSynthRomReady()) return;   // the part's ports read rom.2's too
     keepStore();
+    keepSystem();
     const Vc2LoadedWaves* waves = vc2Waves();
     if (owned_ && !owned_->stuck() && (owned_->waves() != nullptr || waves == nullptr)) return;
     made();
@@ -50,9 +74,10 @@ void PluginVc2Play::tick() {
 
 // The part made again, the store given it before the audio thread has it; the last one goes once no block holds it
 void PluginVc2Play::made() {
-    auto next = std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_);
+    auto next = std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_, keeper_.hasSystem ? &keeper_.system : nullptr);
     next->patchGiven(keeper_.none ? nullptr : keeper_.work.data());
     next->patchSeq = keeper_.seq;
+    next->systemSeq = keeper_.systemSeq;
     next->view = &view_;
     live_.store(next.get());
     while (inUse_.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -75,21 +100,17 @@ void PluginVc2Play::keepStore() {
         }
     }
     const bool fromNone = k.none;
-    bool moved = base;
-    for (size_t i = 0; i < params_.size(); ++i) {
-        const Param& p = params_[i];
-        const int v = (int)std::lround(p.value->load());
-        if (!base && v == k.last[i]) continue;
-        k.last[i] = v;
-        if (base && v == (fromNone ? p.def : vc2PatchValue(k.work, *p.h).value_or(v))) continue;
+    const auto holds = [&k, base, fromNone](const Param& p, int v) {   // on the base pass, what the patch reads
+        return base && v == (fromNone ? p.def : vc2PatchValue(k.work, *p.h).value_or(v));
+    };
+    const auto put = [&k](const Param& p, int v) {
         if (k.none) {
             k.work = vc2DefaultStore();
             k.none = false;
         }
         vc2PatchPut(k.work, *p.h, v);
-        moved = true;
-    }
-    if (!moved) return;
+    };
+    if (!keepMoved(params_, k.last, base, holds, put) && !base) return;
     ++k.seq;
     post();
     if (k.none) return;
@@ -97,11 +118,33 @@ void PluginVc2Play::keepStore() {
     if (patch_.gen == k.gen) patch_.store = k.work;
 }
 
+// v457: the system kept: rom.4's defaults once in, each system parameter the part reads written over them where it
+// stands apart from them, then each that moved; posted when one did, its area's number moved with it
+void PluginVc2Play::keepSystem() {
+    Keeper& k = keeper_;
+    const Vc2System* defaults = vc2SystemDefaults();
+    if (defaults == nullptr) return;
+    const bool base = !k.hasSystem;
+    if (base) k.system = *defaults;
+    k.hasSystem = true;
+    const auto holds = [&k](const SystemParam& p, int v) { return v == vc2SystemValue(k.system, p.area, p.h->id); };
+    const auto put = [&k](const SystemParam& p, int v) {
+        vc2SystemPut(k.system, p.area, p.h->id, v);
+        k.areaSeq[(size_t)p.area] = k.systemSeq + 1;
+    };
+    if (!keepMoved(system_, k.systemLast, base, holds, put)) return;
+    ++k.systemSeq;
+    post();
+}
+
 void PluginVc2Play::post() {
     Posted& p = posted_[(size_t)back_];
     p.seq = keeper_.seq;
     p.none = keeper_.none;
     if (!p.none) std::copy(keeper_.work.begin(), keeper_.work.end(), p.bytes.begin());
+    p.systemSeq = keeper_.systemSeq;
+    p.areaSeq = keeper_.areaSeq;
+    if (keeper_.hasSystem) std::ranges::copy(keeper_.system.bytes, p.system.bytes.begin());
     back_ = newest_.exchange(back_ | kFresh, std::memory_order_acq_rel) & kSlot;
 }
 
@@ -120,7 +163,15 @@ PluginVc2Play::Block::Block(PluginVc2Play& owner, bool on) : owner_(owner), on_(
     owner_.inUse_.store(true);
     p_ = owner_.live_.load();
     if (p_ == nullptr) return;
-    if (const Posted* s = owner_.taken(); s != nullptr && s->seq > p_->patchSeq) {
+    const Posted* s = owner_.taken();
+    if (s == nullptr) return;
+    if (s->systemSeq > p_->systemSeq) {   // v457: the system first, so that a patch given with it reads it
+        const uint64_t had = p_->systemSeq;
+        p_->systemGiven(s->system, s->areaSeq[(size_t)Vc2SystemArea::kB] > had,
+                        s->areaSeq[(size_t)Vc2SystemArea::kSystem] > had);
+        p_->systemSeq = s->systemSeq;
+    }
+    if (s->seq > p_->patchSeq) {
         p_->patchGiven(s->none ? nullptr : s->bytes.data());
         p_->patchSeq = s->seq;
     }

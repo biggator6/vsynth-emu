@@ -2,7 +2,8 @@
 // The VC-2's part driven directly, the reference VSynthEmuVc2PlayTest holds the processor's VC-2 mode to (v455): a Vc2Synth
 // started as xt_vc2synth's whole part starts its own, given a patch through its own steps (Vc2Synth::patchGiven), and fed
 // a host's frames by the player's rules as Vc2PartPlayer.h states them, written out again here at 44.1 kHz, where a host
-// frame is a part's frame: the host's channel messages go in before the first block made once the host has reached their
+// frame is a part's frame (v457: and its system moved as Vc2PartPlayer::systemGiven gives it, `systemEdit`): the host's
+// channel messages go in before the first block made once the host has reached their
 // frame, on channel 1 (system and real-time bytes not taken); the nth block takes the input's frames from 32n, the input a
 // block late (32 frames of silence, then the host's), zeros where the host hasn't given them (a block in a wait, run ahead
 // of the host), each frame's words 1 and 5 the mean of its sides.  The bus: MAIN and MULTI × 2^-30.
@@ -27,7 +28,10 @@ public:
     };
     explicit Vc2PlayDirect(const std::vector<uint8_t>* store) {
         s_.start();
-        if (const Vc2System* system = vc2SystemDefaults()) s_.giveSystem(*system);
+        if (const Vc2System* system = vc2SystemDefaults()) {
+            system_ = *system;
+            s_.giveSystem(system_);
+        }
         if (const Vc2LoadedWaves* w = vc2Waves()) s_.giveWaves(*w);
         s_.sink = this;
         s_.runOnOs([this](Vc2PartEvent& e) { return next(e); });
@@ -45,6 +49,25 @@ public:
         if (store_.empty()) store_ = vc2DefaultStore();
         vc2PatchPut(store_, h, value);
         s_.patchGiven(&store_);
+    }
+    // v457: system parameters moved together, at a block's edge (ID, value): written over the system, the system given
+    // again, then the front's messages: the system's (kind 4) if one was system B's, the assignments' (5) if one was the
+    // system's, in that order, before the next block
+    void systemEdit(const std::vector<std::pair<int, int>>& moves) {
+        bool systemB = false, assigns = false;
+        for (const auto& [id, value] : moves) {
+            Vc2SystemArea area {};
+            if (!vc2SystemAreaOf(id, area)) continue;
+            vc2SystemPut(system_, area, id, value);
+            systemB = systemB || area == Vc2SystemArea::kB;
+            assigns = assigns || area == Vc2SystemArea::kSystem;
+        }
+        s_.giveSystem(system_);
+        for (const auto& [on, kind] : { std::pair { systemB, kVc2SystemRead }, std::pair { assigns, kVc2AssignsRead } })
+            if (on) {
+                queue_.push_back({ kVc2ParametersMessage, 0, 0, 1 });
+                words_.push_back(kind);
+            }
     }
     // The host's `n` frames: its input in (l, r), its messages at their frames, the part's frames out into left, right
     void host(const float* l, const float* r, int n, const std::vector<Message>& messages, float* left, float* right) {
@@ -65,6 +88,7 @@ public:
         }
     }
     long ahead = 0, blocks = 0;   // the blocks made ahead in waits, and in all
+    const Vc2Synth& part() const { return s_; }   // v457: for the checks of what its readers wrote
 
 private:
     void produce() {
@@ -105,6 +129,7 @@ private:
         }
     }
     Vc2Synth s_;
+    Vc2System system_;   // v457: rom.4's defaults, the system parameters moved written over them
     std::vector<uint8_t> store_;
     std::deque<Vc2MidiMessage> queue_;
     std::deque<uint32_t> words_;                // each message's word

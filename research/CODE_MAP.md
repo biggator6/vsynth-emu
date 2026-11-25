@@ -26,8 +26,11 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   XtSynth's render moved out as it stood, both's), `XtFn.h` (a callable held in place, std::function's on the part's
   runtime paths), `PluginWaveView.h` (the processor's WaveView moved out). Vc2Synth gains `sink` (each block's frames)
   and `patchGiven` (xt_vc2synth's patch given). v456: `Vc2PartView` (the part as the editor sees it, written by the
-  player after each block, PluginVc2Play's), read by `UiVc2Mic` (the checks, `stateLines`) and the MIC IN card. Checked by `VSynthEmuVc2PlayTest` (`plugin/Tests/Vc2PlayTest.cpp`, its
-  reference `Vc2PlayDirect.h`, its set-up `Vc2PlayRig.h`, its timing mode `Vc2PlayTime.cpp`).
+  player after each block, PluginVc2Play's), read by `UiVc2Mic` (the checks, `stateLines`) and the MIC IN card. v457: the system's parameters to the part: `vc2SystemPut`, `vc2SystemAreaOf` and
+  `vc2SystemDefault` (Vc2SystemStore), the keeper's system (PluginVc2Play, one loop with the store's, `keepMoved`),
+  `Vc2PartPlayer::systemGiven`. Checked by `VSynthEmuVc2PlayTest` (`plugin/Tests/Vc2PlayTest.cpp`, its
+  reference `Vc2PlayDirect.h`, its set-up `Vc2PlayRig.h`, its timing mode `Vc2PlayTime.cpp`, the view's checks
+  `Vc2PlayView.cpp`, the system's `Vc2PlaySystem.cpp`).
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `IOS_companion/`: a companion application for iPhone and iPad, developed separately from the plugin, that works as the XT's Time Trip or X-Y pad over MIDI; tested and working (the user, 2026-11-13). It is not part of the plugin's build, tests or outstanding work; its `IOS_COMPANION_PLAN.md` still reads "Planned" and is out of date.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,

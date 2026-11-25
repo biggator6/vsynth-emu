@@ -33,6 +33,15 @@ enum class Vc2SystemArea : uint8_t { kB, kSystem, kC, kD };
 
 // An ID on an area as rom.4's getter reads it
 int vc2SystemValue(const Vc2System& s, Vc2SystemArea area, int id);
+// v457: the other way: `value` (less the centre, as read) written as the ID's bits on the area
+void vc2SystemPut(Vc2System& s, Vc2SystemArea area, int id, int value);
+// v457: the area rom.4's readers read a system ID of the plugin's parameters on: Clock Source (the clock's, 0x89324350
+// on 0x89320760) and External In Type (the system's dispatcher's, 0x8939b0d0) system B's; the controller assigns
+// 0x89…0x96 (the assignments' dispatcher's 0x8939b110, Time Trip's) the system's.  None for Master Level and Output Gain,
+// which no reader of the part reads (the effects' system reader 0x8935feb0 does: rom.4's unit, not in the VC-2 mode)
+bool vc2SystemAreaOf(int id, Vc2SystemArea& area);
+// v457: rom.4's system default of such an ID, less the centre, on its area; false for another ID or with none loaded
+bool vc2SystemDefault(int id, int& value);
 
 // rom.4's defaults for the three areas, run once in an image after its C startup; false when they fault. Not for the
 // audio thread

@@ -2,7 +2,8 @@
 // part, held bit for bit to the part driven directly (Vc2PlayDirect.h), as PluginTest holds the V-Synth to XtSynth.  For a
 // few of the disk image's .p02s, each loaded into a fresh processor at 44.1 kHz: a chord and single notes through the
 // host's MIDI at frames off the blocks' edges, a controller and a bend, a burst of overlapping notes past the voices, the
-// input a voice-like saw on both sides, and a VC-2 parameter moved halfway; every sample out the same as the part's own
+// input a voice-like saw on both sides, a VC-2 parameter moved halfway, and (v457) three system parameters moved in the
+// burst (Vc2PlaySystem.cpp's checks after); every sample out the same as the part's own
 // (the processor's output passing OutputFinite, a non-number 0 on both sides), nothing allocated or freed in processBlock.
 // Then: the session keeps the mode and the store the part played; the V-Synth mode makes no part; at 48 kHz (the first
 // patch) the part is heard through the rate's conversion, finite, near the same level; rom.4's system defaults in, Part 1
@@ -54,6 +55,10 @@ void operator delete[](void* p, std::size_t) noexcept { Allocations::given(p); }
 namespace {
 constexpr double kRate = 44100.0, kOtherRate = 48000.0;
 constexpr int kBlock = kVc2PlayBlock, kBlocks = 190, kEditAt = 100;   // about 2.2 s; the parameter moved at the 100th
+// v457: the system's moved at the 150th, in the burst (Vc2PlaySystem.cpp): Clock Source and External In Type, system B's,
+// and Knob 1 Assign, the system's
+constexpr int kSystemAt = 150;
+constexpr int kSystemMoved[] = { 0x43, 0x7a, 0x95 };
 // The disk image's .p02s played, by place, the first at 48 kHz as well.  Left out until v362: 018 FemaleChoirs, which
 // plays at nine times real time and nearly silent (peak 1e-4): one note-on's SOLO seek walks records that all read 0
 // (vc2SeekRecords through the tones' boundFloat, 1e9 steps), likely v362's fault (Vc2SynthOscOutside::boundFloat
@@ -85,6 +90,16 @@ const Vc2HostParam* levelParam() {
     return nullptr;
 }
 
+// A parameter of the processor's moved, halfway down or, when that's where it stands, to the top; its value now
+int moveParam(VSynthEmuProcessor& p, const juce::String& id) {
+    auto* prm = p.apvts.getParameter(id);
+    const int now = (int)std::lround(prm->convertFrom0to1(prm->getValue()));
+    const int lo = (int)prm->getNormalisableRange().start, hi = (int)prm->getNormalisableRange().end;
+    const int v = (now + lo) / 2 != now ? (now + lo) / 2 : hi;
+    prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+    return v;
+}
+
 struct Played {
     long differ = 0, first = -1, allocations = 0;
     double peak = 0, sumSquares = 0, seconds = 0;   // seconds: processBlock's, all of them
@@ -101,13 +116,15 @@ Played play(VSynthEmuProcessor& p, Vc2PlayDirect* direct) {
     for (int b = 0; b < kBlocks; ++b) {
         const int from = b * kBlock;
         if (b == kEditAt && h != nullptr) {   // a level moved: the processor's parameter, the direct part's store
-            auto* prm = p.apvts.getParameter(h->paramId);
-            const int now = (int)std::lround(prm->convertFrom0to1(prm->getValue()));
-            const int lo = (int)prm->getNormalisableRange().start, hi = (int)prm->getNormalisableRange().end;
-            const int v = (now + lo) / 2 != now ? (now + lo) / 2 : hi;   // moved, halfway down or to the top
-            prm->setValueNotifyingHost(prm->convertTo0to1((float)v));
+            const int v = moveParam(p, h->paramId);
             p.vc2Play().tick();
             if (direct != nullptr) direct->edit(*h, v);
+        }
+        if (b == kSystemAt) {   // v457: system parameters moved, mid-burst: the processor's, the direct part's system
+            std::vector<std::pair<int, int>> moves;
+            for (const int id : kSystemMoved) moves.push_back({ id, moveParam(p, vc2HostParamId(id, 0, 0)) });
+            p.vc2Play().tick();
+            if (direct != nullptr) direct->systemEdit(moves);
         }
         juce::MidiBuffer midi;
         for (const Message& m : messages)
@@ -179,9 +196,10 @@ void onePatch(TestChecks& check, const DiskPatch& patch, const juce::File& work,
     Vc2PatchFile read;
     check(vc2PatchRead(patch.bytes.data(), patch.bytes.size(), read), patch.name + " should read");
     auto p = vc2Processor(check, file, kRate);
+    const std::string name = patch.name + ": ";
+    vc2PlaySystemDefaults(check, *p, name);
     Vc2PlayDirect direct(&read.store);
     const Played r = play(*p, &direct);
-    const std::string name = patch.name + ": ";
     check(r.differ == 0, name + std::to_string(r.differ) + " samples differ from the part's own, the first at frame " +
                              std::to_string(r.first));
     check(r.finite, name + "a sample out isn't a number");
@@ -204,6 +222,7 @@ void onePatch(TestChecks& check, const DiskPatch& patch, const juce::File& work,
           name + "the session doesn't keep the store the part played");
     if (other) otherRate(check, file, r, name);
     if (other) silentInput(check, *p, name);
+    vc2PlaySystemChecks(check, *p, direct, name);
     vc2PlayViewChecks(check, *p, name);   // every patch: a vocoder's may keep a carrier, the others let theirs go
     level = std::max(level, r.peak);
 }

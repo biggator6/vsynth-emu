@@ -354,3 +354,15 @@ vc2play-carrier-always|    const bool note = v.sounding.load(std::memory_order_r
 vc2play-chip-no-mic|    if (c[kMicCheck].state == State::silent) return "NO MIC";|    ;|plugin/Source/UiVc2Mic.cpp|vc2play
 editor-vc2-checks-never-wait|    if (!v.playing.load(std::memory_order_relaxed)) return State::waits;|    ;|plugin/Source/UiVc2Mic.cpp|layout
 editor-vc2-lines-never-wait|    if (!v.playing.load(relaxed)) return std::vector<juce::String>(kStateLines, kLineWaits);|    ;|plugin/Source/UiVc2Mic.cpp|layout
+# v457: the system's parameters to the part (VSynthEmuVc2PlayTest's Vc2PlaySystem.cpp and its system move): the system
+# given, its front's messages, kept from the parameters, the areas, the defaults, a part made again on it
+vc2play-system-old|        p_->systemGiven(s->system, s->areaSeq[(size_t)Vc2SystemArea::kB] > had,|        p_->systemGiven(*vc2SystemDefaults(), s->areaSeq[(size_t)Vc2SystemArea::kB] > had,|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-system-no-read|    if (systemB) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, kVc2SystemRead);|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-system-no-assigns|    if (assigns) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, kVc2AssignsRead);|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-system-unkept|        vc2SystemPut(k.system, p.area, p.h->id, v);|        ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-system-ext-in-unmapped|    if (id == kClockSource \|\| id == kExternalInType) area = Vc2SystemArea::kB;|    if (id == kClockSource) area = Vc2SystemArea::kB;|plugin/Source/Vc2SystemStore.cpp|vc2play
+vc2play-system-assigns-on-b|    else if (id >= kAssignsFirst && id <= kAssignsLast) area = Vc2SystemArea::kSystem;|    else if (id >= kAssignsFirst && id <= kAssignsLast) area = Vc2SystemArea::kB;|plugin/Source/Vc2SystemStore.cpp|vc2play
+vc2play-system-default-descriptor|std::clamp(vc2SystemDefault(id, system) ? system : d->def - d->centre, lo, hi)|std::clamp(d->def - d->centre, lo, hi)|plugin/Source/PluginVc2Params.cpp|vc2play
+vc2play-system-made-defaults|std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_, keeper_.hasSystem ? &keeper_.system : nullptr)|std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_, nullptr)|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-system-start-defaults|    if (const Vc2System* given = system != nullptr ? system : vc2SystemDefaults()) s.giveSystem(*given);|    if (const Vc2System* given = vc2SystemDefaults()) s.giveSystem(*given);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+# (vc2play-system-put-raw, the centre left out of vc2SystemPut, is equivalent: every one of the 16 has a centre of 0)

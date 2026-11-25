@@ -4,6 +4,7 @@
 #include "PluginVc2Params.h"
 #include "PluginParamIds.h"
 #include "Vc2Params.h"
+#include "Vc2SystemStore.h"
 #include <algorithm>
 
 namespace {
@@ -89,7 +90,10 @@ HostRange hostRange(int id, bool rom4) {
     if (const XtTypedDesc* t = vc2TypedDesc(id)) return { t->min, t->max, std::clamp(t->def, t->min, t->max) };
     const XtParamDesc* d = vc2ParamDesc(id);
     const int lo = d->min - d->centre, hi = d->max - d->centre;
-    return { lo, hi, std::clamp(d->def - d->centre, lo, hi) };
+    // v457: a system ID the part reads starts at rom.4's system default, as the XT starts with no system file to load
+    // (its defaults' routines: the controller assigns' are not their descriptors' 0)
+    int system = 0;
+    return { lo, hi, std::clamp(vc2SystemDefault(id, system) ? system : d->def - d->centre, lo, hi) };
 }
 
 } // namespace
