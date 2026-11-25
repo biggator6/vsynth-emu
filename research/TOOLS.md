@@ -30,6 +30,17 @@ Moved here as they stood from CLAUDE.md (2026-11-23, the user's "Yes, all five")
 - `env.sh`: the tools' paths, sourced by each; from bash or zsh (zsh, which has no BASH_SOURCE, by `$0`), and a REPO that isn't a checkout is refused rather than used (v178: from zsh REPO landed two folders up, with build/tools made there). `env_test.sh` (in `verify.sh`): sourced from both shells, from inside and outside the checkout, and with REPO given, on a copy in a scratch tree; `--plants` its two planted errors, when env.sh changes.
 - `build.sh`: all harnesses and the XtSynth CLI; the VC-2 part's checks of its voices, notes, keys, OS MIDI, the part
   whole and rom.1's kernel in `build_vc2part.sh`, which it sources (v353). `make_inputs.py`: the raw test inputs.
+  `XT_SANITIZE=1 build.sh [src] [out]` (v550, about 2 minutes) builds the same programs from the same lists under
+  clang's AddressSanitizer and UndefinedBehaviorSanitizer (`-fsanitize=address,undefined -fsanitize-recover=address
+  -fno-omit-frame-pointer -O1 -g`) and libc++'s bounds (`_LIBCPP_HARDENING_MODE_EXTENSIVE`, which sees an index
+  leaving one `std::array` member for the next, as ASan can't), into `build/tools/asan/bin`. Run a harness through
+  quiet-test with `ASAN_OPTIONS=halt_on_error=0:detect_leaks=0:suppress_equal_pcs=0:handle_sigtrap=1` and
+  `UBSAN_OPTIONS=print_stacktrace=1`: one run then reports every ASan and UBSan error, and libc++'s bounds trap with
+  a stack. "ERROR: AddressSanitizer" (TRAP for libc++'s) and "runtime error:" lines are findings. Without
+  `suppress_equal_pcs=0` every memcpy fault after the first is hidden (their pc is the interceptor's). The draws can
+  differ from -O2's (-O1's float arithmetic), which is how v338's and v339's faults showed. The v550 sweep ran it on
+  the VC-2's harnesses at 2024, 7 and 31337 before step 4.5's second half (HARDWARE_FIRMWARE.md, "The VC-2 checks
+  under the sanitizers").
 - `ghidra.sh Script.java args`: headless Ghidra on rom.2 (DecompFn, Disasm,
   MkFunc then DecompFn for undefined functions, FuncAt, CallersOf).
 - `kernelmap.py [rom.1] [rom.4]` (v352): what rom.1, the kernel, is, from its bytes: its base by the VBR its reset code

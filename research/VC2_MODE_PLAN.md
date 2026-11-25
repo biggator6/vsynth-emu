@@ -1259,7 +1259,7 @@ version against rom.4's routines with what it calls hooked:
          (the sNaN quieted). Deferred because only a NaN's sign differs, and matching the interpreter would change
          `xtf::sub`, which rom.2's ports share; XtFloat.h is unchanged and there is no VC-2-only subtract. Meanwhile
          xt_vc2synth's notes part keeps a sounding VOCODER OSC's Type in a new patch (`vocoderTypesKept`,
-         Vc2SynthNotesCheck.cpp). What the NaN does to the audio: step 4.5's [gap], "A NaN sample to the host".
+         Vc2SynthNotesCheck.cpp). What the NaN does to the audio: step 4.5's "A NaN sample to the host" (closed by v454).
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
@@ -1341,6 +1341,11 @@ version against rom.4's routines with what it calls hooked:
       "A .p02 onto the VC-2's parameters"). With it the first half is done.
    4. The second half: the mode switch's audio, the wiring to Vc2Synth, the VC-2 pages and cards, the plugin test of a
       played block.
+      - Before it, done (v550): the VC-2's firmware checks under AddressSanitizer, UBSan and libc++'s bounds
+        (`XT_SANITIZE=1 build.sh`), the 21 step 4.3 isn't changing at 40 and 400 cases, three seeds: the voices' noise
+        drawn as an XT's keys; the check rig's compare passed to step 4.3 (HARDWARE_FIRMWARE.md, "The VC-2 checks under
+        the sanitizers"). Step 4.3's own three (osc, tone, synth) are its to run so.
+
    Open for the second half, found in step 4.3 (v349):
    - [gap] Part 1 Receive Switch off, among the system settings. rom.4's system defaults (`0x89328d60`, run by
      `0x89319e10`) set it on (ID 0x47 = 1); a user's own system setting turns it off. With it off, G's channel word is
@@ -1350,12 +1355,19 @@ version against rom.4's routines with what it calls hooked:
      part reads zeros (its step fails on a read no region holds); xt_vc2synth's notes part draws Part 1 receiving always.
      Step 4.5 decides between starting the plugin with Receive on and finding the boot flash's bytes; the read isn't
      ported.
-   - [gap] A NaN sample to the host. In step 4.3's [deferred] state (the VOCODER's balance NaN), the carrier's noise
+   - [x] A NaN sample to the host. In step 4.3's [deferred] state (the VOCODER's balance NaN), the carrier's noise
      gain is NaN on both sides, and `vc2Clamp01` passes a NaN through (both compares false). So the carrier's render
      (Vc2Carrier.cpp) gives a NaN noise scale, its noise low-pass state goes NaN and stays so until the carrier's next
      init (a note-on), and every sample the OSC gives is NaN, the saw's added to it; with them the tone's mix, COSMs
      and TVA, and the part's bus. Whatever rom.4 does, the plugin must never hand the host a NaN sample: step 4.5 puts
-     a guard where the VC-2's audio leaves the part, and the plugin test holds it. Not fixed in v349.
+     a guard where the VC-2's audio leaves the part, and the plugin test holds it. Not fixed in v349. Closed by v454
+     (the user's "ok, fix the NaN at the output", 2026-11-24): the guard is at the plugin's output rather than the
+     part's, so it holds for the V-Synth's audio and the VC-2's alike. `OutputFinite` (PluginOutputFinite.h), made at
+     processBlock's top, sets every sample that isn't a finite number to 0 on every way out; `VSynthEmuOutputTest`
+     (in verify.sh) plays a float wave holding NaN and ±infinity with no image: 410 samples out weren't numbers
+     before the guard, 5/5 checks after (HARDWARE_FIRMWARE.md, "The plugin's output always numbers"). When the
+     VC-2's audio reaches processBlock (this step's second half), it passes the same guard; the plugin test of a
+     played block then also holds it on the VC-2's own path.
    - [gap] The MIDI input's real-time bytes (v354; v355). v354 took `0x89313cb0` for their handler; it is the clock
      task's listener on the OS MIDI's hub, of the parameters' messages, and v355 ports it with the clock task's 0x40
      pass (`0x89313d50`, `0x89313e10`: Clock Source, Clock Out, the patch's tempo). With Clock Source MIDI the clock

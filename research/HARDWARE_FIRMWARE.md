@@ -5815,6 +5815,50 @@ processBlock for 40 blocks of 512. Before the guard: 410 samples out weren't fin
 channels), exit 1. After it: 5/5 checks hold, every sample finite and the wave's sine still heard. verify.sh: the
 renders and PluginTest as before.
 
+### The VC-2 checks under the sanitizers (2026-11-23, v550) {#vc2-checks-sanitized}
+
+Before the VC-2 sounds in the plugin (step 4.5's second half), its firmware checks ran under clang's AddressSanitizer
+and UndefinedBehaviorSanitizer and libc++'s bounds checks, as v337–v339 found faults that only a crash, an ASan build
+or a coverage build showed. These were the 21 harnesses step 4.3 isn't changing: autonote, carrier, cosm, hireso, in,
+keys, kind6, legacy, libm, midi, mixer, notes, params, patch, sets, settings, tracker, tva, vocoder, voices, waves.
+
+**The build.** `XT_SANITIZE=1 research/tools/build.sh` builds build.sh's programs from the same lists with
+`-fsanitize=address,undefined -fsanitize-recover=address -fno-omit-frame-pointer -O1 -g` and
+`_LIBCPP_HARDENING_MODE_EXTENSIVE`, into `build/tools/asan/bin`. ASan can't see an index that leaves one `std::array`
+member for the next one in the same object, where v337's fault was; libc++'s bounds see that, as a trap. ASan's default
+`suppress_equal_pcs` puts every memcpy fault under one report (its pc is the interceptor's), so the runs turned it off
+and sorted the reports by their first frames instead.
+
+**The runs.** Each harness at fcheck's count and at 400 cases (params at 20, libm at 200,000), at 2024, 7 and 31337,
+under ASan and UBSan, then at fcheck's counts with libc++'s bounds besides. Every run was 0 different. Two findings,
+neither reachable on an XT:
+- **The voices' release path (fixed here).** `Vc2Assigner::release` reads a voice's key (+0x42) as an index into the key
+  table's latched bits (`latched[key >> 4]`, eight halfwords). xt_vc2voices' release, voice-class and listener parts
+  start every case from noise, so a voice's key reached 128–255 and the index ran past the table's eight halfwords:
+  libc++'s trap at seeds 2024 and 7 (the red test). rom.4 reads the table's next words there, and the port's struct
+  holds the same bytes there, so -O2 agreed only by the layout's luck, and with undefined behaviour. An XT gives
+  every one of these keys from MIDI's note numbers or a held key's bit (a key table's last note-on and note-off keys,
+  a glide's sounding key, from 60 at its reset, and the four keys it remembers), so the keys stay in 0…127. As with v339, the
+  draw was fixed and the port left as it is: `releaseStart` (Vc2AssignReleaseCheck.cpp) now masks each such key of the
+  noise to 0…127. The masks take no draws, and -O2's output is the same byte for byte at all three seeds, the counts
+  included.
+- **The check rig's compare (passed to step 4.3, whose file it is).** `vc2FirstDifference` (Vc2CheckRig.h) gives its
+  two word vectors `bytes / 4` words, then reads and copies `bytes` into them. xt_vc2sets' OSC blocks compare the
+  wave sets' counts (0x8993448c, three halfwords, 6 bytes), so every event wrote 2 bytes past a one-word vector
+  (16,000 reports a run at each site, the read and the copy). Its compare also never saw the third halfword, the
+  alias set's count. Only the rig is involved; no port runs that code. With `(bytes + 3) / 4` words (zero-filled, so a last
+  partial word compares the bytes it holds), tried in a scratch copy, xt_vc2sets is 0 different at -O2 and clean
+  under ASan at 40 and 400 cases, all three seeds, with its counts unchanged.
+
+Results:
+- Under ASan and UBSan: the 21 clean at fcheck's counts and at 400 cases, all three seeds, apart from xt_vc2sets' rig
+  compare above (clean with the rig's fix). With libc++'s bounds besides, at fcheck's counts: clean but for the two
+  findings; xt_vc2voices clean with v550's draw at 40 and 400 cases.
+- At -O2: xt_vc2voices 0 different at 40 and 400 cases, all three seeds. Its output at 40 is byte for byte as before
+  (fcheck's baseline unchanged); at 400 one retune more at 2024, a masked key now meeting a drawn one.
+- `mutate_vc2.py --voices`, the whole list (none of its plants is in the check, so `--changed` runs none, but the
+  draw the release path's plants are caught on changed): 328 planted, none missed, no errors.
+
 ### The VC-2's waves at the plugin's start (2026-11-23, v504) {#vc2-waves-at-start}
 
 v503's load now runs at the plugin's start, once a process, beside rom.4's tables. That keeps the user's rule that

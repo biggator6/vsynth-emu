@@ -4024,6 +4024,18 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - EVENT's moved centre depends on a systems byte the part's OSC reader always clears, so rom.4 never takes that path. It is ported as rom.4 has it and the check draws the byte both ways.
 - The first coverage run left EVENT's centre without a key below 60: the mode and the key were drawn as noise. Drawing EVENT half the time and the key within 0…127 reached every branch.
 
+### Session 25 (2026-11-23) — v550: the VC-2 checks under the sanitizers
+
+- Started from the coordinating session's brief, in a worktree from vc2-mode (c79fd54), on the 21 VC-2 harnesses step
+  4.3 isn't changing. `XT_SANITIZE=1 build.sh` is the switch, beside XT_STACK_INIT.
+- ASan's default dedup hid every memcpy fault behind the first, since they all share the interceptor's pc. The one
+  that showed was the check rig's, 16,000 times a run. With dedup off and the reports sorted by stack, nothing else
+  was there.
+- ASan alone found no port fault. libc++'s bounds found one at the first run: an index from one `std::array` member into
+  the next, which ASan can't see, the kind of fault v337 found. Its trap was a check's noise giving a key past 127.
+- The rig's fault is in a file step 4.3 has changed, so it went to that session with its fix tried in a scratch copy
+  of plugin/, never committed.
+
 ### Session 25, continued (2026-11-23) — v503: the waves loaded by rom.4 itself
 
 - The coordinator turned the work around: from v502 on rom.4's own loaders run in the interpreter at load time, and
