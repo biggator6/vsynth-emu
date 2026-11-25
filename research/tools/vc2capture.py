@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
-"""vc2capture.py [--out DIR] [--rom4 FILE] [--rom2 FILE] [--dev 17] [--ch 1] [--input-wavs]: what the VC-2 captures need
-(RECORDING_GUIDE.md, "VC-2 captures"; research/VC2_MODE_PLAN.md, step 5, what each run settles).  Writes, by default to
-analysis/test_files/vc2/ (gitignored):
+"""vc2capture.py [--out DIR] [--rom4 FILE] [--writer FILE] [--dev 17] [--ch 1] [--input-wavs]: what the VC-2 captures
+need (RECORDING_GUIDE.md, "VC-2 captures"; research/VC2_MODE_PLAN.md, step 5, what each run settles).  Writes, by default
+to analysis/test_files/vc2/ (gitignored):
 
   vc2probe.wav         the signal into the XT's input, 44.1 kHz, 24-bit, stereo (vc2probe.py)
-  vc2_test.mid         about 20 s, to see that the XT takes the messages in VC-2 mode: the input comes through as the
-                       direct sound, Master Level drops during its sweep, and MFX Type changes on the screen
-  vc2_run_1.mid ...    the four runs (vc2takes.py), each take with a cue at which fxplay --audio starts the input
+  card/                what goes on the XT's card: "VC-2 Project.ini" and RUNS.vc2/Patch/NNN RUN NNN.p02, the patches
+                       the runs select (vc2cardrun.py), made by rom.4's own routines through vc2patchwrite
+  vc2_test.mid         about 23 s, to see that the XT takes the messages in VC-2 mode: patch RUN 001 from the card, the
+                       input through as the direct sound, Master Level dropping during its sweep, MFX Type changing on
+                       the screen
+  vc2_run_1.mid ...    the four runs (vc2takes.py), each take with a cue at which fxplay --audio starts the input; a
+                       take that sets what only the panel reaches (the system's Output Gain and External In Type) has a
+                       pause before it, at a "hand:" cue fxplay shows, for the user to set that at the panel
   vc2_vsynth.mid       the same input into V-Synth mode's EXT IN OSC at each External In Type (vc2vsynth.py)
   vc2_takes.csv        every take: when it starts, what it sets in the panel's words, the input it gets, why
   vc2_run_N_in.wav     with --input-wavs: a run's whole input as one file, for a DAW that plays it beside the MIDI
 
 The addresses are vc2map.py's: rom.4's own map, model 00 00 0D, read from the image (HARDWARE_FIRMWARE.md, "rom.4's
-SysEx: the VC-2's own address map").  Most of what the VC-2 runs set has no address there, or none under PATCH Init's
-Category, so they are not written: the script says which parameters, writes the input and the V-Synth-mode run
-(rom.2's map, which holds), and exits 2, until step 5's VC-2 runs are made again (research/VC2_MODE_PLAN.md, step 5).
-The runs hold rom.4's typed defaults, sent with each type, so they stay in the gitignored folder, as the effects' do.
+SysEx: the VC-2's own address map").  What rom.4 takes no SysEx for under PATCH Init's Category goes in the patches,
+each take selecting its own by Bank Select and Program Change (the user's choice, 2026-11-25).  The runs and the
+patches hold rom.4's defaults, so they stay in the gitignored folder, as the effects' runs do.
 
   vc2capture.py --check FILE.mid ...   parses runs back and checks every checksum (capsysex.check)
   vc2capture.py --learn FILE           names each DT1 in FILE (fxplay --in's output) by rom.4's map: the XT's own
@@ -25,124 +29,15 @@ import argparse, csv, os, re, struct
 import vc2probe
 import vc2takes
 import vc2vsynth
-from capsysex import Run, check, nibbles
-from vc2map import MODEL, TYPES4, Map
+from capsysex import check
+from vc2cardrun import INI_NAME, Patches
+from vc2map import MODEL, Map
+from vc2writer import TEST_SETS, Vc2Run, build, probe_seconds, settings, test_run
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..')
 FW = os.path.join(REPO, 'firmware/unpacked')
-NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-EFFECT_SWITCHES = ('MFX Switch', 'Chorus Switch', 'Reverb Switch')
+WRITER = os.path.join(REPO, 'build/tools/bin/vc2patchwrite')   # build.sh builds it
 FIELDS = ['run', 'take', 'note_on_s', 'note_off_s', 'next_s', 'probe', 'settings', 'why']
-
-
-def note_name(k):
-    return '%s%d' % (NOTE_NAMES[k % 12], k // 12 - 1)
-
-
-def probe_seconds(probe):
-    return {'full': vc2probe.END, 'fx': vc2probe.FX_END}.get(probe, 5.0)
-
-
-class Vc2Run(Run):
-    """A VC-2 run: capsysex's Run writing rom.4's parameters by name through the map."""
-    def __init__(self, dev, ch, m):
-        super().__init__(dev, ch, MODEL)
-        self.map = m
-
-    def put(self, name, v):
-        if self.state.get(name) != v:
-            self.sx(self.map.address(self.map.id_of(name)), [v])
-            self.state[name] = v
-
-    def apply(self, want):
-        """Writes what differs from the last take: the effects' switches off first, so nothing sounds through a change;
-        a type with each of its typed defaults; the rest; the switches on last.  Returns whether a program loaded."""
-        reload = False
-        for k in EFFECT_SWITCHES:
-            if want[k] == 0:
-                self.put(k, 0)
-        for k in TYPES4:
-            if self.state.get(k) != want[k]:
-                self.put(k, want[k])
-                reload = True
-                for address, v in self.map.typed(k, want[k]):
-                    self.sx(address, nibbles(v))
-        for k, v in want.items():
-            if k not in EFFECT_SWITCHES and k not in TYPES4:
-                self.put(k, v)
-        for k in EFFECT_SWITCHES:
-            if want[k] == 1:
-                self.put(k, 1)
-        return reload
-
-    def apply_take(self, t):
-        """A take's settings over the base; with none, the base alone (the run's set-up)."""
-        return self.apply({**vc2takes.BASE, **(t['set'] if t else {})})
-
-
-def settings(m, t):
-    """A take in the panel's words, what it sets over the base, for doing it by hand."""
-    p = ['%s %s' % (k, m.text(m.id_of(k), v)) for k, v in t['set'].items()]
-    p.append('play nothing' if t['key'] is None else 'hold %s' % note_name(t['key']))
-    if t['probe'] is None:
-        p.append('the input silent')
-    if t.get('marker'):
-        p.append('Direct Sound Level 127 for the input\'s first %.1f s (its clicks and sweep), then as set, and only '
-                 'then the key' % vc2takes.MARKER_S)
-    return '; '.join(p)
-
-
-def build(run, takes, w, text):
-    """A run on writer w (its apply_take: a take's writes, None the set-up): its take rows and cues [(ms, probe)]."""
-    rows, cues = [], []
-    w.wait(3000)
-    w.apply_take(None)
-    w.wait(2000)
-    for t in takes:
-        reload = w.apply_take(t)
-        if t.get('marker'):
-            w.put('Direct Sound Level', 127)
-        w.wait(2500 if reload else 800)                     # a program's load, a mute ramp, a reverb's clear
-        start = w.ms
-        if t['probe']:
-            w.cue('probe:%.1f' % probe_seconds(t['probe']))     # fxplay plays the input's first that many seconds
-            cues.append((start, t['probe']))
-        if t.get('marker'):                                 # the clicks through the direct sound, then the take's own level
-            w.wait(vc2takes.MARKER_S * 1000)
-            w.put('Direct Sound Level', {**vc2takes.BASE, **t['set']}['Direct Sound Level'])
-        if t['key'] is not None:
-            w.note(True, t['key'])
-        w.wait(start + probe_seconds(t['probe']) * 1000 + 200 - w.ms)
-        if t['key'] is not None:
-            w.note(False, t['key'])
-        off = w.ms
-        w.wait(t['tail'] * 1000)
-        rows.append(dict(run=run, take=t['name'], note_on_s='%.3f' % (start / 1000), note_off_s='%.3f' % (off / 1000),
-                         next_s='%.3f' % (w.ms / 1000), probe=t['probe'] or '', settings=text(t), why=t['why']))
-    w.wait(1000)
-    return rows, cues
-
-
-def test_run(m, dev, ch):
-    """The test: the input as the direct sound and as the EXT IN tone on C4, so it is heard whichever word the mic is;
-    Master Level down in its sweep; MFX Type to Parametric EQ and back."""
-    w = Vc2Run(dev, ch, m)
-    heard = {**vc2takes.BASE, 'Direct Sound Level': 127, 'OSC 1 Switch': 1, 'MFX Switch': 1}
-    w.wait(1000)
-    w.apply(heard)
-    w.wait(1500)
-    w.cue('probe:%.1f' % vc2probe.FX_END)
-    w.note(True, 60)
-    w.wait(8000)
-    w.put('Master Level', 40)
-    w.wait(1000)
-    w.apply({**heard, 'Master Level': 40, 'MFX Type': 1})
-    w.wait(8000)
-    w.note(False, 60)
-    w.put('Master Level', 127)
-    w.apply(vc2takes.BASE)
-    w.wait(200)
-    return w
 
 
 def input_wav(path, cues, total_ms, x):
@@ -193,9 +88,6 @@ def learn(m, path):
             print('  %s: %#05x %s = %s' % (h, i, m.names[i], m.text(i, v) if len(data) == 1 else v))
 
 
-TEST_SETS = ('Direct Sound Level', 'OSC 1 Switch', 'MFX Switch', 'Master Level', 'MFX Type')   # test_run sets
-
-
 def unreachable(m):
     """What the test and the VC-2 runs set that rom.4 takes no DT1 for under PATCH Init's Category: no address, or one
     whose entry writes under other Categories alone (vc2map.py)."""
@@ -216,6 +108,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(REPO, 'analysis/test_files/vc2'))
     ap.add_argument('--rom4', default=os.path.join(FW, 'V-SynthXT.rom.4.bin'))
+    ap.add_argument('--writer', default=WRITER, help='vc2patchwrite, built by its own line')
     ap.add_argument('--dev', type=int, default=17, help='Device ID as the XT shows it, 17-32')
     ap.add_argument('--ch', type=int, default=1, help='MIDI channel, 1-16')
     ap.add_argument('--input-wavs', action='store_true', help="each run's input as one WAV, for a DAW")
@@ -229,28 +122,26 @@ def main():
     m = Map(a.rom4)
     if a.learn:
         return learn(m, a.learn)
+    if not os.access(a.writer, os.X_OK):
+        raise SystemExit('no %s: research/tools/build.sh builds it' % a.writer)
     os.makedirs(a.out, exist_ok=True)
     x = vc2probe.probe()
     vc2probe.wav24(os.path.join(a.out, 'vc2probe.wav'), x)
-    missing = unreachable(m)
-    rows, runs = [], []
-    if missing:
-        print('rom.4 takes no DT1 under PATCH Init\'s Category for %d of what the VC-2 runs set: %s.  The test '
-              'and runs 1-4 are not written (HARDWARE_FIRMWARE.md, "rom.4\'s SysEx: the VC-2\'s own address map"; '
-              'research/VC2_MODE_PLAN.md, step 5).' % (len(missing), ', '.join(missing)))
-    else:
-        with open(os.path.join(a.out, 'vc2_test.mid'), 'wb') as f:
-            f.write(test_run(m, a.dev - 1, a.ch - 1).smf())
-        runs = [(run, takes(), Vc2Run(a.dev - 1, a.ch - 1, m), lambda t: settings(m, t))
-                for run, takes in vc2takes.RUNS.items()]
+    patches = Patches(m, vc2takes.BASE, unreachable(m))
+    with open(os.path.join(a.out, 'vc2_test.mid'), 'wb') as f:
+        f.write(test_run(m, a.dev - 1, a.ch - 1, patches).smf())
+    runs = [(run, takes(), Vc2Run(a.dev - 1, a.ch - 1, m, patches), lambda t: settings(m, t, patches))
+            for run, takes in vc2takes.RUNS.items()]
     runs.append(('vc2_vsynth', vc2vsynth.takes(), vc2vsynth.VsRun(a.dev - 1, a.ch - 1), vc2vsynth.settings))
-    write_runs(a, runs, x, rows)
-    if missing:
-        raise SystemExit(2)
+    write_runs(a, runs, x)
+    folder = patches.write(os.path.join(a.out, 'card'), a.writer, a.rom4)
+    print('card/: %s and %d patches in %s; by hand at the panel: %s' % (
+        INI_NAME, len(patches.numbers), os.path.relpath(folder, a.out), ', '.join(patches.by_hand)))
 
 
-def write_runs(a, runs, x, rows):
+def write_runs(a, runs, x):
     """Each run's MIDI (and with --input-wavs its input), then the take list."""
+    rows = []
     for run, takes, w, text in runs:
         r, cues = build(run, takes, w, text)
         with open(os.path.join(a.out, run + '.mid'), 'wb') as f:

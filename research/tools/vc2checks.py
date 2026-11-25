@@ -97,8 +97,14 @@ class Vc2Checks:
         self.pitches()
 
     def direct_law(self):
-        ref = self.by[next(n for n in DIRECT_TAKES if self.sounding(n))]
-        self.sides_of(ref.name)
+        """The direct sound's sides by its first take, and its levels against a take at Direct Sound Level 127: a
+        recording made --from past `main` and `main_again` has none, and each other direct take moves its own level."""
+        self.sides_of(next(n for n in DIRECT_TAKES if self.sounding(n)))
+        ref = next((self.by[n] for n in ('main', 'main_again') if self.sounding(n)), None)
+        if ref is None:
+            self.add('INFO', 'No `main` or `main_again` here (a recording made --from?): the direct sound\'s levels '
+                     'have no take at 127 to be read against.')
+            return
         if ref.lvl() is not None:
             self.add('INFO', 'The direct sound at 127 is %+.2f dB against the input, on its 1 kHz steps at %d and %d '
                      'dBFS.' % (ref.lvl(), LOW_STEPS[0], LOW_STEPS[1]))

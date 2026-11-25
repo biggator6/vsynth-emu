@@ -1,11 +1,13 @@
 #!/bin/bash
 # fxplay_test.sh: fxplay against the runs it plays, with no hardware (about a minute).  It builds fxplay into
 # build/tools/fxplay/, then:
-#   - every byte of the effects' runs and the VC-2's arrives at a virtual output (--test), the cues sent as nothing;
+#   - every byte of the effects' runs and the VC-2's (their Bank Select and Program Change too) arrives at a virtual
+#     output (--test), the cues sent as nothing;
 #   - the input of each VC-2 run, rendered offline through fxplay's own AudioQueue (--test-audio), is sample for
 #     sample the run's input as vc2capture.py --input-wavs writes it, by its own code (the cues' times and lengths);
 #   - a run whose cue isn't probe:<seconds> is refused, saying so.
-# Needs the user's rom.2 and rom.4 (firmware/unpacked/, or ROM2= and ROM4=) and .venv's numpy; PY= another python.
+# Needs the user's rom.2 and rom.4 (firmware/unpacked/, or ROM2= and ROM4=), build.sh's vc2patchwrite and .venv's
+# numpy; PY= another python.
 # Exits non-zero on any difference.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -20,7 +22,7 @@ clang++ -std=c++17 -O2 -Wall -Werror "$REPO/research/tools/fxplay.cpp" -framewor
     -framework AudioToolbox -framework CoreAudio -o "$BIN"
 "$PY" "$REPO/research/tools/fxcapture.py" --rom "$ROM2" --out "$WORK/fx" > /dev/null
 if ! "$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --out "$WORK/vc2" --input-wavs > "$WORK/vc2.txt"; then
-    # Until step 5's runs are made again, vc2capture.py writes no VC-2 run (VC2_MODE_PLAN.md, step 5's decision)
+    # vc2capture.py needs rom.4 and build.sh's vc2patchwrite, which writes the card's patches the VC-2 runs select
     echo "fxplay_test: WRONG, no VC-2 runs to test: $(head -c 300 "$WORK/vc2.txt")…"
     exit 1
 fi

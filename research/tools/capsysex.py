@@ -52,6 +52,12 @@ class Run:
     def sx(self, addr, data):
         self.ev.append((self.ms, b'S' + dt1(self.dev, addr, data, self.model))); self.ms += 20
     def note(self, on, n): self.ev.append((self.ms, b'N' + bytes([(0x90 if on else 0x80) | self.ch, n, 127 if on else 0])))
+    def control(self, cc, v):
+        """A Control Change on the run's channel (Bank Select's MSB is CC 0, its LSB CC 32)."""
+        self.ev.append((self.ms, b'N' + bytes([0xB0 | self.ch, cc, v])))
+    def program(self, p):
+        """A Program Change on the run's channel, 0-127."""
+        self.ev.append((self.ms, b'N' + bytes([0xC0 | self.ch, p])))
     def cue(self, text):
         """A marker (FF 06) here: fxplay --audio starts that part of its input at it."""
         self.ev.append((self.ms, b'M' + text.encode('ascii')))
@@ -83,7 +89,8 @@ def check(path):
         while True:
             c = b[i]; i += 1; v = (v << 7) | (c & 127)
             if not c & 128: return v
-    t = 0; sx = notes = 0; first = None
+    t = sx = notes = programs = 0
+    first = None
     while i < end:
         t += var(); c = b[i]; i += 1
         if c == 0xff:
@@ -98,6 +105,13 @@ def check(path):
             sx += 1; first = first or (b'\xf0' + m).hex(' ')
         elif c & 0xf0 in (0x80, 0x90):
             i += 2; notes += 1
+        elif c & 0xf0 == 0xb0:
+            assert b[i] < 128 and b[i + 1] < 128, 'a Control Change over 127 at %d ms' % t
+            i += 2; programs += b[i - 2] in (0, 32)
+        elif c & 0xf0 == 0xc0:
+            assert b[i] < 128, 'a Program Change over 127 at %d ms' % t
+            i += 1; programs += 1
         else:
             raise AssertionError('event %02x at %d ms' % (c, t))
-    print('%s: %d SysEx, all checksums good; %d note events; %.1f minutes; first %s' % (os.path.basename(path), sx, notes, t / 60000.0, first))
+    print('%s: %d SysEx, all checksums good; %d note events; %d Bank Select and Program Change; %.1f minutes; first %s'
+          % (os.path.basename(path), sx, notes, programs, t / 60000.0, first))

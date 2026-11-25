@@ -150,6 +150,11 @@ class Map:
             raise SystemExit('rom.4 has %d SysEx-addressed IDs named %r' % (len(ids), name))
         return ids[0]
 
+    def id_named(self, name):
+        """The ID with this name, address or not: the only one so named, or else id_of's."""
+        ids = [i for i, n in enumerate(self.names) if n == name]
+        return ids[0] if len(ids) == 1 else self.id_of(name)
+
     def descriptor(self, i):
         """(centre, default, min, max): the first bank's, 12 bytes an ID."""
         return tuple(struct.unpack_from('<H', self.rom.b, DESC4 + 12 * i + 4 + 2 * k - ROM_BASE)[0] for k in range(4))

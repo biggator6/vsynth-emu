@@ -4290,3 +4290,24 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the receive map takes it.
 - Not traced: model 00 24's handlers (files or waves) and two senders of other models. rom.2's own tables aren't read:
   the V-Synth map there still stands on the manual and fxcapture's checks alone.
+
+### Session 25, continued (2026-11-25) — v505: the VC-2's patches on the card
+
+- The user chose patch files for the 23 settings. Of them, 21 are a patch's; Output Gain and External In Type are the
+  system's, which no patch holds and SysEx can't reach.
+- The save was found by name, as v602's was: the .p02's header strings are written in one routine, which turned out to be
+  rom.2's writer at one distance. Its store-to-file layout is the read's conversion mirrored, and the setters are rom.2's
+  at the setters' own distance. All 128 factory patches come back byte for byte. A drawn store can't: its bits that no
+  ID holds don't reach a file. Its check is that its file reads back to a store that writes the same file again.
+- The first setter run found 112 settings "wrong", every one a one-value range. rom.4's setter doesn't hold those, as
+  rom.2's doesn't; the check had assumed it did.
+- One plant was missed: the writer entered 2 bytes in runs the same, as the interpreter's call returns at its sentinel
+  whatever the stack holds. It was an equivalent plant, and was replaced.
+- The card's layout took rom.4's boot on cards made in memory. It needed three kernel answers the boot's table lacks:
+  a line read, a handle's name, and the seek's place. With those the project's ini is read line by line, each line
+  whole, and the Patch folder fills the bank by the files' numbers.
+- I first proposed giving the two system settings runs of their own. That would have taken each take away from the
+  `main` its checks read against in the same recording. Instead run 1 pauses 20 s before such a take, at a `hand:` cue
+  fxplay prints, so the run's timing and checks stay as they were.
+- vc2cut_test's from-part-way case then failed for something real: a recording resumed just before `master_100` took
+  that take as its own reference. The direct sound's levels are now read only against a take at 127.

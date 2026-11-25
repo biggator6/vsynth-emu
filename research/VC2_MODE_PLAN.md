@@ -1492,7 +1492,10 @@ then `vc2capture.py` writing the patch files a run needs and sending the bank an
   "A VC-2 patch saved").
 - [x] Where a card's patches sit and the Bank Select and Program Change that reach one (no version: vc2card's run;
   HARDWARE_FIRMWARE.md, "A card's patches in VC-2 mode").
-- [ ] vc2capture.py's runs selecting each take's patch, the card's folder, the tests green, the guide's step.
+- [x] vc2capture.py's runs selecting each take's patch (vc2writer.py, vc2cardrun.py), the card's folder, the tests green
+  (fxplay_test.sh, vc2cut_test.py), the guide's step (RECORDING_GUIDE.md, "VC-2 captures": copy to the card, check one
+  patch by ear). Output Gain and External In Type, the system's, which no patch holds: set by hand in run 1's 20 s
+  pauses at fxplay's `hand:` cues, so the takes keep their places and their checks (no version).
 
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
