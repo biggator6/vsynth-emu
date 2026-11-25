@@ -1546,6 +1546,126 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A VC-2 patch saved (2026-11-25, v505) {#vc2-patch-save}
+
+For step 5's patch files (the user's "Patch files", 2026-11-25; VC2_MODE_PLAN.md, step 5). rom.4's own .p02 save runs
+in the interpreter, as v602 runs rom.2's: `Vc2PatchSave.cpp`, held by `xt_vc2save` (`Vc2PatchSaveCheck.cpp`).
+
+**Names first.** One routine reads the .p02's header strings ("VC20", "Rev008", "PATa", "VC_2"):
+`0x893411b0(path, layout)`. It opens the file for writing (`0x89336c90`). It writes the first header (00 1e, "VC20",
+"Rev008"), then the second ("PATa", "VC_2", the data's place 0x20 and its length 0x13a4, big-endian), then the
+layout's bytes, each by `0x89336d70`, and closes the file (`0x893391c0`). On a short write it removes the file
+(`0x89341360` → `0x89336ea0`) and returns 0, else 1. It is rom.2's `0x8948fc30`, 0x14ea80 away (codepairs.py).
+
+The store's layout comes from `0x89324f20(layout, store)`, the mirror of the read's conversion `0x89324b20`.
+
+rom.4's save of patch n, `0x893270a0`, is the two:
+- `0x89324f20(0x8996f595, store)`;
+- then `0x89341380(n, layout)`, which builds "<project>Patch\" + "%03d %s.p02" (the project's path from `0x893436b0`)
+  and calls the writer.
+
+**The setters.** rom.2's two, 0x159230 away:
+- `0x89328680(place, descriptor, value)` for the first bank (rom.2's `0x894818b0`): the centre added, held to min and
+  max unless they are equal (compared unsigned), the width's bits kept;
+- `0x89328bf0(place, slot's descriptor, typed descriptor, value)` for a typed ID (rom.2's `0x89481e20`): held to its
+  type's range, then as its slot's.
+
+Their descriptors:
+- `0x8950f0b0`, 12 bytes an ID;
+- `0x895131a8`, 8 bytes a typed one, from 0x56a.
+
+A value's place is its ID's section in v450's layout (`vc2Store()`). A typed ID's is its block's slot
+(`vc2StoreSlotBase` plus the slot).
+
+**The run.** The store sits in XtFwMachine's samples' room (`kSamp`), the layout 0x2000 past it. Hooks answer the
+writer's four OS calls and keep the bytes written (`Written`). Not for the audio thread.
+
+**Checks.** `xt_vc2save <rom.4> 40 2024`; also 300 cases at seed 7, 0 different:
+
+| Part | Cases | Different |
+| --- | --- | --- |
+| The image's patches (Internal.vc2/Patch), read by vc2PatchRead and written again: each is its file byte for byte, and its file reads back as its store | 128 | 0 |
+| Drawn stores: each one's file, read back, writes the same file again (bits no ID holds don't reach a file, so a drawn store can't come back byte for byte) | 40 | 0 |
+| The first bank: every ID of the store's sections, in zone 1, again in zone 8 where its section repeats and in COSM 2 for a COSM's. Read back by xtStoreValue: in range as set, past it at an end, a one-value range in its bits; no other byte moved | 1517 | 0 |
+| Every typed ID, the same, read back by vc2StoreTyped | 1224 | 0 |
+
+`mutate_vc2.py --save` caught 20 of 20 (`vc2save_muts.txt`). The plants cover:
+- the routines and their arguments;
+- the writer's calls;
+- the descriptor banks and their strides;
+- a typed ID's block and slot;
+- the zone, the COSM and the value;
+- the store kept.
+
+The first `writer` plant started the writer 2 bytes in, and was missed: the call runs the same with its first
+instruction skipped, since the interpreter returns at its sentinel whatever the stack holds. The bank file's writer
+(`0x89342680`) in its place replaced it.
+
+**A finding.** rom.4's setter doesn't hold a one-value range (min equal to max), as rom.2's doesn't (v602). On a first
+run, 112 of the first bank's settings past such a range read back as set, in the field's bits: −1 in a 4-bit field
+reads 15. The check now expects that.
+
+**The tool.** `vc2patchwrite <rom.4> <out.p02> [ID=value[@zone] ...]` (research/tools/, built by build.sh). It starts
+from rom.4's default patch (what its reader lays under a header with no data), sets the values by the setters, and
+writes the file by the writer. It reads the file back before keeping it, and refuses a value that doesn't read back as
+set.
+
+### A card's patches in VC-2 mode (2026-11-25, no version) {#vc2-card-patches}
+
+For step 5's patch files: where a card's patches sit, and the Bank Select and Program Change that reach one in VC-2
+mode. The research tool is `vc2card <rom.4>` (`vc2card.cpp`, `vc2cardfiles.h`, `vc2cardkernel.cpp`): rom.4's boot
+of the bank and the project, run on cards made in memory. Each fact has two sources: the code, read, and the run.
+
+**The project.** `0x89342cb0(0x8997ab20)` reads "C:\VC-2 Project.ini" (C: is the card) a line at a time, by the
+kernel's line read `0x88008cb0`. It compares each line whole:
+1. "[current project]\r\n";
+2. `drive="PC Card"\r\n` (C:\), or `drive="Internal"\r\n` (A:\Internal.vc2\, its path then ignored);
+3. `path="…"`, whose value is appended to the drive. It must end in '\' and open as a folder.
+
+Anything else, or a folder that isn't there, falls back to "A:\Internal.vc2\". `0x893436b0(0x8997ab20)` gives the
+path to the rest of rom.4.
+
+**The bank.** `0x899613e8`: +0 its base, +4 its count (a halfword). The static initializer `0x8931a940` makes 512
+patches at `0x89addbf8`, each the init patch (`0x893291c0`), state byte 2. `0x89341e90` loads the project's Patch
+folder:
+- it lists Patch\;
+- it parses each name by `0x89340eb0`: "NNN name", NNN 1…512, then ' ' or '_', the rest the patch's name;
+- it loads a slot whose state (`0x893272e0`) is 2 or 3: the file read by `0x89341de0` (its reader `0x893419a0`) and
+  copied in by `0x89327070`.
+
+**Program Change.** `0x89318a20(record, out)` takes the record's +0 as the Program Change, +1 as Bank Select's MSB and
++2 as its LSB:
+- the MSB must be 87;
+- LSB 0 gives patch PC + 1, for PC under 64 (patches 1…64);
+- LSB n of 1 or more gives (n − 1)·128 + 64 + PC + 1, held to the bank's count (`0x893273c0(1)`, 512). LSB 4 reaches
+  449…512, with PC 0…63.
+
+rom.4's map has the setup's Part 1 Bank Select MSB (ID 0, default 87), its LSB and its Program Number (01 00 00 00…02).
+It also has the system's Receive Program Change and Receive Bank Select (02 00 00 08 and 09, both on by default).
+
+**The run.** Card 1 holds the ini (drive="PC Card", path="RUNS.vc2\") and 12 files in RUNS.vc2\Patch\. It gives:
+- the project C:\RUNS.vc2\;
+- slots 1, 2, 64, 65, 66, 128, 129, 300, 448, 449, 511 and 512 named by their files (CARD00…CARD11), the rest the init
+  patch;
+- the parse's grid as above.
+
+The other cards:
+- without the path's trailing '\', the path is broken and nothing loads;
+- a missing folder, or drive="Internal", gives A:\Internal.vc2\;
+- "513 PAST.p02" and "ABC NAME.p02" are skipped.
+
+**What the run answers for rom.1's kernel** (calls the boot's table doesn't answer):
+- the line read `0x88008cb0`: a line of the file, CR LF kept;
+- a handle's name `0x88008cd0`: the opened folder's path;
+- the seek's place: the wrapper returns at `0x89336e0a` with r12 the place. The reader needs it; the boot's kernel
+  answered 0;
+- the folder calls `0x88008d90` and `0x88008de0`, the removal `0x88009000`, and `0x88008db0` on a missing folder.
+
+**For the captures.** vc2cardrun.py writes the card's folder: "VC-2 Project.ini" at its root, and
+RUNS.vc2\Patch\NNN RUN NNN.p02 (with an empty Wave\). A take selects its patch by CC 0 = 87, CC 32 = its LSB, then
+the Program Change. It then waits 1.5 s for the load: a pause chosen, not measured. RECORDING_GUIDE.md has one patch
+checked by ear.
+
 ### rom.4's SysEx: the VC-2's own address map (2026-11-25, no version) {#vc2-sysex-map}
 
 For VC2_MODE_PLAN.md, step 5, whose SysEx map was inferred from the V-Synth's: rom.4's receive and send paths, read,

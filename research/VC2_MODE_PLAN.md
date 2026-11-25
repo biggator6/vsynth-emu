@@ -1488,6 +1488,11 @@ rom.4's own patch save run in the interpreter, held by a round trip of every fac
 and Bank Select reach a card patch in VC-2 mode and how the card's folder is laid out, from rom.4's code by two sources;
 then `vc2capture.py` writing the patch files a run needs and sending the bank and Program Change at each take's cue,
 `fxplay_test.sh` and `vc2cut_test.py` green again on the new runs, and the guide's copy-to-card step.
+- [x] rom.4's patch save in the interpreter, its writer and setters, held by xt_vc2save (v505; HARDWARE_FIRMWARE.md,
+  "A VC-2 patch saved").
+- [x] Where a card's patches sit and the Bank Select and Program Change that reach one (no version: vc2card's run;
+  HARDWARE_FIRMWARE.md, "A card's patches in VC-2 mode").
+- [ ] vc2capture.py's runs selecting each take's patch, the card's folder, the tests green, the guide's step.
 
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
