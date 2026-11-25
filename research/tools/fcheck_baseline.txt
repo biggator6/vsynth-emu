@@ -295,8 +295,8 @@ tone, SOLO segments: 2 notes left off, a read outside memory; 0 band reads far f
 tone, SOLO segments: 0 different
 tone, stored waves: 454 of 504 played on their own vpdt (SOLO 300, BACKING 139, ENSEMBLE 15), 0 encoded again as theirs can't be played as it is, 50 skipped
 tone, stored waves: 2 SOLO with a terminator other than (256, 1), 24 cases from their end, 53 grains on it
-tone, stored waves: 918 notes, 52 taken by a sounding tone, 103 truncated, 57352 blocks, 6923849 checks
-tone, stored waves: 1 notes left off, a read outside memory; 5576 band reads far from their wave
+tone, stored waves: 1140 notes, 121 taken by a sounding tone, 137 truncated, 76258 blocks, 8681135 checks
+tone, stored waves: 1 notes left off, a read outside memory; 83430 band reads far from their wave
 tone, stored waves: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks
@@ -350,8 +350,8 @@ tone, SOLO segments: 0 notes left off, a read outside memory; 0 band reads far f
 tone, SOLO segments: 0 different
 tone, stored waves: 90 of 504 played on their own vpdt (SOLO 61, BACKING 28, ENSEMBLE 1), 0 encoded again as theirs can't be played as it is, 10 skipped
 tone, stored waves: 0 SOLO with a terminator other than (256, 1), 0 cases from their end, 0 grains on it
-tone, stored waves: 172 notes, 6 taken by a sounding tone, 19 truncated, 10106 blocks, 1130433 checks
-tone, stored waves: 0 notes left off, a read outside memory; 178 band reads far from their wave
+tone, stored waves: 219 notes, 25 taken by a sounding tone, 26 truncated, 13394 blocks, 1420559 checks
+tone, stored waves: 0 notes left off, a read outside memory; 6490 band reads far from their wave
 tone, stored waves: 0 different
 tone, the clock's rate: 5 tempos, 2 minutes each, 33623 clocks
 tone, the clock's rate: 0 notes, 0 taken by a sounding tone, 0 truncated, 0 blocks, 5 checks

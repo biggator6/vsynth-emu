@@ -1546,6 +1546,37 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Time Trip's pad by a controller alone: check-pad-cc caught (2026-11-25, v361) {#tone-pad-cc-reach}
+
+`tone_muts.txt`'s `check-pad-cc`, the tone list's open [gap] since v189: xt_tone's live edit not giving the
+firmware's pad handler a controller moved alone (`moveLive`), so XtSynth's pad hears it and the firmware's doesn't. It
+shows only where that controller is also a Time Trip Assign and a later Time Trip asks the pad.
+
+**Why the draws missed it.** A controller moves alone at a live edit in two places, and neither reaches it. The
+random cases' live edits move CC 7, 11, 10 or 1, which `drawMatrix`'s Time Trip Assigns leave out. The sweep's CC 91
+and 93 cases run no Time Trip. The pad is compared only at a trip's own messages. Since v189's fixed pick no case
+moved a Time Trip Assign alone and then asked the pad (missed on 32 clean seeds). A steer inside the random cases moves
+their notes' ends and every later draw, so the reach is cases of their own.
+
+**The replays** (`XtToneCases.cpp`, the state in the case loop's Report). After the last case, the random cases with a
+live edit (g % 3 == 2) one in four are run again, each on a generator of its own (the run's seed and the case's number).
+The run's generator is given back after, so no case's draw moves. A replay has:
+- Time Trip Assign X on CC 91 and Y on the chart's 83;
+- the trip's messages sent Y first, where its pad moves by those controllers;
+- its live edit moving CC 91 alone, the panel kept as it was.
+
+Its differences are said as case 100000 + its case, and its counts go in the last section's (stored waves). The
+check's own file grows by no line (2,491); the replays are XtToneCases' (the fork of this session that found the reach;
+its scratch's global state became the Report's, as the kit's rules ask).
+
+Results:
+- xt_tone 0 different at 2024, 7 and 31337 (2,000 cases); every line as before but the stored waves' two (918 notes
+  to 1,140 at 2024), and the same two in the EXT IN section. fcheck `--update` moved those four lines alone.
+- `check-pad-cc` caught at the default seed 2024 (its list line's seed 4242 dropped): case 100311 (the replay of 311),
+  the pad's radius, then the Time Trip's walk and the outputs.
+- `mutate_tone.py`, the whole list (xt_tone's own check changed), clean first: 1,194 planted, 1,194 caught, 0 errors
+  (2 h 58 min under the machine's load). `tone_stack_test.sh`: the same, 2,000 cases at seed 24.
+
 ### The part's reach: seven of xt_vc2synth's misses caught (2026-11-25, v360) {#vc2-synth-reach}
 
 Step 4.3's eighty-eighth version. Seven of the plants xt_vc2synth missed, each given the reach to be caught: four by

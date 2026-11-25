@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+Time Trip's pad by a controller alone v361 (2026-11-25, on claude/v358-plant-reach after v360; HARDWARE_FIRMWARE.md,
+  "Time Trip's pad by a controller alone: check-pad-cc caught"): the tone list's [gap] since v189. No case moved a Time
+  Trip Assign alone and then asked the pad. Replays after the last case, a random case with a live edit one in four,
+  each on a generator of its own with the run's given back: Time Trip Assign X on CC 91, Y on 83, the pad's messages Y
+  first, the live edit moving CC 91 alone. xt_tone 0 different at 2024/7/31337, only the stored waves' two lines moved
+  (and EXT IN's); check-pad-cc caught at 2024 (case 100311), its seed 4242 dropped. The whole tone list 1,194 of
+  1,194 caught; tone_stack_test the same.
+
 The part's reach v360 (2026-11-25, on claude/v358-plant-reach after v359; HARDWARE_FIRMWARE.md, "The part's reach:
   seven of xt_vc2synth's misses caught"): rcv-full-stop by a compare inside a wait at MIDI IN's full ring; the sensing
   pair (ost-cyclic-sensing, rcv-sensing-mark) by a fresh pair's lead-in past the sensing check's first 512 ticks;

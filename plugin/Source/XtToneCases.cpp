@@ -204,6 +204,53 @@ Ctl toneAlone(Ctl c) {
     return c;
 }
 
+namespace {
+// v361: check-pad-cc's replays (XtToneCases.h): the pick's and the replay's own generators' salts, a replay one random
+// case with a live edit in four, said as 100000 + its case
+constexpr uint32_t kPadPickSalt = 0x9e3779b9u, kPadMix = 2654435761u, kPadOwnSalt = 0x85ebca6bu;
+constexpr int kPadOneIn = 4, kPadEvery = 3, kPadLive = 2, kPadCaseNo = 100000;
+
+// A random case with a live edit, one in four by the pick's own draw
+bool padReplayed(const XtTonePads& p, int g) {
+    if (g % kPadEvery != kPadLive) return false;
+    Rng pick { p.seed ^ kPadPickSalt ^ (uint32_t)g * kPadMix };
+    return pick.one(kPadOneIn);
+}
+} // namespace
+
+bool xtTonePadMore(XtTonePads& p, int& g, int end, int cases, Rng& r) {
+    if (!p.seeded) p.seed = r.s;
+    p.seeded = true;
+    if (!p.on && g < end) return true;
+    if (!p.on) p.saved = r;
+    p.on = true;
+    while (p.next < cases && !padReplayed(p, p.next)) ++p.next;
+    if (p.next >= cases) r = p.saved;
+    if (p.next >= cases) return false;
+    g = p.next++;
+    r = Rng { p.seed ^ kPadOwnSalt ^ (uint32_t)g * kPadMix };
+    return true;
+}
+
+int xtTonePadCaseNo(const XtTonePads& p, int g) { return p.on ? kPadCaseNo + g : g; }
+
+Ctl xtTonePadAssigns(const XtTonePads& p, Ctl c) {
+    if (!p.on) return c;
+    c.assign[10] = kPadCc;
+    c.assign[11] = kPadY;
+    return c;
+}
+
+bool xtTonePadLive(const XtTonePads& p, const Ctl& c, bool byCc) {
+    return p.on && byCc && c.assign[10] == kPadCc && c.assign[11] == kPadY;
+}
+
+bool xtTonePadKeep(const XtTonePads& p, Ctl& n, const Ctl& ctl, bool byCc) {
+    if (!xtTonePadLive(p, ctl, byCc)) return false;
+    n = ctl;
+    return true;
+}
+
 int xtToneMain(int argc, char** argv, int (*run)(int, char**, bool)) {
     if (xtToneMsmMode(argc, argv)) return xtToneMsm(argc, argv);
     const bool extIn = argc > 2 && std::strcmp(argv[2], "extin") == 0;
