@@ -1549,7 +1549,8 @@ stage time (+0x6c) and the onset level (+0x58).
 ### A VC-2 patch saved (2026-11-25, v505) {#vc2-patch-save}
 
 For step 5's patch files (the user's "Patch files", 2026-11-25; VC2_MODE_PLAN.md, step 5). rom.4's own .p02 save runs
-in the interpreter, as v602 runs rom.2's: `Vc2PatchSave.cpp`, held by `xt_vc2save` (`Vc2PatchSaveCheck.cpp`).
+in the interpreter, as v602 runs rom.2's: `Vc2PatchSave.cpp`, held by two parts of `xt_vc2patch` after v450's
+(`Vc2PatchSaveCheck.cpp`).
 
 **Names first.** One routine reads the .p02's header strings ("VC20", "Rev008", "PATa", "VC_2"):
 `0x893411b0(path, layout)`. It opens the file for writing (`0x89336c90`). It writes the first header (00 1e, "VC20",
@@ -1577,10 +1578,12 @@ Their descriptors:
 A value's place is its ID's section in v450's layout (`vc2Store()`). A typed ID's is its block's slot
 (`vc2StoreSlotBase` plus the slot).
 
-**The run.** The store sits in XtFwMachine's samples' room (`kSamp`), the layout 0x2000 past it. Hooks answer the
-writer's four OS calls and keep the bytes written (`Written`). Not for the audio thread.
+**The run.** It runs on the rom.4 image v450's reader keeps (`vc2PatchFilesRom`), as v602's save runs on rom.2's.
+The store sits in XtFwMachine's samples' room (`kSamp`), the layout 0x2000 past it. Hooks answer the writer's four OS
+calls and keep the bytes written (`Written`). Not for the audio thread.
 
-**Checks.** `xt_vc2save <rom.4> 40 2024`; also 300 cases at seed 7, 0 different:
+**Checks.** `xt_vc2patch <rom.4> 40 2024`, its two parts after v450's; also 300 cases at seeds 7 and 31337, 0
+different:
 
 | Part | Cases | Different |
 | --- | --- | --- |
@@ -1589,7 +1592,9 @@ writer's four OS calls and keep the bytes written (`Written`). Not for the audio
 | The first bank: every ID of the store's sections, in zone 1, again in zone 8 where its section repeats and in COSM 2 for a COSM's. Read back by xtStoreValue: in range as set, past it at an end, a one-value range in its bits; no other byte moved | 1517 | 0 |
 | Every typed ID, the same, read back by vc2StoreTyped | 1224 | 0 |
 
-`mutate_vc2.py --save` caught 20 of 20 (`vc2save_muts.txt`). The plants cover:
+`mutate_vc2.py --patch` caught all 58: the 19 `save-` plants (`vc2patch_muts.txt`, `PORT=vc2save`) and v450's 39, as
+before.
+The plants cover:
 - the routines and their arguments;
 - the writer's calls;
 - the descriptor banks and their strides;
@@ -1605,7 +1610,8 @@ instruction skipped, since the interpreter returns at its sentinel whatever the 
 run, 112 of the first bank's settings past such a range read back as set, in the field's bits: −1 in a 4-bit field
 reads 15. The check now expects that.
 
-**The tool.** `vc2patchwrite <rom.4> <out.p02> [ID=value[@zone] ...]` (research/tools/, built by build.sh). It starts
+**The tool.** `vc2patchwrite <rom.4> <out.p02> [ID=value[@zone] ...]` (research/tools/, built by
+`build_vc2patchwrite.sh`). It starts
 from rom.4's default patch (what its reader lays under a header with no data), sets the values by the setters, and
 writes the file by the writer. It reads the file back before keeping it, and refuses a value that doesn't read back as
 set.

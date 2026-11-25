@@ -35,3 +35,8 @@ struct Vc2PatchOnDisk {
 // The files' part: each file through vc2PatchRead against rom.4's routines on its data straight, and its name against
 // the file's; then the files' headers and lengths made otherwise, each against what rom.4's reader takes of it
 long vc2PatchFiles(Vc2Fw& fw, const std::vector<Vc2PatchOnDisk>& files);
+
+// rom.4's patch save's parts (v505, Vc2PatchSaveCheck.cpp): the files and `cases` drawn stores written by vc2PatchWrite
+// and read back; and every ID set by vc2PatchSet on the first file's store and read back
+long vc2PatchSaves(const std::vector<Vc2PatchOnDisk>& files, int cases, int seed);
+long vc2PatchSetters(const std::vector<Vc2PatchOnDisk>& files, int seed);

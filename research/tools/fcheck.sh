@@ -213,12 +213,6 @@ if [ -x "$X/xt_vc2patch" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4" "$DISK")
   part xt_vc2patch 'echo "== xt_vc2patch"; "$X/xt_vc2patch" "$ROM4" 40 2024 | grep -v "^  "'
 fi
-# rom.4's patch save, run in the interpreter, against v450's reader and the port's reads (v505): on rom.4 and the disk
-# image's patches
-if [ -x "$X/xt_vc2save" ] && [ -f "$ROM4" ]; then
-  FILES=("$ROM4" "$DISK")
-  part xt_vc2save 'echo "== xt_vc2save"; "$X/xt_vc2save" "$ROM4" 40 2024 | grep -v "^  "'
-fi
 # rom.4's wave loaders against its own routines (v500): on rom.4 and the disk image's VC-2 index
 if [ -x "$X/xt_vc2waves" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4" "$DISK")

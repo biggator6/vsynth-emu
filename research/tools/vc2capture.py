@@ -36,7 +36,7 @@ from vc2writer import TEST_SETS, Vc2Run, build, probe_seconds, settings, test_ru
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..')
 FW = os.path.join(REPO, 'firmware/unpacked')
-WRITER = os.path.join(REPO, 'build/tools/bin/vc2patchwrite')   # build.sh builds it
+WRITER = os.path.join(REPO, 'build/tools/vc2/vc2patchwrite')   # build_vc2patchwrite.sh builds it
 FIELDS = ['run', 'take', 'note_on_s', 'note_off_s', 'next_s', 'probe', 'settings', 'why']
 
 
@@ -123,7 +123,7 @@ def main():
     if a.learn:
         return learn(m, a.learn)
     if not os.access(a.writer, os.X_OK):
-        raise SystemExit('no %s: research/tools/build.sh builds it' % a.writer)
+        raise SystemExit('no %s: research/tools/build_vc2patchwrite.sh builds it' % a.writer)
     os.makedirs(a.out, exist_ok=True)
     x = vc2probe.probe()
     vc2probe.wav24(os.path.join(a.out, 'vc2probe.wav'), x)

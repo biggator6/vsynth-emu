@@ -6,8 +6,8 @@
 #   - the input of each VC-2 run, rendered offline through fxplay's own AudioQueue (--test-audio), is sample for
 #     sample the run's input as vc2capture.py --input-wavs writes it, by its own code (the cues' times and lengths);
 #   - a run whose cue isn't probe:<seconds> is refused, saying so.
-# Needs the user's rom.2 and rom.4 (firmware/unpacked/, or ROM2= and ROM4=), build.sh's vc2patchwrite and .venv's
-# numpy; PY= another python.
+# Needs the user's rom.2 and rom.4 (firmware/unpacked/, or ROM2= and ROM4=) and .venv's numpy; PY= another python.
+# It builds vc2patchwrite from the working tree (build_vc2patchwrite.sh), for the card's patches.
 # Exits non-zero on any difference.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -20,9 +20,11 @@ rm -rf "${WORK:?}"
 mkdir -p "$WORK/fx" "$WORK/vc2" "$(dirname "$BIN")"
 clang++ -std=c++17 -O2 -Wall -Werror "$REPO/research/tools/fxplay.cpp" -framework CoreMIDI -framework CoreFoundation \
     -framework AudioToolbox -framework CoreAudio -o "$BIN"
+bash "$REPO/research/tools/build_vc2patchwrite.sh" "$WORK/vc2patchwrite" > /dev/null
 "$PY" "$REPO/research/tools/fxcapture.py" --rom "$ROM2" --out "$WORK/fx" > /dev/null
-if ! "$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --out "$WORK/vc2" --input-wavs > "$WORK/vc2.txt"; then
-    # vc2capture.py needs rom.4 and build.sh's vc2patchwrite, which writes the card's patches the VC-2 runs select
+if ! "$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --out "$WORK/vc2" --writer "$WORK/vc2patchwrite" \
+        --input-wavs > "$WORK/vc2.txt"; then
+    # vc2capture.py needs rom.4, and vc2patchwrite for the card's patches the VC-2 runs select
     echo "fxplay_test: WRONG, no VC-2 runs to test: $(head -c 300 "$WORK/vc2.txt")…"
     exit 1
 fi

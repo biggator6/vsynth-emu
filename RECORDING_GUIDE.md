@@ -104,10 +104,9 @@ settings that no patch holds and SysEx can't reach.  Run 1 pauses 20 s before ea
 what to set, and you set it at the panel.
 
 **Files** are in `analysis/test_files/vc2/`, made by the commands below from the repository's root.  They aren't in git, as the
-runs and patches hold firmware defaults.  To make them (the first builds the patch writer with the firmware checks, a few
-minutes):
+runs and patches hold firmware defaults.  To make them (the first builds the patch writer, about 10 s):
 ```bash
-bash research/tools/build.sh
+bash research/tools/build_vc2patchwrite.sh
 ```
 ```bash
 .venv/bin/python3 research/tools/vc2capture.py

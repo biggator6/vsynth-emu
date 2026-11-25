@@ -81,6 +81,11 @@ bool vc2LoadPatchFiles(const char* path) { return g_image.keep(path); }
 
 bool vc2PatchFilesLoaded() { return g_image.kept(); }
 
+const std::string& vc2PatchFilesRom() {
+    static const std::string none;
+    return g_image.kept() ? g_image.path() : none;
+}
+
 bool vc2PatchRead(const uint8_t* file, size_t size, Vc2PatchFile& out, std::string* why) {
     out = {};
     if (!g_image.kept()) return fail(why, "rom.4 isn't loaded");

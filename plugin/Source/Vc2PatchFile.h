@@ -15,6 +15,8 @@ struct Vc2PatchFile {
 // loadVc2's (XtSynthRom.cpp): the image a file's read runs on, kept for the process, once; true when it's kept
 [[nodiscard]] bool vc2LoadPatchFiles(const char* path);
 bool vc2PatchFilesLoaded();
+// The image's path as kept, for rom.4's patch save (Vc2PatchSave.h, v505); empty until vc2PatchFilesLoaded()
+const std::string& vc2PatchFilesRom();
 // A .p02 into its store: false, and why, for a file rom.4's reader refuses, one under its two 16-byte headers (whose
 // short count rom.4's caller would take as read, with nothing laid out), a fault, or before the image is kept
 bool vc2PatchRead(const uint8_t* file, size_t size, Vc2PatchFile& out, std::string* why = nullptr);

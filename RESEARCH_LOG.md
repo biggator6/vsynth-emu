@@ -4311,3 +4311,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
   fxplay prints, so the run's timing and checks stay as they were.
 - vc2cut_test's from-part-way case then failed for something real: a recording resumed just before `master_100` took
   that take as its own reference. The direct sound's levels are now read only against a take at 127.
+- Then the coordinator gave the shape it wanted for the merge. The save takes rom.4's path from v450's reader by one
+  accessor, as v602's takes none. Its checks are two parts of xt_vc2patch rather than a harness of their own, and its
+  plants are lines of v450's list. build.sh changes only on xt_vc2patch's lines, so the writer tool got a build
+  script of its own. The git guard refuses a reset while untracked files stand in the worktree, so this went on top as
+  a second v505 commit, as v334 did. The recount showed 19 plants, not the 20 the first commit said.

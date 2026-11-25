@@ -10,10 +10,10 @@
 #include <string>
 #include <vector>
 
-// The store (kVc2StoreBytes, Vc2PatchStore.h) as a .p02's bytes, on the rom.4 image at `rom4`: false (and why) for a
-// store not a patch's size, an image that can't be read, a routine that faults, or the writer giving the file up
-bool vc2PatchWrite(const std::string& rom4, const std::vector<uint8_t>& store, std::vector<uint8_t>& file,
-                   std::string* why = nullptr);
+// Both run on the rom.4 image v450's reader keeps (vc2LoadPatchFiles; vc2PatchFilesRom), so they need it kept first.
+// The store (kVc2StoreBytes, Vc2PatchStore.h) as a .p02's bytes: false (and why) before the image is kept, for a store
+// not a patch's size, an image that can't be read, a routine that faults, or the writer giving the file up
+bool vc2PatchWrite(const std::vector<uint8_t>& store, std::vector<uint8_t>& file, std::string* why = nullptr);
 
 // The values into `store`, in order, each by rom.4's setter (v506), as xtFwPatchSet sets a .p00's by rom.2's: 0x89328680
 // for the first bank (the centre added, held to the descriptor's min and max unless they're equal, compared unsigned),
@@ -21,5 +21,4 @@ bool vc2PatchWrite(const std::string& rom4, const std::vector<uint8_t>& store, s
 // descriptors (0x8950f0b0, 12 bytes an ID; 0x895131a8, 8 bytes a typed one), each ID's place by vc2Store(); a typed
 // ID's `base` its block's first slot, or 0 for vc2StoreSlotBase's.  Needs rom.4's tables (vc2LoadParams).  False (and
 // why) for a store not a patch's size, an ID outside a patch, or a setter that fails; `store` is then as it was
-bool vc2PatchSet(const std::string& rom4, std::vector<uint8_t>& store, const std::vector<XtPatchSet>& values,
-                 std::string* why = nullptr);
+bool vc2PatchSet(std::vector<uint8_t>& store, const std::vector<XtPatchSet>& values, std::string* why = nullptr);

@@ -2,10 +2,10 @@
 // captures' runs (vc2capture.py; research/VC2_MODE_PLAN.md, step 5, the user's "Patch files"): rom.4's default patch
 // (what its reader lays under a file with no data: v450's vc2PatchRead on a header alone), each value set by rom.4's
 // setters (vc2PatchSet) in the order given, the store written by its writer (vc2PatchWrite; both v505, held by
-// xt_vc2save).  An ID is hex (0x194) or decimal, a value as rom.4's read gives it (the descriptor's value less its
+// xt_vc2patch).  An ID is hex (0x194) or decimal, a value as rom.4's read gives it (the descriptor's value less its
 // centre), a zone 1…8 (1 if none).  The file is read back before it is kept, each value as it was set, or it is
 // refused.  The firmware is the user's, read at run time; the file it writes holds rom.4's defaults, so it stays out
-// of git.  build.sh builds it into build/tools/bin/, beside the harnesses.
+// of git.  build_vc2patchwrite.sh builds it into build/tools/vc2/.
 #include "Vc2Params.h"
 #include "Vc2PatchFile.h"
 #include "Vc2PatchSave.h"
@@ -75,8 +75,8 @@ int main(int argc, char** argv) {
     std::vector<uint8_t> file;
     std::string why;
     if (!vc2PatchRead(none.data(), none.size(), patch, &why)) return failed("rom.4's default patch: " + why);
-    if (!vc2PatchSet(argv[1], patch.store, sets, &why)) return failed(why);
-    if (!vc2PatchWrite(argv[1], patch.store, file, &why)) return failed(why);
+    if (!vc2PatchSet(patch.store, sets, &why)) return failed(why);
+    if (!vc2PatchWrite(patch.store, file, &why)) return failed(why);
     if (!readsBack(file, sets, why)) return failed(std::string(argv[2]) + ": " + why);
     FILE* out = std::fopen(argv[2], "wb");
     if (!out) return failed(std::string("can't write ") + argv[2]);

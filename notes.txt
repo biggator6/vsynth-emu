@@ -695,11 +695,13 @@ The VC-2 checks under the sanitizers v550 (2026-11-23, on claude/vc2-sanitize-4e
 A VC-2 patch saved v505 (2026-11-25, on claude/vc2-sysex-map after e6b023a; HARDWARE_FIRMWARE.md, "A VC-2 patch
   saved"; step 5's patch files, the user's "Patch files"). rom.4's own .p02 save in the interpreter (Vc2PatchSave):
   the writer 0x893411b0 (found by the header strings; rom.2's 0x8948fc30) on the layout from 0x89324f20 (0x89324b20's
-  mirror), and the setters 0x89328680 and 0x89328bf0 (rom.2's 0x894818b0, 0x89481e20) on rom.4's descriptors.
-  xt_vc2save (Vc2PatchSaveCheck.cpp, in fcheck at 40): 128 of 128 factory patches back as their files and stores, 40
-  drawn stores (300 at seed 7) writing their files again, 1517 first-bank and 1224 typed settings read back by the
-  port, 0 different; a one-value range isn't held by the setter (112 settings read back as set). mutate_vc2.py --save
-  20 of 20 caught (one equivalent plant replaced). vc2patchwrite (build.sh): a card patch by these, read back first.
+  mirror), and the setters 0x89328680 and 0x89328bf0 (rom.2's 0x894818b0, 0x89481e20) on rom.4's descriptors, on
+  the image v450's reader keeps (vc2PatchFilesRom). xt_vc2patch's two new parts (Vc2PatchSaveCheck.cpp; the
+  coordinator's shape, a64da37's own harness folded in): 128 of 128 factory patches back as their files and stores, 40
+  drawn stores (300 at seeds 7 and 31337) writing their files again, 1517 first-bank and 1224 typed settings read back
+  by the port, 0 different; a one-value range isn't held by the setter (112 settings read back as set). mutate_vc2.py
+  --patch: 58 of 58, the 19 save- plants (one equivalent plant replaced) and v450's 39. vc2patchwrite
+  (build_vc2patchwrite.sh): a card patch by these, read back first.
 
 The VC-2's waves at the plugin's start v504 (2026-11-23, after v503 and vc2-mode's merge; HARDWARE_FIRMWARE.md,
   "The VC-2's waves at the plugin's start"): v503's load once a process, beside rom.4's tables. PluginRom.cpp seeks

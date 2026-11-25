@@ -1,5 +1,5 @@
-# Planted errors in rom.4's patch store and its .p02 reader (v450), for mutate_vc2.py --patch: each must make
-# xt_vc2patch, on rom.4 and the disk image's patches, say something differs.  name|old|new[|port[|seed]]
+# Planted errors in rom.4's patch store and its .p02 reader (v450) and its save (v505), for mutate_vc2.py --patch: each
+# must make xt_vc2patch, on rom.4 and the disk image's patches, say something differs.  name|old|new[|port[|seed]]
 # The store's sections (Vc2PatchStore.cpp): each place, stride and bound
 common-last|{ 0x120, 0x1b5, 0x000, 0 },|{ 0x120, 0x1b6, 0x000, 0 },
 mfx-at|{ 0x1b6, 0x23b, 0x06c, 0 },|{ 0x1b6, 0x23b, 0x06d, 0 },
@@ -44,3 +44,26 @@ xt-zone|return s.at + s.zoneStride * zone + |return s.at + s.zoneStride * (zone 
 xt-past-store|if (at < 0 \|\| at + bytes > (int)store.size()) return 0;|if (at < 0 \|\| at + bytes >= (int)store.size()) return 0;|vc2patchxt
 xt-typed-slot|const int v = xtStoreValue(l, store, base + d->slot, zone, cosm);|const int v = xtStoreValue(l, store, base + d->slot + 1, zone, cosm);|vc2patchxt
 xt-typed-range|return v < d->min \|\| v > d->max ? d->def : v;|return v < d->min \|\| v >= d->max ? d->def : v;|vc2patchxt
+# rom.4's patch save (v505, Vc2PatchSave.cpp): the routines it runs and what it hands them
+save-to-file|kToFile = 0x89324f20;|kToFile = 0x89324b20;|vc2save
+save-writer|kWriter = 0x893411b0;|kWriter = 0x89342680;|vc2save
+save-setters-swapped|kSet = 0x89328680, kSetTyped = 0x89328bf0;|kSet = 0x89328bf0, kSetTyped = 0x89328680;|vc2save
+save-layout-from|{ kFile, kStore }|{ kFile, kStore + 2 }|vc2save
+save-writer-from|{ kPath, kFile }|{ kPath, kFile + 4 }|vc2save
+# The writer's file calls: what it wrote, and how much
+save-write-place|s.read(s.r[5], bytes.data() + at, s.r[6]);|s.read(s.r[5] + 1, bytes.data() + at, s.r[6]);|vc2save
+save-write-short|s.ret(s.r[6]);|s.ret(s.r[6] - 1);|vc2save
+# The setters' descriptors: the banks, their strides, an ID's and a typed one's
+save-descs-at|kDescs = 0x8950f0b0,|kDescs = 0x8950f0bc,|vc2save
+save-desc-bytes|kDescBytes = 12,|kDescBytes = 8,|vc2save
+save-typed-descs-at|kTypedDescs = 0x895131a8,|kTypedDescs = 0x895131b0,|vc2save
+save-typed-bytes|kTypedBytes = 8;|kTypedBytes = 12;|vc2save
+save-slot-desc|kDescBytes * (uint32_t)base;|kDescBytes * (uint32_t)(base + 1);|vc2save
+save-typed-desc-id|(uint32_t)(v.id - kVc2FirstTyped);|(uint32_t)(v.id - kVc2FirstTyped + 1);|vc2save
+# Which bank, block and place a value goes to, and the value
+save-typed-first|v.id >= kVc2FirstTyped;|v.id > kVc2FirstTyped;|vc2save
+save-typed-base|(v.base ? v.base : vc2StoreSlotBase(v.id))|(v.base ? v.base : vc2StoreSlotBase(v.id) + 1)|vc2save
+save-zone-dropped|v.zone, v.cosm);|0, v.cosm);|vc2save
+save-cosm-dropped|v.zone, v.cosm);|v.zone, 0);|vc2save
+save-value-off|value = (uint32_t)v.value;|value = (uint32_t)(v.value + 1);|vc2save
+save-not-kept|cpu->read(kStore, store.data(), store.size());||vc2save

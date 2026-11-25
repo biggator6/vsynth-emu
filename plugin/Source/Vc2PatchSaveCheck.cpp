@@ -1,15 +1,15 @@
-// xt_vc2save <rom.4> [cases] [seed] (v505): rom.4's patch save (Vc2PatchSave.h) held two ways.  Every patch of the disk
-// image's Internal.vc2, read by v450's reader (vc2PatchRead, held to rom.4's own read by xt_vc2patch) and written by
-// vc2PatchWrite, comes back as its file byte for byte, and that file read again gives its store; and `cases` stores of
-// drawn bytes, whose bits no ID holds don't reach a file, each give a file that reads back as a store writing it again.
-// And rom.4's setters (vc2PatchSet) on the first factory patch's store: every first-bank ID a section holds and every
-// typed ID, a drawn value each (one in four past its range), in zone 1 and again in zone 8 where its section repeats by
-// zone and in COSM 2 for a COSM's, each read back by the port's reads (xtStoreValue, vc2StoreTyped): a value in its
-// range as it was set, one past it at an end of it (a one-value range isn't held: as set, in its bits), and no byte
-// past the ID's own field moved.  So what the setters are handed (each ID's section, its zone's stride, COSM 2's offset,
-// its descriptor's place, a typed ID's block and slot) is rom.4's.  A line a part, its first differences under it.
-// XT_VC2SAVE_MAIN only.
-#ifdef XT_VC2SAVE_MAIN
+// xt_vc2patch's parts for rom.4's patch save (v505; Vc2PatchSave.h), held two ways, after v450's.  Every patch of the
+// disk image's Internal.vc2, read by v450's reader (vc2PatchRead, held to rom.4's own read by the parts before) and
+// written by vc2PatchWrite, comes back as its file byte for byte, and that file read again gives its store; and `cases`
+// stores of drawn bytes, whose bits no ID holds don't reach a file, each give a file that reads back as a store writing
+// it again.  And rom.4's setters (vc2PatchSet) on the first factory patch's store: every first-bank ID a section holds
+// and every typed ID, a drawn value each (one in four past its range), in zone 1 and again in zone 8 where its section
+// repeats by zone and in COSM 2 for a COSM's, each read back by the port's reads (xtStoreValue, vc2StoreTyped): a value
+// in its range as it was set, one past it at an end of it (a one-value range isn't held: as set, in its bits), and no
+// byte past the ID's own field moved.  So what the setters are handed (each ID's section, its zone's stride, COSM 2's
+// offset, its descriptor's place, a typed ID's block and slot) is rom.4's.  A line a part, its first differences under
+// it.  XT_VC2PATCH_MAIN only.
+#ifdef XT_VC2PATCH_MAIN
 #include "Vc2PatchCheck.h"
 #include "Vc2Params.h"
 #include "Vc2PatchFile.h"
@@ -66,14 +66,13 @@ bool heldToEnds(int read, int set, int lo, int hi) {
 // One ID set at each of its places on `store` and read back by `read`; `field` the ID whose bytes it takes (a typed
 // one's slot)
 template <typename Read>
-void setAtEach(const std::string& rom4, const std::vector<uint8_t>& store, XtPatchSet s, int field, Read read,
-               Vc2PatchTally& t) {
+void setAtEach(const std::vector<uint8_t>& store, XtPatchSet s, int field, Read read, Vc2PatchTally& t) {
     const auto [lo, hi] = read.range;
     for (const XtPatchSet& at : setPlaces(s.id, s.value, field)) {
         std::vector<uint8_t> after = store;
         std::string why;
         ++t.compared;
-        const bool ok = vc2PatchSet(rom4, after, { at }, &why);
+        const bool ok = vc2PatchSet(after, { at }, &why);
         const int got = read(after, at);
         if (ok && read.holds(got, s.value) && movedOnlyIn(store, after, bytesOfId(field, at.zone, at.cosm))) continue;
         char line[160];
@@ -109,20 +108,20 @@ struct TypedRead {
 };
 
 // Every first-bank ID of the store's sections and every typed ID, set by rom.4's setters and read back
-long settersHeld(const std::string& rom4, const std::vector<uint8_t>& store, ValueDraws& r) {
+long settersHeld(const std::vector<uint8_t>& store, ValueDraws& r) {
     Vc2PatchTally first { "set, first bank" }, typed { "set, typed" };
     for (const XtPatchSectionDef& s : vc2Store().sections)
         for (int id = s.first; id <= s.last && id < kVc2FirstTyped; ++id)
             if (const XtParamDesc* d = vc2ParamDesc(id)) {
                 const std::pair<int, int> range { d->min - d->centre, d->max - d->centre };
                 const XtPatchSet set { id, r.value(range.first, range.second), 0, 0, 0 };
-                setAtEach(rom4, store, set, id, FirstBankRead { id, range, d }, first);
+                setAtEach(store, set, id, FirstBankRead { id, range, d }, first);
             }
     for (int id = kVc2FirstTyped; const XtTypedDesc* t = vc2TypedDesc(id); ++id) {
         const int base = vc2StoreSlotBase(id);
         if (base < 0 || !vc2ParamDesc(base + t->slot)) continue;
         const XtPatchSet set { id, r.value(t->min, t->max), 0, 0, 0 };
-        setAtEach(rom4, store, set, base + t->slot, TypedRead { id, { t->min, t->max } }, typed);
+        setAtEach(store, set, base + t->slot, TypedRead { id, { t->min, t->max } }, typed);
     }
     return first.say("values by rom.4's setter, read back, no other byte moved")
            + typed.say("typed values by rom.4's setter, read back, no other byte moved");
@@ -131,55 +130,46 @@ long settersHeld(const std::string& rom4, const std::vector<uint8_t>& store, Val
 // A store written and its file read back: whether it gave `file` (when one is given) and the store again.  A drawn
 // store's bits that no ID holds don't reach the file, so for one (`file` none) the store its file reads back as must
 // write the same file again.
-bool writtenAndBack(const std::string& rom4, const std::vector<uint8_t>& store, const std::vector<uint8_t>* file,
-                    std::string& why) {
+bool writtenAndBack(const std::vector<uint8_t>& store, const std::vector<uint8_t>* file, std::string& why) {
     std::vector<uint8_t> written, again;
     Vc2PatchFile back;
-    if (!vc2PatchWrite(rom4, store, written, &why)) return false;
+    if (!vc2PatchWrite(store, written, &why)) return false;
     if (file && written != *file) why = "not its file: " + std::to_string(written.size()) + " bytes";
     else if (!vc2PatchRead(written.data(), written.size(), back, &why)) why = "its file unread: " + why;
     else if (file && back.store != store) why = "its file reads back otherwise";
-    else if (!file && (!vc2PatchWrite(rom4, back.store, again, &why) || again != written))
+    else if (!file && (!vc2PatchWrite(back.store, again, &why) || again != written))
         why = "its file read back writes another file " + why;
     return why.empty();
 }
 
-// The image's patches and `cases` drawn stores written again; the first factory store, for the setters
-long patchesWrittenAgain(const std::string& rom4, int cases, ValueDraws& r, std::vector<uint8_t>& firstStore) {
-    XtDiskImage disk;
-    Vc2PatchTally files { "saved, the image's patches" }, drawn { "saved, drawn stores" };
-    disk.open(rom4.substr(0, rom4.find_last_of('/') + 1) + "V-SynthXTDiskImage.bin.0.bin");
-    for (const XtDiskImage::Entry& e : disk.list("Internal.vc2/Patch")) {
-        const std::vector<uint8_t> bytes = disk.read(e);
+} // namespace
+
+long vc2PatchSaves(const std::vector<Vc2PatchOnDisk>& files, int cases, int seed) {
+    Vc2PatchTally saved { "saved, the image's patches" }, drawn { "saved, drawn stores" };
+    ValueDraws r { std::mt19937((unsigned)seed) };
+    for (const Vc2PatchOnDisk& f : files) {
         Vc2PatchFile p;
         std::string why;
-        ++files.compared;
-        if (!vc2PatchRead(bytes.data(), bytes.size(), p, &why)) files.differs(e.name + ": unread: " + why);
-        else if (!writtenAndBack(rom4, p.store, &bytes, why)) files.differs(e.name + ": " + why);
-        if (firstStore.empty()) firstStore = p.store;
+        ++saved.compared;
+        if (!vc2PatchRead(f.bytes.data(), f.bytes.size(), p, &why)) saved.differs(f.name + ": unread: " + why);
+        else if (!writtenAndBack(p.store, &f.bytes, why)) saved.differs(f.name + ": " + why);
     }
     for (int c = 0; c < cases; ++c, ++drawn.compared) {
         std::vector<uint8_t> store(kVc2StoreBytes);
         std::string why;
         for (uint8_t& b : store) b = (uint8_t)r.rng();
-        if (!writtenAndBack(rom4, store, nullptr, why)) drawn.differs("drawn store " + std::to_string(c) + ": " + why);
+        if (!writtenAndBack(store, nullptr, why)) drawn.differs("drawn store " + std::to_string(c) + ": " + why);
     }
-    return files.say("back as their files and their stores") + drawn.say("whose files read back write them again")
-           + (files.compared ? 0 : 1);
+    return saved.say("back as their files and their stores") + drawn.say("whose files read back write them again");
 }
 
-} // namespace
-
-int main(int argc, char** argv) {
-    Vc2Fw fw;
-    const auto run = vc2Start(argc, argv, fw, "xt_vc2save", vc2LoadAll<vc2LoadParams, vc2LoadPatchFiles>);
-    if (!run) return 2;
-    ValueDraws r { std::mt19937((unsigned)run->seed) };
-    std::vector<uint8_t> store;
-    long different = patchesWrittenAgain(argv[1], run->cases, r, store);
-    if (store.size() == (size_t)kVc2StoreBytes) different += settersHeld(argv[1], store, r);
-    else ++different;
-    std::printf("xt_vc2save: %ld different\n", different);
-    return different ? 1 : 0;
+long vc2PatchSetters(const std::vector<Vc2PatchOnDisk>& files, int seed) {
+    ValueDraws r { std::mt19937((unsigned)seed) };
+    Vc2PatchFile p;
+    if (files.empty() || !vc2PatchRead(files.front().bytes.data(), files.front().bytes.size(), p)) {
+        std::printf("set: no factory patch to set values on\n");
+        return 1;
+    }
+    return settersHeld(p.store, r);
 }
 #endif

@@ -2,6 +2,7 @@
 #include "Vc2PatchSave.h"
 #include "Sh4Interp.h"
 #include "Vc2Params.h"
+#include "Vc2PatchFile.h"
 #include "Vc2PatchStore.h"
 #include "XtFwMachine.h"
 #include <memory>
@@ -47,15 +48,15 @@ struct Written {
     }
 };
 
-// The rom.4 image's machine with `store` at kStore: none (and why) for a store not a patch's size or an image that
-// can't be read
-std::unique_ptr<Sh4> rom4Holding(const std::string& rom4, const std::vector<uint8_t>& store, std::string* why) {
+// The machine of the rom.4 image v450's reader keeps, with `store` at kStore: none (and why) for a store not a patch's
+// size, or no image kept or one that can't be read
+std::unique_ptr<Sh4> rom4Holding(const std::vector<uint8_t>& store, std::string* why) {
     if (store.size() != (size_t)kVc2StoreBytes) {
         fail(why, "not a VC-2 patch's store");
         return nullptr;
     }
     auto cpu = std::make_unique<Sh4>();
-    if (!cpu->loadRom(rom4.c_str())) {
+    if (!vc2PatchFilesLoaded() || !cpu->loadRom(vc2PatchFilesRom().c_str())) {
         fail(why, "rom.4 can't be read");
         return nullptr;
     }
@@ -83,10 +84,9 @@ bool rom4Sets(Sh4& c, const XtPatchSet& v, std::string* why) {
 
 } // namespace
 
-bool vc2PatchWrite(const std::string& rom4, const std::vector<uint8_t>& store, std::vector<uint8_t>& file,
-                   std::string* why) {
+bool vc2PatchWrite(const std::vector<uint8_t>& store, std::vector<uint8_t>& file, std::string* why) {
     file.clear();
-    const auto cpu = rom4Holding(rom4, store, why);
+    const auto cpu = rom4Holding(store, why);
     if (!cpu) return false;
     if (!cpu->call(kToFile, { kFile, kStore }, xtfw::kStack)) return fail(why, "rom.4's file layout: " + cpu->error());
     Written written;
@@ -99,9 +99,8 @@ bool vc2PatchWrite(const std::string& rom4, const std::vector<uint8_t>& store, s
     return true;
 }
 
-bool vc2PatchSet(const std::string& rom4, std::vector<uint8_t>& store, const std::vector<XtPatchSet>& values,
-                 std::string* why) {
-    const auto cpu = rom4Holding(rom4, store, why);
+bool vc2PatchSet(std::vector<uint8_t>& store, const std::vector<XtPatchSet>& values, std::string* why) {
+    const auto cpu = rom4Holding(store, why);
     if (!cpu) return false;
     for (const XtPatchSet& v : values)
         if (!rom4Sets(*cpu, v, why)) return false;
