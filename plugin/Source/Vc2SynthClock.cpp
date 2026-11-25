@@ -1,5 +1,6 @@
 // The part's clock (Vc2SynthClock.h, v354).
 #include "Vc2SynthClock.h"
+#include "XtRing.h"   // v355
 #include "XtTempoTicks.h"
 
 namespace {
@@ -13,6 +14,13 @@ constexpr uint32_t kWaitEvent = 0x8000;            // [FW] the waiter's event (0
 constexpr uint16_t kSinceMost = 0xffff;            // [FW] the since count's end (0x893131aa)
 constexpr uint32_t kNotesTask = 0x8994fec8u, kScheduleEvent = 0x10;   // [FW] the schedule's post (0x8938feac)
 constexpr uint32_t kScheduleStep = 20;             // [FW] a MIDI clock's ticks, the schedule's step (0x8938feba)
+// [FW] v355: the listener's classes (the parameters' messages) and the kinds of 0x40's it takes (4 and 6, 0x89313d24's
+// table), 0x41's (0); System B's Clock Source (0 INT, 1 MIDI) and Clock Out, the part's Patch Tempo (in 0.1 BPM); a
+// quarter's ms at 1 BPM, over the clock's 20 ticks (3000 × +0x10)
+constexpr uint8_t kParameters = 0x40, kPartParameters = 0x41;
+constexpr uint32_t kKindBits = 0xff, kSyncKindA = 4, kSyncKindB = 6;
+constexpr int16_t kClockSource = 0x43, kClockOut = 0x44, kPatchTempo = 0x13a;
+constexpr int32_t kTempoTenths = 10, kQuarterAtOne = 3000;
 
 XtTempoTicks ticksOf(const Vc2ClockObject& o) {
     XtTempoTicks t;
@@ -104,11 +112,48 @@ void Vc2SynthClock::fired(uint32_t timer) {
 }
 
 void Vc2SynthClock::pass(uint32_t events) {
-    if ((events & kTakeEvent) == 0) return;
-    XtTempoTicks t = ticksOf(object);
-    const int32_t ticks = t.take();   // 0x89312fd0
-    store(object, t);
-    if (ticks != 0) timers().advance(ticks, [this](uint32_t timer) { fired(timer); });
+    if ((events & kTakeEvent) != 0) {
+        XtTempoTicks t = ticksOf(object);
+        const int32_t ticks = t.take();   // 0x89312fd0
+        store(object, t);
+        if (ticks != 0) timers().advance(ticks, [this](uint32_t timer) { fired(timer); });
+    }
+    if ((events & kSettingsEvent) != 0) {   // v355
+        sourceMoved();
+        tempoMoved();
+    }
+}
+
+void Vc2SynthClock::heard(uint8_t cls, uint32_t word) {
+    const uint32_t kind = word & kKindBits;
+    const bool parameters = cls == kParameters && (kind == kSyncKindA || kind == kSyncKindB);
+    if (parameters || (cls == kPartParameters && kind == 0)) parts.post(kTask, kSettingsEvent);
+}
+
+// INT: the clock off the MIDI IN ring if on it; MIDI: on it, its count from outside begun again, if not; Clock Out
+// kept while the clock is its own
+void Vc2SynthClock::sourceMoved() {
+    Vc2ClockObject& o = object;
+    const int32_t source = parts.systemBValue(kClockSource), out = parts.systemBValue(kClockOut);
+    const auto nodeAt = [this](uint32_t at) -> Vc2RingNode& { return parts.midiInNode(at); };
+    if (source == 0 && o.external != 0) {
+        xtRingUnlink(midiIn, 0u, kAt, nodeAt);
+        o.external = 0;
+    } else if (source == 1 && o.external == 0) {
+        o.external = 1;
+        o.seen = kNoneSeen;
+        o.since = 0;
+        o.six = kSix;
+        o.ramp = 0;
+        xtRingLink(midiIn, 0u, kAt, nodeAt);
+    }
+    if (o.external == 0) o.sendOut = (uint16_t)out;
+}
+
+// The quarter's ms by the patch's tempo while the clock counts on its own
+void Vc2SynthClock::tempoMoved() {
+    const int32_t bpm = parts.patchValue(kPatchTempo) / kTempoTenths;
+    if (object.sync == 0) object.quarterMs = object.perClock * kQuarterAtOne / bpm;
 }
 
 void Vc2SynthClock::armSchedule() {

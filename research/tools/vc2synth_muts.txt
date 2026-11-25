@@ -113,7 +113,7 @@ smi-note-off|    vc2ChannelNoteOff(w, source, channel, key, velocity);|    vc2Ch
 smi-note-on|    vc2ChannelNoteOn(w, source, channel, key, velocity);|    vc2ChannelNoteOn(w, source, channel, key, velocity ^ 1);|vc2synthmidi
 smi-object-key|{ object, table, word, (int32_t)key, velocity }|{ object, table, word, (int32_t)key + 1, velocity }|vc2synthmidi
 smi-object-word|{ object, table, word, 0, 0 }|{ object, table, 0, 0, 0 }|vc2synthmidi
-smi-handle|    s_.midi.handle(m, word, *this, *s_.settings);\n|\n|vc2synthmidi
+smi-handle|{ s_.midi.handle(m, word, *this, *s_.settings); }|{}|vc2synthmidi
 smi-dispatch|    vc2MidiDispatch(w, m, word);|    (void)w;|vc2synthmidi
 syn-audio-class|kAudioClass = 0x898cd394;|kAudioClass = 0x898cd370;|vc2synth
 syn-dc-start|kDcCutStart = 1;|kDcCutStart = 0;|vc2synth
@@ -195,8 +195,8 @@ smi-reset-status|constexpr uint8_t kResetStatus = 0x70;|constexpr uint8_t kReset
 smi-reset-source|{ kResetStatus, 0, 0, (uint8_t)source }|{ kResetStatus, 0, 0, (uint8_t)(source + 1) }|vc2synthmidi
 smi-schedule|void Vc2SynthMidi::schedule() { s_.updateParts->schedule(); }|void Vc2SynthMidi::schedule() {}|vc2synthmidi
 smi-release|void Vc2SynthMidi::autoNoteRelease() { s_.autoNote.askRelease(); }|void Vc2SynthMidi::autoNoteRelease() {}|vc2synthmidi
-upd-schedule|s_.mixer.scheduleTones(s_.toneParts->tasksTones(), *this);|s_.mixer.scheduleTones({}, *this);|vc2synthupdate
-upd-voices-tones|s_.mixer.updateTones(s_.toneParts->tasksTones(), *this);|s_.mixer.updateTones({}, *this);|vc2synthupdate
+upd-schedule|{ s_.mixer.scheduleTones(s_.toneParts->tasksTones(), *this); }|{}|vc2synthupdate
+upd-voices-tones|{ s_.mixer.updateTones(s_.toneParts->tasksTones(), *this); }|{}|vc2synthupdate
 # v351: the part's block (vc2synthtones, Vc2SynthTones.cpp: the sounding tones as the mixer takes them, v349's
 # upd-sounding-next and upd-tone-update moved here as tns-sounding-next and tns-update; vc2synthblock,
 # Vc2SynthBlock.cpp: the mixer's parts and Auto Note's host; vc2synth, the block and the audio task's start), by
@@ -211,7 +211,9 @@ tns-carrier|return tone().sounds(host());|return !tone().sounds(host());|vc2synt
 tns-render-carrier|tone().renderWhole(&frames->left, s_.buffers, host());|tone().render(&frames->left, s_.buffers, host());|vc2synthtones
 tns-held|return tone().held(host());|return false;|vc2synthtones
 tns-render|{ tone().render(&frames->left, s_.buffers, host()); }|{ tone().renderWhole(&frames->left, s_.buffers, host()); }|vc2synthtones
-tns-tasks|tasks_[n] = &t;|tasks_[n] = &tones_[0];|vc2synthtones
+tns-voices|voices_[n++] = toneAt(at);|voices_[n++] = &tones_[0];|vc2synthtones
+tns-first|{ return toneAt(s_.lists.sounding); }|{ return nullptr; }|vc2synthtones
+tns-next|tone().head.next); }|tone().head.prev); }|vc2synthtones
 blk-input|second, kBlockSamples, s_.pitch|second, kBlockSamples - 1, s_.pitch|vc2synthblock
 blk-ring|s_.ring.write(mic, s_.tracker.period());|s_.ring.write(mic, s_.tracker.period() + 1.0f);|vc2synthblock
 blk-engine|return s_.vocoder.engine != nullptr;|return s_.vocoder.engine == nullptr;|vc2synthblock
@@ -260,8 +262,8 @@ clk-raise|parts.raise(kTask, kTakeEvent);|parts.raise(kTask, 4);|vc2synthclock
 clk-fire-count|++schedule.count;|schedule.count += 2;|vc2synthclock
 clk-fire-post|parts.post(kNotesTask, kScheduleEvent);|parts.post(kNotesTask, 0x20);|vc2synthclock
 clk-fire-step|schedule.at += kScheduleStep;|schedule.at += kScheduleStep + 1;|vc2synthclock
-clk-take-event|if ((events & kTakeEvent) == 0) return;|if ((events & kAlarmEvent) == 0) return;|vc2synthclock
-clk-take-store|    store(object, t);\n    if (ticks != 0) timers()|    if (ticks != 0) timers()|vc2synthclock
+clk-take-event|if ((events & kTakeEvent) != 0) {|if ((events & kAlarmEvent) != 0) {|vc2synthclock
+clk-take-store|        store(object, t);\n        if (ticks != 0) timers()|        if (ticks != 0) timers()|vc2synthclock
 clk-arm-at|schedule.at = list.clock + kScheduleStep;|schedule.at = list.clock + kScheduleStep + 1;|vc2synthclock
 clk-ramp-read|    t.ramp = o.ramp;\n    return t;|    return t;|vc2synthclock
 clk-remainder-kept|    o.remainder = t.remainder;\n|\n|vc2synthclock
@@ -275,3 +277,141 @@ syn-schedule-built|    Vc2SynthClock::buildSchedule(schedule);   // and|    // a
 syn-schedule-armed|    tempoClock().armSchedule();   // v354|    // v354|vc2synth
 syn-clock-ms|void Vc2Synth::clockMs() { tempoClock().ms(); }|void Vc2Synth::clockMs() {}|vc2synth
 syn-schedule-count|noteGate, pitch, schedule.count,|noteGate, pitch, schedule.at,|vc2synth
+# v355: the part's tasks on rom.1's kernel (vc2synthos, Vc2SynthOs.cpp: the start, a task's first run and its passes,
+# the runs a post, an interrupt's end and a wait inside a pass give; vc2synthostasks, Vc2SynthOsTasks.cpp: the
+# prologues' parts, the audio task's passes, the cyclic handler, TMU0's handler, the DMA's interrupts, a block's ticks,
+# a message as the OS MIDI task's work and the hub's tell, the notes' mailbox), the clock's MIDI listener and its 0x40
+# pass (vc2synthclock), the part mixer's walk of the sounding list (vc2synthmixer), the forwarding to the OS model and
+# the clock's settings (vc2synth, vc2synthmidi), by xt_vc2synth's whole part against rom.4's tasks on rom.1.  Not
+# planted: a block missed (+0x2c: the output's interrupt with the audio task busy, which the events never give, a block
+# always done before the next) and so the busy flag's set (+0x28, cleared again in the same block before any compare),
+# and the clock task's own alarm off (its event 1: no alarm of its is ever set).
+os-first-run|        started_[t] = true;\n|\n|vc2synthos
+os-pass-events|parts_.pass(task, took_[t]);|parts_.pass(task, 0);|vc2synthos
+os-wait-mask|    uint16_t mask = kMasks[t];|    uint16_t mask = kMasks[t] & ~2u;|vc2synthos
+os-idle-advance|            parts_.advance();|            stuck_ = true;|vc2synthos
+os-stuck-idle|stuck_ = task != kIdle;|stuck_ = true;|vc2synthos
+os-post-run|    else runUntil(poster);|    else (void)poster;|vc2synthos
+os-gives-way|    if (kGivesWay[(size_t)poster]) gaveWay_|    if (kGivesWay[(size_t)poster] && poster == kInput) gaveWay_|vc2synthos
+os-gave-way|    if (std::exchange(gaveWay_[t], false) \|\| stuck_) return;|    if (std::exchange(gaveWay_[t], false) && stuck_) return;|vc2synthos
+os-pass-mask|        mask = parts_.pass(task, took_[t]);|        parts_.pass(task, took_[t]);|vc2synthos
+os-unlock-run|    took(s);\n    if (s.switched) runUntil(me);|    took(s);|vc2synthos
+os-raise-audio|    if (t >= 0) kernel.raise(t, (uint16_t)flags);|    if (t > 0) kernel.raise(t, (uint16_t)flags);|vc2synthos
+os-tick-app|    parts_.appTick();\n|\n|vc2synthos
+os-end-taken|    if (kernel.watchdog) took(kernel.interruptEnd());|    if (kernel.watchdog) kernel.interruptEnd();|vc2synthos
+os-wait-in-pass|    took(kernel.wait(mask));\n    runUntil(me);|    took(kernel.wait(mask));\n    runUntil(kIdle);|vc2synthos
+ost-record|kUpdateRecord = 10, kUpdateHandler = 0,|kUpdateRecord = 9, kUpdateHandler = 0,|vc2synthostasks
+ost-ticks|kUpdateOn = 1, kUpdateTicks = 10;|kUpdateOn = 1, kUpdateTicks = 11;|vc2synthostasks
+ost-lock|kUpdateLock = 0x880f3dc0u;|kUpdateLock = 0x880f3dc4u;|vc2synthostasks
+ost-started|    s_.updateStarted = 1;|    s_.updateStarted = 2;|vc2synthostasks
+ost-queue-post|s_.queue.q.post = Os::kObjects[Os::kUpdate];|s_.queue.q.post = Os::kObjects[Os::kNotes];|vc2synthostasks
+ost-notes-alarm|    os.kernel.setInterval(0);\n    s_.taskStart();|    os.kernel.setInterval(1);\n    s_.taskStart();|vc2synthostasks
+ost-input-at|(s_.dmaBuffers[kInput] << kBufferShift)|((s_.dmaBuffers[kInput] ^ 1) << kBufferShift)|vc2synthostasks
+ost-input-frames|        s_.input = input_;|        s_.input = nullptr;|vc2synthostasks
+ost-busy-off|        s_.audioTask[kBusyWord] = 0;\n|\n|vc2synthostasks
+ost-cyclic-ticks|    ++s_.ticks;\n|\n|vc2synthostasks
+ost-cyclic-event|os.raise(Os::kObjects[Os::kUpdate], kUpdateEvent);|os.raise(Os::kObjects[Os::kUpdate], 1);|vc2synthostasks
+ost-clock|s_.clock = (int32_t)os.kernel.time;|s_.clock = (int32_t)os.kernel.time + 1;|vc2synthostasks
+ost-input-toggle|    s_.dmaBuffers[kInput] ^= 1;\n|\n|vc2synthostasks
+ost-output-toggle|        s_.dmaBuffers[kOutput] ^= 1;\n|\n|vc2synthostasks
+ost-output-flag|s_.outputFlag = 0;   // 0x893f36d0|s_.outputFlag = 1;   // 0x893f36d0|vc2synthostasks
+ost-blocks|    ++w[kBlocksWord];\n|\n|vc2synthostasks
+ost-ms-edge|for (; msAcc_ >= kFramesPerMs;|for (; msAcc_ > kFramesPerMs;|vc2synthostasks
+ost-interrupts-order|    interrupt([this] { inputDone(); });\n    interrupt([this] { outputDone(); });|    interrupt([this] { outputDone(); });\n    interrupt([this] { inputDone(); });|vc2synthostasks
+ost-cyclic-sensing|        midi.sensing();\n|\n|vc2synthostasks
+ost-two-bytes|const size_t count = cls == kProgram \|\| cls == kPressure ? 2 : 3;|const size_t count = cls == kProgram ? 2 : 3;|vc2synthostasks
+ost-usb|if (channel && (m.source == kMidiIn \|\| m.source == kUsb)) {|if (channel && m.source == kMidiIn) {|vc2synthostasks
+ost-midi-on|    os.start();\n    midi.midiOn();|    os.start();|vc2synthostasks
+ost-notes-link|    midi.notesStart();\n|\n|vc2synthostasks
+ost-audio-mask|    return Os::kMasks[Os::kAudio];|    return Os::kMasks[Os::kAudio] & ~4u;|vc2synthostasks
+clk-heard-kind|kSyncKindA = 4, kSyncKindB = 6;|kSyncKindA = 4, kSyncKindB = 5;|vc2synthclock
+clk-heard-part|(cls == kPartParameters && kind == 0)|(cls == kPartParameters && kind == 1)|vc2synthclock
+clk-heard-event|parts.post(kTask, kSettingsEvent);|parts.post(kTask, kTakeEvent);|vc2synthclock
+clk-settings-pass|if ((events & kSettingsEvent) != 0) {|if ((events & kSettingsEvent) == 0) {|vc2synthclock
+clk-source-int|if (source == 0 && o.external != 0) {|if (source == 2 && o.external != 0) {|vc2synthclock
+clk-source-unlink|        xtRingUnlink(midiIn, 0u, kAt, nodeAt);\n|\n|vc2synthclock
+clk-source-midi|} else if (source == 1 && o.external == 0) {|} else if (source == 3 && o.external == 0) {|vc2synthclock
+clk-source-seen|        o.seen = kNoneSeen;\n        o.since = 0;|        o.seen = 0;\n        o.since = 0;|vc2synthclock
+clk-source-six|        o.six = kSix;\n        o.ramp = 0;|        o.six = kSix + 1;\n        o.ramp = 0;|vc2synthclock
+clk-source-ramp|        o.ramp = 0;\n        xtRingLink|        o.ramp = 1;\n        xtRingLink|vc2synthclock
+clk-source-link|        xtRingLink(midiIn, 0u, kAt, nodeAt);\n|\n|vc2synthclock
+clk-source-out|if (o.external == 0) o.sendOut = (uint16_t)out;|if (o.external != 0) o.sendOut = (uint16_t)out;|vc2synthclock
+clk-tempo|parts.patchValue(kPatchTempo) / kTempoTenths;|parts.patchValue(kPatchTempo) / kTempoTenths + 1;|vc2synthclock
+clk-tempo-sync|if (object.sync == 0) object.quarterMs|if (object.sync == 1) object.quarterMs|vc2synthclock
+clk-tempo-scale|kQuarterAtOne = 3000;|kQuarterAtOne = 3001;|vc2synthclock
+mix-walk-next|        tone = tones.next(at);   // v355: before its update, which may end it and give the notes' task its turn\n        at->update(n);|        at->update(n);\n        tone = tones.next(at);|vc2synthmixer
+syn-system-b|settings->value(Vc2ParamBlock::kSystemB, 0, 0, id); }|settings->value(Vc2ParamBlock::kSystem, 0, 0, id); }|vc2synth
+syn-patch-part|settings->value(Vc2ParamBlock::kPart, 0, 0, id); }|settings->value(Vc2ParamBlock::kPart, 1, 0, id); }|vc2synth
+syn-post-os|    if (osTasks) osTasks->post(object, flags);   // v355|    // v355|vc2synth
+syn-raise-os|    if (osTasks) osTasks->raise(object, flags);   // v355|    // v355|vc2synth
+syn-fade-os|    if (osTasks) osTasks->waitFade();|    if (osTasks && osTasks->blocks < 0) osTasks->waitFade();|vc2synth
+smi-drain-os|if (s_.osTasks) s_.osTasks->drain(|if (s_.osTasks && s_.osTasks->blocks < 0) s_.osTasks->drain(|vc2synthmidi
+# v355, the XT's MIDI input path on both sides (the coordinator's call (a)): the receive objects (vc2midireceive,
+# Vc2MidiReceive.cpp: the parser's channel way, the ring's put and its full marker, the markers, the take, the sensing
+# check), a hub listener's queue (vc2osqueue, Vc2OsQueue.cpp), the senders, listeners, waits and drains
+# (vc2synthmidipath, Vc2SynthOsMidi.cpp), the path's build, the prologues' links, the MIDI on and the input task's
+# settings (vc2synthmidistart, Vc2SynthOsMidiStart.cpp), the part's nodes of it (vc2synth), by xt_vc2synth's whole part
+# with its bursts and floods. Not planted: the running status (the check gives every message its status byte), the
+# take's word (no listener reads it for a channel message or a reset), USB-MIDI Thru's diversion and its markers' iset
+# or set (the check keeps Thru off: its MIDI out side isn't modelled), a waiters' list's order (one sender per list in
+# the draws), the drain's flag (no compare falls inside a drain), the fade's end with the model stuck (only a cut wait
+# reaches it, after its compare). Missed in v355 (229 changed plants, 223 caught): the sensing check's call and its
+# mark's clear (ost-cyclic-sensing, rcv-sensing-mark: the settings move the check to the second USB port's object at
+# the first parameters' message, long before its first 512 ticks, and that object takes no bytes), a full ring's count
+# (rcv-full-stop: only a running status shows it, and the check gives every status byte), the wait for empty's
+# draining test (mp-empty-draining: no sender tests the OS MIDI task's queue mid-drain), the word before the channel
+# states (kt-state-before: a channel state's notify reaches no listener, the OS MIDI's lists empty on both sides, v346;
+# the read kept for the out-of-bounds one it ended), and tns-count as before (v351)
+rcv-full-code|vc2ReceiveMarker(r, 2, false, parts);|vc2ReceiveMarker(r, 3, false, parts);|vc2midireceive
+rcv-full-stop|        vc2ReceiveMarker(r, 2, false, parts);\n        return false;|        vc2ReceiveMarker(r, 2, false, parts);\n        return true;|vc2midireceive
+rcv-put-event|    r.w.write = a;\n    giveTask(r, false, parts);|    r.w.write = a;|vc2midireceive
+rcv-length|return cls == kProgram \|\| cls == kPressure ? 2 : 3;|return cls == kProgram ? 2 : 3;|vc2midireceive
+rcv-enabled|    if (r.w.enabled == 0) return true;|    if (r.w.enabled != 0) return true;|vc2midireceive
+rcv-marker-skip|    while (a == r.w.read) a = after(r.w, a);\n|\n|vc2midireceive
+rcv-marker-running|r.w.running = r.w.sensing = r.w.mark = 0;|r.w.sensing = r.w.mark = 0;|vc2midireceive
+rcv-take-reset|message = (message & ~0xffu) \| kReset;|message = (message & ~0xffu) \| 0x72;|vc2midireceive
+rcv-sensing-mark|        r.w.mark = 0;\n        return;|        return;|vc2midireceive
+rcv-mark|    r.w.mark = 1;\n|\n|vc2midireceive
+rcv-wrap|a + 4 >= w.end ? w.start : a + 4; }|a + 4 >= w.end ? w.start + 4 : a + 4; }|vc2midireceive
+rcv-source|        r.w.built[3] = r.w.source;|        r.w.built[3] = 1;|vc2midireceive
+rcv-marker-source|    bytes[3] = r.w.source;|    bytes[3] = 0;|vc2midireceive
+q-one-word|kOneWordAbove = 0x6f;|kOneWordAbove = 0x70;|vc2osqueue
+q-full-one|        if (first == q.w.read) return false;|        if (first == q.w.read && q.w.end == 0) return false;|vc2osqueue
+q-full-two|if (first == q.w.read \|\| second == q.w.read) return false;|if (first == q.w.read) return false;|vc2osqueue
+q-take-order|    q.w.read = after(q.w, q.w.read);\n    word = at(q, q.w.read);|    word = at(q, q.w.read);\n    q.w.read = after(q.w, q.w.read);|vc2osqueue
+q-wrap|a + 4 >= w.end ? w.start : a + 4; }|a + 4 >= w.end ? w.start + 4 : a + 4; }|vc2osqueue
+mp-wake-event|        os_.post(Os::kObjects[(size_t)w.list[i]->task], kWaitEvent);|        os_.post(Os::kObjects[(size_t)w.list[i]->task], 0x4000);|vc2synthmidipath
+mp-send-post|    os_.post(owner, kListenerEvent);\n    return true;|    os_.post(owner, 4);\n    return true;|vc2synthmidipath
+mp-room-count|        ++roomWaits;\n|\n|vc2synthmidipath
+mp-empty-count|        ++emptyWaits;\n|\n|vc2synthmidipath
+mp-out-kinds|kOutKinds[] = { 4, 5 };|kOutKinds[] = { 4 };|vc2synthmidipath
+mp-out-post|os_.post(kInputTcb, kInputSettings);|os_.post(kInputTcb, 2);|vc2synthmidipath
+mp-os-classes|kOsClasses[] = { 0x01, 0x70, 0xa0,|kOsClasses[] = { 0x01, 0x72, 0xa0,|vc2synthmidipath
+mp-os-kinds|kOsKinds[] = { 0, 4, 5 };|kOsKinds[] = { 0, 4 };|vc2synthmidipath
+mp-notes-classes|kNotesClasses[] = { 0x01, 0x40, 0x41, 0x70,|kNotesClasses[] = { 0x01, 0x40, 0x70,|vc2synthmidipath
+mp-notes-owner|    s_.midiPath.notes.w.owner = kNotesTcb;   // 0x89390216\n|\n|vc2synthmidipath
+mp-empty-draining|if (p.osMidi.w.draining != 0 \|\| !vc2QueueEmpty(p.osMidi.w)) {|if (!vc2QueueEmpty(p.osMidi.w)) {|vc2synthmidipath
+mp-ring-node|    if (t.node == Path::kHubNodeAt) {|    if (t.node == Path::kClockAt) {|vc2synthmidipath
+mp-drain-two|if (vc2QueueMessageWords((uint8_t)message) == 2 && !vc2QueueTake|if (vc2QueueMessageWords((uint8_t)message) == 3 && !vc2QueueTake|vc2synthmidipath
+mp-front-way|front_ = Sender { Os::kFront, Stage::emptyWait,|front_ = Sender { Os::kFront, Stage::hubListener,|vc2synthmidipath
+mp-second-port|takeInput(s_.midiPath.usb, false);|takeInput(s_.midiPath.midiIn, false);|vc2synthmidipath
+mp-room-retry|    t.stage = Stage::hubListener;\n    return true;\n}\n\n// The hub's|    t.stage = Stage::idle;\n    return true;\n}\n\n// The hub's|vc2synthmidipath
+ms-sensing-ticks|kSensingTicks = 0x200, kFlushTicks = 0x100;|kSensingTicks = 0x1ff, kFlushTicks = 0x100;|vc2synthmidistart
+ms-flush-record|kFlushRecord = 8, kFlushHandler = 2;|kFlushRecord = 9, kFlushHandler = 2;|vc2synthmidistart
+ms-hub-class|kHubClass = 0x898c82dcu;|kHubClass = 0x898c82e0u;|vc2synthmidistart
+ms-receive-event|kMidiInEvent = 2, kUsbEvent = 4,|kMidiInEvent = 4, kUsbEvent = 4,|vc2synthmidistart
+ms-out-link|    hubLink(s_, Path::kOutAt);\n|\n|vc2synthmidistart
+ms-settings-active|        p.words.active = Path::kUsb2At;\n|\n|vc2synthmidistart
+ms-thru-off|kThruOn = 2, kThruOff = 3;|kThruOn = 2, kThruOff = 1;|vc2synthmidistart
+ms-thru-markers|        vc2ReceiveMarker(p.usb, kSettingsMarker, true, *this);\n|\n|vc2synthmidistart
+ms-dummy|const uint8_t flag = s_.systemBValue(kUsbDummy) != 0 ? 1 : 0;|const uint8_t flag = s_.systemBValue(kUsbDummy) != 0 ? 0 : 1;|vc2synthmidistart
+ms-linked|    p.hub.linked = 1;\n|\n|vc2synthmidistart
+ms-give-event|os_.raise(Vc2SynthOs::kObjects[Vc2SynthOs::kFront], kFrontEvent);|os_.raise(Vc2SynthOs::kObjects[Vc2SynthOs::kFront], 2);|vc2synthmidistart
+ms-usb-byte|vc2ReceiveByte(source == kUsbSource ? s_.midiPath.usb : s_.midiPath.midiIn, byte, *this);|vc2ReceiveByte(s_.midiPath.midiIn, byte, *this);|vc2synthmidistart
+ms-enable-usb2|p.usb2.w.enabled = p.midiIn.w.enabled = p.usb.w.enabled = 1;|p.midiIn.w.enabled = p.usb.w.enabled = 1;|vc2synthmidistart
+ms-queue-handler|kOsMidiClass, kOsMidiTcb, kOsMidiHandler);|kOsMidiClass, kOsMidiTcb, 0);|vc2synthmidistart
+syn-midi-part|    midiPath.buildPart();                     // v355|    // v355|vc2synth
+syn-midi-os|    midiPath.buildOs();\n|\n|vc2synth
+syn-hub-clock|: at == Vc2MidiPath::kClockAt ? p.clock.node|: at == Vc2MidiPath::kClockAt ? p.out.node|vc2synth
+syn-midiin-node|return at == Vc2SynthClock::kAt ? clockObject.node : midiPath.hub.node;|return midiPath.hub.node;|vc2synth
+kt-state-before|    return (at < 0 ? k.stateBefore : k.states|    return (at < 0 ? k.states[0] : k.states|vc2synthchannel

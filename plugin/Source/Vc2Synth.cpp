@@ -82,9 +82,50 @@ void Vc2Synth::notesPass(uint32_t events) {   // v350
     vc2NotesTaskPass(w, events);
 }
 
+void Vc2Synth::post(uint32_t object, uint32_t flags) {
+    if (object == kVc2SynthNotesTask) notesEvents |= flags;
+    if (osTasks) osTasks->post(object, flags);   // v355
+}
+
+void Vc2Synth::raise(uint32_t object, uint32_t flags) {
+    if (object == Vc2SynthClock::kTask) clockEvents |= flags;
+    if (object == kVc2SynthNotesTask) notesEvents |= flags;
+    if (osTasks) osTasks->raise(object, flags);   // v355
+}
+
+void Vc2Synth::waitFade(int tone) {
+    if (osTasks) osTasks->waitFade();   // v355: the notes' task asleep until a block ends the fade
+    // with no OS model the fade ends at once; with one stuck, too, its check saying so
+    if (!osTasks || osTasks->os.stuck()) hosts[(size_t)tone].tva.w.fade = 0.0f;
+}
+
+void Vc2Synth::runOnOs(std::function<bool(Vc2PartEvent&)> source) {   // v355
+    midiPath.buildOs();
+    osTasks = std::make_unique<Vc2SynthOsTasks>(*this, std::move(source));
+    osTasks->start();
+}
+
+// [FW] v355: the MIDI IN ring's nodes (the clock object's, else the hub's), the hub's ring's (its four listeners')
+Vc2RingNode& Vc2Synth::midiInNode(uint32_t at) {
+    return at == Vc2SynthClock::kAt ? clockObject.node : midiPath.hub.node;
+}
+
+Vc2RingNode& Vc2Synth::hubNode(uint32_t at) {
+    Vc2MidiPath& p = midiPath;
+    return at == Vc2MidiPath::kOutAt     ? p.out.node
+           : at == Vc2MidiPath::kClockAt ? p.clock.node
+           : at == Vc2MidiPath::kOsMidiAt ? p.osMidi.w.node
+                                          : p.notes.w.node;
+}
+
 void Vc2Synth::clockMs() { tempoClock().ms(); }   // v354
 
 void Vc2Synth::clockPass(uint32_t events) { tempoClock().pass(events); }   // v354
+
+// v355: the clock's settings, through the getter's blocks (System B's 0x89320760, part 0's 0x893207b0)
+int32_t Vc2Synth::systemBValue(int16_t id) { return settings->value(Vc2ParamBlock::kSystemB, 0, 0, id); }
+
+int32_t Vc2Synth::patchValue(int16_t id) { return settings->value(Vc2ParamBlock::kPart, 0, 0, id); }
 
 void Vc2Synth::giveSystem(const Vc2System& given) {
     std::memcpy(system.bytes.data(), given.bytes.data(), system.bytes.size());
@@ -142,6 +183,7 @@ void Vc2Synth::start() {
     for (Vc2PartNode& n : nodes.nodes) n.channel = 0;   // .bss: the part's init gives them none
     Vc2SynthClock::build(clockObject);        // v354: the OS's row 20, 0x893133d0, which the part's tempo reads
     Vc2SynthClock::buildSchedule(schedule);   // and the part's first row's timer (0x893903b0)
+    midiPath.buildPart();                     // v355: row 21's clock listener, the notes' listener and queue
 
     midi.staticInitPorts();   // the whole table's 0x893179d0
     midi.staticInitStates();  // and 0x89317db0

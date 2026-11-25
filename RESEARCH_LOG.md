@@ -4230,3 +4230,17 @@ Round-2 recordings.  First build-out after that: real-time granular port
   making the same NaN in kind 6 and parting on its sign; the cause was a start the check had skipped: an XT resets the
   tracker in the audio task's prologue, so its period is never 0 when kind 6 renders. A NaN in a check is a question
   about state before it is one about arithmetic.
+- v352 to v355 loaded rom.1, the kernel (the user's "Load rom.1"), ported its event services against its own, then
+  ran rom.4's four tasks on it in one interpreter against the part on its model. The whole machine showed three things
+  the part's checks of one task at a time could not. Every task's prologue waits at a start barrier that only the
+  idle task's first hook releases. v354 had misread a routine (`0x89313cb0`) that only a listener on the OS MIDI's
+  hub reaches. And the notes' task runs inside the update task's pass whenever a tone ends, so the update's walk of
+  the sounding list has to read each next as rom.4 does, not take the list first. A check that calls one task's loop
+  body fixes the order of work; another task's turn inside it shows only on the machine. What the model leaves out
+  (the semaphores, a suspend, a restart) is now counted on rom.1, so leaving it out is a claim the check holds.
+  The MIDI input path then came in on both sides (the coordinator's call), and the machine kept teaching. A sender
+  mid-tell is preempted by the task it posts, so a port on one C++ stack has to keep the sender's place as state
+  rather than as a frame. A truncated tone that never renders makes rom.4's notes' task wait for good, and the check
+  has to cut that wait rather than draw events forever. USB-MIDI Thru sends MIDI IN to an out nobody drains on the
+  rig. Each looked like a port bug for a while and was the firmware's own behaviour; the machine was the only way to
+  tell. Filling a queue on purpose (bursts, a flood) was what proved the waits for room are rom.4's.

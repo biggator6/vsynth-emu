@@ -79,14 +79,20 @@ std::string taskStart(Vc2Fw& fw, Vc2Synth& s, const Posts& posts) {
 // v347: a system on both sides: rom.4's defaults half the time, else its three areas noise, Part 1 Receive Switch on
 // three times in four of those (v349: always where `receives`, as the update task's passes need: with it off, G's
 // channel word is rom.4's 0x8999738c, 0, and M's init on the static M reads its sources at 0x84 on, an XT's boot
-// flash, which the part has none of)
-void systemDrawn(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, bool receives) {
+// flash, which the part has none of); v355: a one-bit ID kept off where asked (the whole part's USB-MIDI Thru)
+struct SystemKept {
+    bool receives = false;
+    int offId = -1;
+};
+void systemDrawn(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, SystemKept kept) {
     Vc2System system = *vc2SystemDefaults();
     if (rng() % 2 == 0) {
         for (uint8_t& b : system.bytes) b = (uint8_t)rng();
         const XtParamDesc* on = vc2ParamDesc(kReceiveSwitch);
         const size_t at = (size_t)(Vc2System::kRecord + on->offset);
-        if (receives || rng() % 4) system.bytes[at] |= (uint8_t)(0x80 >> on->bit);
+        if (kept.receives || rng() % 4) system.bytes[at] |= (uint8_t)(0x80 >> on->bit);
+        const XtParamDesc* off = kept.offId < 0 ? nullptr : vc2ParamDesc(kept.offId);
+        if (off != nullptr) system.bytes[(size_t)(Vc2System::kRecord + off->offset)] &= (uint8_t)~(0x80 >> off->bit);
     }
     for (const Vc2System::Area& a : Vc2System::kAreas) fw.cpu.write(a.at, system.bytes.data() + a.from, a.size);
     s.giveSystem(system);
@@ -94,9 +100,9 @@ void systemDrawn(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, bool receives) {
 
 // A store's bytes drawn for both sides, or none, with a system drawn: whether a store was; v349: the bytes given
 // `steer` before either side has them, a store where it says so
-bool storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng, bool receives = false,
+bool storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng, SystemKept kept = {},
                 const Vc2SynthSteer& steer = {}) {
-    systemDrawn(fw, s, rng, receives);
+    systemDrawn(fw, s, rng, kept);
     bool none = rng() % 4 == 0;
     for (uint8_t& b : store) b = (uint8_t)rng();
     if (steer && steer(store)) none = false;
@@ -210,14 +216,19 @@ void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s) {
     s.givePatch(nullptr);
 }
 
-std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
-                                const Vc2SynthPosts& posts, const Vc2SynthSteer& steer) {
-    storeDrawn(fw, s, store, rng, true, steer);   // v349: Part 1 receiving, for the update task's passes
+std::string vc2SynthPatchGiven(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
+                               const Vc2SynthSteer& steer, int offId) {
+    storeDrawn(fw, s, store, rng, { true, offId }, steer);   // v349: Part 1 receiving, for the update task's passes
     std::string d = partRead(fw, s);
     for (const Dispatcher& k : kDispatchers) {
         if (d.empty()) d = dispatched(fw, s, k);
     }
-    if (d.empty()) d = messageBoth(fw, s, true, 0, 0);   // v346: part 0's message, its node the held class
+    return d.empty() ? messageBoth(fw, s, true, 0, 0) : d;   // v346: part 0's message, its node the held class
+}
+
+std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
+                                const Vc2SynthPosts& posts, const Vc2SynthSteer& steer) {
+    const std::string d = vc2SynthPatchGiven(fw, s, store, rng, steer);   // v355: shared with the whole part
     return d.empty() ? vc2SynthStepDifference(fw, s, posts) : d;
 }
 

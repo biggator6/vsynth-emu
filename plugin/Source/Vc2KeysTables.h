@@ -12,6 +12,7 @@ struct Vc2KeysTables {
     std::array<uint16_t, 16> bits {};               // 0x89535938: bit n
     std::array<uint16_t, 8> zero {};                // 0x89535958: the empty bitmap
     std::array<uint8_t, 4> sources {};              // 0x8950d6d9: each source's row
+    uint32_t stateBefore = 0;                       // 0x8950d6dc: the word before (v355: row 0's channel -1 reads it)
     std::array<uint32_t, kRows * 16> states {};     // 0x8950d6e0: each row's 16 channel states, by address
     float divisor = 0;                              // 0x89392400: the velocity factor's, 127²
 };

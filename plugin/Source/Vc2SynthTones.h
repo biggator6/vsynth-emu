@@ -15,11 +15,15 @@
 struct Vc2Synth;
 class Vc2SynthTone;
 
-class Vc2SynthTones {
+class Vc2SynthTones final : public Vc2MixerTones {
 public:
     explicit Vc2SynthTones(Vc2Synth& s);
-    std::span<Vc2MixerTone* const> tasksTones();   // the sounding list's, for the voices' update and schedule
-    std::span<Vc2MixerVoice* const> voices();      // the same, for the block
+    // v355: the sounding list for the voices' update and schedule, walked as it stands (the notes' task can change it
+    // while the update runs); its first and a tone's next
+    Vc2MixerTones& tasksTones() { return *this; }
+    Vc2MixerTone* first() override;
+    Vc2MixerTone* next(Vc2MixerTone* tone) override;
+    std::span<Vc2MixerVoice* const> voices();      // the sounding list's in its order, for the block
 
 private:
     // A tone of the pool, its methods on its host
@@ -33,17 +37,17 @@ private:
         void renderCarrier(Vc2MixerFrame* frames) override;    // +0x18
         bool held() override;                                  // +0x60
         void render(Vc2MixerFrame* frames) override;           // +0x24
+        Vc2Tone& tone();
 
     private:
-        Vc2Tone& tone();
         Vc2SynthTone& host();
         Vc2Synth& s_;
         int index_;
     };
-    // The sounding list's tones in its order into both lists; how many
+    // The sounding list's tones in its order into the block's list; how many
     size_t walk();
+    Tone* toneAt(uint32_t at);   // the tone at a pool address, nullptr for 0
     Vc2Synth& s_;
     std::vector<Tone> tones_;   // one a tone of the pool, made with the part
-    std::array<Vc2MixerTone*, Vc2TonePool::kTones> tasks_ {};
     std::array<Vc2MixerVoice*, Vc2TonePool::kTones> voices_ {};
 };

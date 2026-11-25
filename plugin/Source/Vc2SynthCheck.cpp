@@ -51,9 +51,10 @@
 namespace {
 constexpr uint32_t kRowsAt = 0x898c5cc0, kRowBytes = 12, kRowRoutine = 4;   // [FW] the part's rows: {0, routine, 0}
 constexpr uint32_t kFirstOutside = 0x893f5070;                              // [FW] row 95's routine, not the part's
-// [FW] the OS's rows, earlier, in the table's order: (v354) row 20's clock object, which the part's tempo reads; the OS
-// MIDI's rows 26…28: its ports, its states, (v347) its part objects
-constexpr uint32_t kOsRows[] = { 0x893133d0, 0x893179d0, 0x89317db0, 0x89318140 };
+// [FW] the OS's rows, earlier, in the table's order: (v354) row 20's clock object, which the part's tempo reads; (v355)
+// row 21's, the clock task's MIDI listener's class (0x8995cc08), which the hub's tell calls; the OS MIDI's rows 26…28:
+// its ports, its states, (v347) its part objects
+constexpr uint32_t kOsRows[] = { 0x893133d0, 0x89313e70, 0x893179d0, 0x89317db0, 0x89318140 };
 
 // v342: the part's regions are the plugin's (Vc2SynthMemory.h, moved from here)
 using SynthRegion = Vc2SynthRegion;
@@ -65,9 +66,10 @@ std::string bytesDifference(Vc2Fw& fw, const SynthRegion& r) { return vc2SynthBy
 
 std::string synthDifference(Vc2Fw& fw, Vc2Synth& s) { return vc2SynthDifference(fw, s); }
 
-// rom.4's start: the OS's rows, then the part's, each called in turn; how many, or what faulted
-std::string runRows(Vc2Fw& fw, int& rows) {
-    std::vector<uint32_t> routines(std::begin(kOsRows), std::end(kOsRows));
+// rom.4's start: the OS's rows (main's, or v355 a list given), then the part's, each called in turn; how many, or what
+// faulted
+std::string runRows(Vc2Fw& fw, int& rows, std::span<const uint32_t> osRows) {
+    std::vector<uint32_t> routines(osRows.begin(), osRows.end());
     for (uint32_t at = kRowsAt; fw.cpu.rd32(at + kRowRoutine) != kFirstOutside; at += kRowBytes)
         routines.push_back(fw.cpu.rd32(at + kRowRoutine));
     for (const uint32_t routine : routines) {
@@ -186,6 +188,11 @@ std::string systemStart(Vc2Fw& fw) {
 }
 } // namespace
 
+std::string vc2SynthRomStart(Vc2Fw& fw, int& rows, std::span<const uint32_t> osRows) {   // v355: main's, and the
+    const std::string what = runRows(fw, rows, osRows.empty() ? std::span<const uint32_t>(kOsRows) : osRows);   // rig's
+    return what.empty() ? systemStart(fw) : what;
+}
+
 std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r) {
     std::vector<uint8_t> theirs(r.bytes);
     fw.cpu.read(r.at, theirs.data(), r.bytes);
@@ -219,8 +226,7 @@ int main(int argc, char** argv) {
     const auto run = vc2Start(argc, argv, fw, "xt_vc2synth", synthLoadTables);
     if (!run) return 1;
     int rows = 0;
-    std::string what = runRows(fw, rows);
-    if (what.empty()) what = systemStart(fw);   // v347
+    std::string what = vc2SynthRomStart(fw, rows);   // v347: the system's start after the rows
     const auto synth = std::make_unique<Vc2Synth>();
     synth->start();
     if (vc2SystemDefaults() != nullptr) synth->giveSystem(*vc2SystemDefaults());
@@ -234,13 +240,20 @@ int main(int argc, char** argv) {
     if (tones.empty() && what.empty()) tones = unmakeTones(fw, *synth);   // v346: the pool free again
     if (!tones.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the tones made: %s\n", tones.c_str());
     std::printf("synth: %d tones made through the part's hosts, their words compared, then given back\n", made);
-    const bool sound = what.empty() && tones.empty();
     Vc2SynthPosts posts;   // v346: the OS's hooks, the parts' one rig
     vc2SynthInstallOs(fw, posts);
-    const long load = sound ? vc2SynthLoadPart(fw, *synth, *run, posts) : 0;     // v345
-    const long notes = sound ? vc2SynthNotesPart(fw, *synth, *run, posts) : 0;   // v346
-    const long reads = sound ? vc2SynthReadsPart(fw, *synth, *run) : 0;   // v343: after the load, its noise last
-    const long tally = (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1) + load + notes + reads;
+    // v355: with XT_VC2SYNTH_STOP, the parts after the first that differs left (a plant's run)
+    long tally = (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1);
+    const bool stop = xtSwitch("XT_VC2SYNTH_STOP") != nullptr;
+    const auto next = [&tally, stop](const std::function<long()>& part) {
+        if (!(stop && tally != 0)) tally += part();
+    };
+    if (tally == 0) {
+        next([&] { return vc2SynthLoadPart(fw, *synth, *run, posts); });    // v345
+        next([&] { return vc2SynthNotesPart(fw, *synth, *run, posts); });   // v346
+        next([&] { return vc2SynthReadsPart(fw, *synth, *run); });          // v343: after the load, its noise last
+        next([&] { return vc2SynthWholePart(argv[1], *run); });             // v355: a fresh pair, on their OSes
+    }
     std::printf("xt_vc2synth: %ld different\n", tally);
     return 0;
 }

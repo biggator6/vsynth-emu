@@ -36,6 +36,7 @@
 #include "Vc2Sets.h"
 #include "Vc2StaticMatrix.h"
 #include "Vc2SynthClock.h"
+#include "Vc2SynthOsTasks.h"
 #include "Vc2SynthTone.h"
 #include "Vc2SystemStore.h"
 #include "Vc2TimeTrip.h"
@@ -120,28 +121,29 @@ struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     // v345: a tone of the pool made (0x893b2db0(0, id)) through the host of the tone it takes, its address, 0 none
     uint32_t makeTone(uint32_t id);
     Vc2SynthTone& hostOf(uint32_t tone) { return hosts[(size_t)tones.indexOf(tone)]; }
-    // v345: an OS event set on its object (0x89301830): the notes' task's the part keeps
-    void post(uint32_t object, uint32_t flags) override {
-        if (object == kVc2SynthNotesTask) notesEvents |= flags;
-    }
+    // v345: an OS event set on its object (0x89301830): the notes' task's the part keeps; v355: on its OS model, given
+    // it as well
+    void post(uint32_t object, uint32_t flags) override;
     // v354: one from an interrupt (0x89301840): the clock task's the part keeps as well; no MIDI clock goes out
-    void raise(uint32_t object, uint32_t flags) override {
-        if (object == Vc2SynthClock::kTask) clockEvents |= flags;
-        post(object, flags);
-    }
+    void raise(uint32_t object, uint32_t flags) override;
     bool sendClock() override { return false; }
+    int32_t systemBValue(int16_t id) override;   // v355: the clock's settings
+    int32_t patchValue(int16_t id) override;
     // v354: the clock's millisecond (0x89313000, TMU0's handler's), and the clock task's pass on the events its wait
     // took (mask 0x47: 2 its take into the tempo timers)
     void clockMs();
     void clockPass(uint32_t events);
-    Vc2SynthClock tempoClock() { return { clockObject, tempo, schedule, *this }; }
+    Vc2SynthClock tempoClock() { return { clockObject, tempo, schedule, midiPath.ring, *this }; }
+    // v355: a node of the MIDI IN ring (the clock object's, the hub's) or of the hub's ring (its listeners'), by address
+    Vc2RingNode& midiInNode(uint32_t at) override;
+    Vc2RingNode& hubNode(uint32_t at);
     // v340: the tones' world.  The tail's routines the notes' (v345), the OS's event posted; the truncation's wait the
     // tasks' version's: until it, a wait ends the fade
     const Vc2ToneHost& host(int tone) override { return hosts[(size_t)tone]; }
     void osEvent(uint32_t event, uint32_t flags) override { post(event, flags); }
     void ended(int tone) override;
     void truncated(int tone) override;
-    void waitFade(int tone) override { hosts[(size_t)tone].tva.w.fade = 0.0f; }
+    void waitFade(int tone) override;   // the fade ended at once; v355: on its OS model, its wait
     int32_t osClock() override { return clock; }
     Vc2MicRing& micRing() override { return ring; }
     const Vc2Unvoiced& inputStage() override { return vocoder.stage; }
@@ -178,7 +180,11 @@ struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     uint32_t noteGate = 0;                 // 0x89981904: no note-on while set (v308)
     Vc2ScheduleTimer schedule {};          // 0x89981b40: the schedule's timer, its count +0x20 (v309; v354 whole)
     Vc2TempoList tempo {};                 // 0x8992e328: the OS's tempo timers' list (v354)
+    Vc2MidiPath midiPath {};               // 0x8995662c…: the XT's MIDI input path, the MIDI IN ring 0x899598a0 (v355)
     uint32_t clockEvents = 0;              // v354: the flags raised on the clock task's event object (0x8994fdf8)
+    std::array<uint32_t, 2> dmaBuffers {}; // 0x89989cf0: the output's and the input's DMA buffer in use, 0 or 1 (v355)
+    uint32_t updateStarted = 0;            // 0x8993d08c: the update task's start made (v355)
+    uint32_t outputFlag = 0;               // 0x8993d090: the output's interrupt's (v355)
     std::array<uint32_t, 2> autoNoteKeys {};   // 0x8993d034, 0x8993d038: Auto Note's note-on and note-off keys (v309)
     // v346: the audio task's object (0x8998a480, .bss, row 16's 0x89396470: +8 its class, +0x18 the stereo source's
     // flag, +0x24 Out DC cut for TG; past it, 0x8998a4b4…, the block's), SysEx's flag (0x8992e3d1, .data 1)
@@ -234,4 +240,8 @@ struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     std::unique_ptr<Vc2SynthTones> toneParts;     // v351
     std::unique_ptr<Vc2SynthUpdate> updateParts;   // v349
     std::unique_ptr<Vc2SynthBlock> blockParts;     // v351
+    // v355: the part on its OS model, its events from `source` (Vc2SynthOsTasks.h); none for the checks of its parts,
+    // which run each task's pass themselves
+    std::unique_ptr<Vc2SynthOsTasks> osTasks;
+    void runOnOs(std::function<bool(Vc2PartEvent&)> source);
 };

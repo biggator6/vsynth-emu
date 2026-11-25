@@ -188,6 +188,12 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2Kernel.cpp
     Source/Vc2TempoTimers.cpp
     Source/Vc2SynthClock.cpp
+    Source/Vc2SynthOs.cpp
+    Source/Vc2SynthOsTasks.cpp
+    Source/Vc2OsQueue.cpp
+    Source/Vc2MidiReceive.cpp
+    Source/Vc2SynthOsMidi.cpp
+    Source/Vc2SynthOsMidiStart.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

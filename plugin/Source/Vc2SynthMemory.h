@@ -26,6 +26,8 @@ Vc2SynthRegion vc2SynthRegion(uint32_t at, T& mine, const char* what) {
 // Every member's place: the whole objects, the tables a field at a time, the mixes' rings, each pool tone's head and
 // tail
 std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s);
+// v355: the MIDI input path's, the receive objects, rings, listeners, queues and words
+void vc2SynthMidiRegions(Vc2MidiPath& p, std::vector<Vc2SynthRegion>& out);
 
 class Vc2SynthMemory {
 public:

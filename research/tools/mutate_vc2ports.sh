@@ -39,7 +39,12 @@
 # Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its records and chunks (vc2waverecords, v502) under
 # xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's answers (vc2wavekernel) and its files
 # (vc2bootfiles) under its fourth part; rom.1's kernel's event services (vc2kernel, v353) under xt_vc2kernel, on rom.1
-# beside rom.4; the part's clock (vc2synthclock, v354) and the tempo timers (vc2tempotimers) under xt_vc2synth.
+# beside rom.4; the part's clock (vc2synthclock, v354) and the tempo timers (vc2tempotimers) under xt_vc2synth; the
+# part's tasks on the kernel (vc2synthos, v355), their parts on the part (vc2synthostasks) and the part mixer's walk of
+# the tones (vc2synthmixer, Vc2PartMixer.cpp: only the whole part's preemption tells where it reads a next) under it too;
+# the XT's MIDI input path (v355: vc2midireceive, vc2osqueue, vc2synthmidipath Vc2SynthOsMidi.cpp, vc2synthmidistart
+# Vc2SynthOsMidiStart.cpp) and a channel state's lookup (vc2synthchannel, Vc2PartChannel.cpp: the notes' task's own
+# messages on a channel of -1) under it.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -198,6 +203,14 @@ VC2PORTS=(
     "vc2kernel|Vc2Kernel.cpp|XT_VC2KERNEL_MAIN|vc2kernel_obj|VC2KERNEL"
     "vc2synthclock|Vc2SynthClock.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2tempotimers|Vc2TempoTimers.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthos|Vc2SynthOs.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthostasks|Vc2SynthOsTasks.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmixer|Vc2PartMixer.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2midireceive|Vc2MidiReceive.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2osqueue|Vc2OsQueue.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmidipath|Vc2SynthOsMidi.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmidistart|Vc2SynthOsMidiStart.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthchannel|Vc2PartChannel.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

@@ -6,9 +6,16 @@
 #include "Vc2SynthMemory.h"
 #include <functional>
 #include <random>
+#include <span>
 #include <string>
 #include <vector>
 
+// v355: rom.4's start as main runs it, on a fresh image: its initializers (how many in `rows`; the OS's rows main's, or
+// `osRows` in the table's order), then the system's start; what faulted, or none
+std::string vc2SynthRomStart(Vc2Fw& fw, int& rows, std::span<const uint32_t> osRows = {});
+// v355: the whole part (Vc2SynthWholeCheck.cpp): a fresh pair on their OSes, the port's model and rom.1's kernel with
+// rom.4 (Vc2MachineRig, rom.1 beside `rom4`); how many differ
+long vc2SynthWholePart(const char* rom4, const Vc2Run& run);
 // The first byte of the region that differs from rom.4's at its address, said; none
 std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r);
 // The first region of the part that differs, said; none
@@ -39,6 +46,22 @@ using Vc2SynthSteer = std::function<bool(std::vector<uint8_t>&)>;
 // differs after
 std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
                                 const Vc2SynthPosts& posts, const Vc2SynthSteer& steer);
+// v355: the patch given both sides as vc2SynthPatchLoaded gives it, without its compare (the whole part's, whose posts
+// go to its OSes), a system ID of one bit, `offId`, kept off in the system drawn; what faulted, or none
+std::string vc2SynthPatchGiven(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
+                               const Vc2SynthSteer& steer, int offId = -1);
+// v355: the notes part's draws (Vc2SynthNotesCheck.cpp), the whole part's too: a message and its word, its kind by
+// the notes part's order (on the channel part 0's node of source 1 receives on, mostly); and a store's steer (robot
+// human depth 0 one time in 4, a sounding VOCODER's Type kept), counting the patches under such a tone and the Types kept
+struct Vc2SynthDrawn {
+    Vc2MidiMessage m {};
+    uint32_t word = 0;
+    size_t kind = 0;
+};
+Vc2SynthDrawn vc2SynthMessageDrawn(std::mt19937& rng, const Vc2Synth& s);
+bool vc2SynthSteered(Vc2Synth& s, std::vector<uint8_t>& bytes, std::mt19937& rng, long& under, long& kept);
+// v355: an ID's raw bits put in a store at a zone, where xtStoreRaw reads them (the notes part's own)
+void vc2SynthRawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw);
 // The store taken away on both sides (rom.4's part 0 entry none), before the store's bytes go
 void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s);
 // A part's cases (v346): as many as the run's, 16 at the least, on the seed `offset` after the run's, each `one` given

@@ -34,9 +34,19 @@ constexpr Way kWays[] = { partNoteOff, partNoteOn, partHeard, partController, pa
 } // namespace
 
 void Vc2SynthMidi::message(const Vc2MidiMessage& m, uint32_t word) {
-    s_.midi.handle(m, word, *this, *s_.settings);
+    handled(m, word);
+    dispatch(m, word);
+}
+
+void Vc2SynthMidi::handled(const Vc2MidiMessage& m, uint32_t word) { s_.midi.handle(m, word, *this, *s_.settings); }
+
+void Vc2SynthMidi::dispatch(const Vc2MidiMessage& m, uint32_t word) {
     Vc2MidiWorld w = dispatchWorld();
     vc2MidiDispatch(w, m, word);
+}
+
+void Vc2SynthMidi::drainQueue() {   // v355
+    if (s_.osTasks) s_.osTasks->drain([this](const Vc2MidiMessage& m, uint32_t word) { dispatch(m, word); });
 }
 
 // v350: the notes' task's calls

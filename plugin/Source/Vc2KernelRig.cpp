@@ -18,8 +18,6 @@ constexpr uint32_t kKernelRam = 0x00200000u, kHeap = 0x89200000u, kHeapBytes = 0
 constexpr uint32_t kTimerSetUp = 0x88011bc0u, kTimerAck = 0x88011be0u, kWatchdogStart = 0x88011bf0u;
 // The switch (0x88011c30) is given the two TCBs; it adds tcbSP's 0x2c to each itself
 constexpr uint32_t kWatchdogStop = 0x88011c10u, kLoadContext = 0x88011c20u, kSwitch = 0x88011c30u;
-
-void answerNothing(Sh4& c) { c.ret(0); }
 } // namespace
 
 int Vc2KernelRig::task(uint32_t a) {
@@ -35,7 +33,8 @@ bool Vc2KernelRig::call(uint32_t f, std::initializer_list<uint32_t> args, uint32
     return ok;
 }
 
-bool Vc2KernelRig::load(const char* rom4, std::string& why) {
+bool vc2LoadKernel(Sh4& cpu, const char* rom4, std::vector<uint32_t>& own, std::string& why) {
+    using Rig = Vc2KernelRig;
     std::string path = rom4;
     const size_t at = path.rfind(".rom.4.");
     if (at == std::string::npos) {
@@ -49,11 +48,10 @@ bool Vc2KernelRig::load(const char* rom4, std::string& why) {
         why = "no rom.1 at " + path;
         return false;
     }
-    cpu.mapRam(kBase, kKernelRam);
+    cpu.mapRam(Rig::kBase, kKernelRam);
     cpu.mapRam(kHeap, kHeapBytes);
-    cpu.mapRam(kRam, kRamBytes);
-    cpu.write(kBase, img.data(), img.size());
-    if (cpu.rd32(kVbrWord) != kBase) {
+    cpu.write(Rig::kBase, img.data(), img.size());
+    if (cpu.rd32(kVbrWord) != Rig::kBase) {
         why = path + " isn't rom.1: its reset code doesn't set VBR to 0x88000000";
         return false;
     }
@@ -62,8 +60,14 @@ bool Vc2KernelRig::load(const char* rom4, std::string& why) {
     cpu.write(cpu.rd32(kDataTo), data.data(), data.size());
     for (const auto& [from, to] : kBss)
         for (uint32_t a = cpu.rd32(from); a < cpu.rd32(to); a += 4) cpu.wr32(a, 0);
-    for (uint32_t e = kOwnTasks; e < kOwnTasksEnd; e += 20) own.push_back(cpu.rd32(e + 4));
-    for (const uint32_t a : { kTimerSetUp, kTimerAck, kLoadContext }) cpu.hook(a, answerNothing);
+    for (uint32_t e = Rig::kOwnTasks; e < Rig::kOwnTasksEnd; e += 20) own.push_back(cpu.rd32(e + 4));
+    return true;
+}
+
+bool Vc2KernelRig::load(const char* rom4, std::string& why) {
+    if (!vc2LoadKernel(cpu, rom4, own, why)) return false;
+    cpu.mapRam(kRam, kRamBytes);
+    for (const uint32_t a : { kTimerSetUp, kTimerAck, kLoadContext }) cpu.hook(a, vc2AnswerNothing);
     cpu.hook(kWatchdogStart, [this](Sh4& c) {
         watchdog = true;
         c.ret(0);

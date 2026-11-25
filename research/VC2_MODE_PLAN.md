@@ -1234,6 +1234,21 @@ version against rom.4's routines with what it calls hooked:
          xt_vc2synth's notes part with clock events (HARDWARE_FIRMWARE.md, "The part's clock and tempo timers"). Next:
          the part's tasks on Vc2Kernel (the audio, clock, notes and update tasks at their levels; the 1 ms tick with
          the update task's alarm and cyclic handler and the clock's ms; the block's DMA), then the whole check.
+       - [x] The part's tasks on the kernel (v355), Vc2Synth whole done: the part on its OS model
+         (`Vc2Synth::runOnOs`; `Vc2SynthOs`, the four tasks, the MIDI input task, the OS MIDI task and the front's
+         stand-in on Vc2Kernel at their levels with the idle below, a post's woken task run at once, a sender's pass
+         ending at a post that switches, an interrupt taken with the idle running, a wait inside a pass taking the next
+         outside event; `Vc2SynthOsTasks`, their prologues' and passes' parts, the cyclic handlers, TMU0's handler with
+         the OS clock, the DMA's interrupts, a MIDI message as its bytes' receive interrupts or the front's); the XT's
+         MIDI input path on both sides by the coordinator's call (a) under the 0-different rule (`Vc2MidiReceive`, the
+         receive objects and MIDI IN's 2048-word ring with its full marker; `Vc2OsQueue`; `Vc2SynthOsMidi`, the input,
+         OS MIDI and front tasks, the senders' waits for empty and for room, the drains' wakes); the clock task's MIDI
+         listener and its 0x40 pass (Clock Source, Clock Out, the patch's tempo); the update's walk of the sounding list
+         as it stands, since the notes' task preempts it; a channel state's lookup on a channel of -1. Checked whole
+         against rom.4's own tasks on rom.1's kernel in one interpreter, their prologues and interrupts rom.4's and
+         rom.1's own (`Vc2MachineRig`; xt_vc2synth's whole part, with bursts that fill the notes' queue and floods that
+         fill MIDI IN's ring; HARDWARE_FIRMWARE.md, "The part's tasks on the kernel"). Next: step 5's second half, the
+         plugin's side, which needs it, with the step 4.5 [gap]s below.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
@@ -1341,11 +1356,28 @@ version against rom.4's routines with what it calls hooked:
      init (a note-on), and every sample the OSC gives is NaN, the saw's added to it; with them the tone's mix, COSMs
      and TVA, and the part's bus. Whatever rom.4 does, the plugin must never hand the host a NaN sample: step 4.5 puts
      a guard where the VC-2's audio leaves the part, and the plugin test holds it. Not fixed in v349.
-   - [gap] The MIDI input's start, continue and stop (v354). The MIDI input's real-time byte handler (`0x89313cb0`)
-     posts the clock task 0x40, whose pass then runs `0x89313d50` and `0x89313e10` on its MIDI clock object
-     (`0x8995cc08`); the part's MIDI takes channel messages only, so neither is ported. With them comes Clock Source
-     EXTERNAL's F8 (the object's +0x40 path, ported in the ms but fed nothing). Step 4.5 decides whether the plugin's
-     host transport stands in for them, as XtSynth's does for the V-Synth.
+   - [gap] The MIDI input's real-time bytes (v354; v355). v354 took `0x89313cb0` for their handler; it is the clock
+     task's listener on the OS MIDI's hub, of the parameters' messages, and v355 ports it with the clock task's 0x40
+     pass (`0x89313d50`, `0x89313e10`: Clock Source, Clock Out, the patch's tempo). With Clock Source MIDI the clock
+     object goes on the MIDI IN ring (`0x899598a0`), whose listeners the input task tells each message it takes (its
+     F8's the object's +0x40 path, ported in the ms but fed nothing; start, continue and stop the class's own, not
+     traced); the port's parser drops the real-time bytes, SysEx and system common (v355), and the part's MIDI takes
+     none. Step 4.5 decides whether the plugin's host transport stands in for them, as XtSynth's does for the V-Synth.
+   - [gap] The MIDI out side (v355): USB-MIDI Thru (MIDI IN's messages to USB out instead of the part, USB's to MIDI
+     out as well), the MIDI out task and its flush (cyclic record 8). Nothing drains USB out or MIDI out on the rig,
+     so the whole part keeps Thru off; step 4.5 decides what the plugin does with Thru (most likely nothing: a host
+     has no MIDI out of the part's).
+   - [gap] The front (v355): the whole part's front is a stand-in on entry 12's TCB sending each message the check
+     gives it as the front's are (`0x89314d60`); the front's own task (its panel, its patch loads) is step 4.5's.
+   - [gap] A wait inside a pass, in the plugin (v355). On its OS model the notes' task's wait for a fade (0x1000, the
+     TVA's render posting it in a later block) takes the part's next outside events until the fade ends: the update
+     task's passes, the ticks and the blocks run meanwhile, as on an XT. The plugin hands the part a host block's
+     events and input at once, so a wait reaching past them needs the next host block before the part can go on.
+     Step 4.5 decides: run the part a host block behind the host (the plugin's latency), or let such a wait take
+     the blocks the host block still holds and end the fade at the host block's end. The host's MIDI never makes the
+     host wait (v355): each message goes, as its bytes, into MIDI IN's or USB's receive ring (2048 words,
+     preallocated, as rom.4's row 15 builds it), and a full ring drops its backlog for the full marker, as rom.4's does
+     (`0x89311e90`); the input task's wait for room is the task's own state, not the audio thread's.
 
 ### 5. Against the machine
 

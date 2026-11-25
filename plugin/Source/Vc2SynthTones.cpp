@@ -29,14 +29,18 @@ void Vc2SynthTones::Tone::render(Vc2MixerFrame* frames) { tone().render(&frames-
 
 size_t Vc2SynthTones::walk() {
     size_t n = 0;
-    for (uint32_t at = s_.lists.sounding; at != 0 && n < tasks_.size(); at = s_.tones.at(at).head.next) {
-        Tone& t = tones_[(size_t)s_.tones.indexOf(at)];
-        tasks_[n] = &t;
-        voices_[n++] = &t;
+    for (uint32_t at = s_.lists.sounding; at != 0 && n < voices_.size(); at = s_.tones.at(at).head.next) {
+        voices_[n++] = toneAt(at);
     }
     return n;
 }
 
-std::span<Vc2MixerTone* const> Vc2SynthTones::tasksTones() { return { tasks_.data(), walk() }; }
+Vc2SynthTones::Tone* Vc2SynthTones::toneAt(uint32_t at) {
+    return at == 0 ? nullptr : &tones_[(size_t)s_.tones.indexOf(at)];
+}
+
+Vc2MixerTone* Vc2SynthTones::first() { return toneAt(s_.lists.sounding); }
+
+Vc2MixerTone* Vc2SynthTones::next(Vc2MixerTone* tone) { return toneAt(static_cast<Tone*>(tone)->tone().head.next); }
 
 std::span<Vc2MixerVoice* const> Vc2SynthTones::voices() { return { voices_.data(), walk() }; }

@@ -57,7 +57,7 @@ VC2VOICES=(Vc2PartVoices Vc2PartVoicesTables Vc2PartVoicesCheck Vc2PartVoicesEve
 VC2NOTES=(Vc2Notes Vc2NotesCheck Vc2NotesEvents Vc2NotesFakes)
 VC2KEYS=(Vc2Keys Vc2KeysTables Vc2KeysCheck Vc2KeysEvents Vc2PartNodes Vc2PartNodesCheck)
 VC2MIDI=(Vc2OsMidi Vc2OsMidiHandler Vc2OsMidiTables Vc2KeysTables Vc2OsMidiCheck Vc2OsMidiEvents)
-VC2KERNEL=(Vc2Kernel Vc2KernelRig Vc2KernelCheck)   # v353: rom.1's event services
+VC2KERNEL=(Vc2Kernel Vc2KernelRig Vc2KernelWords Vc2KernelCheck)   # v353: rom.1's event services; v355 its words
 # xt_vc2synth's (v314): every VC-2 port the plugin's build lists but the .p02 reader (v450) and rom.4's own load of the
 # waves and its files (v503), which runs at the start, not in the part (from v345 rom.4's parameter tables and the patch
 # store, which the part reads); then the rom.2 ports they lean on, the shared compares and the check
@@ -67,8 +67,9 @@ while read -r f; do
     [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\)\.cpp$|\1|p' "$REPO/plugin/Vc2Sources.cmake")
 VC2SYNTH+=(Vc2SynthCheck Vc2SynthReadsCheck Vc2SynthLoadCheck Vc2SynthNotesCheck Vc2SynthTasksCheck Vc2CheckWords
-           XtLfo XtEnvelope XtCosm XtOsc XtExtIn XtLitePlayer XtAnalog XtFxValueText XtTempoTicks)   # v345:
-           # harnessParts adds the store's, firmware's; v351 the tasks' steps' file; v354 the tempo ticks
+           XtLfo XtEnvelope XtCosm XtOsc XtExtIn XtLitePlayer XtAnalog XtFxValueText XtTempoTicks
+           Vc2SynthWholeCheck Vc2KernelRig Vc2KernelWords Vc2MachineRig)   # v345: harnessParts adds the store's,
+           # firmware's; v351 the tasks' steps' file; v354 the tempo ticks; v355 the whole part on rom.1's kernel
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
          Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck

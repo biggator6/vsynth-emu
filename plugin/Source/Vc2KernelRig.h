@@ -10,6 +10,12 @@
 #include <utility>
 #include <vector>
 
+// v355: rom.1 from beside rom.4 into an interpreter (its image, .data and .bss by its start-up's words, its RAM mapped);
+// its own tasks' TCBs into `own`; false, `why` saying so, when it can't be
+bool vc2LoadKernel(Sh4& cpu, const char* rom4, std::vector<uint32_t>& own, std::string& why);
+// A hook that answers 0 and returns (v355: the two rigs')
+inline void vc2AnswerNothing(Sh4& c) { c.ret(0); }
+
 struct Vc2KernelRig {
     // [FW] rom.1's words and routines (research/tools/kernelmap.py and HARDWARE_FIRMWARE.md, "rom.1, the kernel")
     static constexpr uint32_t kBase = 0x88000000u;       // its reset code's VBR

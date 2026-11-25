@@ -51,17 +51,14 @@ struct NotesCounts {
 
 // A message drawn, and its word: its status's class by kind, its data, its source; the parameters' messages a word of
 // a kind 0…13 (3, the system's, with Out DC cut, one time in four) and its second byte (0 half the time)
-struct Drawn {
-    Vc2MidiMessage m;
-    uint32_t word = 0;
-};
-Drawn messageDrawn(std::mt19937& rng, NotesCounts& n, uint8_t receiving) {
+using Drawn = Vc2SynthDrawn;   // v355: shared with the whole part
+Drawn messageDrawn(std::mt19937& rng, uint8_t receiving) {
     const size_t kind = kKindByDraw[rng() % kKindByDraw.size()];
-    ++n.byKind[kind];
     const uint8_t channel = rng() % 8 == 0 || kind >= kWordFrom ? (uint8_t)(rng() % 16) : receiving;
     const uint8_t key = (uint8_t)(57 + 3 * (rng() % kKeys));
     const uint8_t number = rng() % 4 ? kControllers[rng() % std::size(kControllers)] : (uint8_t)(rng() % 128);
     Drawn d;
+    d.kind = kind;
     d.m.status = (uint8_t)(kClasses[kind] | (kind < kWordFrom ? channel : 0));
     d.m.data1 = kind <= 1 ? key : kind == 2 ? number : (uint8_t)(rng() % 128);
     d.m.data2 = (uint8_t)(rng() % 128);
@@ -172,21 +169,31 @@ constexpr PassWay kPassWays[] = { updateWay, notesWay, blockWay, clockWay };   /
 std::string notesStepEvent(NotesStep& t) {
     const uint32_t pick = t.rng() % kPassOneIn;
     if (pick >= std::size(kPassWays)) {
-        return partMidiEvent(t.fw, t.s, messageDrawn(t.rng, t.n, receivingOf(t.s)), t.posts);
+        const Drawn m = messageDrawn(t.rng, receivingOf(t.s));
+        ++t.n.byKind[m.kind];
+        return partMidiEvent(t.fw, t.s, m, t.posts);
     }
     ++t.n.passes[pick];
     return kPassWays[pick](t);
 }
 } // namespace
 
+Vc2SynthDrawn vc2SynthMessageDrawn(std::mt19937& rng, const Vc2Synth& s) { return messageDrawn(rng, receivingOf(s)); }
+
+void vc2SynthRawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw) { rawPut(store, id, zone, raw); }
+
+bool vc2SynthSteered(Vc2Synth& s, std::vector<uint8_t>& bytes, std::mt19937& rng, long& under, long& kept) {
+    robotDepthDrawn(bytes, rng);
+    const bool k = vocoderTypesKept(s, bytes, kept);
+    under += k ? 1 : 0;
+    return k;
+}
+
 long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts) {
     NotesCounts n;
     const auto oneCase = [&](std::mt19937& rng, std::vector<uint8_t>& store) {
         const auto kept = [&s, &n, &rng](std::vector<uint8_t>& bytes) {
-            robotDepthDrawn(bytes, rng);
-            const bool k = vocoderTypesKept(s, bytes, n.kept);
-            n.under += k ? 1 : 0;
-            return k;
+            return vc2SynthSteered(s, bytes, rng, n.under, n.kept);
         };
         std::string d = vc2SynthPatchLoaded(fw, s, store, rng, posts, kept);
         NotesStep step { fw, s, rng, posts, n };

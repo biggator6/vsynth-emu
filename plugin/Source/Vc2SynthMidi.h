@@ -27,6 +27,9 @@ public:
     explicit Vc2SynthMidi(Vc2Synth& s) : s_(s) {}
     // A message as rom.4 takes it: the OS MIDI's handler, then the dispatcher, each on the message and its word
     void message(const Vc2MidiMessage& m, uint32_t word);
+    // v355: the OS MIDI's handler alone, and the dispatcher alone (the notes' task's drain's, on the OS model)
+    void handled(const Vc2MidiMessage& m, uint32_t word);
+    void dispatch(const Vc2MidiMessage& m, uint32_t word);
     // The dispatcher's calls: a channel message by its handler, the parameters' messages, DC cut, all notes off
     void channelMessage(Vc2MidiHandler h, int32_t source, int32_t channel, uint32_t data1, uint32_t data2) override;
     void parameters(uint32_t word) override { s_.settings->parameters(kindOf(word), secondOf(word)); }
@@ -46,7 +49,8 @@ public:
     void osRoutine(uint32_t, uint32_t) override {}                    // the OS's own, not the part's
     uint8_t sysexOn() override { return s_.sysexOn; }
     // v350: the notes' task's pass's calls beyond a channel message
-    void drainQueue() override {}   // no mailbox: `message` dispatches as a message comes
+    // No mailbox: `message` dispatches as a message comes; v355: on the OS model, the mailbox's messages dispatched
+    void drainQueue() override;
     void endedScan() override;
     void reset(int32_t source) override;
     void schedule() override;

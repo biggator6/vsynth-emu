@@ -897,11 +897,12 @@ xt_vc2midi: 0 different
 kernel: 40 cases, 8000 services, 576 switches
 xt_vc2kernel: 0 different
 == xt_vc2synth
-synth: the start, 98 of rom.4's initializers, 150 regions and the vocoder compared
+synth: the start, 99 of rom.4's initializers, 167 regions and the vocoder compared
 synth: 24 tones made through the part's hosts, their words compared, then given back
 synth load: the task's start, 16 cases (16 with a store), 320 events: 90 part reads, 79 dispatchers, 69 messages, 82 part messages
 synth notes: 16 cases, 640 events: 153 note-ons, 87 note-offs, 52 controllers, 20 bends, 17 poly pressures, 25 pressures, 19 programs, 36 parameters', 14 the part's, 19 resets, 55 update passes, 46 notes' task's passes, 49 blocks (13 sounding, 0 not finite), 48 clock events (16 schedules); 161 voiced; 6 patches under a VOCODER's tone, 3 Types kept
-synth reads: 1 cases, 40 events: 15 memory reads, 150 readers, 6 getters, 4 sums, 600 placements; 0 bytes no region holds
+synth reads: 1 cases, 40 events: 16 memory reads, 60 readers, 10 getters, 8 sums, 600 placements; 0 bytes no region holds
+synth whole: the start on both OSes; 16 cases on 1 pairs, 1920 events: 3409 blocks (2473 ticks, 217 sounding), 4171 messages (1 bursts, 1 floods); 10 waits in a pass, 0 cut; 1 patches under a VOCODER's tone, 1 Types kept; on rom.1 23958 contexts loaded, 191 suspends, 10588 semaphore waits; the senders' 9 waits for room, 231 for empty; markers 0 0 1 0 3
 xt_vc2synth: 0 different
 == xt_vc2patch
 sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)

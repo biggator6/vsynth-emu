@@ -335,6 +335,31 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's tasks on the kernel v355 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v354's b306173;
+  HARDWARE_FIRMWARE.md, "The part's tasks on the kernel"); Vc2Synth whole done. Vc2SynthOs (the audio, clock, notes
+  and update tasks, the MIDI input task, the OS MIDI task and the front's stand-in on Vc2Kernel at their levels, the
+  idle below; a post's woken task run at once, a sender's pass ending at a post that switches, interrupts with the
+  idle running, a wait inside a pass taking the next outside event) and Vc2SynthOsTasks (their prologues' and
+  passes' parts, the cyclic handlers, TMU0's handler with the OS clock, the DMA's interrupts, a MIDI message as its
+  bytes' receive interrupts or the front's), Vc2Synth::runOnOs. The XT's MIDI input path on both sides, the
+  coordinator's call (a) under the 0-different rule: Vc2MidiReceive (rom.4's receive objects; MIDI IN's ring is
+  0x8995662c+0x40, 2048 words, full it drops its backlog for marker 2, 0x89311e90), Vc2OsQueue (a hub listener's
+  queue, the notes' 127 messages), Vc2SynthOsMidi (the input, OS MIDI and front tasks, the hub's and the MIDI IN
+  ring's listeners, the senders' waits for empty and room as state, the drains' wakes). The clock task's MIDI listener
+  (0x89313cb0, v354 took it for the real-time bytes) and its 0x40 pass (Clock Source, Clock Out, the tempo); the
+  update's walk of the sounding list as it stands (Vc2MixerTones), since the notes' task preempts it. Found: a
+  truncated tone that never renders makes the notes' task wait for good, on rom.4 too (the check cuts such a wait and
+  goes on with a fresh pair); a channel of -1 reads the word before the states table (0x8950d6dc); USB-MIDI Thru sends
+  MIDI IN to USB out, which nothing drains on the rig (kept off). xt_vc2synth's whole part: a fresh pair against
+  rom.4's tasks on rom.1's kernel in one interpreter (Vc2MachineRig: rom.1's switch with three hooks, rom.4's start
+  and prologues, the idle's first hook releasing the start's barrier, the front's stand-in), the kernel's words
+  (Vc2KernelWords, shared with xt_vc2kernel), the services the model holds as nothing and the senders' waits counted
+  on rom.1, bursts that fill the notes' queue and floods that fill MIDI IN's ring; 0 different at 2024/7/31337/3/4/5
+  (40 cases), 160 to 368 waits for room each. Plants: --synth --changed 229, 223 caught (the three tempo plants
+  caught; missed the sensing check's two, a full ring's count, the draining test, the word before the channel
+  states, tns-count: none reachable by the draws); --mixer 45, --keys 6, --settings 31 changed, all caught; --kernel
+  whole 42, all caught but kn-rr-freeze (v353). fcheck's baseline updated; verify.sh green.
+
 The part's clock and tempo timers v354 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v353's 5ef5045;
   HARDWARE_FIRMWARE.md, "The part's clock and tempo timers"): found, the clock object 0x8995cb40 is built by rom.4's
   row 20 (0x893133d0), which the part's start didn't run (its copy 0; C's tempo read zeros): now 120 BPM as on an XT.

@@ -1546,6 +1546,280 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's tasks on the kernel (2026-11-24, v355) {#vc2-synth-os}
+
+Step 4.3's eighty-third version, Vc2Synth whole's fifteenth and last. The part runs on its OS model, and is checked
+whole against rom.4's own tasks on rom.1's kernel in one interpreter: the part's four, and the XT's MIDI input path
+with them (the input task, the OS MIDI task, and a stand-in for the front), their prologues, passes and interrupts
+rom.4's and rom.1's own. This is the third condition of the user's "Load rom.1" (2026-11-24, recorded with v352). The
+MIDI input path is in it by the coordinator's call, below.
+
+**rom.4's main** (`0x89300040`), after its C start-up, calls:
+1. `0x89301730`: its tables of the kernel's semaphores' and cyclic records' addresses (`0x8992e208`, `0x8992e1e8`).
+2. The static initializers (`0x895063fc`).
+3. `0x89300b90`: the idle task's hook (its handler 12) set to `0x89300ba0`.
+4. The task start `0x89301790` (v352).
+
+**The start's barrier.** Each task's prologue registers the running task (`0x89300ab0`: the table `0x8994fc4c`, its
+count at `0x8994fd4c`), sets itself up, and waits on 0x8000 (`0x89300b10`) until the count is 0 again. The idle task's
+first hook (`0x89300ba0`) waits for every registered task to arrive, then gives each 0x8000 in turn; each, above the
+idle, runs on at once to its loop's wait. Then it clears the count and makes the hook `0x89300c00`, the system's save
+to flash: once a second, `0x89319b40` compares the system record (`0x8995cc14`, 46 bytes) with its copy
+(`0x89960fc0`), and saves it (`0x893445b0`, under semaphore 12) once it has stayed the same for a second. That is the
+OS's, not the part's.
+
+**The prologues**, the port's part of each beside rom.4's:
+- audio (`0x89395ac0`): the DMA's handlers 6 and 7 (`0x89395cf0`, `0x89395d50`, through the kernel's slot 36). After
+  the barrier: the DMA's set-up (`0x89395fe0`: both buffers and `0x89989d00` zeroed, the DMA controller's two
+  channels at `0xffa00000`), then the mixer's reset (`0x893b1680`), the port's.
+- clock (`0x89313c00`): its MIDI listener `0x8995cc08` on the OS MIDI's hub (`0x89961238`, by `0x893111b0`), and TMU0's
+  application handler 1 (`0x89313be0`).
+- notes (`0x8938fc00`): v350's start, then its listener `0x8998190c` on the hub. After the barrier: its own alarm off,
+  the schedule armed (v354).
+- update (`0x893952b0`): once, by `0x8993d08c`. After the barrier: cyclic record 10 (its handler `0x893952a0` every 10
+  ticks), the update queue's +0x1c (its own TCB) and +0x20 (semaphore 6), its own alarm every 10 ticks.
+- MIDI input (entry 1, `0x89311a30`, TCB `0x8994fd90`, level 1): its prologue `0x89311970`, below.
+- OS MIDI (entry 6, `0x89314ce0`, TCB `0x8994fe94`, level 12): its listener `0x8995cca0` on the hub; its loop drains
+  its queue on 2 into the OS MIDI's handler (`0x89314e90`, v313).
+- the front's stand-in, on entry 12's TCB (`0x8994ffcc`, level 27), its code `0x89300220` hooked: each message the
+  check gives it is sent as the front's are (`0x89314d60`: the wait for the OS MIDI task's queue to empty, then the
+  hub's listeners), else a wait on 1. The front's MIDI on (`0x8942d6b0`'s `0x8931a590`) runs from the idle at the start.
+
+**The hub's tell** (`0x89311250`) calls each listener on the hub's ring from its head, through its class's +0x14
+method (the class's +0xc its this-delta). The ring holds the MIDI out side's listener, the clock task's, the OS MIDI
+task's and the notes'.
+
+**v354's note that `0x89313cb0` takes the MIDI input's start and stop bytes was wrong.** It is the method of the
+clock task's listener (class `0x898c82b8`, set by row 21, `0x89313e70`, which the check's start now runs). It posts
+the clock task 0x40 on the parameters' message 0x40 of kind 4 or 6, or 0x41 of kind 0 (the word's low byte). On
+0x40 the clock task runs two routines:
+- `0x89313d50`, by System B's Clock Source (ID 0x43). INT takes the clock object off the MIDI clocks' ring
+  (`0x899598a0`, by `0x89311200`) if it is on it, and +0x40 to 0. MIDI puts it on (by `0x893111b0`, the object's +0 and
+  +4 its links) if it isn't, with +0x40 1, +0x41 −1, +0x46 0, +0x48 125 and +0x4a 0. Then, while +0x40 is clear,
+  Clock Out (ID 0x44) into +0x4c.
+- `0x89313e10`: while +0xe is clear, the quarter's ms (+0x14) becomes 20 × 3000 / (Patch Tempo / 10). The tempo (ID
+  0x13a) is in 0.1 BPM, 200 to 2500, so the divide (`0x89505db8`) never meets 0.
+
+v354 called `0x899598a0` the MIDI clocks' ring. It is the MIDI IN ring, below: the clock object is on it while the
+clock comes from outside. The real-time bytes, SysEx and system common are dropped by the port's parser, and the
+part's events carry none ([gap] in VC2_MODE_PLAN.md, step 4.5).
+
+**The interrupts** come with the idle running:
+- TMU0 (`0x8800ea30`): the kernel's tick, then the application's handler 1 while `0x880f21b4` is set;
+- the input's DMA (handler 6): its buffer index (`0x89989cf4`) turned, the audio task 4;
+- the output's (handler 7): while the audio task's object isn't busy (`0x8998a480` + 0x28), busy, its buffer index
+  (`0x89989cf0`) turned, the audio task 2 and `0x8993d090` cleared; else +0x2c counts a block missed; +0xc counts
+  each;
+- a MIDI byte on MIDI IN or USB: the parser on its receive object (below), each byte its own interrupt.
+
+TMU0's tick also runs the kernel's due cyclic handlers: the update task's (record 10), the sensing check (record 7,
+`0x89311330`) and MIDI out A's flush (record 8, `0x893115e0`, the MIDI out's, nothing in the port).
+
+Each is followed by the watchdog's interrupt (`0x8800fb60`) when started. The OS clock (`0x893018d0`) is the
+kernel's sysTime. An EXT IN render's loop (`0x893c62f0`) reads one word past the input's second buffer, in its last
+delay slot, and never uses it.
+
+**The context switch** (`0x88011c30`, then `0x88010fe0`) saves the running task's context on its own stack, with +0x2c
+the frame: sr, pr as the context's pc, r14…r8, pr, macl, mach, gbr, fpscr and fr15…fr12. The loads (`0x88010fb6`,
+`0x88011008`) pop them back and end `ldc.l @r15+,spc; ldc.l @r15+,ssr; rte`. The interpreter has no `stc.l sr`, no
+`ldc.l` into spc or ssr, and no rte. So the rig runs those in hooks at `0x88010fe0`, `0x88010fd8` and `0x88011028`,
+and the rest is rom.1's own.
+
+**The MIDI input path, on both sides: the coordinator's call.** The notes' task's waits for a fade let MIDI pile up in
+front of it. On an XT that MIDI waits in the OS's own rings and queues, with their own limits, and a port without them
+can't stay 0 different once they fill. So the coordinator chose (a): model the XT's MIDI input path on both sides,
+under CLAUDE.md's rule that a port is done at 0 different in its harness. The user can overturn it. On the machine the
+input task and the OS MIDI task run as tasks at their levels on rom.1's switch, and the front's messages come from the
+stand-in. The port runs the same tasks on its model.
+
+**The receive objects** (0x2244 bytes, rows 14, 15 and 18): MIDI IN's `0x8995662c` (source 1, the input task's event
+2), USB's `0x899598b0` (source 2, event 4), and a second USB port's `0x899543e8` (source 6, entry 5's event 0x400,
+whose task never runs). Each holds:
+- +0 enabled (by the front's MIDI on), +4…+7 the message being built (status, data, data, source), +8 its length,
+  +9 the bytes so far;
+- +0xa an active sensing seen, +0xc a byte since the sensing check, +0xd the running status, +0xe the source, +0xf
+  the phase;
+- +0x10 the task and +0x14 its event;
+- its ring of 0x800 words at +0x40: +0x18 start, +0x1c end, +0x20 the last read, +0x24 the last written;
+- the SysEx buffer (+0x2c, 0x200 bytes) and its class (+0x3c).
+
+**MIDI IN's ring**, the buffer in front of the input task, is receive object A's: `0x8995662c` + 0x40, 2048 words, so
+2047 messages. (`0x899598a0`, which the coordinator named, is the MIDI IN ring of listeners, below.) The receive
+interrupt gives each byte to the parser (`0x893123b0`, through the class's +0x38, `0x893113a0`):
+- A status byte from 0x80 starts a message. Its length comes from `0x8950cff8` (2 for 0xc0 and 0xd0, else 3), the
+  source goes in +7, and it becomes the running status. A data byte with no status is dropped.
+- A whole message goes into the ring at the last written + 4, wrapping at the end, and the input task is given its
+  event (iset, `0x89301840`).
+- When that slot is the last read, the ring is full. Then `0x89311e90` puts a marker (0xfd, code 2, the source) at the
+  last read + 4 instead, which drops every message still waiting (the backlog). It clears the running status, the
+  sensing flag and the mark, and gives the input task its event. The message that found the ring full is lost, and
+  its count is not reset.
+- `0x89311f40` is the same marker, put from a task (set, `0x89301830`).
+
+The take (`0x893122d0`) gives a marker as the reset 0x70, with its code in data 1 and the word's low byte 0. A marker's
+codes are 0 a receive error, 1 an active sensing's timeout (the check `0x893125e0`, cyclic record 7 every 512 ticks,
+on the object `0x8992e33c` names), 2 the ring full, and 4 the MIDI settings changed. Nothing on the way stalls the
+sender: the interrupt never waits, and a full ring drops.
+
+**The input task** (wait mask 0xe):
+- On 2 it takes each of MIDI IN's messages and tells it on the MIDI IN ring (`0x899598a0`, by `0x89311250`). With
+  USB-MIDI Thru on (`0x8992e344` = 2) it sends each to USB out instead (`0x89312790` on `0x8995bb10`).
+- On 4 it takes USB's, tells each, and with Thru on sends each to MIDI out too (`0x89958870`).
+- On 8 it runs the MIDI settings (`0x89311ca0`). The sensing check moves to the second USB port's object, the object
+  it watched given marker 4 the first time. USB-MIDI Thru (System B's ID 0x7d) goes into `0x8992e344` (2 on, 3 off),
+  and a change of it gives marker 4 to both USB ports. ID 0x80 goes into `0x8992e340`. Then `0x89311d10` puts
+  System's 0x9e into MIDI out A's +6, the MIDI out's.
+
+Its prologue (`0x89311970`) links the MIDI out side's listener (`0x899598a4`) on the hub and makes cyclic records 7
+(the sensing check, every 0x200 ticks) and 8 (MIDI out A's flush, every 0x100).
+
+**The MIDI IN ring** (`0x899598a0`, row 17) holds the listeners every message the input task takes is told: the hub's
+node (`0x8996123c`, linked once by the MIDI on), and the clock object (`0x8995cb40`) while the clock comes from outside
+(its method `0x893133c0`, a bare return). The hub's node's method (`0x89314d30`) waits until the OS MIDI task's queue
+is empty (`0x89311070`: while it is draining or not empty, a record on its list and a wait on 0x8000), then tells the
+hub.
+
+**The hub** (`0x89961238`, row 30, `0x8931a5d0`) is its ring's head, its node, its node's class (`0x898c82f4`), +0x10
+the node linked, and its class (`0x898c82dc`). The system's store object follows it at `0x89961250`. Its listeners:
+- the MIDI out side's (`0x89311c30`): 0x40 of kinds 4 or 5 posts the input task 8;
+- the clock task's (`0x89313cb0`, v354's note corrected below);
+- the OS MIDI task's (`0x8995cca0`, `0x89314db0`): the classes 0x01, 0x70 and 0xa0…0xe0, and 0x40 of kinds 0, 4 and 5,
+  sent to its queue, event 2;
+- the notes' (`0x8998190c`, `0x893901b0`): 0x01, 0x40, 0x41, 0x70, 0x72 and 0x80…0xe0, its owner set to the notes'
+  TCB, then sent, event 2.
+
+**A listener's queue** is 0x34 bytes of words, then its ring: the OS MIDI task's 0x400 words, the notes' 0x80, so 127
+one-word messages. Its words: +0xc start, +0x10 end, +0x14 the last read, +0x18 the last written, +0x24 the waiters'
+records, +0x28 the owner, +0x2c draining, +0x30 the handler's class. A message is one word with a status above 0x6f,
+else two (the parameters' messages).
+- The send (`0x89310fb0`) puts it and posts the owner the event. With no room it waits (`0x89310e70`: its record on
+  the queue's list, a wait on 0x8000 until a drain's end clears it) and tries again.
+- The drain (`0x893110b0`) marks the queue draining and gives each message to the handler. Then it clears the mark and,
+  with the dispatch locked out (`0x89301880`), gives every waiter 0x8000 and clears its record, the latest first, and
+  lets the dispatch in (`0x89301890`).
+
+**USB-MIDI Thru** sends MIDI IN to USB out and USB to MIDI out. Neither out is drained on the rig (the MIDI out task's
+work, not the part's: [gap]), so a flood with Thru on makes the input task's send to USB out loop on rom.1's service
+at `0x88008930` for good. The check keeps Thru off: the system drawn for a patch has it 0 (`vc2SynthPatchGiven`'s
+`offId`).
+
+**Found: a wait that never ends, on rom.4 as in the port.** The notes' task waits on 0x1000 for the fade of a tone it
+truncates (`0x893b3bc0`), which the TVA's render posts when the fade ends. The part mixer's walk (`0x893b1820`) renders
+a tone only as a carrier (its TVA's level above 0) or, when the tone isn't held, while its tail's render word
+(+0x1b34) is set. A tone with neither never renders, so its fade never moves and the notes' task waits for good. At
+seed 31337, 600 events into such a wait, rom.4's notes' TCB still waits on 0x1000 with the idle running. The check cuts
+a wait at 6,000 events, compares both inside it, and goes on with a fresh pair.
+
+**Found: a channel of -1.** The notes' task plays its own messages (the held note, the poly pressure) on the Auto Note
+node's channel, which a patch can leave at -1. A channel state's lookup (`vc2ChannelStateOf`) then reads the word
+before its row's 16; for row 0, the word before the table, `0x8950d6dc` (the sources' last row byte and padding). The
+port read past its array there. It now reads that word (`Vc2KeysTables::stateBefore`).
+
+**Found by the check: the update's walk.** A tone that ends in the update's pass posts the notes' task 4, and the
+notes' task runs at once, inside the update's pass. The end is `0x893b4940`: state 4, the pool's lock let go, then the
+tone's ended routine, which posts through `0x893901a0`. The notes' ended scan then changes the sounding list. The
+update's loop (`0x893b16d2`) reads a tone's next before its update, and the schedule's (`0x893b1742`) reads it after
+its count. The port's mixer had walked a list taken before the loop. It now walks the list as it stands
+(`Vc2MixerTones`), reading each next where rom.4 does.
+
+**A wait inside a pass.** The notes' task waits for a fade on 0x1000, which the TVA's render posts in a later block.
+Meanwhile the update task's passes, the interrupts and the blocks run on. The port's model runs such a wait by taking
+the next outside event (a block, a message) with the idle running, the waiting task's pass below on the C++ stack,
+until the kernel runs that task again. One C++ stack can't resume a task while another waits inside a pass below
+it. On an XT the front, mid-tell, is preempted by the notes' task it posts, which then waits for a fade while the front
+goes on. So the senders keep their place as state: a post of theirs that switches ends their pass there, the task
+ready, and its next run goes on from it. No sender's pass is then below another task's. The model says when it can't
+go on (`stuck()`: only where the check cuts a wait), and from then on makes no kernel call.
+
+**What the model holds as nothing.** The rig counts these on rom.1, so the check holds the claim:
+- the semaphores (the pool's lock `0x880f3db4`, the update queue's 6; `0x880104e0`, `0x880106c0`): no wait finds one
+  that another task holds;
+- the update task's suspend and resume of the notes' task around C's refresh (`0x893018e0`, `0x893018f0`: `0x88010370`,
+  `0x880103d0`): no event is set on it while it is suspended;
+- the task restart (`0x893018a0`: `0x88010ae0`), the update queue's move on given its task: never reached.
+
+Outside the part, answered 0 as before: the OS's timer queue (`0x893004a0`, `0x89300640`), the OS's routines the 0x40
+and 0x01 messages run, and the MIDI clock out. The audio task's other work runs on rom.4's side and touches no word
+of the part: the meter's copy and meter, the output's conversion to int and its copy to the DMA's buffer, and the
+stereo source.
+
+**The port** (`Vc2Synth::runOnOs`): `Vc2SynthOs` holds the seven tasks on Vc2Kernel at their levels, with the idle
+below. A task's first run is its prologue's part, and each run after it a pass on what its wait took, the pass saying
+what it waits on next. A post's woken task runs at once, until the poster runs again, but a sender's post ends its
+pass (`kGivesWay`). An interrupt's end runs the woken tasks to the idle. The dispatch is locked out and let in around
+a drain's wake. `Vc2SynthOsTasks` holds those parts on the part:
+- the prologues' parts, and the audio task's passes (4: the mixer's input at the buffer just filled; 2: the block,
+  then not busy);
+- the cyclic handlers (the update task's, the sensing check), and TMU0's handler (the OS clock, then the clock's ms);
+- the DMA's two interrupts, after a block's ticks (frames × 1000 against 44,100);
+- a message: a channel message on MIDI IN or USB as its bytes, each its receive interrupt (two for 0xc0 and 0xd0, else
+  three); any other the front's to send.
+
+`Vc2MidiPath` holds the MIDI path's memory at rom.4's addresses: the three receive objects, the MIDI IN ring, the out
+listener, the hub, the clock task's listener, the OS MIDI task's and the notes' queues, and the words at `0x8992e33c`.
+`Vc2SynthOsMidi` runs the input task's, the OS MIDI task's and the front's passes, the notes' drain, the listeners and
+the senders' waits; `Vc2MidiReceive` the receive objects, `Vc2OsQueue` a listener's queue. Nothing on the path blocks
+or allocates: the receive objects' rings and the queues are fixed arrays, as rom.4's are, and a full ring does what
+rom.4's does. The front's stand-in holds at most 2048 messages given it, and the check holds that it never drops one.
+
+**The rig** (`Vc2MachineRig`) is rom.4 (Vc2Fw) with rom.1 beside it (`vc2LoadKernel`, out of v353's rig). The DMA
+controller's, TMU's and the board's pages and the DMA buffers are mapped as RAM. TMU0's set-up and acknowledgement are
+answered, and the watchdog's start and stop kept. Its arrangements:
+- the kernel's start's last context load (into its first own task) answered;
+- the application's state (`0x880f21b4`) 1;
+- rom.4's main's calls but the initializers, which the check's start runs;
+- rom.4's start with its first dispatch put off, then rom.4's tasks but the seven and the kernel's own but its idle
+  off their queues, and curTask the idle;
+- then the first dispatch from the idle, the idle's first hook, and the front's MIDI on (`0x8931a590`) as the idle's
+  call;
+- the front's stand-in, entry 12's code hooked (`0x89300220`), and the senders' waits (`0x89310e70`) and the markers
+  (`0x89311e90`, `0x89311f40`) counted.
+
+Every outside event is then a call of the idle's, which returns once every task waits again: a MIDI byte the parser's
+call on its receive object (`0x893123b0`), a message for the front its stand-in raised.
+
+**The check** (xt_vc2synth's whole part, last, on the seed five after the run's): a fresh pair, each started as main
+starts its own, then each OS's tasks to their first waits, and the front's MIDI on. Then 16 to 40 cases, each a patch
+given from the idle task (the load's steps, USB-MIDI Thru kept off) and 120 events: a block two times in three (its
+ticks, the input's interrupt with drawn frames, the output's), else a MIDI message as the notes part draws it. The
+model takes the events from one list, a wait inside a pass taking the next, and the machine is then given each it
+took. The check's own bounds, no firmware's:
+- inside such a wait, one time in four, a burst of 130 to 429 channel messages on MIDI IN or USB, more than the notes'
+  queue holds, so the input task waits for room;
+- a pair's first burst a flood of 2,100 to 2,399 on MIDI IN, more than its receive ring holds, so the ring fills and
+  takes the full marker;
+- a wait longer than 6,000 events cut there, both compared inside it, the next case a fresh pair's.
+
+After each event: every region (the MIDI path's with it, a queue's waiters' word left out: their records are on the
+tasks' stacks), each tone's words, the kernel's words (the seven tasks', the idle's), the rig's counts, and the
+senders' waits for room and for empty counted on both (the rig's by the hook at `0x89310e70`, by its caller).
+
+Results:
+- xt_vc2synth 0 different at 2024, 7, 31337, 3, 4 and 5 (40 cases each; 2, 2, 2, 1, 1 and 2 pairs, each second pair
+  after a cut wait):
+
+  | seed | blocks | messages | bursts, floods | waits in a pass | waits for room | for empty | full markers |
+  |---|---|---|---|---|---|---|---|
+  | 2024 | 32,846 | 23,931 | 21, 1 | 66 | 166 | 3,653 | 1 |
+  | 7 | 40,340 | 31,736 | 26, 2 | 105 | 243 | 5,299 | 2 |
+  | 31337 | 27,144 | 20,094 | 14, 1 | 81 | 160 | 3,277 | 1 |
+  | 3 | 51,348 | 37,666 | 37, 1 | 167 | 368 | 6,729 | 1 |
+  | 4 | 45,993 | 33,449 | 27, 1 | 99 | 312 | 6,119 | 1 |
+  | 5 | 45,098 | 34,537 | 26, 2 | 84 | 287 | 5,870 | 2 |
+
+  The waits for room are the input task's sends into the notes' full queue, each counted on rom.4 by its call of
+  `0x89310e70` from the send (`0x89310fb0`), and the same on the port. On rom.1 the semaphore waits (153,343 at 2024)
+  and suspends (3,676) change nothing.
+- Plants, `--synth --changed`: 229, 223 caught. The three tempo plants v355 had left (clk-tempo-sync, clk-tempo-scale,
+  syn-patch-part) are caught with Patch Tempo steered into its range. Missed, each for what the draws can't reach: the
+  sensing check's call and its mark's clear (it watches the second USB port's object from the first parameters'
+  message, and that object takes no bytes), a full ring's count (only a running status shows it), the wait for
+  empty's draining test, the word before the channel states (no listener hears a state's notify), and tns-count
+  (v351). `--mixer --changed` 45, `--keys --changed` 6 and `--settings --changed` 31, all caught; `--kernel` whole
+  (its check's words moved to Vc2KernelWords) 42, all caught but kn-rr-freeze, as in v353.
+- fcheck: xt_vc2synth's lines (99 initializers, 167 regions, the reads part's draws with them, the whole part's line),
+  the baseline updated; every other check as it was.
+
 ### The part's clock and tempo timers (2026-11-24, v354) {#vc2-synth-clock}
 
 Step 4.3's eighty-second version, Vc2Synth whole's fourteenth. The part now has rom.4's tempo clock and its timers,

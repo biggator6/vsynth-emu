@@ -37,6 +37,20 @@ private:
     std::vector<MixCall>* log_;
 };
 
+// v355: the port's tones as a list, linked in their order as rom.4's are (none of their calls changes it)
+class TasksPortList final : public Vc2MixerTones {
+public:
+    explicit TasksPortList(std::vector<TasksPortTone>& tones) : tones_(tones) {}
+    Vc2MixerTone* first() override { return tones_.empty() ? nullptr : &tones_.front(); }
+    Vc2MixerTone* next(Vc2MixerTone* tone) override {
+        const auto k = (size_t)(static_cast<TasksPortTone*>(tone) - tones_.data()) + 1;
+        return k < tones_.size() ? &tones_[k] : nullptr;
+    }
+
+private:
+    std::vector<TasksPortTone>& tones_;
+};
+
 class TasksPortParts final : public Vc2MixerTaskParts {
 public:
     explicit TasksPortParts(std::vector<MixCall>& log) : log_(log) {}
@@ -92,15 +106,14 @@ std::string tasksEvent(TasksSides& t, std::mt19937& rng) {
     t.fw.cpu.write(kWordsAt, &w, sizeof w);
     std::vector<TasksPortTone> tones;
     for (int k = 0; k < count; ++k) tones.emplace_back(k, t.mine);
-    std::vector<Vc2MixerTone*> span;
-    for (TasksPortTone& tone : tones) span.push_back(&tone);
+    TasksPortList list { tones };
     t.rom.clear();
     t.mine.clear();
     TasksPortParts parts { t.mine };
     const bool update = rng() % 2 != 0;
     ++t.events;
     if (!t.fw.call(update ? kUpdateAt : kScheduleAt, {})) return "the routine faults: " + t.fw.cpu.error();
-    (t.mixer.*(update ? &Vc2PartMixer::updateTones : &Vc2PartMixer::scheduleTones))(span, parts);
+    (t.mixer.*(update ? &Vc2PartMixer::updateTones : &Vc2PartMixer::scheduleTones))(list, parts);
     const std::string words = vc2RegionsDifference(t.fw, { { kWordsAt, &w, sizeof w, "the mixer's words" } });
     return words.empty() ? mixCallsDifference(t.rom, t.mine) : words;
 }

@@ -2,6 +2,7 @@
 // moved from Vc2SynthCheck.cpp as it stood, with v340's buffers and frames).
 #include "Vc2SynthMemory.h"
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 
 // [FW] every member's place: the whole objects and the tables a field at a time
@@ -79,6 +80,9 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
         vc2SynthRegion(0x8993d034, s.autoNoteKeys, "Auto Note's keys"),
         vc2SynthRegion(0x8993d080, s.ticks, "the ticks"),
         vc2SynthRegion(0x8993d084, s.time, "the time struct"),
+        vc2SynthRegion(0x8993d08c, s.updateStarted, "the update task's start's flag"),   // v355
+        vc2SynthRegion(0x8993d090, s.outputFlag, "the output's interrupt's flag"),       // v355
+        vc2SynthRegion(0x89989cf0, s.dmaBuffers, "the DMA buffers in use"),               // v355
         vc2SynthRegion(0x8993fb48, s.tones.head, "the tone pool's head"),
         vc2SynthRegion(0x8993fb4c, s.tones.serial, "its serial"),
         vc2SynthRegion(Vc2ToneLists::kNewestAt, s.lists.newest, "the newest mark"),
@@ -113,7 +117,37 @@ std::vector<Vc2SynthRegion> vc2SynthRegions(Vc2Synth& s) {
     }
     for (const Vc2System::Area& a : Vc2System::kAreas)   // v347: the system's three areas
         out.push_back({ a.at, s.system.bytes.data() + a.from, (size_t)a.size, a.what });
+    vc2SynthMidiRegions(s.midiPath, out);   // v355
     return out;
+}
+
+namespace {
+// A queue's words but its waiters' word (their records are on their tasks' stacks; the port's are Vc2SynthOsMidi's)
+// and its ring
+template <size_t Words>
+void queueRegions(uint32_t at, Vc2OsQueue<Words>& q, const char* what, std::vector<Vc2SynthRegion>& out) {
+    constexpr size_t kWaiters = offsetof(Vc2OsQueueWords, waiters), kOwner = offsetof(Vc2OsQueueWords, owner);
+    auto* w = reinterpret_cast<uint8_t*>(&q.w);
+    out.push_back({ at, w, kWaiters, what });
+    out.push_back({ at + (uint32_t)kOwner, w + kOwner, sizeof q.w - kOwner, what });
+    out.push_back({ at + (uint32_t)sizeof q.w, q.ring.data(), sizeof q.ring, what });
+}
+} // namespace
+
+// [FW] v355: the MIDI input path's (Vc2SynthOsMidi.h), each at its own address
+void vc2SynthMidiRegions(Vc2MidiPath& p, std::vector<Vc2SynthRegion>& out) {
+    using P = Vc2MidiPath;
+    out.push_back(vc2SynthRegion(P::kMidiInAt, p.midiIn, "MIDI IN's receive object"));
+    out.push_back(vc2SynthRegion(P::kUsbAt, p.usb, "USB's receive object"));
+    out.push_back(vc2SynthRegion(P::kUsb2At, p.usb2, "the second USB port's receive object"));
+    out.push_back(vc2SynthRegion(P::kRingAt, p.ring, "the MIDI IN ring"));
+    out.push_back(vc2SynthRegion(P::kOutAt, p.out, "the MIDI out listener"));
+    out.push_back(vc2SynthRegion(P::kHubAt, p.hub, "the hub"));
+    out.push_back(vc2SynthRegion(P::kClockAt, p.clock, "the clock task's listener"));
+    queueRegions(P::kOsMidiAt, p.osMidi, "the OS MIDI task's queue", out);
+    queueRegions(P::kNotesAt, p.notes, "the notes' task's queue", out);
+    // the words from 0x8992e33c (0x8992e338 not the path's)
+    out.push_back({ P::kWordsAt + 4, reinterpret_cast<uint8_t*>(&p.words) + 4, sizeof p.words - 4, "the MIDI words" });
 }
 
 Vc2SynthMemory::Vc2SynthMemory(Vc2Synth& s) : regions_(vc2SynthRegions(s)) {

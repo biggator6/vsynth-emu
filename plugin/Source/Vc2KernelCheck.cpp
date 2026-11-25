@@ -9,6 +9,7 @@
 #ifdef XT_VC2KERNEL_MAIN
 #include "Vc2Kernel.h"
 #include "Vc2KernelRig.h"
+#include "Vc2KernelWords.h"   // v355
 #include "XtArgs.h"
 #include "XtSwitches.h"
 #include <array>
@@ -29,72 +30,14 @@ constexpr uint16_t kIntervals[] = { 0, 1, 2, 3, 5, 10 };
 constexpr uint32_t kLockOutBit = 0x80000000u;
 constexpr uint32_t kNoSpec = 0xffffffffu;   // [FW] the maker's spec that clears its record (0x88010830)
 
-// One word of the state, by what it is and whose, as either side gives it
-struct Word {
-    const char* what;
-    int whose;
-    int64_t value;
-    bool operator==(const Word&) const = default;
-};
-
-int64_t freezeOf(uint32_t a) { return a == 0xffffffffu ? -1 : Rig::task(a); }
+// v355: the words compared are Vc2KernelWords.h's (moved there as they were), the check's TCBs and handlers by its
+// rig's places
+int64_t taskOf(uint32_t a) { return Rig::task(a); }
 int64_t handlerOf(uint32_t a) { return a == 0 ? -1 : (int64_t)((a - Rig::kHandlers) / 0x10u); }
-
-std::vector<Word> theirs(Rig& rig, int tasks) {
-    Sh4& c = rig.cpu;
-    std::vector<Word> w;
-    for (int t = 0; t < tasks; ++t) {
-        const uint32_t a = Rig::tcb(t);
-        w.insert(w.end(), { { "event", t, c.rd16(a) }, { "wait", t, c.rd16(a + 2) }, { "interval", t, c.rd16(a + 6) },
-                            { "ready", t, c.rd16(a + 0xa) }, { "quantum", t, c.rd8(a + 0xc) },
-                            { "count", t, c.rd8(a + 0xd) }, { "level", t, (c.rd32(a + 0x14) - Rig::kReadyQueue) / 4 },
-                            { "alarmNext", t, Rig::task(c.rd32(a + 0x1c)) }, { "alarmAt", t, c.rd32(a + 0x20) },
-                            { "readyNext", t, Rig::task(c.rd32(a + 0x28)) } });
-    }
-    for (int l = 0; l < Vc2Kernel::kLevels; ++l)
-        w.push_back({ "head", l, Rig::task(c.rd32(Rig::kReadyQueue + 4u * l)) });
-    const uint32_t s = Rig::kSystem;
-    w.insert(w.end(), { { "current", 0, Rig::task(c.rd32(s)) }, { "time", 0, c.rd32(s + 4) },
-                        { "freeze", 0, freezeOf(c.rd32(s + 8)) }, { "lock", 0, c.rd32(s + 0xc) },
-                        { "alarms", 0, Rig::task(c.rd32(s + 0x10)) }, { "roundLevel", 0, c.rd32(s + 0x14) },
-                        { "watchdog", 0, rig.watchdog } });
-    for (int k = 0; k < Vc2Kernel::kCyclics; ++k) {
-        const uint32_t r = rig.cyclic(k);
-        w.insert(w.end(), { { "handler", k, handlerOf(c.rd32(r)) }, { "on", k, c.rd16(r + 4) },
-                            { "cyclicInterval", k, c.rd32(r + 8) }, { "due", k, c.rd32(r + 0xc) },
-                            { "owner", k, Rig::task(c.rd32(r + 0x10)) } });
-    }
-    return w;
-}
-
-std::vector<Word> ours(const Vc2Kernel& k) {
-    std::vector<Word> w;
-    for (int t = 0; t < (int)k.tasks.size(); ++t) {
-        const Vc2KernelTask& a = k.tasks[t];
-        w.insert(w.end(), { { "event", t, a.event }, { "wait", t, a.wait }, { "interval", t, a.interval },
-                            { "ready", t, a.ready }, { "quantum", t, a.quantum }, { "count", t, a.count },
-                            { "level", t, a.level }, { "alarmNext", t, a.alarmNext }, { "alarmAt", t, a.alarmAt },
-                            { "readyNext", t, a.readyNext } });
-    }
-    for (int l = 0; l < Vc2Kernel::kLevels; ++l) w.push_back({ "head", l, k.heads[l] });
-    w.insert(w.end(), { { "current", 0, k.current }, { "time", 0, k.time }, { "freeze", 0, k.freeze },
-                        { "lock", 0, k.lock }, { "alarms", 0, k.alarms }, { "roundLevel", 0, k.roundLevel },
-                        { "watchdog", 0, k.watchdog } });
-    for (int c = 0; c < Vc2Kernel::kCyclics; ++c) {
-        const Vc2KernelCyclic& r = k.cyclics[c];
-        w.insert(w.end(), { { "handler", c, r.handler }, { "on", c, r.on }, { "cyclicInterval", c, r.interval },
-                            { "due", c, r.due }, { "owner", c, r.owner } });
-    }
-    return w;
-}
+constexpr Vc2KernelNames kNames { Rig::tcb, taskOf, handlerOf };
 
 std::string difference(Rig& rig, const Vc2Kernel& k) {
-    const std::vector<Word> a = theirs(rig, (int)k.tasks.size()), b = ours(k);
-    for (size_t i = 0; i < a.size(); ++i)
-        if (!(a[i] == b[i]))
-            return std::string(a[i].what) + " " + std::to_string(a[i].whose) + ": rom.1's " +
-                   std::to_string(a[i].value) + ", the port's " + std::to_string(b[i].value);
-    return "";
+    return vc2KernelDifference(vc2KernelTheirs(rig.cpu, (int)k.tasks.size(), kNames, rig.watchdog), vc2KernelOurs(k));
 }
 
 // A case: both sides, the draws, the cyclic handlers' tasks and events, and the counts
