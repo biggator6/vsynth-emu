@@ -186,8 +186,13 @@ one of the card's.  Restarting the XT undoes it all.
   channel, make the files again with `vc2capture.py --dev N --ch N`).  For USB-MIDI: **USB Mode MIDI**; a **USB-MIDI Driver
   Type** of GENERIC.
 - **USB External In Type OFF**, so the Mac's sounds can't reach the input.
-- **Output Gain 0dB** and **External In Type MONO-L+R**: what every run starts from.  Run 1 changes them by hand in its pauses
-  and puts them back.  After an interrupted run, set them back to these before the next.
+- **Output Gain 0dB**: SYSTEM, the **Common** group (the buttons at the screen's foot), the **IO** tab (on the left), Output
+  Gain.  Every run starts from it.  Run 1 changes it by hand in its pause and puts it back; after an interrupted run, set
+  it back before the next.
+- **External In Type**: the VC-2's code draws it on no page (research/HARDWARE_FIRMWARE.md, "The VC-2's system settings at
+  its panel"), so it should stay at the VC-2's default, **MONO-L+R**.  Look for it on SYSTEM > Common > IO all the same.
+  If your XT shows it there, or anywhere else in VC-2 mode, write down where and set it to MONO-L+R.  If not, run 1's
+  four External In Type pauses have nothing to set: let them pass, and tell Claude.
 - **Receive Program Change ON** and **Receive Bank Select ON**, for the patches.  The runs send these two themselves, so
   this only checks them.
 
@@ -233,8 +238,9 @@ interface's output level alone for every run, and write it down (question d-4).
 ```bash
 analysis/test_files/vc2/fxplay --audio analysis/test_files/vc2/vc2probe.wav --device "Interface" analysis/test_files/vc2/vc2_run_1.mid "V-Synth"
 ```
-Six times in this run fxplay prints a line such as `>>> by hand at the XT's panel, now: Output Gain +6 dB` and the run pauses
-20 s.  Set what it says on the SYSTEM page before the pause ends; the run carries on by itself.  Otherwise leave the XT alone
+Six times in this run fxplay prints a line such as `>>> by hand at the XT's panel, now: SYSTEM > Common > IO > Output Gain:
++6 dB` and the run pauses 20 s.  Set what it says before the pause ends; the run carries on by itself.  Two of the pauses
+set Output Gain; the other four, External In Type, which step 3 says may have nothing to set.  Otherwise leave the XT alone
 until it says done, then stop, and save as `analysis/test_files/vc2/vc2_run_1.wav`.  A setting made late shows in the check
 below as that take's LOOK or FAIL: then run 1 again.  Check it before run 2:
 ```bash

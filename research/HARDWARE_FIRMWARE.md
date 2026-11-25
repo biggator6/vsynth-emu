@@ -1546,6 +1546,45 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2's system settings at its panel (2026-11-25, no version) {#vc2-system-panel}
+
+For step 5's run 1, whose six "hand:" cues ask for Output Gain and External In Type at the panel. Both are system
+settings that no patch holds and rom.4 has no SysEx address for (see "rom.4's SysEx: the VC-2's own address map").
+Where VC-2 mode's panel has them was read from rom.4's screens, by their titles and labels (names first).
+
+**The screens.** rom.4 has rom.2's system screens by title: `SYSTEM Com Master`, `SYSTEM Com IO`, `SYSTEM Com EQ`,
+`SYSTEM Com MIDI/USB`, `SYSTEM Com Audio I/F`, `SYSTEM Com USB Setting`. It also has some of its own, such as
+`SYSTEM MIC Setting`. The XT's manual (pp. 122, 123, 156) shows how V-Synth mode reaches them: SYSTEM, a group by the
+buttons at the screen's foot (Common), a tab on its left (Master, IO, EQ…).
+
+**Output Gain** (ID 0x78, −12…+12 dB, default +0 dB) is on `SYSTEM Com IO` in VC-2 mode too, by two sources:
+- rom.4's screen routine (`0x894a0c10`, its title from `0x894a0d40`) draws three labels: "USB Input Type",
+  "Output Gain" (`0x894a0c84`) and "Digital Output Freq";
+- rom.2's same screen (`0x8944ebb8`) draws Output Gain there, and the manual lists it under Common, IO.
+
+So its panel path is SYSTEM > Common > IO > Output Gain.
+
+**External In Type** (ID 0x7a, STEREO, MONO-L+R, MONO-L, MONO-R; default MONO-L+R) is drawn on no rom.4 screen:
+- rom.2's IO screen draws "External Input Type", "(Mic -> R)", "External Input Source", "Mix/Parallel", "Output Gain"
+  and "Digital Output Freq". rom.4's draws "USB Input Type" and none of rom.2's first four.
+- `SYSTEM Com Audio I/F` (`0x8949e6e8`) draws the jacks' switches and gain and the USB audio's routing: "MIC Jack
+  Switch", "INPUT Jack Switch", "INPUT Jack Gain", "USB Audio Input Source", "Monitor Sw", "USB Audio Output Dest".
+- No other rom.4 string names it but its own name in the parameter table (`0x898bbaf0`). The "Input Mode" labels are
+  effect types' pages (Lo-Fi, Distortion…).
+- rom.4 keeps a system file of its own, "VC-2 System.s00" (rom.2's is "V-Synth System.s00"), so V-Synth mode's
+  setting very likely doesn't carry over.
+
+So in VC-2 mode External In Type very likely stays at MONO-L+R: no page, no SysEx, no patch. Not yet seen on an XT; the
+guide (step 3) has the user look for it. Not traced: the screens' field tables, which would show each field's ID (the
+IO screen's table at `0x895a4574` didn't read plainly as IDs), and whether rom.4 loads 0x7a from "VC-2 System.s00".
+
+**For the cut.** fxplay can't wait for a key at a "hand:" cue without breaking the run's timing:
+- the cutter places each take's mark near its place on the run's timeline (`capbase.align`, `note_on + MARK + offset`),
+  and fits one line through the clean marks for the takes with none, such as run 2's vocoder takes;
+- `fxplay --audio` schedules the whole input on one timeline at the start.
+
+A wait of unknown length would shift every take after it. So the pause stays a fixed 20 s.
+
 ### A VC-2 patch saved (2026-11-25, v505) {#vc2-patch-save}
 
 For step 5's patch files (the user's "Patch files", 2026-11-25; VC2_MODE_PLAN.md, step 5). rom.4's own .p02 save runs

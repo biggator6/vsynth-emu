@@ -4316,3 +4316,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
   plants are lines of v450's list. build.sh changes only on xt_vc2patch's lines, so the writer tool got a build
   script of its own. The git guard refuses a reset while untracked files stand in the worktree, so this went on top as
   a second v505 commit, as v334 did. The recount showed 19 plants, not the 20 the first commit said.
+- The coordinator kept the pauses and asked for the panel path at each cue. rom.4's screens, read by their titles and
+  labels, put Output Gain on SYSTEM > Common > IO, as rom.2's do. They draw External In Type nowhere: the IO screen's
+  first label became "USB Input Type", and the VC-2 keeps its own system file. So the four extin takes may have
+  nothing to set in VC-2 mode, which was put to the coordinator. A wait for a key at the cue was left out, because
+  the cut and fxplay's input both run on the run's fixed timeline.

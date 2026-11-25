@@ -16,6 +16,11 @@ NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 EFFECT_SWITCHES = ('MFX Switch', 'Chorus Switch', 'Reverb Switch')
 RECEIVES = ('Receive Program Change', 'Receive Bank Select')   # [FW] rom.4's system block, 02 00 00 08 and 09
 HAND_MS = 20000     # the pause for what only the panel reaches, set by hand while fxplay shows the run's "hand:" cue
+# Where VC-2 mode's panel has each of those (HARDWARE_FIRMWARE.md, "The VC-2's system settings at its panel"): [FW]
+# rom.4's "SYSTEM Com IO" screen draws Output Gain (0x894a0c84), as rom.2's same screen does (the XT's manual, pp. 123
+# and 156: SYSTEM, the Common group, the IO tab); rom.4 draws External In Type on no screen
+PANEL = {'Output Gain': 'SYSTEM > Common > IO > Output Gain',
+         'External In Type': 'External In Type (rom.4 draws it on no VC-2 page: RECORDING_GUIDE.md, step 3)'}
 TEST_SETS = ('Direct Sound Level', 'OSC 1 Switch', 'MFX Switch', 'Master Level', 'MFX Type')   # test_run sets
 
 
@@ -40,8 +45,9 @@ class Vc2Run(Run):
         hand = {k: want[k] for k in self.patches.by_hand}
         if hand == self.hand:
             return
-        words = ['%s %s' % (k, self.map.text(self.map.id_named(k), v)) for k, v in hand.items() if self.hand[k] != v]
-        self.cue('hand:' + ', '.join(words))
+        words = ['%s: %s' % (PANEL.get(k, k), self.map.text(self.map.id_named(k), v))
+                 for k, v in hand.items() if self.hand[k] != v]
+        self.cue('hand:' + '; '.join(words))
         self.wait(HAND_MS)
         self.hand = hand
 
@@ -102,8 +108,8 @@ def settings(m, t, patches):
     doing it by hand."""
     p = ['patch %03d' % patches.number({**vc2takes.BASE, **t['set']})]
     for k, v in t['set'].items():
-        word = '%s %s' % (k, m.text(m.id_named(k), v))
-        p.append('by hand ' + word if k in patches.by_hand else word)
+        value = m.text(m.id_named(k), v)
+        p.append('by hand, %s: %s' % (PANEL.get(k, k), value) if k in patches.by_hand else '%s %s' % (k, value))
     p.append('play nothing' if t['key'] is None else 'hold %s' % note_name(t['key']))
     if t['probe'] is None:
         p.append('the input silent')

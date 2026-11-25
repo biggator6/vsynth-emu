@@ -1497,6 +1497,19 @@ then `vc2capture.py` writing the patch files a run needs and sending the bank an
   patch by ear). Output Gain and External In Type, the system's, which no patch holds: set by hand in run 1's 20 s
   pauses at fxplay's `hand:` cues, so the takes keep their places and their checks (no version).
 
+**Decided 2026-11-25, the coordinator's call (the user can overturn it), beside the user's "Patch files": the five system
+takes stay in run 1 with hand cues.** gain_plus6, extin_stereo, extin_monolr, extin_monol and extin_monor keep their places
+in run 1. Each is set by hand in a 20 s pause at a `hand:` cue that fxplay prints with the panel path, and the defaults
+are set back after the last. This replaces the coordinator's earlier "short runs", because the same recording's `main`
+is the stronger reference. A missed setting shows as the take's FAIL or LOOK. A wait for a key at the cue isn't offered:
+the cut places takes by the run's timing, and fxplay schedules the input on one timeline (HARDWARE_FIRMWARE.md, "The
+VC-2's system settings at its panel").
+
+**Found on the way, for the coordinator:** rom.4 draws External In Type on no VC-2 page. Output Gain is on SYSTEM >
+Common > IO, as in V-Synth mode (same section). So in VC-2 mode External In Type very likely can't be set at all and
+stays at MONO-L+R. The four extin takes would then all play at it, unless the user's XT shows the setting. The guide
+(step 3) has the user look. What the extin takes are for, if it can't be set, is the coordinator's to decide.
+
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
 
