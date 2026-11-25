@@ -1450,11 +1450,37 @@ plays a run's input at its cues beside its MIDI (`--audio`, `fxaudio.h`) and pri
 `capclick.py`, `caplayout.py`, `capmeasure.py`, `cappath.py`, `capreport.py`); `vc2cut_test.py` holds it to a simulated XT
 (`vc2sim.py`, on `capsim.py`) with faults planted; `fxplay_test.sh` holds fxplay's input to the take list's own.
 
-**The address map is inferred** (`vc2map.py`): the V-Synth's map on rom.4's own IDs. Nothing in rom.4 that receives or sends
+~~**The address map is inferred** (`vc2map.py`): the V-Synth's map on rom.4's own IDs. Nothing in rom.4 that receives or sends
 SysEx has been read. Block by block, rom.4's IDs from each block's first are rom.2's name for name: the system's 72 but the two
 rom.4 gave to MIDI MODE for VariOS and USB External In Type, the common's 114 with the vocoder block appended at +0x73, the MFX,
 Chorus and Reverb heads, zone 1's 128. The guide's step "Learn the map" asks the XT itself (Transmit Edit Data, `fxplay --in`,
-`vc2capture.py --learn`) before any long run. The VOCODER OSC's own IDs, past a zone's 128, aren't written.
+`vc2capture.py --learn`) before any long run. The VOCODER OSC's own IDs, past a zone's 128, aren't written.~~
+**Withdrawn 2026-11-25:** rom.4's SysEx paths, read and run (HARDWARE_FIRMWARE.md, "rom.4's SysEx: the VC-2's own address
+map"). In VC-2 mode the XT takes DT1 and RQ1 of model **00 00 0D**, at its Device ID or 7F, and drops the V-Synth's 00 53, so
+no message of the inferred map would have set anything. rom.4's map is its own: address tables in .data, an entry per address
+byte, some gated by Patch Category. The setup is at 01 00 00 00, the system at 02 00 00 00, eight MIC settings at 03 00 0i 00,
+the patch common with MFX, Chorus and Reverb in it at 10 00 00 00, three edit blocks at 10 00 03 00, 04 00 and 05 00, and 448
+stored patches from 20 00 00 00. It is the VC-2's edit set, not its store: Vocoder Sw, Type, Sound Level and Depth, Stereo
+Process, Unvoice Spread, Split Point, every OSC Type and Switch, the TVA Switch, Output Assign, Output Gain and External In
+Type have no address, and nor have the VOCODER OSC's own IDs but its vibrato, wave start and harm formant. `vc2map.py` now reads
+rom.4's tables and Category test from the image, checked against `vc2run <rom.4> sysex` (0 different). `vc2capture.py` names
+what the VC-2 runs set that has no address under PATCH Init's Category (23 parameters), writes the input and the
+V-Synth-mode run, and exits 2. `fxplay_test.sh` and `vc2cut_test.py`, which need the VC-2 runs, wait on the decision below.
+
+**[decision, the coordinator's or the user's] How do runs 1…4 set what rom.4 takes no SysEx for?** Their base and takes set 23
+such parameters: Vocoder Sw, Type, Depth and Sound Level, Stereo Process Sw, Unvoice Spread switch, Auto Note Retrigger, Formant
+Shift (only under Categories 3…5 and 11), OSC 1 and 2's Switch, Type, Vari Sw and Time Trip Sw, OSC 1 Wave Gain, MOD Switch,
+TVA Switch, Output Assign, Chorus Send Level, Output Gain and External In Type. The ways, as far as rom.4 shows them:
+- (a) The user sets them at the panel, in a by-hand list per take, and the runs send the rest. Slow, and runs 2 and 1's
+  `extin_*` takes vary exactly these.
+- (b) Patches made for the runs, written as VC-2 patch files (`.p02`) to the card (HARDWARE_FIRMWARE.md, "rom.4's patch
+  store and a .p02"; VC2_VOCAL_DESIGNER.md, "The factory patches, read by rom.4"), one per take or per group of takes. The runs then
+  select each by Bank Select and Program Change, which rom.4's OS turns into a patch change (a stored patch is 65…512 on the
+  SysEx side, its own numbering on the MIDI side not read here), and send the rest by SysEx.
+- (c) Takes that need them dropped, keeping what the map reaches (the direct sound's levels, the effects, the EQ, Formant
+  Template, Unvoice Detect and Level, Env Attack and Release, Auto Note On Switch under Category 1).
+Recommended: (b), as it keeps every take; it needs the patch writer (step 4.5's patch files, or a tool beside `vc2patches.cpp`)
+and Program Change's path to a stored patch read first.
 
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).

@@ -95,6 +95,12 @@ These runs play a known signal into the XT's input, in VC-2 mode, while a MIDI r
 settles, and where it was asked: research/VC2_MODE_PLAN.md, step 5.  **Not tried on an XT**, and nor have the effects captures
 above.  Steps 4 and 5 find out in a few minutes whether the XT takes the messages in VC-2 mode at all.
 
+**Runs 1 to 4 and the test can't be made yet (2026-11-25).**  In VC-2 mode the XT has a SysEx map of its own, and 23 of the
+settings these runs change have no address in it: the vocoder's type, depth and level, the OSC types and switches, External In
+Type, Output Gain and more (research/HARDWARE_FIRMWARE.md, "rom.4's SysEx: the VC-2's own address map").  How the runs will set
+them is still to be decided (research/VC2_MODE_PLAN.md, step 5).  Until then `vc2capture.py` writes the input and the
+V-Synth-mode run alone, and says which settings it couldn't send.  Steps 1 to 4, 6 and 9 can be done now.
+
 **Files** are in `analysis/test_files/vc2/`, made by the commands below from the repository's root.  They aren't in git, as the
 runs hold firmware defaults.  To make them:
 ```bash
@@ -160,23 +166,25 @@ set everything else, in memory only, so **don't write the patch or the system af
 
 Check each of these in VC-2 mode itself: whether its SYSTEM settings are the V-Synth's or its own isn't known.
 
-**4. Check the map, 2 minutes.**  The runs set the VC-2's parameters by SysEx at addresses worked out from the V-Synth's map.
-Nothing in rom.4 confirms that the VC-2 receives them there, so ask the XT first:
+**4. Check the map, 2 minutes.**  The runs set the VC-2's parameters by SysEx at the addresses the VC-2's own code uses
+(model 00 00 0D), read from its firmware and run there, but never yet on an XT, so ask the XT itself:
 1. SYSTEM: **Transmit Edit Data ON**.
 2. On the Mac, with any part of the name of your MIDI input from the XT in place of "V-Synth" (run
    `analysis/test_files/vc2/fxplay --in x` to list the inputs):
    ```bash
    analysis/test_files/vc2/fxplay --in "V-Synth" 120 > analysis/test_files/vc2/learn.txt
    ```
-3. Within those 2 minutes, at the panel, move each of these one step and back: **Direct Sound Level**, **Vocoder Type**,
-   **OSC 1 Type**, **MFX Type**, **Reverb Type**, **Master Level**, **External In Type**.
+3. Within those 2 minutes, at the panel, move each of these one step and back: **Direct Sound Level**, **MFX Type**,
+   **Reverb Type**, **Master Level**, then **Vocoder Type** and **External In Type**.
 4. Then:
    ```bash
    .venv/bin/python3 research/tools/vc2capture.py --learn analysis/test_files/vc2/learn.txt
    ```
-   Each line names the parameter the runs would set at that address.  If they're the ones you moved, the map is the XT's.  If a
-   line says "not a DT1 of model 00 53", or names a different parameter, stop and tell Claude: the runs would set the wrong
-   things.  If nothing at all arrived, check the MIDI cable from the XT and that Transmit Edit Data stayed on.
+   Each line names the parameter the runs would set at that address.  The first four should give lines naming what you moved
+   (a type's change may bring its parameters' lines with it); Vocoder Type and External In Type should give none, as the VC-2
+   has no address for them.  If a line says "not a DT1 of model 00 00 0D", names a different parameter, or either of the last two sends
+   something, stop and tell Claude: the map isn't the XT's.  If nothing at all arrived, check the MIDI cable from the XT and
+   that Transmit Edit Data stayed on.
 5. **Transmit Edit Data OFF** again.
 
 **5. Test, 20 seconds.**  Turn the monitors down.  Run `analysis/test_files/vc2/fxplay --audio-devices` for your interface's

@@ -1546,6 +1546,120 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.4's SysEx: the VC-2's own address map (2026-11-25, no version) {#vc2-sysex-map}
+
+For VC2_MODE_PLAN.md, step 5, whose SysEx map was inferred from the V-Synth's: rom.4's receive and send paths, read,
+then run. Research tools only, no harness: `vc2run <rom.4> sysex` (`vc2sysex.cpp`, `vc2sysexmap.cpp`,
+`vc2sysexsend.cpp`) and `vc2map.py`. **The inferred map was wrong from its model on, and is withdrawn** (the plan,
+step 5).
+
+**The way in.** The OS MIDI handler's message 0x01 calls `0x89310640(0x8995dd0c, message)` while SysEx's flag
+`0x8992e3d1` is set. `0x893154a0` (the handler's kind 4) sets four bytes from the system: that flag from Receive
+Exclusive (ID 0x75, default on), `0x8992e3d2` from Exclusive Protect (0x76), `0x8992e3d3` from Transmit Edit Data
+(0x74), and the device byte `0x8992e3d0` from Device ID (0x77, 16…31, the panel's 17…32; .data and default 0x10). The
+message is a word of length, then F0 … F7, at most 0x200 bytes. The parser is the OS's Roland class (base
+`0x898c7e80`, the object's `0x898c8360`, a slot 12 bytes, its method at +8):
+- 41 goes on; 7F and 7E go to `0x8930f840` and `0x8930fcc0`; anything else to the class's +0x18.
+- The device byte, then the model: each 00 adds 0x100, the next byte is or'd in, looked up in the model table
+  `0x8950cfd0` (model, address bytes): 0x110 4, 0x42 3, 0x46 4, 0x6a 4, 0x153 4, 0x16d 4, 0x20d 4, 0x124 5, 0x14d 4.
+  rom.2's (`0x897a0668`) has the same less 0x16d, 0x20d and 0x14d.
+- 11 is RQ1 (`0x8930f3d0`, then the class's +0x54), 12 DT1: the address bytes 7 bits each, the data, a checksum over
+  both; good goes to +0x48, bad to +0x60.
+
+**The models.** The DT1 method (`0x89315780`) takes a message at the device byte or 7F, for three models alone:
+- **0x20d, 00 00 0D**: the parameters, `0x8931c1b0` (below);
+- 0x124, 00 24 with five address bytes: `0x89319250`, by the address's top nibble to six cases (1 and 4…6 handled,
+  2 and 3 a return), on lists at `0x89973084` and `0x89974024`: files or waves, not parameters, not traced;
+- 0x14d, 00 4D: a bare return.
+
+**The V-Synth's 00 53 is parsed and dropped.** No DT1 of the inferred map would have set anything on an XT in VC-2
+mode. RQ1 (`0x89315830`) answers 0x20d (`0x8931f8b0`) and 0x124 (`0x89319920`). A bad checksum (`0x893158a0`) on
+0x20d or 0x124 puts the screen's message 3 up (`0x89315480(3)`), then takes the DT1 all the same.
+
+**The address decode** (`0x8931c1b0`), the address as 28 bits, b0 << 21 | b1 << 14 | b2 << 7 | b3:
+- Each address byte has an entry of 40 bytes in a table in .data: +0 its value's width in bytes, +1 this byte's place
+  in it, +3 a Category condition, +4 how many (group, ID) pairs follow from +8.
+- A DT1 writes at a value's first byte alone (place 0). The value is `width` bytes from there (one byte as it is,
+  more as nibbles, high first, `0x8931b0c0`), named by the pairs of the value's last byte's entry (`0x8931b158`).
+  The other bytes' entries name the IDs rom.4's descriptors give as 4-bit views of the same field (MFX Parameter
+  1's three dummies, 0x1bb…0x1bd, before it).
+- The counts are words in .data from `0x899343d0`, made into the .bss counts the handler tests by the SysEx task's
+  start (`0x89316a40` on `0x8995e644`, from `0x89314ce0`).
+
+| Address | What | Table | Entries |
+|---|---|---|---|
+| 01 00 00 00 | the setup: Part 1's bank and program, Transpose, Octave Shift, Beep, Sampling Template, Patch Palette, Chord Memory's switches | `0x8992e408` | 12 |
+| 02 00 00 00 | the system: Master Tune (4 bytes), Key Shift, Level, Clock Source and Out, Receive Program Change, Bank Select and Channel, the controllers' assigns, the system EQ, Arpeggio Grid, Chord Memory (2 bytes a note) | `0x8992e5e8` | 145 |
+| 03 00 0i 00, i 0…7 | MIC setting i + 1: Sampling Template Name 1…8 and the pre-effect chain (0x4f7…0x51f) | `0x8992fc90` | 29 each |
+| 10 00 00 00 | the patch common: Patch Category, Name, Tempo (4), Beam Type, Pad Mode and Hold, Coarse and Fine Tune, Scale Tune (2 a note), the three effect switches, then MFX from 10 00 00 32, Chorus from 10 00 01 36, Reverb from 10 00 01 69 (a type's parameters 4 bytes each) | `0x89930118` | 331, to 10 00 02 4A |
+| 10 00 03 00 | an edit set: portamento, Mono/Poly, Legato, Bend Up, Env 1 and 5 Decay, zone 1's OSC 1 and 2 (levels, waves, tunes, vibrato, harm formant, sub-oscillator), its COSM's switch and first two parameters, Matrix Controls 1…3, the patch EQ, the TVA's level and pan, Env 13 | `0x899334d0` | 67 |
+| 10 00 04 00 | Modulator Key Mode, zone 2's OSC 1 (wave, pitch, time, formant, tempo sync, level), Matrix Controls 5…8 | `0x89933f48` | 15 |
+| 10 00 05 00 | Direct Sound Level, zone 1's Reverb and MFX sends, Matrix Control 4, Env Attack and Release, Auto Note On Switch, Hold Dump Time, Unvoice Detect and Level, Formant Template and Shift | `0x899341a0` | 14 |
+| 20 00 00 00 + k b1's, k 0…447 | stored patch k + 65: the 10 00 blocks as they are | the same | |
+
+**Groups.** A pair's group picks the setter (`0x8931b110`): 1 the setup, 2 and 3 the system, 4 a MIC setting (b2 its
+number), 5 and 6 the common, 7 MFX, 8 Chorus, 9 Reverb, 10…12 zone 1's envelopes, OSC block and COSM, 13…15 zone 2's.
+The system's writer (`0x89321340`) takes the data bytes from the first ID, so a 4-byte value goes in whole. A stored
+patch's setters (`0x8931ba70`) take groups 5…15 and test Exclusive Protect first: on, the screen's message 2 and no
+write.
+
+**Patch Category** (0x12c, 0…11, of the patch written to) gates an entry with a condition (`0x8931c5d0`). Condition 0
+writes always, a Category past 11 nothing; else, by condition, the Categories: 1, 0…9; 2, 0…5 and 7…9; 3, 2, 5 and 9;
+4, 6; 5, 7…9; 6, 0…2 and 7…10; 7, 0…6; 8, 0…5 and 7…11; 9, 0…2 and 6…10; 10, 3…5 and 11. So Formant Shift writes
+under Categories 3…5 and 11 alone, Auto Note On Switch under 0…6, OSC 1 Pulse Width under 2, 5 and 9, the 10 00 04
+block under 7…9; Patch Category itself, the names, the effects, the setup, system and MIC settings always.
+
+**What has no address.** No entry names, of the vocoder block (0x193…0x1a5): Vocoder Sw, Vocoder Type, Vocoder Sound
+Level, Vocoder Depth, Auto Note Retrigger, Split Point, robot human depth, Stereo Process Sw, Unvoice Spread switch.
+Of the tone: no OSC Switch, Type, Wave Gain, Vari or Time Trip switch, no TVA Switch, Output Assign, Chorus Send Level
+or MOD Switch, and none of the VOCODER OSC's own IDs (0x354…0x383 but the vibrato's, wave start and harm formant's).
+Of the system: no Output Gain, External In Type, Receive Exclusive, Device ID or Transmit Edit Data. The map is the
+VC-2's edit set, not its store.
+
+**Two sources, held to each other.**
+- The code, read: the decode above, the tables read by `vc2map.py` from the image (their places from the handler,
+  their contents at run time, the Category law decoded from `0x8931c5d0`'s own jump tables).
+- The code, run: `vc2run <rom.4> sysex` builds the object by its static initializer (`0x89315bc0`) and the counts by
+  the task's start, and hands the parser DT1s of 384 bytes (byte k is k & 15): every b0 at b1 00 and every b2, then
+  every b1 and b2 of the eight b0 that write (01, 02, 03, 10, 20…23), then b2 0…8 at every b1 at each Category 0…12.
+  Every setter the path ends in is hooked (16 leaves and the 4 effect objects; the Category's reads answer as drawn).
+  Each set's ID is the setter's own (its info's +0x10), its address the data byte it came from.
+
+`vc2map.py --check-run` compares them: 347 values, 0 different in address, group, zone, ID and Categories. The 8 MIC
+settings are alike, and the 448 stored patches are the temporary one's, numbered k + 65. Three errors planted in a
+copy of `vc2map.py` (the Category test one case off, a value named by its first byte, one table swapped) each fail
+it: 104 and 260 different, and a fault.
+
+**What the run's parser takes:**
+- model 00 00 0D writes; 00 53 and 00 4D write nothing, and 00 24 with a fifth address byte reaches its own handler;
+- device 10 and 7F write, 11 and 1F don't; with the device byte at 1F, 1F writes and 10 doesn't;
+- a checksum one off writes, and shows message 3.
+
+**What rom.4 sends.** `0x89310a80` builds every head: F0 41, the device byte, the model's zeros and byte, 12, the
+address. Its callers pass 0x20d, but for `0x893237f0` (0x153, the V-Synth's) and `0x8932baa8` (0x16d, device 10),
+neither traced.
+- **An RQ1's answer** (`0x8931f8b0`) is a DT1 of the address asked, run: `F0 41 10 00 00 0D 12 10 00 00 01`, the four
+  values, `6B F7`. It goes on MIDI out A (`0x89958870`) and USB out (`0x8995bb10`), each after a header word.
+- **Transmit Edit Data** (`0x8992e3d3`) is tested by the parameters' writers (`0x89321640` and fifteen more) before
+  they call the sender for their kind: `0x89315f90` the setup, `0x89315fb0` and `0x89315fd0` the system, `0x89315ff0`
+  a MIC setting by its number, `0x89316020` the common, `0x89316040` MFX, `0x89316060` Chorus, `0x89316080` Reverb,
+  `0x893160d0` the envelopes, `0x893160a0` the OSC block, `0x89316110` the COSM, each with a word on the stack. All go
+  through `0x89315cb0` to `0x8931f8b0`.
+
+Run on every ID, each sender's DT1s land as the receive map takes them: at the ID's own address; or as a run from an
+earlier address covering it (Chord Memory's and Scale Tune's notes, sent from the pair's first); or, for a value's
+other IDs, the value whole from its first byte. None goes anywhere else. Not sent:
+- an address's second ID: Env 5 Decay at Env 1's, OSC 2 Vibrato Type and Rate at OSC 1's;
+- with the stack word 1, Env 13's Attack, Release and Attack Velocity Sens, which `0x89315cb0` skips.
+
+Group 6 (Beam Type, Pad Mode and Hold) has no sender among these. An edit at the panel of a parameter with no address
+sends nothing: Vocoder Type moved with Transmit Edit Data on gives no message.
+
+**Not settled:** model 00 24's handlers, the 0x153 and 0x16d senders, what the senders' stack word is, and whether the
+XT itself agrees (RECORDING_GUIDE.md, "VC-2 captures", step 4, now asks it on rom.4's map). rom.2's receive path is
+the same class, and its own tables are not read here: the V-Synth map's rule there, address offset = ID − the block's
+first, is still the manual's and fxcapture's checks, not rom.2's code.
+
 ### LITE's heads past the wave memory's first quarter (2026-11-25, v357) {#vc2-osc-heads-reach}
 
 Step 4.3's eighty-fifth version. The merge's whole `--osc` list missed v326's `heads-count`, LITE's heads' sample

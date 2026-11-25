@@ -4273,3 +4273,20 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - For v602, rom.2's own save path was found by the patch file's header strings (SVD0, PATa, KATE): the writer
   0x8948fc30, the store-to-file routine 0x8947de90 (825 of 825 full-length files back byte for byte, every store back
   from its written file, 1,327 of 1,327) and the setters 0x894818b0 and 0x89481e20.
+
+### Session 25 (2026-11-25) — rom.4's SysEx map, read and run (no version)
+
+- The coordinator asked for rom.4's SysEx paths, to prove or correct step 5's map, inferred from the V-Synth's. The
+  inference didn't survive its first byte past the header: rom.4's DT1 method takes models 0x20d, 0x124 and 0x14d, and
+  the V-Synth's 0x153 is parsed and dropped. The VC-2's model is 00 00 0D, the one rom.4's own senders put out.
+- The map is rom.4's own: an address table per block in .data, an entry per address byte, the value named by its last
+  byte's entry, some entries gated by Patch Category. It reaches the VC-2's edit set, not its store, so 23 of the
+  settings step 5's runs change have no address at all (the vocoder's type, depth and level, the OSC types, External
+  In Type, Output Gain). How the runs set them is now the coordinator's or the user's decision (the plan, step 5).
+- Two sources, as the house asks: vc2map.py reads the tables and decodes the Category test from the image; `vc2run
+  sysex` runs rom.4's own parser on DT1s at every address with the setters hooked. They agree on all 347 values. The run
+  needed the SysEx task's start (0x89316a40) for the tables' counts, and a stand-in class for the out ports, whose base
+  class has pure methods; with them the RQ1 answer and the edit-data senders ran, and every DT1 they sent lands where
+  the receive map takes it.
+- Not traced: model 00 24's handlers (files or waves) and two senders of other models. rom.2's own tables aren't read:
+  the V-Synth map there still stands on the manual and fxcapture's checks alone.
