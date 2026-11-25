@@ -1249,6 +1249,9 @@ version against rom.4's routines with what it calls hooked:
          rom.1's own (`Vc2MachineRig`; xt_vc2synth's whole part, with bursts that fill the notes' queue and floods that
          fill MIDI IN's ring; HARDWARE_FIRMWARE.md, "The part's tasks on the kernel"). Next: step 5's second half, the
          plugin's side, which needs it, with the step 4.5 [gap]s below.
+       - [x] The merge's gate (v356): the --tone list's update-osc-order, missed from v334, shown equivalent on rom.4
+         (its update in both orders leaves the same memory) and taken out (HARDWARE_FIRMWARE.md, "A tone's two OSC
+         updates: their order shows nowhere").
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each

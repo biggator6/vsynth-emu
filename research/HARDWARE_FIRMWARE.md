@@ -1546,6 +1546,38 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A tone's two OSC updates: their order shows nowhere (2026-11-25, v356) {#vc2-tone-osc-order}
+
+Step 4.3's eighty-fourth version. The merge's whole `--tone` list (worktree vc2-merge-4-3) missed v322's
+`update-osc-order`, the tone's two OSC updates swapped. It is caught on vc2-mode's 3508022 and missed on 46cffe5.
+
+**Which version.** Built at each version with the plant (xt_vc2tone, 40 cases, seed 2024): caught at v330
+(d051a27), v333 (051e88f) and the two vc2-mode merges after it (7e1d3ad, c6ea59a); missed from v334 (3ed4d17, SOLO
+the voice's own) on. v334's planted errors were `--osc --changed`, and the tone list had no changed plant, so the run
+that would have shown it was never made.
+
+**Why.** v324 drew one note-on in four with both OSCs VariPhrase, as then only VariPhrase's update called out of the
+tone, and the order of those calls showed the order of the updates. v330 to v334 made the players' set-ups the
+voice's own, SOLO's last. Since then a tone's update calls nothing out, and each OSC's update writes that voice
+alone: the update takes the tone's shared routines as const, and its parts are reads but the mic ring, which only a
+note-on and a render touch. The draw is still there (336 two-VariPhrase inputs at 2024), and no draw can show the
+order: there is nothing left for it to change.
+
+**On rom.4 itself.** A scratch run of xt_vc2tone took each tone update twice on rom.4's side. It ran once as it is,
+and once with the update's two calls of `0x893ae1c0` swapped in its code (`0x893b49cc`…`0x893b49e6`: OSC 2's at +0xba4,
+then OSC 1's at +0x20, the pool word re-aimed, r14 set as before). Both started from the same memory, and every
+mapped byte was compared after, the call's stack below `0x8c0e0000` aside. Over 2,400 updates a seed at 400 cases on
+2024, 7 and 31337 (342 of them with both OSCs VariPhrase), the two leave the same memory. The patch reads back as
+written, and with OSC 1's call dropped instead, 816 of 2,400 updates differ. So the order changes nothing on an XT.
+
+**The plant** is taken out, as v228's `build-osc-order` and `matched-order` were when the real voices made them
+equivalent (vc2tone_muts.txt's note). No code changed.
+
+Results:
+- `mutate_vc2.py --tone`, the whole list: 757 planted, all caught (its clean run first). No other check's file
+  changed.
+- fcheck as baseline; verify.sh green.
+
 ### The part's tasks on the kernel (2026-11-24, v355) {#vc2-synth-os}
 
 Step 4.3's eighty-third version, Vc2Synth whole's fifteenth and last. The part runs on its OS model, and is checked
