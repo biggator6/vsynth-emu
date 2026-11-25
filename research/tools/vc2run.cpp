@@ -40,7 +40,7 @@
 //        plugin/Source/Sh4Setup.cpp plugin/Source/XtLfo.cpp plugin/Source/XtEnvelope.cpp plugin/Source/XtFirmware.cpp
 //        plugin/Source/XtFwMachine.cpp plugin/Source/XtMultiBandPlayer.cpp plugin/Source/XtFxChip.cpp
 //        plugin/Source/XtFxControl.cpp plugin/Source/XtFxUnit.cpp plugin/Source/XtFxValueText.cpp plugin/Source/XtOsc.cpp
-//        plugin/Source/XtFxInput.cpp plugin/Source/XtExtIn.cpp
+//        plugin/Source/XtFxInput.cpp plugin/Source/XtExtIn.cpp plugin/Source/XtFxImage.cpp
 //        plugin/Source/XtWaveFile.cpp -o build/tools/vc2/vc2run
 #include "vc2runs.h"
 #include <algorithm>
