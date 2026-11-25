@@ -3,9 +3,11 @@
 #include "Vc2PartPlayer.h"
 #include "Vc2PatchStore.h"
 #include "Vc2SynthOsTasks.h"
+#include "Vc2SynthVoices.h"
 #include "Vc2SystemStore.h"
 #include "Vc2WaveBoot.h"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace {
@@ -123,4 +125,25 @@ void Vc2PartPlayer::mixed(const float* frames) {
         at[2 * i] = (f[kMainL] + f[kMultiL]) * kLevel;
         at[2 * i + 1] = (f[kMainR] + f[kMultiR]) * kLevel;
     }
+    viewed(at);
+}
+
+// v456: what the editor sees of the part after a block (Vc2PartView.h), each word relaxed
+void Vc2PartPlayer::viewed(const float* lr) {
+    if (view == nullptr) return;
+    Vc2Synth& s = *part_;
+    constexpr auto relaxed = std::memory_order_relaxed;
+    float out = 0.0f;
+    for (int i = 0; i < 2 * kBlock; ++i) out = std::max(out, std::fabs(lr[i]));
+    const float in = s.vocoder.stage.peak();
+    view->inputPeak.store(in, relaxed);
+    view->voiced.store(s.vocoder.stage.voiced(), relaxed);
+    view->period.store(s.tracker.period(), relaxed);
+    view->lock.store(s.tracker.s.lock, relaxed);
+    view->autoNote.store(s.autoNote.w.note, relaxed);
+    view->sounding.store(s.voices.sounding(*s.voiceParts).count, relaxed);
+    view->outputPeak.store(out, relaxed);
+    const int64_t quiet = view->quietFrames.load(relaxed);
+    view->quietFrames.store(in >= Vc2PartView::kQuiet ? 0 : quiet + kBlock, relaxed);
+    view->playing.store(true, relaxed);
 }

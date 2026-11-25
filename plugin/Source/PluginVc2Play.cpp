@@ -53,6 +53,7 @@ void PluginVc2Play::made() {
     auto next = std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_);
     next->patchGiven(keeper_.none ? nullptr : keeper_.work.data());
     next->patchSeq = keeper_.seq;
+    next->view = &view_;
     live_.store(next.get());
     while (inUse_.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     owned_ = std::move(next);

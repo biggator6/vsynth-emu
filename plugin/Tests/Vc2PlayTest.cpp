@@ -61,7 +61,6 @@ constexpr int kBlock = kVc2PlayBlock, kBlocks = 190, kEditAt = 100;   // about 2
 // `time` mode, Vc2PlayTime.cpp) and put back once v362 is in (VC2_MODE_PLAN.md, step 4.5's [gap] on it)
 constexpr size_t kPatchesPlayed[] = { 0, 40, 101, 120 };
 constexpr int kReceiveSwitch = 0x47, kUsbThru = 0x7d;        // [FW] Part 1 Receive Switch, USB-MIDI Thru: system B's
-constexpr float kInputLevel = 0.25f, kPitch = 220.0f;
 constexpr double kLevelNear = 6.0;                           // dB the 48 kHz run's level may stand from 44.1 kHz's
 
 using Message = Vc2PlayDirect::Message;
@@ -75,12 +74,6 @@ std::vector<Message> hostMessages() {
     for (int k = 0; k < 40; ++k) m.push_back({ 72000 + 97 * k, 0x90, (uint8_t)(48 + k % 24), (uint8_t)(40 + k) });
     for (int k = 0; k < 40; ++k) m.push_back({ 80000 + 53 * k, 0x80, (uint8_t)(48 + k % 24), 0 });
     return m;
-}
-
-// The input: a saw at kPitch, a little higher on the right, at kInputLevel
-float inputAt(int frame, int side) {
-    const double cycle = frame * (kPitch * (side ? 1.01 : 1.0)) / kRate;
-    return kInputLevel * (float)(2.0 * (cycle - std::floor(cycle)) - 1.0);
 }
 
 // A VC-2 parameter of zone 1 named as a level, its value moved: the first whose name says Level
@@ -121,8 +114,8 @@ Played play(VSynthEmuProcessor& p, Vc2PlayDirect* direct) {
             if (m.frame >= from && m.frame < from + kBlock)
                 midi.addEvent(juce::MidiMessage(m.status, m.data1, m.data2), m.frame - from);
         for (int i = 0; i < kBlock; ++i) {
-            inL[(size_t)i] = inputAt(from + i, 0);
-            inR[(size_t)i] = inputAt(from + i, 1);
+            inL[(size_t)i] = vc2PlayInput(from + i, 0);
+            inR[(size_t)i] = vc2PlayInput(from + i, 1);
         }
         buf.copyFrom(0, 0, inL.data(), kBlock);
         buf.copyFrom(1, 0, inR.data(), kBlock);
@@ -211,6 +204,7 @@ void onePatch(TestChecks& check, const DiskPatch& patch, const juce::File& work,
           name + "the session doesn't keep the store the part played");
     if (other) otherRate(check, file, r, name);
     if (other) silentInput(check, *p, name);
+    vc2PlayViewChecks(check, *p, name);   // every patch: a vocoder's may keep a carrier, the others let theirs go
     level = std::max(level, r.peak);
 }
 

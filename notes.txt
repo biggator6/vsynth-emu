@@ -676,6 +676,13 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VC-2 part's view in the editor v456 (2026-11-25, after v455; HARDWARE_FIRMWARE.md, "The VC-2 part's view in the
+  editor"): Vc2PartView, written by the player after each block (the input stage's peak and voiced flag, the tracker's
+  period and lock, Auto Note's note, the voices sounding, the output's peak, the frames since the input was last above
+  -60 dBFS), read lock-free by the mic's checks (NO MIC after a second of quiet, NO NOTE with no voice) and the MIC IN
+  card's six state lines; each waits while no part has played. VSynthEmuVc2PlayTest's view checks (Vc2PlayView.cpp),
+  62/62; the editor 5224/5224. The VOCODER card's bands still wait.
+
 The VC-2 in the plugin v455 (2026-11-25, on claude/vc2-plugin-4-5b from vc2-mode's 30cab59; HARDWARE_FIRMWARE.md, "The
   VC-2 in the plugin"): step 4.5's second half, its first version. With the mode on the VC-2, processBlock plays the part
   (Vc2PartPlayer: Vc2Synth on its OS model, the front's stand-in's start messages, the host's MIDI on MIDI IN before the

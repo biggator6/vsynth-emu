@@ -1546,6 +1546,28 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 part's view in the editor (2026-11-25, v456) {#vc2-plugin-view}
+
+Step 4.5's second half, its second version: the VC-2 pages' state that waited for Vc2Synth (v453; research/UI_DESIGN_VC2.md,
+"6. The mic's state", d-12) now reads the playing part. `Vc2PartView` is written by the player after each block it
+hears, every word a relaxed atomic, and read by the editor on its timer: the input stage's largest peak of the last eight
+blocks (`Vc2Unvoiced::peak`, rom.4's 0x899d9a5c), its voiced decision (0x893ed3e0), the tracker's period and lock, Auto
+Note's note, the sounding voices' count (0x893912e0), the output's peak, and the frames since the input's peak last
+reached −60 dBFS. It lives on `PluginVc2Play`, so a part made again writes the same one; nothing of it is the firmware's
+own beyond the words it copies.
+
+- The checks (`Vc2Mic`): Mic signal fails when the input has been under −60 dBFS for a second (the path's chip NO MIC),
+  Carrier when no voice sounds (NO NOTE); each waits while no part has played, as before v456.
+- The MIC IN card: the input's level in dBFS, VOICED or UNVOICED, the tracked pitch as a note with its lock, Auto Note's
+  note, the notes sounding, the output's level (`Vc2Mic::stateLines`); each line waits while no part has played.
+- Still waiting: the VOCODER card's bands (d-14), which the view doesn't carry yet.
+- Checked by VSynthEmuVc2PlayTest on each of its four patches (Vc2PlayView.cpp: a note held on the saw, both checks
+  ticked and the card's lines the part's; a second of silence, the mic's check failing, NO MIC with the vocoder on; the
+  note let go, fewer notes and the carrier's check agreeing with them, as a vocoder patch may keep a carrier sounding,
+  LargeChoir 1 does; 74 checks) and VSynthEmuEditorTest (with no part played, the lines wait). 9 plants
+  (`vc2play-view-`, `vc2play-mic-`, `vc2play-carrier-`, `vc2play-chip-`, `editor-vc2-checks-`, `-lines-`), all caught,
+  and the 15 `editor-vc2-` before them.
+
 ### The VC-2 in the plugin (2026-11-25, v455) {#vc2-plugin-play}
 
 Step 4.5's second half, its first version (research/VC2_MODE_PLAN.md). With the mode switch on the VC-2, processBlock

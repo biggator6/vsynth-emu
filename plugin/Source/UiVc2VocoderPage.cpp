@@ -18,7 +18,7 @@ constexpr int kType = 0x194, kSwitch = 0x193, kShift = 0x19f, kHireso = 1;   // 
 // Formant Template, Depth) and what LEGACY alone reads (Hold Dump Time)
 constexpr int kHiresoOnly[] = { 0x19a, 0x19b, 0x1a0, 0x197 }, kLegacyOnly[] = { 0x19e };
 constexpr float kFaint = 0.4f;
-const char* const kWaits = "waits for the VC-2 synth (step 4.3)";
+const char* const kWaits = "waits for the VC-2 part";
 const char* const kStateNames[] = { "Input level", "Voiced", "Tracked pitch", "Auto Note", "Notes sounding",
                                     "Output level" };
 
@@ -72,6 +72,11 @@ public:
             const juce::String mark = ok ? "OK" : waits ? "..." : "NO";
             Look::showText(*checks_[i], mark + "  " + c.name, ok ? Look::ready : waits ? Look::muted : Look::warning);
         }
+        // v456: the part's state, as its view says, muted while no part has played
+        const bool playing = p.vc2Play().view().playing.load(std::memory_order_relaxed);
+        const auto state = Vc2Mic::stateLines(p);
+        for (size_t i = 0; i < values_.size() && i < state.size(); ++i)
+            Look::showText(*values_[i], state[i], playing ? Look::text : Look::muted);
         status_.say(Vc2Mic::status(p));
     }
     std::vector<juce::String> lines() const {

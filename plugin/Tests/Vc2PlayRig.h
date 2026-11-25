@@ -5,6 +5,7 @@
 #include "../Source/PluginProcessor.h"
 #include "../Source/Vc2WavesInUse.h"
 #include "../Source/XtEncoded.h"
+#include <cmath>
 #include <memory>
 #include <string>
 
@@ -33,5 +34,15 @@ inline std::unique_ptr<VSynthEmuProcessor> vc2Processor(TestChecks& check, const
     return p;
 }
 
+// The input the checks play: a saw at 220 Hz, a little higher on the right, at a quarter of full scale
+inline float vc2PlayInput(int frame, int side) {
+    constexpr double kPitch = 220.0, kRight = 1.01, kRate = 44100.0;
+    constexpr float kLevel = 0.25f;
+    const double cycle = frame * (kPitch * (side ? kRight : 1.0)) / kRate;
+    return kLevel * (float)(2.0 * (cycle - std::floor(cycle)) - 1.0);
+}
+
 // The timing mode (Vc2PlayTime.cpp): `VSynthEmuVc2PlayTest <rom> time <place> [notes]`
 int vc2PlayTime(const juce::File& rom, const juce::File& work, const juce::StringArray& rest);
+// v456: the part's view as the editor reads it, on a processor that has played (Vc2PlayView.cpp)
+void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::string& name);

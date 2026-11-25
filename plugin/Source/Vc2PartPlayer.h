@@ -21,6 +21,7 @@
 //   most, and the next reads hear them first; meanwhile the host's messages wait for the next block asked for.  A wait
 //   that would run past the second stops the part (stuck), silent from then; the plugin makes another (PluginVc2Play).
 // Audio thread, but the constructor and prepare.
+#include "Vc2PartView.h"
 #include "Vc2Synth.h"
 #include "XtHostInput.h"
 #include "XtRateOut.h"
@@ -64,6 +65,7 @@ public:
     // default
     void patchGiven(const uint8_t* store);
     uint64_t patchSeq = 0;   // the plugin's number of the patch given last (PluginVc2Play's)
+    Vc2PartView* view = nullptr;   // v456: written after each block heard (PluginVc2Play's); none, nothing written
     // A channel message, before the frames rendered after it; false when the queue is full and it's dropped
     bool message(uint8_t status, uint8_t data1, uint8_t data2);
     // A piece of the host's input, `n` frames, most() at the most (inL and inR, both nullptr for none; inR nullptr with
@@ -88,6 +90,7 @@ private:
     // mixed, so a block nested in another's wait never writes over the outer one's (a stack by depth, kInputs deep)
     static constexpr size_t kInputs = 16;
     void mixed(const float* frames) override;
+    void viewed(const float* lr);   // v456: the view, after a block's frames `lr` (L, R) are out
     bool next(Vc2PartEvent& e);
     void produce();
     const int32_t* inputOf(long n);

@@ -1352,6 +1352,9 @@ version against rom.4's routines with what it calls hooked:
         (`PluginVc2Play`), the played-block test bit for bit against the part driven directly, in verify.sh
         (`VSynthEmuVc2PlayTest`; HARDWARE_FIRMWARE.md, "The VC-2 in the plugin"). Not yet: the system's parameters to
         the part, the effects (rom.4's unit) with the Effects switch on, the pages' live views of the part.
+      - done (v456): the pages' view of the part: `Vc2PartView`, written after each block, the mic's checks (NO MIC, NO
+        NOTE) and the MIC IN card's state lines from it (HARDWARE_FIRMWARE.md, "The VC-2 part's view in the editor").
+        Not yet: the VOCODER card's bands (d-14).
       - Before it, done (v550): the VC-2's firmware checks under AddressSanitizer, UBSan and libc++'s bounds
         (`XT_SANITIZE=1 build.sh`), the 21 step 4.3 isn't changing at 40 and 400 cases, three seeds: the voices' noise
         drawn as an XT's keys; the check rig's compare passed to step 4.3 (HARDWARE_FIRMWARE.md, "The VC-2 checks under
@@ -1409,7 +1412,9 @@ version against rom.4's routines with what it calls hooked:
      (`VSynthEmuVc2PlayTest <rom> time 17 1`, v455's timing mode): 7.3 s for 2.0 s, the same with 1, 3 or 24 notes; every
      sample under one note-on's SOLO seek (vc2OscSoloSetUp, vc2SeekRecords' `while (!(recEnd > to)) loadNext`), the seek
      to 0 over records all read 0, 1.05e9 steps before it ended: the 9x is that seek's (boundFloat reading 0), not the
-     play path's (XtRateOut, Vc2PartPlayer, PluginVc2Play hold none of the time).
+     play path's (XtRateOut, Vc2PartPlayer, PluginVc2Play hold none of the time). With v362's boundFloat change on a
+     scratch copy of v455 (the coordinator's diff, not on this branch): 0.534 s for 2.0 s (27% of real time), peak 0.11,
+     and 28% with 3 notes. So 018 goes back into the test at the joint merge, once v362 is in.
    - [gap] vc2SeekRecords' last loop has no bound. Over zero-length records, as before v362 or from a damaged wave, it
      walks ~1e9 steps on the audio thread. rom.4 would loop the same. Whether the plugin bounds it is open (v455; the
      coordinator, 2026-11-25: not to decide now; if the plugin should guard the audio thread, the user's decision).

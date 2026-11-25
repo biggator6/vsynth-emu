@@ -343,3 +343,14 @@ vc2play-patch-not-given|        p_->patchGiven(s->none ? nullptr : s->bytes.data
 vc2play-edit-not-put|        vc2PatchPut(k.work, *p.h, v);|        ;|plugin/Source/PluginVc2Play.cpp|vc2play
 vc2play-store-not-kept|    if (patch_.gen == k.gen) patch_.store = k.work;|    ;|plugin/Source/PluginVc2Play.cpp|vc2play
 vc2play-mode-unread|void PluginVc2Play::readMode() { vc2_.store(pluginMode(apvts_.state) == PluginMode::vc2); }|void PluginVc2Play::readMode() { vc2_.store(false); }|plugin/Source/PluginVc2Play.cpp|vc2play
+# v456: the part's view (Vc2PartView.h), written after each block and read by the mic's checks and the MIC IN card
+# (VSynthEmuVc2PlayTest's view checks; the editor's with no part played)
+vc2play-view-unset|    next->view = &view_;|    ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-view-sounding|    view->sounding.store(s.voices.sounding(*s.voiceParts).count, relaxed);|    view->sounding.store(0, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-view-quiet|    view->quietFrames.store(in >= Vc2PartView::kQuiet ? 0 : quiet + kBlock, relaxed);|    view->quietFrames.store(0, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-view-input|    view->inputPeak.store(in, relaxed);|    view->inputPeak.store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-mic-always|    const bool mic = v.quietFrames.load(std::memory_order_relaxed) < Vc2PartView::kQuietFrames;|    const bool mic = true;|plugin/Source/UiVc2Mic.cpp|vc2play
+vc2play-carrier-always|    const bool note = v.sounding.load(std::memory_order_relaxed) > 0;|    const bool note = true;|plugin/Source/UiVc2Mic.cpp|vc2play
+vc2play-chip-no-mic|    if (c[kMicCheck].state == State::silent) return "NO MIC";|    ;|plugin/Source/UiVc2Mic.cpp|vc2play
+editor-vc2-checks-never-wait|    if (!v.playing.load(std::memory_order_relaxed)) return State::waits;|    ;|plugin/Source/UiVc2Mic.cpp|layout
+editor-vc2-lines-never-wait|    if (!v.playing.load(relaxed)) return std::vector<juce::String>(kStateLines, kLineWaits);|    ;|plugin/Source/UiVc2Mic.cpp|layout

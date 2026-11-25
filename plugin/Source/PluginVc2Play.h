@@ -56,6 +56,8 @@ public:
     bool vc2() const { return vc2_.load(); }
     Vc2PartPlayer* player() const { return live_.load(); }
     int built() const { return built_; }
+    // v456: the part as the editor sees it, any thread, every part made writing this one (Vc2PartView.h)
+    const Vc2PartView& view() const { return view_; }
 
 private:
     // A VC-2 parameter as the store takes it: its ID, its value, its default
@@ -101,4 +103,5 @@ private:
     std::atomic<Vc2PartPlayer*> live_ { nullptr };
     std::unique_ptr<Vc2PartPlayer> owned_;
     int built_ = 0;
+    Vc2PartView view_;
 };
