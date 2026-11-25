@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
     shared.osc.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
     shared.osc.jumpRng.seed((uint32_t)run->seed * 7 + 5);   // v335: the period-jump player's
     shared.osc.analogRng.seed((uint32_t)run->seed * 11 + 7);   // v337: the analog's renders'
+    shared.osc.headsRng.seed((uint32_t)run->seed * 13 + 9);    // v357: LITE's heads' samples
     std::string start = oscCaptureBandStates(fw, shared.osc, oscVoiceAt(0));
     toneInstallRom(fw, rom, shared.fade, shared.osc.draws, oscRom);
     if (start.empty()) start = toneOscSetUp(s);   // v319: the records' exp2 octaves, the carriers' rate, kind 6's globals

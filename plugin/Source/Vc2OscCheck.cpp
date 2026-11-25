@@ -206,6 +206,7 @@ int main(int argc, char** argv) {
     shared.soloRng.seed((uint32_t)run->seed * 5 + 3);   // v334: SOLO's
     shared.jumpRng.seed((uint32_t)run->seed * 7 + 5);   // v335: the period-jump player's
     shared.analogRng.seed((uint32_t)run->seed * 11 + 7);   // v337: the analog's renders'
+    shared.headsRng.seed((uint32_t)run->seed * 13 + 9);    // v357: LITE's heads' samples
     for (OscFamily f : { OscFamily::band, OscFamily::solo, OscFamily::jump }) oscPlayersPart(s, *run, tally, f);
     const std::string bands = oscCaptureBandStates(fw, shared, oscVoiceAt(0));   // v332: before the hooks
     oscInstallRom(fw, shared.draws, rom, oscVoiceNumber);
