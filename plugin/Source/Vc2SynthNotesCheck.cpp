@@ -74,19 +74,10 @@ Drawn messageDrawn(std::mt19937& rng, uint8_t receiving) {
 constexpr int kOscTypeId = 0x2e5, kOscTypeStep = 52, kOscs = 2, kRobotId = 0x1a3;
 constexpr uint32_t kVocoderType = 3, kVocoderKind = 5, kRobotZeroOneIn = 4;
 
-// An ID's bits in the store at a zone set to `raw`, where xtStoreRaw reads them (its value raw less the centre)
+// An ID's bits in the store at a zone set to `raw`, where xtStoreRaw reads them (its value raw less the centre); v455:
+// the store's own put, the plugin's too (XtPatchStore.cpp)
 void rawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw) {
-    const XtParamDesc* d = vc2ParamDesc(id);
-    const int section = xtStoreSection(vc2Store(), id, zone);
-    if (d == nullptr || section < 0) return;
-    const int width = std::abs(d->width), total = width + d->bit, bytes = (total + 7) / 8, at = section + d->offset;
-    if (at < 0 || at + bytes > (int)store.size() || width >= 32) return;
-    const int shift = bytes * 8 - total;
-    const uint32_t mask = ((1u << width) - 1) << shift;
-    uint32_t v = 0;
-    for (int k = 0; k < bytes; ++k) v = v << 8 | store[(size_t)(at + k)];
-    v = (v & ~mask) | (raw << shift & mask);
-    for (int k = bytes - 1; k >= 0; --k, v >>= 8) store[(size_t)(at + k)] = (uint8_t)v;
+    xtStoreRawPut(vc2Store(), store, id, zone, 0, raw);
 }
 
 // v349's steer, the user's call (2026-11-24, "Defer it"; VC2_MODE_PLAN.md's [deferred] item on the VOCODER's NaN

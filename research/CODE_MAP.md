@@ -18,6 +18,15 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   D's parts take a mode's tables (a Block's `Model`, each panel's and page's `Mode`), the V-Synth's by default; a new
   VC-2 control is a row in one of those tables. Its parameters are no longer held apart: `VSynthEmuEditorTest` reaches
   every one (`EditorVc2Test.cpp`, `EditorVc2TextTest.cpp`). What waits for Vc2Synth says so on its page.
+- The VC-2 mode's audio (v455; HARDWARE_FIRMWARE.md "The VC-2 in the plugin"): `PluginVc2Play` (the processor's: the
+  mode read from the session, the part made on the control thread and handed to the audio thread by an atomic pointer,
+  the patch's store written from the VC-2's parameters and given at a block's edge, its `Block` the audio thread's),
+  `Vc2PartPlayer` (Vc2Synth on its OS model fed the host's MIDI, blocks and input, its bus out, the front's stand-in's
+  start; in `Vc2Sources.cmake`, left out of xt_vc2synth's build), `XtRateOut` (the 44.1 kHz frames at the host's rate:
+  XtSynth's render moved out as it stood, both's), `XtFn.h` (a callable held in place, std::function's on the part's
+  runtime paths), `PluginWaveView.h` (the processor's WaveView moved out). Vc2Synth gains `sink` (each block's frames)
+  and `patchGiven` (xt_vc2synth's patch given). Checked by `VSynthEmuVc2PlayTest` (`plugin/Tests/Vc2PlayTest.cpp`, its
+  reference `Vc2PlayDirect.h`, its set-up `Vc2PlayRig.h`, its timing mode `Vc2PlayTime.cpp`).
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `IOS_companion/`: a companion application for iPhone and iPad, developed separately from the plugin, that works as the XT's Time Trip or X-Y pad over MIDI; tested and working (the user, 2026-11-13). It is not part of the plugin's build, tests or outstanding work; its `IOS_COMPANION_PLAN.md` still reads "Planned" and is out of date.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,

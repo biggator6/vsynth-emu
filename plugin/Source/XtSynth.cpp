@@ -177,12 +177,7 @@ XtSynth::~XtSynth() = default;
 
 void XtSynth::prepare(double rate) {
     hostRate = rate > 0 ? rate : 44100.0;
-    step = 44100.0 / hostRate;
-    sinc.make(0.5 * std::min(1.0, hostRate / 44100.0) * 0.95);   // 44.1 kHz → host rate (XtSinc.h), in cycles per source sample
-    constexpr int kHalf = XtSinc::kHalf;
-    src.assign((size_t)kHalf * 2, 0.0f);           // kHalf frames of silent history
-    srcFrames = (size_t)kHalf;
-    readPos = (double)kHalf;                       // output time 0 = the first mixed frame: no delay
+    out.prepare(hostRate);   // kHalf frames of silent history, output time 0 the first mixed frame (XtRateOut.h, v455)
     for (Voice& v : voice) v.active = false;
 }
 

@@ -5,7 +5,7 @@
 // what that task's wait answers, and the part runs the task's pass (xt_vc2kernel checks it against rom.1's own).
 #include <array>
 #include <cstdint>
-#include <functional>
+#include "XtFn.h"
 #include <utility>
 #include <vector>
 
@@ -37,7 +37,7 @@ public:
     static constexpr int kLevels = 32, kCyclics = 16, kNone = -1;
     static constexpr int kRoundLevel = 16;   // [FW] roundLevel as the kernel's start leaves it (0x88010c64)
     // A due cyclic handler's run, by its number, from the tick (rom.1's 0x8800fdf0 calls each due record's +0)
-    using Handler = std::function<void(int)>;
+    using Handler = XtFn<void(int)>;   // v455: held in place, no allocation (XtFn.h)
     // What a service did to the running task: whether it switched, to which task, and what that task's wait answers
     struct Switch {
         bool switched = false;

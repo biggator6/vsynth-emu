@@ -58,8 +58,9 @@ if [ $BUILT = 1 ]; then
     # own parameter and every parameter with a control, each press's route; the outside input to the EXT IN OSC (v207):
     # the feed at nine rates, the processor against XtSynth given the input by the law, the Effects off and on; the output
     # always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite; a project's
-    # own files (v600 on): a link to a preset wave followed to the wave it names
-    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor ExtIn Output Project; do
+    # own files (v600 on): a link to a preset wave followed to the wave it names; the VC-2 mode's audio (v455): the
+    # processor against the part driven directly, bit for bit, nothing allocated in processBlock
+    for t in Teardown Restore WaveFile Rom Switch Step DiskImage Arp ArpPlugin Editor ExtIn Output Project Vc2Play; do
         checkTest "build/plugin/VSynthEmu${t}Test" "$ROM"
     done
     # Every patch of the firmware's image through the parameters and effects, and a project on disk against XtSynth

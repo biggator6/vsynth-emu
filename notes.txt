@@ -676,6 +676,19 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VC-2 in the plugin v455 (2026-11-25, on claude/vc2-plugin-4-5b from vc2-mode's 30cab59; HARDWARE_FIRMWARE.md, "The
+  VC-2 in the plugin"): step 4.5's second half, its first version. With the mode on the VC-2, processBlock plays the part
+  (Vc2PartPlayer: Vc2Synth on its OS model, the front's stand-in's start messages, the host's MIDI on MIDI IN before the
+  block it precedes, the input at each block's own place into words 1 and 5, MAIN + MULTI at 2^-30 out; a wait's blocks
+  ahead in XtRateOut's room of a second), and the VC-2's parameters reach it (PluginVc2Play: written over the .p02's store
+  on the control thread, given at a block's edge as Vc2Synth::patchGiven, the store kept as the session's). XtRateOut is
+  XtSynth's render moved out (ab 4/4 identical). Fixed on the way: rom.4's system defaults now load with its tables (Part
+  1 received nothing); Vc2Synth::giveWaves gives the players the samples (PCM read none); std::function allocations on
+  the audio thread (XtFn); XtHostInput::taken from its prepare. VSynthEmuVc2PlayTest (in verify.sh, about 7 s): four
+  factory .p02s bit for bit against the part driven directly, 138-168 blocks ahead in waits each, no allocation in
+  processBlock. Open: the system's parameters and the effects in the VC-2 mode, the pages' live views; 018 FemaleChoirs'
+  SOLO walk at nine times real time.
+
 The plugin's output always numbers v454 (2026-11-24, on vc2-mode ab50a1c; HARDWARE_FIRMWARE.md, "The plugin's output
   always numbers"; the user's "ok, fix the NaN at the output"). OutputFinite (PluginOutputFinite.h), made at the top of
   processBlock, sets a sample that isn't a finite number to 0 on every way out, so no NaN or infinity reaches the host

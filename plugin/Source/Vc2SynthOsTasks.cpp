@@ -104,11 +104,6 @@ void Vc2SynthOsTasks::appTick() {
     s_.clockMs();
 }
 
-void Vc2SynthOsTasks::interrupt(const std::function<void()>& handler) {
-    handler();
-    os.interruptEnd();
-}
-
 void Vc2SynthOsTasks::inputDone() {
     s_.dmaBuffers[kInput] ^= 1;
     os.raise(Os::kObjects[Os::kAudio], kInputEvent);

@@ -28,34 +28,9 @@ void XtSynth::busOut(float* lr) {
     }
 }
 
+// The bus's blocks at the host's rate, through XtRateOut (v455: its render moved there as it stood)
 void XtSynth::render(float* left, float* right, int n) {
     pickUpSample();
-    constexpr int kHalf = XtSinc::kHalf;
-    const bool direct = std::abs(step - 1.0) < 1e-12;
-    for (int j = 0; j < n; ++j) {
-        const size_t need = (size_t)std::floor(readPos) + (direct ? 1 : (size_t)kHalf + 1);
-        while (srcFrames < need) {
-            if (src.size() < (srcFrames + 32) * 2) src.resize((srcFrames + 32) * 2);
-            mixBlock(src.data() + srcFrames * 2);
-            srcFrames += 32;
-        }
-        if (direct) {
-            const size_t i = (size_t)readPos;
-            left[j] = src[2 * i];
-            right[j] = src[2 * i + 1];
-            readPos += 1.0;
-        } else {
-            const long i0 = (long)std::floor(readPos);
-            sinc.at(src.data(), i0, readPos - (double)i0, left[j], right[j]);
-            readPos += step;
-        }
-    }
+    out.render(left, right, n, [this] { mixBlock(out.append(32)); });
     hostFrames += n;
-    // drop consumed frames, keeping the history the kernel needs
-    const long keep = (long)std::floor(readPos) - kHalf;
-    if (keep > 4096) {
-        std::memmove(src.data(), src.data() + keep * 2, (srcFrames - (size_t)keep) * 2 * sizeof(float));
-        srcFrames -= (size_t)keep;
-        readPos -= (double)keep;
-    }
 }

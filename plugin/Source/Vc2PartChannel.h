@@ -14,7 +14,7 @@
 #include "Vc2Keys.h"
 #include "Vc2PartNodes.h"
 #include <cstdint>
-#include <functional>
+#include "XtFn.h"
 
 // What the channel's messages reach beyond the keys, the nodes and the pitch source
 class Vc2ChannelParts {
@@ -44,4 +44,4 @@ void vc2ChannelHeard(Vc2ChannelWorld& w, int32_t source, int32_t channel);   // 
 uint32_t vc2ChannelStateOf(int32_t source, int32_t channel);
 uint32_t vc2ChannelTableOf(int32_t source, int32_t channel);
 void vc2EachNode(const Vc2PartNodes& nodes, int32_t source, int32_t channel,
-                 const std::function<void(const Vc2PartNode&)>& each);
+                 const XtFn<void(const Vc2PartNode&)>& each);   // v455: XtFn, no allocation

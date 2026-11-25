@@ -27,7 +27,7 @@
 #include "XtSoloVoice.h"
 #include "XtLinearPlayer.h"
 #include "XtLitePlayer.h"
-#include "XtSinc.h"
+#include "XtRateOut.h"
 #include "XtEncoded.h"
 #include "XtSynthControls.h"
 #include "XtSynthVoice.h"
@@ -170,12 +170,8 @@ private:
     float chaosSeed = 0x1.666666p-1f; // the global logistic map the LFOs draw their seeds from (0.7 at power-on, 0x894f4c80)
     double hostRate = 44100;
 
-    // 44.1 kHz mix, produced in 32-frame blocks, read by the resampler
-    std::vector<float> src;        // interleaved L/R
-    size_t srcFrames = 0;
-    double readPos = 0;            // in source frames
-    double step = 1;               // 44100 / hostRate
-    XtSinc sinc;                   // polyphase windowed sinc, 44.1 kHz → host rate (XtSinc.h)
+    // 44.1 kHz mix, produced in 32-frame blocks, read at the host's rate (XtRateOut.h, v455)
+    XtRateOut out;
 
     void pickUpSample();
     void mixBlock(float* lr);      // 32 frames, a voice at a time in its parts (XtSynthBlock.cpp, v203):

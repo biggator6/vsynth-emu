@@ -73,7 +73,7 @@ void XtSynth::hostClock(double bpm, bool moving, double ppq) {
     clockFollow();
     if (!moving || !(hostBpm > 0.0)) return;
     // Where the next block will sound: the frames between the read position and it, as this host block's first frame stands at ppq
-    const double at = (ppq + ((double)srcFrames - readPos) / 44100.0 * hostBpm / 60.0) * 24.0;
+    const double at = (ppq + out.ahead() / 44100.0 * hostBpm / 60.0) * 24.0;
     if (std::fabs(at - hostAt) > 1.0) hostDone = (int64_t)std::ceil(at) - 1;   // a locate or a loop's end: what it passed gives no clocks
     hostAt = at;
 }

@@ -37,3 +37,44 @@ VSynthEmuProcessor::createParameterLayout() {
 
     return { params.begin(), params.end() };
 }
+
+// ── The Matrix's lists (moved as they stood from PluginProcessor.cpp, v455) ─────
+juce::StringArray VSynthEmuProcessor::matrixSourceNames() {
+    juce::StringArray a { "OFF" };
+    for (int n = 1; n < 96; ++n) a.add(n == 32 ? juce::String("(OFF)") : "CC" + juce::String(n).paddedLeft('0', 2));
+    a.addArray(juce::StringArray { "BEND", "AFT", "+PAD-X", "+PAD-Y", "PAD-X", "PAD-Y", "TRIP-R", "BEAM-L", "BEAM-R", "KNOB1", "KNOB2", "VELO", "KEYF" });
+    return a;
+}
+
+juce::StringArray VSynthEmuProcessor::matrixDestNames() {
+    juce::StringArray a { "OFF" };
+    for (const char* o : { "OSC1", "OSC2" }) {
+        for (const char* d : { "PITCH", "TIME/PW", "FORMA/FAT", "LVL", "PENV-ATK", "PENV-DCY", "PENV-REL", "TENV-ATK", "TENV-DCY", "TENV-REL",
+                               "FENV-ATK", "FENV-DCY", "FENV-REL", "AENV-ATK", "AENV-DCY", "AENV-REL", "LFO-RATE", "LFO-PCH", "LFO-TM/PW", "LFO-FR/FT", "LFO-LVL" })
+            a.add(juce::String(o) + "-" + d);
+    }
+    for (const char* o : { "CSM1", "CSM2" })
+        for (const char* d : { "PRM1", "PRM2", "ENV1-ATK", "ENV1-DCY", "ENV1-REL", "ENV2-ATK", "ENV2-DCY", "ENV2-REL", "LFO-RATE", "LFO-PRM1", "LFO-PRM2" })
+            a.add(juce::String(o) + "-" + d);
+    a.addArray(juce::StringArray { "TVA-LVL", "TVA-ENV-ATK", "TVA-ENV-DCY", "TVA-ENV-REL", "TVA-LFO-RATE", "TVA-LFO-LVL", "TVA-LFO-PAN", "MFX-SEND", "CHO-SEND", "REV-SEND",
+                                   "MFX-PRM1", "MFX-PRM2", "MFX-PRM3", "TVA-PAN" });
+    return a;
+}
+
+juce::StringArray VSynthEmuProcessor::assignValueNames() {
+    juce::StringArray a { "OFF" };
+    for (int n = 1; n < 96; ++n) a.add(n == 32 ? juce::String("(OFF)") : "CC" + juce::String(n).paddedLeft('0', 2));
+    return a;
+}
+
+const char* VSynthEmuProcessor::assignParamId(int i) {
+    static const char* const k[kAssigns] = { "assignBeam2L", "assignBeam2R", "assignBeam3L", "assignBeam3R", "assignBeam4L", "assignBeam4R", "assignPadX", "assignPadY", "assignKnob1", "assignKnob2", "assignTripX", "assignTripY" };
+    return k[i];
+}
+
+const char* VSynthEmuProcessor::assignName(int i) {
+    static const char* const k[kAssigns] = { "Beam 2 L", "Beam 2 R", "Beam 3 L", "Beam 3 R", "Beam-L", "Beam-R", "Pad X", "Pad Y", "Knob 1", "Knob 2", "Trip X", "Trip Y" };
+    return k[i];
+}
+
+int VSynthEmuProcessor::assignDefault(int i) { return i == 6 ? 80 : i == 7 ? 81 : i == 10 ? 82 : i == 11 ? 83 : 0; }

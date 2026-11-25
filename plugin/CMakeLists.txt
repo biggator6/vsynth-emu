@@ -132,6 +132,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtSynthClock.cpp
     Source/XtSynthOut.cpp
     Source/XtSinc.cpp
+    Source/XtRateOut.cpp
     Source/XtExtIn.cpp
     Source/XtSynthArp.cpp
     Source/XtSynthZones.cpp
@@ -172,6 +173,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginExtIn.cpp
     Source/PluginVc2Params.cpp
     Source/PluginVc2Patch.cpp
+    Source/PluginVc2Play.cpp
     Source/PluginRender.cpp
     Source/XtHostInput.cpp
     Source/XtFxValueText.cpp
@@ -245,6 +247,8 @@ vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp T
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)
 # The output always numbers (v454): a float wave holding NaN and infinities, played with no image, comes out finite
 vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
+# The VC-2 mode's audio (v455): the processor against the part driven directly, bit for bit, nothing allocated
+vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayTime.cpp Tests/TestMain.cpp)
 # A project's own files (v600 on): a link to a preset wave followed to the wave it names
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
              Tests/TestMain.cpp Tests/TestWave.cpp)
@@ -253,4 +257,4 @@ add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
                  VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
-                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest)
+                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest VSynthEmuVc2PlayTest)

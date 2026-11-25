@@ -39,6 +39,11 @@ public:
     long overruns() const { return over_; }
 
     const int32_t* block() override;
+    // v455: up to `frames` of what it holds taken and dropped, the oldest first: how many were; and the frames taken or
+    // passed over since prepare, counted on (the VC-2's part reads each block's input at its own place: a block that ran
+    // ahead of the host in a wait passes over the input it had no frames for, Vc2PartPlayer.h)
+    int drop(int frames);
+    uint32_t taken() const { return out_.taken() - takenFrom_; }
     void withoutChip(XtExtInput& to, const int32_t* lr) override { copy_.into(to, lr, 32); }
 
     // A host sample as the XT's int32: x × 2^31 toward zero, the limits past ±1, and silence for what isn't a number
@@ -62,4 +67,5 @@ private:
     XtExtInCopy copy_;
     int latency_ = 32, most_ = 1;
     long short_ = 0, over_ = 0;
+    uint32_t takenFrom_ = 0;     // what out_ had taken at prepare (v455)
 };

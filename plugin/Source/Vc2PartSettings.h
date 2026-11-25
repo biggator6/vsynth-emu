@@ -13,7 +13,7 @@
 #include "Vc2PartNodes.h"
 #include <array>
 #include <cstdint>
-#include <functional>
+#include "XtFn.h"
 
 // The read objects a reader sets up, each a block of parameters the getter 0x89324350 reads by ID: the part's
 // (0x893207b0), the system's three (0x89320790, 0x89320760, 0x89320f60) and a note kind's three (0x89320a50,
@@ -129,7 +129,7 @@ struct Vc2PartWorld {
 };
 
 // The OSC block's reader the part's reader calls for each kind and OSC, false to stop (v289)
-using Vc2OscBlockReader = std::function<bool(int kind, int osc)>;
+using Vc2OscBlockReader = XtFn<bool(int kind, int osc)>;   // v455: XtFn, no allocation
 
 class Vc2PartSettings {
 public:

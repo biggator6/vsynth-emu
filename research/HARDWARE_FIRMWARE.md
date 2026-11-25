@@ -1546,6 +1546,84 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 in the plugin (2026-11-25, v455) {#vc2-plugin-play}
+
+Step 4.5's second half, its first version (research/VC2_MODE_PLAN.md). With the mode switch on the VC-2, processBlock
+plays the part: Vc2Synth on its OS model (v355), the host's MIDI and blocks in time order, and the patch the VC-2's
+parameters make. The V-Synth mode is as it was (ab.sh 4/4 identical).
+
+**The player** (`Vc2PartPlayer`). The part is made and started as xt_vc2synth's whole part makes its own: rom.4's start,
+rom.4's system defaults, the waves loaded, the tasks on their OS (`runOnOs`, its source the player's). Then the front's
+stand-in's start: four parameters' messages (status 0x40, the word a kind), each the front's to send through the OS MIDI
+task as the whole part sends them: kind 3 (the calibration, the voices' counts), 4 (the system: part 1's receive
+channel, Patch Remain), 5 (the assignments), and 0 with the routing's reset (0x80). Without them part 1's node has no
+channel (−1) and no note reaches a voice. Which messages rom.4's own front sends at power-on, and in what order, isn't
+traced. Then:
+- The host's channel messages go in as MIDI IN's (source 1), as their bytes, on channel 1, part 1's receive channel by
+  rom.4's defaults (every host channel reaches it, as every one reaches the V-Synth). System and real-time bytes aren't
+  taken: with Clock Source MIDI the host's transport is to stand in for the clock through the V-Synth's own path (the
+  coordinator's call, 2026-11-25), once the system's parameters reach the part.
+- A block is made when the read needs a frame not yet made, the messages waiting first: `XtRateOut`, XtSynth's render
+  moved out as it stood, reads the part's 44.1 kHz frames at the host's rate. At 44.1 kHz a message at frame f goes in
+  before block ⌈f/32⌉.
+- A block's input: the host's through `XtHostInput`, each block reading the 32 frames at its own place (the nth block
+  since the input's start from frame 32n, the input a block late at 44.1 kHz), zeros where the host hasn't given them;
+  words 1 (the mic, kind 6's ring) and 5 (the tracker) each the mean of L and R, the rest 0, silence exactly 0. That rule
+  is a stand-in, unsourced (the coordinator's call, 2026-11-25), in one place (`vc2InputWord`, `kMicWord`,
+  `kTrackerWord`, Vc2PartPlayer.h): which slots the two are on an XT waits on step 5's captures (VC2_MODE_PLAN.md, step
+  5's items 2 and 4, and step 4.5's [gap] "The part's input frames"). A host block's input goes in whole before its
+  frames are rendered, so the MIDI's place in it changes nothing.
+- The output: MAIN + MULTI at 2^-30 (rom.4's unit gives a raw word out at ×2 of its 24 bits, v274), DIR and the sends
+  nowhere: no effects yet. `OutputFinite` (v454) as before.
+- A wait inside a pass (the notes' task's on a fade): the blocks the source gives after the one asked for run ahead of
+  the host, their input what the host has given at their places, mostly none, the host's input there passed over when
+  it comes; their frames wait in XtRateOut's room, a second's, heard first, while the host's messages wait for the next
+  block asked for. A block's input outlives the waits inside it, so the input buffers are a stack by depth: a ring let a
+  long wait's blocks write over the outer block's before its input interrupt. A wait that would run past the room stops
+  the source, the model gives up (stuck), and the part is silent until the control thread makes another.
+
+**The patch** (`PluginVc2Play`). A store: the .p02 loaded last or the session's (v452), or with neither, none (every ID
+its default) until a parameter moves from its default, then every ID's default in each zone, COSM and line its
+sections hold (`vc2DefaultStore`). The control thread (every 10 ms, beside fxTick) writes each VC-2 parameter that moved
+where rom.4 reads it (`vc2PatchPut`, a typed ID at its block's slot; `xtStoreRawPut`, xtStoreRaw's other way, which the
+notes part's `rawPut` now calls), and posts the store through three slots to the audio thread, which gives it at the next
+block's edge as `Vc2Synth::patchGiven`: the store, the part's read, the system's, assignments' and calibration's
+dispatchers and part 0's message, xt_vc2synth's patch given, now one routine its load, notes and whole parts call too.
+The store written is the session's (the patch's generation guards a load's against it). The part is made on the control
+thread, given the store, and handed to the audio thread by an atomic pointer; the last one goes once no block holds it.
+The VC-2 mode wants rom.2's tables in as well as rom.4's: the part's ports read rom.2's (XtOsc's curves, the envelopes',
+LFOs', COSMs', band players' and analog's). The system's parameters (the controller assigns, Master Level, Output Gain,
+Clock Source, External In Type) don't reach the part yet: it plays rom.4's system defaults.
+
+**Found on the way.**
+- rom.4's system defaults weren't loaded in the plugin, only by xt_vc2synth's own table list: the part read Part 1
+  Receive Switch 0, its node no channel. `loadVc2` loads them now (vc2_tables.sh's row, VSynthEmuRomTest's tables).
+- The part's players read no samples in the plugin: `giveWaves` set the store, the sets and the wave memory but not
+  `samples`, which every player reads. Now the pool's memory as rom.4's halfwords from its address, where the loaders put
+  every sample the library's waves use. xt_vc2synth gives no waves, so this join isn't held to rom.4; the patches are heard.
+- std::function on the part's note path (the channel's nodes), its settings' rows and OS block reader, the OS MIDI
+  task's drains, the kernel's tick and the tempo timers allocated on the audio thread, 22 a chord: `XtFn` holds the
+  lambda in place, refused at compile time when it doesn't fit. The interrupts' handlers a template.
+- The reference driven without denormals flushed differed from processBlock by the last bits on a quiet patch: the SH-4
+  flushes them, and so does processBlock (ScopedNoDenormals); the test's reference runs so too.
+- `XtHostInput::taken()` counts from its prepare, not its construction (its clear leaves the ring's count).
+
+**The check**: `VSynthEmuVc2PlayTest` (Vc2PlayTest.cpp, the reference `Vc2PlayDirect.h`, in verify.sh). Four of the disk
+image's .p02s, each loaded into a fresh processor at 44.1 kHz in the VC-2 mode: a chord, controllers, a bend, single
+notes and a burst of 40 overlapping notes from the host's MIDI at frames off the blocks' edges, a saw on the input, a
+level moved halfway. Every sample out equals the part driven directly by the same rules (57 checks): 3,040 blocks each,
+138 to 168 of them ahead in waits; nothing allocated or freed in processBlock; the session keeps the mode and the store
+played; at 48 kHz (the first patch) finite, no allocation, within 6 dB of 44.1 kHz's level; the V-Synth mode makes no
+part; Part 1 Receive Switch on and USB-MIDI Thru off by rom.4's defaults, no parameter holding either; a silent input
+exactly 0 in the part's mic and tracker words. About 7 s. 12 plants (`vc2play-`, panel_muts.txt), all caught; none for
+the input buffers' stack by depth, as no wait the test makes takes 16 blocks inside a block's own ticks (a ring of 16
+was missed there).
+
+**The cost**: processBlock 10–27% of one core in real time for the four. 018 FemaleChoirs runs at nine times real time
+and nearly silent (peak 1e-4), its time in its SOLO walk (`vc2solo::loadNext` through the tones' `boundFloat`): likely
+v362's fault (`Vc2SynthOscOutside::boundFloat` answering 0 for an address in no tone, the known-misses session), and out
+of the test until then (VC2_MODE_PLAN.md, step 4.5's [gap] on it).
+
 ### LITE's heads past the wave memory's first quarter (2026-11-25, v357) {#vc2-osc-heads-reach}
 
 Step 4.3's eighty-fifth version. The merge's whole `--osc` list missed v326's `heads-count`, LITE's heads' sample

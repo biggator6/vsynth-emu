@@ -113,15 +113,31 @@ bool storeDrawn(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt1993
     return !none;
 }
 
+// The part's read, a dispatcher and a message on rom.4's side alone (v455: a patch given has the part's side its own,
+// Vc2Synth::patchGiven); what faulted, or none
+std::string fwPartRead(Vc2Fw& fw) {
+    return fw.call(kReadPart, { 0 }) ? "" : "the part's read faults: " + fw.cpu.error();
+}
+
+std::string fwDispatched(Vc2Fw& fw, const Dispatcher& d) {
+    return fw.call(d.routine, {}) ? "" : "a dispatcher faults: " + fw.cpu.error();
+}
+
+std::string fwMessage(Vc2Fw& fw, bool part, uint8_t kind, uint8_t second) {
+    fw.cpu.wr8(kMessageAt, kind);
+    fw.cpu.wr8(kMessageAt + 1, second);
+    return fw.call(part ? kPartMessages : kMessages, { 0, kMessageAt }) ? "" : "a message faults: " + fw.cpu.error();
+}
+
 // The part's read and a dispatcher, each on both sides
 std::string partRead(Vc2Fw& fw, Vc2Synth& s) {
-    if (!fw.call(kReadPart, { 0 })) return "the part's read faults: " + fw.cpu.error();
+    if (std::string d = fwPartRead(fw); !d.empty()) return d;
     s.settings->readPart(0);
     return "";
 }
 
 std::string dispatched(Vc2Fw& fw, Vc2Synth& s, const Dispatcher& d) {
-    if (!fw.call(d.routine, {})) return "a dispatcher faults: " + fw.cpu.error();
+    if (std::string why = fwDispatched(fw, d); !why.empty()) return why;
     (s.settings.get()->*d.mine)();
     return "";
 }
@@ -135,9 +151,7 @@ void storeMoved(Vc2Fw& fw, std::vector<uint8_t>& store, std::mt19937& rng) {
 
 // A message's two bytes on rom.4's side, then the routine on both: the part's or any kind's
 std::string messageBoth(Vc2Fw& fw, Vc2Synth& s, bool part, uint8_t kind, uint8_t second) {
-    fw.cpu.wr8(kMessageAt, kind);
-    fw.cpu.wr8(kMessageAt + 1, second);
-    if (!fw.call(part ? kPartMessages : kMessages, { 0, kMessageAt })) return "a message faults: " + fw.cpu.error();
+    if (std::string d = fwMessage(fw, part, kind, second); !d.empty()) return d;
     if (part) {
         s.settings->partParameters(kind, second);
     } else {
@@ -219,11 +233,13 @@ void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s) {
 std::string vc2SynthPatchGiven(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,
                                const Vc2SynthSteer& steer, int offId) {
     storeDrawn(fw, s, store, rng, { true, offId }, steer);   // v349: Part 1 receiving, for the update task's passes
-    std::string d = partRead(fw, s);
+    std::string d = fwPartRead(fw);
     for (const Dispatcher& k : kDispatchers) {
-        if (d.empty()) d = dispatched(fw, s, k);
+        if (d.empty()) d = fwDispatched(fw, k);
     }
-    return d.empty() ? messageBoth(fw, s, true, 0, 0) : d;   // v346: part 0's message, its node the held class
+    if (d.empty()) d = fwMessage(fw, true, 0, 0);   // v346: part 0's message, its node the held class
+    s.patchGiven(s.patch);   // v455: the part's side as the plugin gives a patch, the same steps
+    return d;
 }
 
 std::string vc2SynthPatchLoaded(Vc2Fw& fw, Vc2Synth& s, std::vector<uint8_t>& store, std::mt19937& rng,

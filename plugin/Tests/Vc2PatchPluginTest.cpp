@@ -21,21 +21,7 @@ constexpr const char* kRom4 = "V-SynthXT.rom.4.bin";
 constexpr int kSystemLast = 0x11f, kTypedFirst = 0x56a;   // [FW] rom.4's system IDs end there; the typed from there
 constexpr int kStartOffsets[] = { 0x306, 0x33a };         // [FW] 32 bits, on the V-Synth's range (startOffsetParam)
 constexpr size_t kDiskPatches = 128;
-
-struct DiskPatch {
-    std::string name;
-    std::vector<uint8_t> bytes;
-};
-
-// The disk image's Internal.vc2/Patch, beside the ROM
-std::vector<DiskPatch> diskVc2Patches(const juce::File& rom) {
-    XtDiskImage disk;
-    std::vector<DiskPatch> out;
-    if (!disk.open(rom.getSiblingFile("V-SynthXTDiskImage.bin.0.bin").getFullPathName().toStdString())) return out;
-    for (const XtDiskImage::Entry& e : disk.list("Internal.vc2/Patch"))
-        if (!e.isDir) out.push_back({ e.name, disk.read(e) });
-    return out;
-}
+// The disk image's .p02s: TestPatches.h's (v455, shared with VSynthEmuVc2PlayTest)
 
 // What a store says of a VC-2 parameter, its ID in its zone and COSM; nothing for the system's, which no patch holds
 std::optional<int> storeSays(const std::vector<uint8_t>& store, const Vc2HostParam& h) {

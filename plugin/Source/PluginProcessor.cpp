@@ -26,7 +26,14 @@ VSynthEmuProcessor::VSynthEmuProcessor()
 class VSynthEmuProcessor::FxThread : public juce::Thread {
 public:
     explicit FxThread(VSynthEmuProcessor& p) : juce::Thread("XT effects"), owner(p) {}
-    void run() override { while (!threadShouldExit()) { owner.fxTick(); wait(10); } }
+    // The effects' tick, then the VC-2 mode's: its part and the patch it plays (PluginVc2Play.h, v455)
+    void run() override {
+        while (!threadShouldExit()) {
+            owner.fxTick();
+            owner.vc2Play_.tick();
+            wait(10);
+        }
+    }
 private:
     VSynthEmuProcessor& owner;
 };
@@ -53,6 +60,7 @@ VSynthEmuProcessor::~VSynthEmuProcessor() {
 void VSynthEmuProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     synth_.prepare(sampleRate);
     hostIn_.prepare(sampleRate, synth_.input);   // the outside input at this rate, feeding the EXT IN OSCs (v207)
+    vc2Play_.prepare(sampleRate, samplesPerBlock);   // the VC-2's part, its input and output at this rate (v455)
     scratch_.assign((size_t)std::max(samplesPerBlock, 1) * 2, 0.0f);
     if (!fxThread_ && !fxManual_) { fxThread_ = std::make_unique<FxThread>(*this); fxThread_->startThread(); }
     playbackPos_  = -1;
@@ -265,43 +273,4 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new VSynthEmuProcessor();
 }
 
-// ── The Matrix's lists ──────────────────────────────────────────────────
-juce::StringArray VSynthEmuProcessor::matrixSourceNames() {
-    juce::StringArray a { "OFF" };
-    for (int n = 1; n < 96; ++n) a.add(n == 32 ? juce::String("(OFF)") : "CC" + juce::String(n).paddedLeft('0', 2));
-    a.addArray(juce::StringArray { "BEND", "AFT", "+PAD-X", "+PAD-Y", "PAD-X", "PAD-Y", "TRIP-R", "BEAM-L", "BEAM-R", "KNOB1", "KNOB2", "VELO", "KEYF" });
-    return a;
-}
-
-juce::StringArray VSynthEmuProcessor::matrixDestNames() {
-    juce::StringArray a { "OFF" };
-    for (const char* o : { "OSC1", "OSC2" }) {
-        for (const char* d : { "PITCH", "TIME/PW", "FORMA/FAT", "LVL", "PENV-ATK", "PENV-DCY", "PENV-REL", "TENV-ATK", "TENV-DCY", "TENV-REL",
-                               "FENV-ATK", "FENV-DCY", "FENV-REL", "AENV-ATK", "AENV-DCY", "AENV-REL", "LFO-RATE", "LFO-PCH", "LFO-TM/PW", "LFO-FR/FT", "LFO-LVL" })
-            a.add(juce::String(o) + "-" + d);
-    }
-    for (const char* o : { "CSM1", "CSM2" })
-        for (const char* d : { "PRM1", "PRM2", "ENV1-ATK", "ENV1-DCY", "ENV1-REL", "ENV2-ATK", "ENV2-DCY", "ENV2-REL", "LFO-RATE", "LFO-PRM1", "LFO-PRM2" })
-            a.add(juce::String(o) + "-" + d);
-    a.addArray(juce::StringArray { "TVA-LVL", "TVA-ENV-ATK", "TVA-ENV-DCY", "TVA-ENV-REL", "TVA-LFO-RATE", "TVA-LFO-LVL", "TVA-LFO-PAN", "MFX-SEND", "CHO-SEND", "REV-SEND",
-                                   "MFX-PRM1", "MFX-PRM2", "MFX-PRM3", "TVA-PAN" });
-    return a;
-}
-
-juce::StringArray VSynthEmuProcessor::assignValueNames() {
-    juce::StringArray a { "OFF" };
-    for (int n = 1; n < 96; ++n) a.add(n == 32 ? juce::String("(OFF)") : "CC" + juce::String(n).paddedLeft('0', 2));
-    return a;
-}
-
-const char* VSynthEmuProcessor::assignParamId(int i) {
-    static const char* const k[kAssigns] = { "assignBeam2L", "assignBeam2R", "assignBeam3L", "assignBeam3R", "assignBeam4L", "assignBeam4R", "assignPadX", "assignPadY", "assignKnob1", "assignKnob2", "assignTripX", "assignTripY" };
-    return k[i];
-}
-
-const char* VSynthEmuProcessor::assignName(int i) {
-    static const char* const k[kAssigns] = { "Beam 2 L", "Beam 2 R", "Beam 3 L", "Beam 3 R", "Beam-L", "Beam-R", "Pad X", "Pad Y", "Knob 1", "Knob 2", "Trip X", "Trip Y" };
-    return k[i];
-}
-
-int VSynthEmuProcessor::assignDefault(int i) { return i == 6 ? 80 : i == 7 ? 81 : i == 10 ? 82 : i == 11 ? 83 : 0; }
+// The Matrix's lists and the controller assigns' names are with the layout, PluginParams.cpp (v455)

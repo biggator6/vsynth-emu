@@ -61,7 +61,7 @@ VC2KERNEL=(Vc2Kernel Vc2KernelRig Vc2KernelWords Vc2KernelCheck)   # v353: rom.1
 # xt_vc2synth's (v314): every VC-2 port the plugin's build lists but the .p02 reader (v450) and rom.4's own load of the
 # waves and its files (v503), which runs at the start, not in the part (from v345 rom.4's parameter tables and the patch
 # store, which the part reads); then the rom.2 ports they lean on, the shared compares and the check
-NOT_SYN=" Vc2PatchFile Vc2BootFiles Vc2WaveBoot Vc2WaveBootKernel Vc2WavesInUse "
+NOT_SYN=" Vc2PatchFile Vc2BootFiles Vc2WaveBoot Vc2WaveBootKernel Vc2WavesInUse Vc2PartPlayer "   # v455: the plugin's player
 VC2SYNTH=()
 while read -r f; do
     [[ "$NOT_SYN" == *" $f "* ]] || VC2SYNTH+=("$f")

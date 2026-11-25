@@ -25,7 +25,7 @@ uint32_t vc2ChannelTableOf(int32_t source, int32_t channel) {
 }
 
 void vc2EachNode(const Vc2PartNodes& nodes, int32_t source, int32_t channel,
-                 const std::function<void(const Vc2PartNode&)>& each) {
+                 const XtFn<void(const Vc2PartNode&)>& each) {
     const auto list = static_cast<size_t>(Vc2PartNodes::kChannels * (source - 1) + channel);
     for (uint32_t at = nodes.lists[list]; at != 0; at = nodes.node(at).next) each(nodes.node(at));
 }

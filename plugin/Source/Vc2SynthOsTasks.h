@@ -42,7 +42,7 @@ public:
     void raise(uint32_t object, uint32_t flags) { os.raise(object, flags); }
     void waitFade() { os.waitInPass(kFadeEvent); }
     // The notes' task's queue drained through `dispatch` (its waiters woken at its end)
-    void drain(const std::function<void(const Vc2MidiMessage&, uint32_t)>& dispatch) { midi.notesDrain(dispatch); }
+    void drain(const XtFn<void(const Vc2MidiMessage&, uint32_t)>& dispatch) { midi.notesDrain(dispatch); }
     long blocks = 0, messages = 0, ticks = 0;   // what was delivered
 
     void prologue(int task) override;
@@ -79,7 +79,13 @@ private:
     void deliver(const Vc2PartEvent& e);
     void block(const int32_t* input);
     void message(const Vc2MidiMessage& m, uint32_t word);
-    void interrupt(const std::function<void()>& handler);
+    // An interrupt: its handler, then its end (v455: a template, so a handler's captures never allocate, the plugin's
+    // audio thread running it)
+    template <class Handler>
+    void interrupt(Handler&& handler) {
+        handler();
+        os.interruptEnd();
+    }
     void inputDone();    // 0x89395cf0's part
     void outputDone();   // 0x89395d50's part
 };

@@ -736,7 +736,7 @@ host-step|hostBpm * (32.0 * 24.0) / (60.0 * 44100.0)|hostBpm * (32.0 * 24.0) / (
 host-at|    hostAt += hostStep();\n||toneblock
 host-keep|    if (bpm > 0.0) hostBpm = bpm;\n|    hostBpm = bpm;\n|toneclock
 host-moving|if (!moving |if (false |toneclock
-host-pos|(ppq + ((double)srcFrames - readPos) / 44100.0 * hostBpm / 60.0) * 24.0|ppq * 24.0|toneclock
+host-pos|(ppq + out.ahead() / 44100.0 * hostBpm / 60.0) * 24.0|ppq * 24.0|toneclock
 host-24|hostBpm / 60.0) * 24.0;\n    if (std::fabs|hostBpm / 60.0) * 25.0;\n    if (std::fabs|toneclock
 host-jump|std::fabs(at - hostAt) > 1.0|std::fabs(at - hostAt) > 1e9|toneclock
 host-jump-ceil|hostDone = (int64_t)std::ceil(at) - 1;   // a locate|hostDone = (int64_t)std::ceil(at);   // a locate|toneclock

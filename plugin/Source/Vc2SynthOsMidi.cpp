@@ -230,7 +230,7 @@ uint16_t Vc2SynthOsMidi::frontPass(uint32_t) {
 }
 
 // 0x893110b0: the queue marked draining, each message taken (two words below 0x70) to the handler, then its end
-void Vc2SynthOsMidi::drain(int k, const std::function<void(const Vc2MidiMessage&, uint32_t)>& handler) {
+void Vc2SynthOsMidi::drain(int k, const XtFn<void(const Vc2MidiMessage&, uint32_t)>& handler) {
     Vc2OsQueueRef q = queue(k);
     q.w.draining = 1;
     uint32_t message = 0, word = 0;
@@ -248,6 +248,6 @@ uint16_t Vc2SynthOsMidi::osMidiPass(uint32_t events) {
     return kOsMidiMask;
 }
 
-void Vc2SynthOsMidi::notesDrain(const std::function<void(const Vc2MidiMessage&, uint32_t)>& dispatch) {
+void Vc2SynthOsMidi::notesDrain(const XtFn<void(const Vc2MidiMessage&, uint32_t)>& dispatch) {
     drain(1, dispatch);
 }
