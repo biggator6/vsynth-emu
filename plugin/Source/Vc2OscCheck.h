@@ -158,6 +158,9 @@ struct OscShared {
     std::mt19937 soloRng {};
     std::vector<OscBandWave> soloWaves {};
     long soloSteers = 0, soloSetUps = 0, soloSeeks = 0;
+    // v357: LITE's heads' samples (oscSteerRenders) one time in four at SOLO's waves, not Vari off's, so a head reads
+    // past the wave memory's first quarter, as before v334 grew it: a generator of its own, so the renders' draws stay
+    std::mt19937 headsRng {};
     // v335: the period-jump player's the same, its waves of periods in kOscJumpAt's room, so SOLO's draws stay
     std::mt19937 jumpRng {};
     std::vector<OscBandWave> jumpWaves {};

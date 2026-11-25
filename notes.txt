@@ -335,6 +335,15 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+LITE's heads past the wave memory's first quarter v357 (2026-11-25, on claude/vc2-part-4-3-rest-773f3e after v356's
+  c956952; HARDWARE_FIRMWARE.md, "LITE's heads past the wave memory's first quarter"): the merge's whole --osc list
+  missed heads-count (the heads' sample count cut to a quarter). Bisected: caught to c6ea59a, missed from v334
+  (3ed4d17), when SOLO's and then the period-jump player's waves grew xt_vc2osc's wave memory to 0x70000 bytes, so its
+  first quarter covered everything the heads read. A draw back: one heads render in four reads SOLO's waves
+  (0x8C0F0000), from a generator of its own (headsRng); xt_vc2osc and xt_vc2tone 0 different at 2024/7/31337,
+  heads-count caught. The whole --osc 2,296 and --tone 757, all caught; fcheck as baseline; verify.sh green (run
+  again with the machine quiet: its first, beside the plants' builds, missed only the steps' timings).
+
 A tone's two OSC updates' order v356 (2026-11-25, on claude/vc2-part-4-3-rest-773f3e after v355's 46cffe5;
   HARDWARE_FIRMWARE.md, "A tone's two OSC updates: their order shows nowhere"): the merge's whole --tone list missed
   update-osc-order. Bisected: caught to c6ea59a, missed from v334 (3ed4d17), when SOLO's set-up, the last hooked call

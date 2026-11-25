@@ -1546,6 +1546,36 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### LITE's heads past the wave memory's first quarter (2026-11-25, v357) {#vc2-osc-heads-reach}
+
+Step 4.3's eighty-fifth version. The merge's whole `--osc` list missed v326's `heads-count`, LITE's heads' sample
+count (`Vc2OscHeads.cpp`'s `channel`, the bound past which a head reads 0) cut to a quarter.
+
+**Which version.** Built at each version with the plant (xt_vc2osc, 40 cases, seed 2024): caught at v328 (d856132,
+39 different), v332 (a728275, 11), v333 (051e88f, 9) and the two vc2-mode merges after it (7e1d3ad, c6ea59a, 9);
+missed from v334 (3ed4d17) on.
+
+**Why.** The count is the whole wave memory the check's parts hold, from `kOscWaveAt` (0x8C0B0000). A head reads its
+samples from the object's +0xf4, which the heads' draw (`oscDrawHeadsWords`) puts at `kOscWaveAt`, and about frames
+2,000 to 5,300 from there (its loops from frame 3,000, the heads a period about the walk): within Vari off's 32 KB. Until v333 the memory was 64 KB (Vari off's wave and the band
+waves), so a quarter of it ended at 16 KB, and the heads' reads past that read 0 under the plant. v334 put SOLO's waves
+above the stack and v335 the period-jump player's above those, so the memory grew to 0x70000 bytes. A quarter of it
+now ends at 0x8C0CC000, past everything the heads read, and the plant cuts nothing. A draw, not the compare, had lost
+its reach.
+
+**The draw.** One heads render in four now has its samples at SOLO's waves (`kOscSoloAt`, 0x8C0F0000), not Vari
+off's, from a generator of its own (`headsRng` in OscShared, seeded from the run's) so the renders' other draws stay.
+Both sides hold the same bytes there (SOLO's waves, drawn into rom.4's memory and the port's alike), and the heads'
+reads, up to about 21 KB, stay inside SOLO's 32 KB. xt_vc2tone's renders go through the same steer.
+
+Results:
+- xt_vc2osc and xt_vc2tone 0 different at 2024 (40 cases), 7 and 31337 (400).
+- `heads-count` caught at 40 cases (4 different).
+- `mutate_vc2.py --osc` and `--tone`, the whole lists (the draw reaches both checks): 2,296 and 757 planted, all
+  caught, each clean first.
+- fcheck as baseline (xt_vc2osc's and xt_vc2tone's lines as they were); verify.sh green. Its first run, beside the
+  plants' builds, failed only the steps' timings (encodes in 10.8 s); run again with the machine quiet, 10/10 in 4.1 s.
+
 ### A tone's two OSC updates: their order shows nowhere (2026-11-25, v356) {#vc2-tone-osc-order}
 
 Step 4.3's eighty-fourth version. The merge's whole `--tone` list (worktree vc2-merge-4-3) missed v322's

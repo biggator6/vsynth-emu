@@ -241,7 +241,7 @@ void oscSteerRenders(Vc2OscVoice& o, OscShared& shared) {
     constexpr uint32_t kLevelAt = 0x1e0, kTargetAt = 0x1dc;   // [FW] the object's +0x84 and +0x80
     std::mt19937& rng = shared.renders;
     if (oscRendersBy(o, kOscVariOffRenders)) oscDrawVariOffWords(o, rng, kOscWaveAt);   // v323
-    if (oscRendersBy(o, kOscHeadsRenders)) oscDrawHeadsWords(o, rng, kOscWaveAt);       // v326
+    if (oscRendersBy(o, kOscHeadsRenders)) oscDrawHeadsWords(o, rng, shared.headsRng() % 4 ? kOscWaveAt : kOscSoloAt);
     if (oscRendersBy(o, kOscModeOneRenders)) oscDrawModeOneWords(o, rng, shared.records, kOscWaveAt);   // v327
     oscSteerBands(o, shared);                                                                           // v332
     oscSteerAnalogRender(o, shared);                                                                    // v337
