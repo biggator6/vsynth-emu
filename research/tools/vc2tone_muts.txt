@@ -34,7 +34,6 @@ update-envelopes-all|        if (parts.envelopeOn(envelope)) parts.tickEnvelope(
 update-lfo-0|    for (int lfo = 1; lfo < kLfos; ++lfo) {   // nor LFO 0|    for (int lfo = 0; lfo < kLfos; ++lfo) {   // nor LFO 0|vc2tone
 update-lfo-follows|        if (parts.lfoOn(lfo)) parts.tickLfo(lfo, ticks);|        if (parts.lfoFollows(lfo)) parts.tickLfo(lfo, ticks);|vc2tone
 update-lfo-n|parts.tickLfo(lfo, ticks);|parts.tickLfo(lfo, n);|vc2tone
-update-osc-order|    parts.updateOsc(kVc2ToneOsc1, ticks);\n    parts.updateOsc(kVc2ToneOsc2, ticks);|    parts.updateOsc(kVc2ToneOsc2, ticks);\n    parts.updateOsc(kVc2ToneOsc1, ticks);|vc2tone
 update-cosm2|    parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|    parts.updateCosm(kVc2ToneCosm2, parts.oscValue(kVc2ToneOsc1));|vc2tone
 update-cosm-level|parts.updateCosm(kVc2ToneCosm1, parts.oscValue(kVc2ToneOsc1));|parts.updateCosm(kVc2ToneCosm1, parts.tvaLevel());|vc2tone
 update-stopped-unasked|    if (!parts.tvaOver() && !parts.tvaStopped()) {|    if (!parts.tvaOver()) {|vc2tone
@@ -761,6 +760,12 @@ host-build-osc-none|else voice(oscOfPiece(piece)).construct();|else {}|vc2toneho
 host-links-osc2|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 1)|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 0)|vc2tonehost
 # v335: host-update-osc-link dropped: an update calls nothing through the link now (its re-seek the voice's own),
 # so the other OSC's link gives the same
+# v356: v322's update-osc-order taken out, as the voices' own set-ups made it equivalent (from v334, SOLO's the last
+# hooked): each of a tone's two OSC updates writes that voice alone, so their order shows nowhere; the set-ups' hook's
+# log showed it. Caught to c6ea59a, missed from v334 (3ed4d17). On rom.4 itself, its update (0x893b4940) run as it is
+# and with its two calls of 0x893ae1c0 swapped leaves all its memory the same but the call's stack, over 2,400 updates
+# a seed at 400 cases on 2024, 7 and 31337 (342 with both OSCs VariPhrase); with OSC 1's call dropped, 816 of 2,400
+# differ
 host-update-osc-count|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n + 1, link(osc), c_.shared);|vc2tonehostosc
 host-osc-value|{ return voice(osc).f32(kRatio); }|{ return voice(osc).f32(kRatio + 4); }|vc2tonehostosc
 host-render-osc-buffer|{ voice(osc).render(buffer, link(osc)); }|{ voice(osc).render(buffer + 2, link(osc)); }|vc2tonehostosc

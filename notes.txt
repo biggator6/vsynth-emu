@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+A tone's two OSC updates' order v356 (2026-11-25, on claude/vc2-part-4-3-rest-773f3e after v355's 46cffe5;
+  HARDWARE_FIRMWARE.md, "A tone's two OSC updates: their order shows nowhere"): the merge's whole --tone list missed
+  update-osc-order. Bisected: caught to c6ea59a, missed from v334 (3ed4d17), when SOLO's set-up, the last hooked call
+  of an update, became the voice's own. Each OSC update writes its voice alone, so the order shows nowhere: on rom.4,
+  its update run as it is and with its two OSC calls swapped leaves the same memory over 7,200 updates (2024/7/31337,
+  400 cases; with OSC 1's call dropped, 816 of 2,400 differ). The plant taken out as equivalent, as v228's
+  build-osc-order was. The whole --tone list 757, all caught; fcheck as baseline; verify.sh green.
+
 The part's tasks on the kernel v355 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v354's b306173;
   HARDWARE_FIRMWARE.md, "The part's tasks on the kernel"); Vc2Synth whole done. Vc2SynthOs (the audio, clock, notes
   and update tasks, the MIDI input task, the OS MIDI task and the front's stand-in on Vc2Kernel at their levels, the
