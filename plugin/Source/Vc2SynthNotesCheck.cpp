@@ -11,7 +11,8 @@
 // one time in four, and a second byte) or the reset (0x70), the OS's routines these run on rom.4's side
 // (Vc2OsMidiParts::kOsRoutines) hooked as the part leaves them; v349: one event in 13 an update pass instead
 // (updatePassEvent).  After each every region of the part, the vocoder, the flags posted the notes' task and each
-// tone's words.  XT_VC2SYNTH_MAIN only.
+// tone's words.  v360: two patch steers on a generator of their own (NotesSteers), and after a case the receive
+// switch's case (vc2SynthReceiveOff, Vc2SynthTasksCheck.cpp) on another.  XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
 #include "Vc2Params.h"
 #include "Vc2PatchStore.h"
@@ -47,6 +48,7 @@ struct NotesCounts {
     long sounding = 0, unfinite = 0;   // v351: the blocks whose frames weren't all 0, held a word not finite
     long under = 0, kept = 0;   // v349: the patches drawn under a VOCODER's tone, the Types kept (vocoderTypesKept)
     std::array<long, std::size(kClasses)> byKind {};
+    long fixups = 0, cosmsKept = 0, offCases = 0;   // v360: the steers' patches, the receive switch's cases
 };
 
 // A message drawn, and its word: its status's class by kind, its data, its source; the parameters' messages a word of
@@ -74,10 +76,11 @@ Drawn messageDrawn(std::mt19937& rng, uint8_t receiving) {
 constexpr int kOscTypeId = 0x2e5, kOscTypeStep = 52, kOscs = 2, kRobotId = 0x1a3;
 constexpr uint32_t kVocoderType = 3, kVocoderKind = 5, kRobotZeroOneIn = 4;
 
-// An ID's bits in the store at a zone set to `raw`, where xtStoreRaw reads them (its value raw less the centre)
-void rawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw) {
+// An ID's bits in the store at a zone (v360: and a COSM's line) set to `raw`, where xtStoreRaw reads them (its value
+// raw less the centre)
+void rawPut(std::vector<uint8_t>& store, int id, int zone, uint32_t raw, int cosm = 0) {
     const XtParamDesc* d = vc2ParamDesc(id);
-    const int section = xtStoreSection(vc2Store(), id, zone);
+    const int section = xtStoreSection(vc2Store(), id, zone, cosm);
     if (d == nullptr || section < 0) return;
     const int width = std::abs(d->width), total = width + d->bit, bytes = (total + 7) / 8, at = section + d->offset;
     if (at < 0 || at + bytes > (int)store.size() || width >= 32) return;
@@ -176,6 +179,49 @@ std::string notesStepEvent(NotesStep& t) {
     ++t.n.passes[pick];
     return kPassWays[pick](t);
 }
+
+// v360: the notes part's steers, on a generator of their own (the run's seed + 13), so no other draw moves. One patch
+// in 4 the note-on's fix-up's case (0x893b3870: the MOD Type OSC SYNC, OSC 2 ANALOG on LA-SAW, the analog's code 10),
+// in both kinds, which never came of noise (svo-noteon-back's reach). One in 2 both COSMs of each kind on one Switch and
+// Type, a sounding kind's as the last patch had its COSM 1, so an update's new block keeps its object's code and
+// COSM 2's block can land on COSM 1 (svo-block-cosm's)
+constexpr int kModTypeId = 0x2d5, kOsc2TypeId = 0x319, kOsc2WaveId = 0x325, kCosmSwitchId = 0x462;   // [FW]
+constexpr int kCosmTypeId = 0x463, kSteeredKinds = 2, kCosms = 2;                                     // [FW]
+constexpr uint32_t kOscSync = 4, kAnalog = 0, kLaSaw = 9, kFixupOneIn = 4, kCosmsOneIn = 2;          // [FW] values
+struct NotesSteers {
+    std::mt19937 own;
+    std::vector<uint8_t> last;   // the last patch's store
+    NotesCounts& n;
+    void fixup(std::vector<uint8_t>& bytes) {
+        ++n.fixups;
+        for (int kind = 0; kind < kSteeredKinds; ++kind) {
+            rawPut(bytes, kModTypeId, kind, kOscSync);
+            rawPut(bytes, kOsc2TypeId, kind, kAnalog);
+            rawPut(bytes, kOsc2WaveId, kind, kLaSaw);
+        }
+    }
+    void cosmsKept(Vc2Synth& s, std::vector<uint8_t>& bytes) {
+        ++n.cosmsKept;
+        std::array<bool, kSteeredKinds> sounding {};
+        int t = 0;
+        for (uint32_t at = s.lists.sounding; at != 0 && t < Vc2TonePool::kTones; at = s.tones.at(at).head.next, ++t) {
+            const uint32_t kind = s.tones.at(at).head.id >> 16;
+            if (kind < kSteeredKinds) sounding[kind] = true;
+        }
+        for (int kind = 0; kind < kSteeredKinds; ++kind) {
+            const std::vector<uint8_t>& from = sounding[(size_t)kind] && !last.empty() ? last : bytes;
+            for (const int id : { kCosmSwitchId, kCosmTypeId }) {
+                const auto raw = (uint32_t)xtStoreRaw(vc2Store(), from, id, kind, 0);
+                for (int cosm = 0; cosm < kCosms; ++cosm) rawPut(bytes, id, kind, raw, cosm);
+            }
+        }
+    }
+    void steer(Vc2Synth& s, std::vector<uint8_t>& bytes) {
+        if (own() % kFixupOneIn == 0) fixup(bytes);
+        if (own() % kCosmsOneIn == 0) cosmsKept(s, bytes);
+        last = bytes;
+    }
+};
 } // namespace
 
 Vc2SynthDrawn vc2SynthMessageDrawn(std::mt19937& rng, const Vc2Synth& s) { return messageDrawn(rng, receivingOf(s)); }
@@ -191,9 +237,13 @@ bool vc2SynthSteered(Vc2Synth& s, std::vector<uint8_t>& bytes, std::mt19937& rng
 
 long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts) {
     NotesCounts n;
+    NotesSteers steers { std::mt19937((uint32_t)run.seed + 13), {}, n };   // v360
+    std::mt19937 receiveOwn((uint32_t)run.seed + 11);                       // v360: the receive switch's case's
     const auto oneCase = [&](std::mt19937& rng, std::vector<uint8_t>& store) {
-        const auto kept = [&s, &n, &rng](std::vector<uint8_t>& bytes) {
-            return vc2SynthSteered(s, bytes, rng, n.under, n.kept);
+        const auto kept = [&s, &n, &rng, &steers](std::vector<uint8_t>& bytes) {
+            const bool k = vc2SynthSteered(s, bytes, rng, n.under, n.kept);
+            steers.steer(s, bytes);
+            return k;
         };
         std::string d = vc2SynthPatchLoaded(fw, s, store, rng, posts, kept);
         NotesStep step { fw, s, rng, posts, n };
@@ -203,16 +253,19 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
             d = notesStepEvent(step);
             n.voiced += s.voices.ages != age && s.voices.ages != 0 ? 1 : 0;
         }
+        if (d.empty()) d = vc2SynthReceiveOff(fw, s, posts, receiveOwn, n.offCases);   // v360
         return d;
     };
     const long different = vc2SynthCases(fw, s, run, 3, "the notes", oneCase);
     std::printf("synth notes: %d cases, %ld events: %ld note-ons, %ld note-offs, %ld controllers, %ld bends, %ld poly "
                 "pressures, %ld pressures, %ld programs, %ld parameters', %ld the part's, %ld resets, %ld update "
                 "passes, %ld notes' task's passes, %ld blocks (%ld sounding, %ld not finite), %ld clock events (%ld "
-                "schedules); %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept\n",
+                "schedules); %ld voiced; %ld patches under a VOCODER's tone, %ld Types kept; v360: %ld patches on the "
+                "fix-up's case, %ld with their COSMs' types kept, %ld cases with the receive switch off\n",
                 vc2SynthCaseCount(run), n.events, n.byKind[0], n.byKind[1], n.byKind[2], n.byKind[3], n.byKind[4],
                 n.byKind[5], n.byKind[6], n.byKind[7], n.byKind[8], n.byKind[9], n.passes[0], n.passes[1],
-                n.passes[2], n.sounding, n.unfinite, n.passes[3], n.fired, n.voiced, n.under, n.kept);
+                n.passes[2], n.sounding, n.unfinite, n.passes[3], n.fired, n.voiced, n.under, n.kept, n.fixups,
+                n.cosmsKept, n.offCases);
     return different;
 }
 #endif

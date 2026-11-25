@@ -1258,7 +1258,16 @@ version against rom.4's routines with what it calls hooked:
        - [x] The plants the merge's whole lists still missed (v358 on): the --kernel list's kn-rr-freeze, caught by
          the words compared between a tick and the watchdog's interrupt (v358; HARDWARE_FIRMWARE.md, "The round
          robin's tie with a put-off dispatch"); the --synth list's plain voice's five and its drain's flag, shown out
-         of reach on rom.4 and taken out (v359; "The plain voice and the drain's flag: out of the part's reach").
+         of reach on rom.4 and taken out (v359; "The plain voice and the drain's flag: out of the part's reach");
+         seven more of the --synth list's caught by draws and compares of their own (v360; "The part's reach: seven of
+         xt_vc2synth's misses caught").
+       - [gap] tns-count (--synth): an OSC voice's count moves only where a VariPhrase player asks it, and xt_vc2synth
+         gives the part no waves (PCM's start leaves the OSC kind 0 without one). Its reach is the part given waves:
+         the coordinator's call (2026-11-25), its own version after check-pad-cc. Both sides the disk image's waves, the
+         port through `giveWaves` and rom.4's RAM by rom.4's own load (v503's, in the interpreter), read at run time
+         beside rom.4; the steer on generators of their own; a real difference the renders show fixed red first as a
+         version of its own; Vc2Synth's wiring, the Vc2SynthOs* and Vc2Midi* files and the plugin's asked first (step
+         4.5's session). Xt_vc2synth's whole part has never rendered a VariPhrase wave until then.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each

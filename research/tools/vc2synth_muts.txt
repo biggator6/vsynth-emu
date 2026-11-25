@@ -423,3 +423,10 @@ syn-midi-os|    midiPath.buildOs();\n|\n|vc2synth
 syn-hub-clock|: at == Vc2MidiPath::kClockAt ? p.clock.node|: at == Vc2MidiPath::kClockAt ? p.out.node|vc2synth
 syn-midiin-node|return at == Vc2SynthClock::kAt ? clockObject.node : midiPath.hub.node;|return midiPath.hub.node;|vc2synth
 kt-state-before|    return (at < 0 ? k.stateBefore : k.states|    return (at < 0 ? k.states[0] : k.states|vc2synthchannel
+# v360: seven of the misses caught by draws and compares of their own (HARDWARE_FIRMWARE.md, "The part's reach"):
+# rcv-full-stop by a compare inside a wait at MIDI IN's full ring; ost-cyclic-sensing and rcv-sensing-mark by a fresh
+# pair's lead-in past the sensing check's first 512 ticks; upd-glue by a pitch over half the whole part's cases, their
+# patches the vocoder's on an EXTIN with Auto Note; svo-noteon-back by a notes patch in 4 on the fix-up's case;
+# svo-block-cosm by each tone's COSM objects compared (masked as xt_vc2tone's but for the targets) and a patch in 2 with
+# both COSMs of a kind on one type; kt-state-before by a case turning Part 1 Receive Switch off by the routing's reset
+# under voices on channel 0, then the notes' task's own poly pressure. tns-count still missed: the part has no waves

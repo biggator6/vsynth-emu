@@ -1546,6 +1546,67 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part's reach: seven of xt_vc2synth's misses caught (2026-11-25, v360) {#vc2-synth-reach}
+
+Step 4.3's eighty-eighth version. Seven of the plants xt_vc2synth missed, each given the reach to be caught: four by
+draws on generators of their own (the notes part's the run's seed + 13 and + 11, the whole part's + 15), so no other
+draw moves, and two by compares added. Never a compare loosened.
+
+**Why each was missed, and its reach.**
+- `rcv-full-stop` (a full MIDI IN ring's parser count, v355). With the ring full, rom.4's parser (`0x89312576`) leaves
+  its count at the message's length; the plant sets it to 1. The next status byte sets it to 0 on both sides, and the
+  check gives every message its status byte. The flood's full ring comes inside a wait, and the check compared only
+  after the step. *The compare*: where the port's MIDI IN ring has just written a full ring's marker (0xfd, code 2), the
+  machine is given what the model took and both are compared there, inside the wait, as a cut does
+  (`Vc2SynthWhole::fullCompare`). MIDI IN's count then differs, 01 against 03, at 2024's case 13.
+- `ost-cyclic-sensing` and `rcv-sensing-mark` (the sensing check's call and its mark's clear, v355). The check (rom.4's
+  `0x89311330`, every 512 ticks) watches MIDI IN's receive object until the first parameters' message moves it to the
+  second USB port's, which takes no bytes. In the draws that message came long before the first 512 ticks. *The draw*:
+  a fresh pair's lead-in before its first patch, silent blocks with a channel message on MIDI IN one event in 16, until
+  the kernel's time passes 600 ticks. Both plants leave MIDI IN's mark set there.
+- `upd-glue` (the vocoder's glue given the tracked period + 100, v349). The glue (`Vc2Vocoder::glue`) reads the period
+  only with an offset, which Auto Note's Formant Template gives (an EXTIN OSC, Auto Note on, a template whose shifts
+  aren't both 0). It clamps every period past 200.45 frames alike (the ratio 100.227 over it below ½), and the noise's
+  periods were 195 to 630. *The draw*: one case in two on a pitch, its blocks' frames a saw of 40 to 189 frames (where
+  not silent, as loud as the noise's shift), its patch the vocoder's on an EXTIN with Auto Note (OSC 1 Type, Auto Note
+  On Switch, Vocoder Sw and Type, a template with shifts). The plant shows at 2024's case 11.
+- `svo-noteon-back` (the note-on's fix-up not written back, v346). The tone's note-on turns OSC 2's code 10 into 2 under
+  the MOD Type OSC SYNC with OSC 2 ANALOG (`0x893b3870`); noise never made that case (0 in every run). *The draw*: one
+  notes-part patch in 4 on it, in both kinds (MOD Type 4, OSC 2 Type ANALOG, OSC 2 Waveform LA-SAW). The note's input
+  then differs, 0a against 02, at 2024's case 15.
+- `svo-block-cosm` (COSM 2's new block given COSM 1, v346). A COSM's new block takes effect only where its code is the
+  object's (`Vc2CosmNoteOn::newBlock`), and what it changes, the two targets (+0xfc, +0x100), lay in the words the
+  tone's compare left out (the COSM objects weren't compared; xt_vc2tone masks +0x70…+0x104 as rom.4's DSP state).
+  *The compare*: each tone's two COSM objects, masked as xt_vc2tone's but for the targets, which the frame keeps in the
+  object (`cosmDifference`, Vc2SynthCheck.cpp). *The draw*: one notes-part patch in 2 has both COSMs of each kind on
+  one Switch and Type, a sounding kind's as the last patch had its COSM 1, so an update's new block keeps the code and
+  COSM 2's lands on COSM 1. COSM 1's target differs at 2024's case 45.
+- `kt-state-before` (a channel state of channel −1 on row 0, the word before the table, v355). The notes' task's own
+  poly pressure (event 0x100) goes on source 3 at the Auto Note node's channel, the part's receive channel, −1 with
+  Part 1 Receive Switch off. The word before the table is 1, so its state 3 matches no voice; the plant's (row 0's
+  channel 0) matches every voice of sources 1 to 3 on channel 0. The notes part keeps the switch on (with it off, the
+  update's Matrix sources read the boot flash, a [gap]); the load part, which may turn it off, plays no note. And the
+  system's message (kind 4) asks every voice of part 0 a change, which takes the notify's place. *The draw*
+  (`vc2SynthReceiveOff`, Vc2SynthTasksCheck.cpp): after a notes case receiving on channel 0 with a voice there, the
+  switch off by the routing's reset (kind 0 with its flag, which reads the switch into part 0's nodes but stops no
+  voice and leaves G's channel word, so no boot flash is read), two update passes (taking the voices' asked updates),
+  the notes' task's own poly pressure, then the switch on again. The voices differ at 2024's case 192.
+
+**Not reached:** `tns-count` (an OSC voice's count moves only where a VariPhrase player asks it), which needs the part
+to have waves: PCM's start (`pcmWaveFound`) leaves the OSC kind 0 without one, and the check gives the part none.
+
+**The split.** `Vc2SynthWholeCheck.cpp` was at the 300-line limit, so a pair's events moved as they stood into
+`Vc2SynthWholeEventsCheck.cpp`, with what both share in `Vc2SynthWholeCheck.h`.
+
+Results:
+- xt_vc2synth 0 different at 2024, 7 and 31337 (400 cases): 90, 97 and 102 fix-up patches; 204, 194 and 197 with the
+  COSMs' types kept; 90, 74 and 65 receive-switch cases; one compare at a full ring each; 18, 22 and 23 cases on a pitch.
+- xt_vc2synth 0 different at the six seeds v355 ran, 2024, 7, 31337, 3, 4 and 5 (40 cases).
+- The seven plants caught at 400 cases, 2024 (`mutate_vc2.py --synth` by name).
+- `mutate_vc2.py --synth`, the whole list: 322 planted, 321 caught, tns-count missed, clean first (28 minutes).
+- fcheck: only xt_vc2synth's two summary lines moved (the notes part's and the whole part's counts, the new ones with
+  them), `--update` on purpose; verify.sh green.
+
 ### The plain voice and the drain's flag: out of the part's reach (2026-11-25, v359) {#vc2-synth-plain-voice}
 
 Step 4.3's eighty-seventh version. Six of the plants xt_vc2synth missed, shown out of reach and taken out of

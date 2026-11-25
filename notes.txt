@@ -335,6 +335,18 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's reach v360 (2026-11-25, on claude/v358-plant-reach after v359; HARDWARE_FIRMWARE.md, "The part's reach:
+  seven of xt_vc2synth's misses caught"): rcv-full-stop by a compare inside a wait at MIDI IN's full ring; the sensing
+  pair (ost-cyclic-sensing, rcv-sensing-mark) by a fresh pair's lead-in past the sensing check's first 512 ticks;
+  upd-glue by a pitch over half the whole part's cases, their patches the vocoder's on an EXTIN with Auto Note;
+  svo-noteon-back by a notes-part patch in 4 on the fix-up's case; svo-block-cosm by each tone's COSM objects compared
+  (masked as xt_vc2tone's but for the targets) and a patch in 2 with both COSMs of a kind on one type; kt-state-before
+  by a case turning Part 1 Receive Switch off by the routing's reset under voices on channel 0, then the notes' task's
+  own poly pressure. Each draw on a generator of its own. tns-count still needs the part to have waves. The whole part's
+  events split into Vc2SynthWholeEventsCheck.cpp (its file was at the limit). xt_vc2synth 0 different at 2024/7/31337
+  (400) and 3/4/5 (40). The whole --synth 322, 321 caught (tns-count), clean first; fcheck --update moved only
+  xt_vc2synth's two summary lines; verify.sh green (it covers v359's tree too, which its own run couldn't).
+
 The plain voice and the drain's flag out of the part's reach v359 (2026-11-25, on claude/v358-plant-reach after v358;
   HARDWARE_FIRMWARE.md, "The plain voice and the drain's flag: out of the part's reach"): six xt_vc2synth misses taken
   out of vc2synth_muts.txt, no code changed. The plain voice's five (svo-destroy-end, -note, -updated,

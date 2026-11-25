@@ -84,7 +84,15 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
 using Vc2SynthInput = std::array<int32_t, 32 * 8>;
 std::string vc2SynthEventDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts);
 std::string vc2SynthUpdatePass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
-std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
+// v360: its events drawn of `only` alone
+std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts,
+                                  uint32_t only = 0xffffffffu);
+// v360: with the part receiving on channel 0 and a voice sounding there, Part 1 Receive Switch off by the routing's
+// reset, two update passes, then the notes' task's own poly pressure (on channel −1, where its channel state is the
+// word before the table's), the switch on again after; `own` its draws, `cases` counted (kt-state-before's reach)
+std::string vc2SynthReceiveOff(Vc2Fw& fw, Vc2Synth& s, Vc2SynthPosts& posts, std::mt19937& own, long& cases);
+// v360: a parameters' message (the part's, or any kind's) on both sides, as the load part gives it
+std::string vc2SynthMessage(Vc2Fw& fw, Vc2Synth& s, bool part, uint8_t kind, uint8_t second);
 std::string vc2SynthMixerBlock(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthInput& input,
                                const Vc2SynthPosts& posts);
 // v354: one to three of the clock's ms (0x89312f50), then the clock task's pass (its loop body from 0x89313c36)

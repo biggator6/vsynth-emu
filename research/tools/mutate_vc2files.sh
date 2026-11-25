@@ -68,8 +68,9 @@ while read -r f; do
 done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\)\.cpp$|\1|p' "$REPO/plugin/Vc2Sources.cmake")
 VC2SYNTH+=(Vc2SynthCheck Vc2SynthReadsCheck Vc2SynthLoadCheck Vc2SynthNotesCheck Vc2SynthTasksCheck Vc2CheckWords
            XtLfo XtEnvelope XtCosm XtOsc XtExtIn XtLitePlayer XtAnalog XtFxValueText XtTempoTicks
-           Vc2SynthWholeCheck Vc2KernelRig Vc2KernelWords Vc2MachineRig)   # v345: harnessParts adds the store's,
-           # firmware's; v351 the tasks' steps' file; v354 the tempo ticks; v355 the whole part on rom.1's kernel
+           Vc2SynthWholeCheck Vc2SynthWholeEventsCheck Vc2KernelRig Vc2KernelWords Vc2MachineRig)   # v345: harnessParts adds the store's,
+           # firmware's; v351 the tasks' steps' file; v354 the tempo ticks; v355 the whole part on rom.1's kernel;
+           # v360 the whole part's events' file
 VC2SETS=(Vc2Sets Vc2NoteMatrix Vc2MatrixSetup Vc2MatrixTables Vc2Matrix Vc2MatrixSources Vc2SetsCheck Vc2SetsDraws
          Vc2SetsEvents Vc2SetCommon Vc2SetCommonCheck Vc2SetEnvelope Vc2SetEnvelopeTables Vc2SetEnvelopeCheck
          Vc2LibMath Vc2LibMathTables Vc2SetChildHead Vc2SetLfo Vc2SetLfoCheck Vc2SetMix Vc2SetMixCheck

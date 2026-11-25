@@ -13,23 +13,25 @@
 // waits for good, on rom.4 as here). After the start, each patch and each event: every region of the part (the MIDI
 // path's with it), each tone's words, the kernel's words (Vc2KernelWords.h: the seven tasks' and the idle's TCBs,
 // readyQueue, the system's words, the cyclic records, the watchdog), the services the port's model holds as nothing
-// having changed nothing on rom.1, and the senders' waits counted on both (Vc2MachineRig's counts). XT_VC2SYNTH_FIRST=1
-// says what differs. XT_VC2SYNTH_MAIN only.
+// having changed nothing on rom.1, and the senders' waits counted on both (Vc2MachineRig's counts). v360, each from a
+// generator of its own (the run's seed + 15), so no other draw moves: a fresh pair's lead-in before its first patch
+// (Vc2SynthWholeEventsCheck.cpp); one case in two on a pitch, its patch the vocoder's on an EXTIN with Auto Note; and a
+// compare inside a wait where MIDI IN's ring has just filled. The pair's events in Vc2SynthWholeEventsCheck.cpp (v360).
+// XT_VC2SYNTH_FIRST=1 says what differs. XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
 #include "Vc2KernelWords.h"
-#include "Vc2MachineRig.h"
+#include "Vc2PartSettingsTables.h"   // v360
 #include "Vc2PatchStore.h"
-#include "Vc2Synth.h"
-#include "Vc2SynthCheck.h"
-#include "Vc2SynthOsTasks.h"
+#include "Vc2SynthWholeCheck.h"   // v360
 #include "Vc2SystemStore.h"
 #include <algorithm>
-#include <deque>
 #include <memory>
 
 namespace {
 using Os = Vc2SynthOs;
 using Rig = Vc2MachineRig;
+using Whole = Vc2SynthWhole;
+using WholeCounts = Vc2SynthWholeCounts;
 // [FW] the cyclic handlers by the port's number: the update task's, the sensing check, MIDI out A's flush
 constexpr uint32_t kHandlers[] = { 0x893952a0u, 0x89311330u, 0x893115e0u };
 constexpr int16_t kUsbThru = 0x7d;   // [FW] System B's USB-MIDI Thru, off at the start
@@ -44,13 +46,14 @@ constexpr uint32_t kTempoFrom = 200, kTempos = 2301;
 constexpr uint32_t kRigRows[] = { 0x8930ee90, 0x89311520, 0x893118f0, 0x89311e10, 0x89312d40, 0x89312ea0, 0x893133d0,
                                   0x89313e70, 0x893150c0, 0x89315440, 0x89315bc0, 0x89317180, 0x893179d0, 0x89317db0,
                                   0x89318140, 0x89318690, 0x8931a5d0 };
-constexpr uint32_t kBlockFrames = 32, kFramesPerMs = 44100, kMsPerSecond = 1000, kInputShifts = 12;
-// The check's own bounds, no firmware's: a wait inside a pass cut at so many events; a burst's messages (more than the
-// notes' queue's 127) and a flood's (more than MIDI IN's receive ring's 2047), drawn on MIDI IN or USB
-constexpr size_t kLongestWait = 6000;
-constexpr uint32_t kBurstFrom = 130, kBursts = 300, kFloodFrom = 2100, kFloods = 300, kBurstChance = 4;
-constexpr uint8_t kChannelFirst = 0x80, kSystemFirst = 0xf0, kMidiIn = 1, kInputs = 2;
-constexpr int kTries = 64;
+// v360: a pitch's case one time in two, its period 40…189 frames; its patch's IDs [FW]: OSC 1's Type (kind 0) EXTIN,
+// Auto Note On Switch, Vocoder Sw on, Vocoder Type LEGACY or HIRESO, Formant Template one whose shifts aren't both 0
+// (the glue reads the tracked period only with an offset, which Auto Note's template gives); the lead-in's ticks, past
+// the sensing check's first 512
+constexpr uint32_t kPitchOneIn = 2, kPeriodFrom = 40, kPeriods = 150, kLeadTicks = 600;
+constexpr int kOscTypeId = 0x2e5, kAutoNoteId = 0x19c, kVocoderSwId = 0x193, kVocoderTypeId = 0x194;
+constexpr int kTemplateId = 0x1a0;
+constexpr uint32_t kExtin = 2, kOn = 1, kVocoderTypes = 2, kTemplates = 16;
 
 // The machine's TCBs as the port's tasks: an address as one (-1 for none, -2 for any not the part's or its idle), a
 // task's TCB, and the cyclic handlers as the port's numbers
@@ -86,9 +89,22 @@ std::string waitsDifference(const Rig& rig, const Vc2SynthOsMidi& m) {
            ", for empty " + std::to_string(m.emptyWaits) + " against " + std::to_string(rig.emptyWaits);
 }
 
-// Every region of the part, the vocoder, each tone's words, then the kernel's, the services', whether the port's model
-// is stuck, and the senders' waits
-std::string wholeDifference(Rig& rig, Vc2Synth& s) {
+// v360: a pitch's case's patch, the vocoder's on an EXTIN OSC 1 with Auto Note (`own` its draws)
+void vocoderOnPitch(std::vector<uint8_t>& bytes, std::mt19937& own) {
+    vc2SynthRawPut(bytes, kOscTypeId, 0, kExtin);
+    vc2SynthRawPut(bytes, kAutoNoteId, 0, kOn);
+    vc2SynthRawPut(bytes, kVocoderSwId, 0, kOn);
+    vc2SynthRawPut(bytes, kVocoderTypeId, 0, own() % kVocoderTypes);
+    const auto& shifts = vc2PartSettingsTables().templateShifts;
+    uint32_t t = own() % kTemplates;
+    for (uint32_t k = 0; k < kTemplates && shifts[t] == 0.0f && shifts[t + kTemplates] == 0.0f; ++k) {
+        t = own() % kTemplates;
+    }
+    vc2SynthRawPut(bytes, kTemplateId, 0, t);
+}
+} // namespace
+
+std::string vc2SynthWholeDifference(Rig& rig, Vc2Synth& s) {
     std::string d = vc2SynthDifference(rig.fw, s);
     for (int tone = 0; tone < Vc2TonePool::kTones && d.empty(); ++tone) d = vc2SynthToneDifference(rig.fw, s, tone);
     if (d.empty() && s.osTasks) {
@@ -103,136 +119,31 @@ std::string wholeDifference(Rig& rig, Vc2Synth& s) {
     return d;
 }
 
-struct WholeCounts {
-    long events = 0, blocks = 0, messages = 0, ticks = 0, nested = 0, sounding = 0, under = 0, kept = 0;
-    long cuts = 0, bursts = 0, floods = 0, pairs = 0;
-    // the machines', every pair's
-    long loads = 0, suspends = 0, semaphoreWaits = 0, roomWaits = 0, emptyWaits = 0;
-    std::array<long, 5> markers {};
-    void tally(const Rig& rig) {
-        loads += rig.loads;
-        suspends += rig.suspends;
-        semaphoreWaits += rig.semaphoreWaits;
-        roomWaits += rig.roomWaits;
-        emptyWaits += rig.emptyWaits;
-        for (size_t k = 0; k < markers.size(); ++k) markers[k] += rig.markers[k];
-    }
-};
+void Vc2SynthWholeCounts::tally(const Rig& rig) {
+    loads += rig.loads;
+    suspends += rig.suspends;
+    semaphoreWaits += rig.semaphoreWaits;
+    roomWaits += rig.roomWaits;
+    emptyWaits += rig.emptyWaits;
+    for (size_t k = 0; k < markers.size(); ++k) markers[k] += rig.markers[k];
+}
 
-// The pair and the events: drawn as the port's model takes them, the machine given them after
-struct Whole {
-    Rig& rig;
-    Vc2Synth& s;
-    std::mt19937& rng;
-    WholeCounts& n;
-    std::deque<Vc2PartEvent> events;
-    std::deque<Vc2SynthInput> inputs;   // the blocks' frames, where their events point
-    size_t taken = 0;                   // the events the port's model has taken
-    size_t given = 0;                   // and the machine been given
-    size_t stepFrom = 0;                // the step's first
-    uint32_t msAcc = 0;                 // the machine's ms against its frames, as the port's model counts them
-    uint32_t burst = 0;                 // a burst's messages still to come
-    bool flooding = false, flooded = false;
-    bool cutting = false;               // a wait cut: the pair can't go on
-    std::string cut;                    // what differed where it was cut
-
-    // A burst's next: a channel message as the notes part draws them, on MIDI IN or USB (a flood's on MIDI IN)
-    Vc2PartEvent burstMessage() {
-        Vc2PartEvent e;
-        e.block = false;
-        for (int k = 0; k < kTries && (e.message.status < kChannelFirst || e.message.status >= kSystemFirst); ++k) {
-            const Vc2SynthDrawn m = vc2SynthMessageDrawn(rng, s);
-            e.message = m.m;
-            e.word = m.word;
-        }
-        e.message.source = (uint8_t)(flooding ? kMidiIn : kMidiIn + rng() % kInputs);
-        --burst;
-        ++n.messages;
-        return e;
-    }
-    // A block two times in three, its frames silence one time in four, else noise shifted down 0…11 bits; else a
-    // message; a burst's while one goes on
-    Vc2PartEvent drawn() {
-        if (burst > 0) return burstMessage();
-        Vc2PartEvent e;
-        if (rng() % 3 != 0) {
-            const bool silent = rng() % 4 == 0;
-            const uint32_t shift = rng() % kInputShifts;
-            Vc2SynthInput& frames = inputs.emplace_back();
-            for (int32_t& word : frames) word = silent ? 0 : (int32_t)rng() >> shift;
-            e.input = frames.data();
-            ++n.blocks;
-        } else {
-            const Vc2SynthDrawn m = vc2SynthMessageDrawn(rng, s);
-            e.block = false;
-            e.message = m.m;
-            e.word = m.word;
-            ++n.messages;
-        }
-        return e;
-    }
-    // A wait's first event drawn: one time in four a burst, the pair's first a flood
-    void burstDrawn() {
-        if (rng() % kBurstChance != 0) return;
-        flooding = !flooded;
-        flooded = true;
-        burst = flooding ? kFloodFrom + rng() % kFloods : kBurstFrom + rng() % kBursts;
-        ++(flooding ? n.floods : n.bursts);
-    }
-    // The next event the port's model takes, drawn when none waits; none past the longest wait, cut there
-    bool next(Vc2PartEvent& e) {
-        if (taken - stepFrom >= kLongestWait) {
-            if (!cutting) waitCut();
-            return false;
-        }
-        if (taken == events.size()) {
-            if (taken == stepFrom + 1 && burst == 0) burstDrawn();
-            events.push_back(drawn());
-        }
-        e = events[taken++];
-        return true;
-    }
-    std::string give(const Vc2PartEvent& e) {
-        if (!e.block) return rig.message(e.message, e.word);
-        std::string d;
-        for (msAcc += kBlockFrames * kMsPerSecond; msAcc >= kFramesPerMs && d.empty(); msAcc -= kFramesPerMs) {
-            ++n.ticks;
-            d = rig.tick();
-        }
-        if (d.empty()) d = rig.input(e.input);
-        return d.empty() ? rig.output() : d;
-    }
-    // The machine given what the port's model took, both compared there, inside the wait, before the port's unwinds
-    void waitCut() {
-        while (given < taken && cut.empty()) cut = give(events[given++]);
-        if (cut.empty()) cut = wholeDifference(rig, s);
-        if (!cut.empty()) cut = "inside a wait cut: " + cut;
-        cutting = true;
-        ++n.cuts;
-    }
-    // One event or more on the port's model (a wait inside a pass takes the next), then each on the machine
-    std::string step() {
-        stepFrom = taken;
-        s.osTasks->deliverNext();
-        n.nested += taken - stepFrom > 1 ? 1 : 0;
-        if (cutting) return cut;
-        std::string d;
-        while (given < taken && d.empty()) d = give(events[given++]);
-        n.sounding += std::ranges::any_of(s.frames, [](float x) { return x != 0.0f; }) ? 1 : 0;
-        return d.empty() ? wholeDifference(rig, s) : d;
-    }
-};
-
+namespace {
 // A patch's steer: the notes part's, then half the time Patch Tempo within its range (noise falls outside it almost
-// always, and the default's 120 BPM is the clock's own, so the clock task's tempo would never move)
+// always, and the default's 120 BPM is the clock's own, so the clock task's tempo would never move); v360: a pitch's
+// case's patch the vocoder's on an EXTIN
 std::string wholeCase(Whole& w, std::vector<uint8_t>& store) {
+    w.pitched = w.own() % kPitchOneIn == 0;
+    w.period = kPeriodFrom + w.own() % kPeriods;
+    w.n.pitched += w.pitched ? 1 : 0;
     const auto steer = [&w](std::vector<uint8_t>& bytes) {
         const bool kept = vc2SynthSteered(w.s, bytes, w.rng, w.n.under, w.n.kept);
         if (w.rng() % 2 == 0) vc2SynthRawPut(bytes, kPatchTempo, 0, kTempoFrom + w.rng() % kTempos);
+        if (w.pitched) vocoderOnPitch(bytes, w.own);
         return kept;
     };
     std::string d = vc2SynthPatchGiven(w.rig.fw, w.s, store, w.rng, steer, kUsbThru);
-    if (d.empty()) d = wholeDifference(w.rig, w.s);
+    if (d.empty()) d = vc2SynthWholeDifference(w.rig, w.s);
     if (!d.empty()) return "the patch: " + d;
     for (int e = 0; e < kEvents && d.empty() && !w.cutting; ++e) {
         ++w.n.events;
@@ -249,8 +160,9 @@ struct Pair {
     std::unique_ptr<Whole> w;
 };
 
-// A fresh pair (the last one's counts tallied), each started as the check's main starts its own, then each on its OS
-std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, WholeCounts& n) {
+// A fresh pair (the last one's counts tallied), each started as the check's main starts its own, then each on its OS;
+// v360: then its lead-in
+std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, std::mt19937& own, WholeCounts& n) {
     if (p.rig) n.tally(*p.rig);
     p = Pair {};
     p.rig = std::make_unique<Rig>();
@@ -263,11 +175,12 @@ std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, WholeCounts& 
     p.s->start();
     if (vc2SystemDefaults() != nullptr) p.s->giveSystem(*vc2SystemDefaults());
     if (d.empty()) d = p.rig->begin();
-    p.w.reset(new Whole { *p.rig, *p.s, rng, n });
+    p.w.reset(new Whole { *p.rig, *p.s, rng, n, own });
     Whole* w = p.w.get();
     p.s->runOnOs([w](Vc2PartEvent& e) { return w->next(e); });
     if (d.empty() && p.s->systemBValue(kUsbThru) != 0) d = "USB-MIDI Thru on";
-    if (d.empty()) d = wholeDifference(*p.rig, *p.s);
+    if (d.empty()) d = vc2SynthWholeDifference(*p.rig, *p.s);
+    if (d.empty()) d = w->leadIn(kLeadTicks);
     ++n.pairs;
     return d.empty() ? "" : "the start: " + d;
 }
@@ -275,15 +188,16 @@ std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, WholeCounts& 
 
 long vc2SynthWholePart(const char* rom4, const Vc2Run& run) {
     std::mt19937 rng((uint32_t)run.seed + 5);
+    std::mt19937 own((uint32_t)run.seed + 15);   // v360
     WholeCounts n;
     Pair p;
-    std::string d = pairMade(rom4, p, rng, n);
+    std::string d = pairMade(rom4, p, rng, own, n);
     if (!d.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the whole part: %s\n", d.c_str());
     std::vector<uint8_t> store((size_t)kVc2StoreBytes);
     int c = 0;
     for (; c < std::min(vc2SynthCaseCount(run), kMostCases) && d.empty(); ++c) {
         d = wholeCase(*p.w, store);
-        if (d.empty() && p.w->cutting) d = pairMade(rom4, p, rng, n);   // the cut pair can't go on
+        if (d.empty() && p.w->cutting) d = pairMade(rom4, p, rng, own, n);   // the cut pair can't go on
         if (!d.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the whole part: case %d, %s\n", c, d.c_str());
     }
     vc2SynthPatchDropped(p.rig->fw, *p.s);
@@ -291,10 +205,11 @@ long vc2SynthWholePart(const char* rom4, const Vc2Run& run) {
     std::printf("synth whole: the start on both OSes; %d cases on %ld pairs, %ld events: %ld blocks (%ld ticks, %ld "
                 "sounding), %ld messages (%ld bursts, %ld floods); %ld waits in a pass, %ld cut; %ld patches under a "
                 "VOCODER's tone, %ld Types kept; on rom.1 %ld contexts loaded, %ld suspends, %ld semaphore waits; the "
-                "senders' %ld waits for room, %ld for empty; markers %ld %ld %ld %ld %ld\n",
+                "senders' %ld waits for room, %ld for empty; markers %ld %ld %ld %ld %ld; v360: %ld lead-ins' events, "
+                "%ld compares at MIDI IN's full ring, %ld cases on a pitch\n",
                 c, n.pairs, n.events, n.blocks, n.ticks, n.sounding, n.messages, n.bursts, n.floods, n.nested, n.cuts,
                 n.under, n.kept, n.loads, n.suspends, n.semaphoreWaits, n.roomWaits, n.emptyWaits, n.markers[0],
-                n.markers[1], n.markers[2], n.markers[3], n.markers[4]);
+                n.markers[1], n.markers[2], n.markers[3], n.markers[4], n.leads, n.fulls, n.pitched);
     return d.empty() ? 0 : 1;
 }
 #endif

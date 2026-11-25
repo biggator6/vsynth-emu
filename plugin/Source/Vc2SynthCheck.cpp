@@ -88,8 +88,27 @@ Words withIndex(const Words& w, int32_t index, size_t indexAt) {
     return out;
 }
 
+// v360: a tone's COSM object (`cosm` 0 or 1) against rom.4's, but for what its sound keeps (rom.4's DSP state, D+4…,
+// which the port keeps in XtCosm's objects; v263) and rom.4's stack bytes, as xt_vc2tone's compare masks them
+// (Vc2ToneCosmCheck.cpp): here the new block's two targets (+0xfc, +0x100), which the frame keeps in the object, are
+// compared too, so a COSM's block given the other COSM shows (svo-block-cosm's reach)
+std::string cosmDifference(Vc2Fw& fw, uint32_t tone, const Vc2CosmObjectWords& port, int cosm) {
+    struct Masked {
+        uint32_t from, to;
+    };
+    constexpr Masked kMasked[] = { { 0x0d, 0x10 }, { 0x5c, 0x60 }, { 0x70, 0xfc }, { 0x114, 0x11c }, { 0x124, 0x140 } };
+    constexpr uint32_t kCosmAt[] = { 0x1728, 0x188c };   // [FW] the tone's COSM 1 and 2
+    const uint32_t at = tone + kCosmAt[cosm];
+    Vc2CosmObjectWords mine = port;
+    for (const Masked& m : kMasked) {
+        fw.cpu.read(at + m.from, reinterpret_cast<char*>(&mine) + m.from, m.to - m.from);
+    }
+    const std::string name = "its COSM " + std::to_string(cosm + 1);
+    return vc2FirstDifference(fw, at, &mine, sizeof mine, name.c_str());
+}
+
 // v340: a made tone's words, each region by its place in the tone: its head, tail and link, its OSC voices, TVA, mix,
-// and its envelopes' and LFOs' words (its COSM objects hold rom.4's own pointers, which xt_vc2tone masks: there)
+// and its envelopes' and LFOs' words; v360: its COSM objects, masked as xt_vc2tone masks them but for the targets
 std::string madeDifference(Vc2Fw& fw, Vc2Synth& s, int tone) {
     constexpr uint32_t kOsc2At = 0xba4, kTvaAt = 0x19f0, kMixAt = 0x1ab8, kLinkAt = 0x2618;     // [FW] the tone's
     constexpr uint32_t kOsc1At = 0x20, kEnvelopesAt = 0x1b38, kLfosAt = 0x2158;                  // [FW]
@@ -120,6 +139,10 @@ std::string madeDifference(Vc2Fw& fw, Vc2Synth& s, int tone) {
     }
     for (const SynthRegion& r : regions) {
         if (std::string d = bytesDifference(fw, r); !d.empty()) return "tone " + std::to_string(tone) + ", " + d;
+    }
+    for (int cosm = 0; cosm < 2; ++cosm) {
+        const std::string d = cosmDifference(fw, at, h.cosms[(size_t)cosm], cosm);
+        if (!d.empty()) return "tone " + std::to_string(tone) + ", " + d;
     }
     return "";
 }
