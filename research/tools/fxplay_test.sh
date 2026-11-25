@@ -19,7 +19,11 @@ mkdir -p "$WORK/fx" "$WORK/vc2" "$(dirname "$BIN")"
 clang++ -std=c++17 -O2 -Wall -Werror "$REPO/research/tools/fxplay.cpp" -framework CoreMIDI -framework CoreFoundation \
     -framework AudioToolbox -framework CoreAudio -o "$BIN"
 "$PY" "$REPO/research/tools/fxcapture.py" --rom "$ROM2" --out "$WORK/fx" > /dev/null
-"$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --out "$WORK/vc2" --input-wavs > /dev/null
+if ! "$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --out "$WORK/vc2" --input-wavs > "$WORK/vc2.txt"; then
+    # Until step 5's runs are made again, vc2capture.py writes no VC-2 run (VC2_MODE_PLAN.md, step 5's decision)
+    echo "fxplay_test: WRONG, no VC-2 runs to test: $(head -c 300 "$WORK/vc2.txt")…"
+    exit 1
+fi
 failed=0
 for run in "$WORK"/fx/*.mid "$WORK"/vc2/*.mid; do
     if ! "$BIN" --test "$run"; then
