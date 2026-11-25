@@ -1482,6 +1482,13 @@ TVA Switch, Output Assign, Chorus Send Level, Output Gain and External In Type. 
 Recommended: (b), as it keeps every take; it needs the patch writer (step 4.5's patch files, or a tool beside `vc2patches.cpp`)
 and Program Change's path to a stored patch read first.
 
+**Decided 2026-11-25, the user's choice of the three: "Patch files (Recommended)".** Each take that needs them selects a
+patch from the card by Program Change. The work, as the coordinator set it out (v505…v519, the loaders' unused block):
+rom.4's own patch save run in the interpreter, held by a round trip of every factory patch (v505 on); where Program Change
+and Bank Select reach a card patch in VC-2 mode and how the card's folder is laid out, from rom.4's code by two sources;
+then `vc2capture.py` writing the patch files a run needs and sending the bank and Program Change at each take's cue,
+`fxplay_test.sh` and `vc2cut_test.py` green again on the new runs, and the guide's copy-to-card step.
+
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
 
