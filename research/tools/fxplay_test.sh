@@ -19,7 +19,7 @@ mkdir -p "$WORK/fx" "$WORK/vc2" "$(dirname "$BIN")"
 clang++ -std=c++17 -O2 -Wall -Werror "$REPO/research/tools/fxplay.cpp" -framework CoreMIDI -framework CoreFoundation \
     -framework AudioToolbox -framework CoreAudio -o "$BIN"
 "$PY" "$REPO/research/tools/fxcapture.py" --rom "$ROM2" --out "$WORK/fx" > /dev/null
-"$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --rom2 "$ROM2" --out "$WORK/vc2" --input-wavs > /dev/null
+"$PY" "$REPO/research/tools/vc2capture.py" --rom4 "$ROM4" --out "$WORK/vc2" --input-wavs > /dev/null
 failed=0
 for run in "$WORK"/fx/*.mid "$WORK"/vc2/*.mid; do
     if ! "$BIN" --test "$run"; then

@@ -11,19 +11,22 @@ analysis/test_files/vc2/ (gitignored):
   vc2_takes.csv        every take: when it starts, what it sets in the panel's words, the input it gets, why
   vc2_run_N_in.wav     with --input-wavs: a run's whole input as one file, for a DAW that plays it beside the MIDI
 
-The addresses are vc2map.py's: the V-Synth's map on rom.4's IDs, checked against both images here.  The runs hold
-rom.4's typed defaults, sent with each type, so they stay in the gitignored folder, as the effects' runs do.
+The addresses are vc2map.py's: rom.4's own map, model 00 00 0D, read from the image (HARDWARE_FIRMWARE.md, "rom.4's
+SysEx: the VC-2's own address map").  Most of what the VC-2 runs set has no address there, or none under PATCH Init's
+Category, so they are not written: the script says which parameters, writes the input and the V-Synth-mode run
+(rom.2's map, which holds), and exits 2, until step 5's VC-2 runs are made again (research/VC2_MODE_PLAN.md, step 5).
+The runs hold rom.4's typed defaults, sent with each type, so they stay in the gitignored folder, as the effects' do.
 
   vc2capture.py --check FILE.mid ...   parses runs back and checks every checksum (capsysex.check)
-  vc2capture.py --learn FILE           names each DT1 in FILE (fxplay --in's output) by the map: the XT's own word
-                                       on the map, from edits at its panel with Transmit Edit Data on"""
+  vc2capture.py --learn FILE           names each DT1 in FILE (fxplay --in's output) by rom.4's map: the XT's own
+                                       word, from edits at its panel with Transmit Edit Data on"""
 import argparse, csv, os, re, struct
 
 import vc2probe
 import vc2takes
 import vc2vsynth
 from capsysex import Run, check, nibbles
-from vc2map import TYPES4, Map
+from vc2map import MODEL, TYPES4, Map
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..')
 FW = os.path.join(REPO, 'firmware/unpacked')
@@ -43,7 +46,7 @@ def probe_seconds(probe):
 class Vc2Run(Run):
     """A VC-2 run: capsysex's Run writing rom.4's parameters by name through the map."""
     def __init__(self, dev, ch, m):
-        super().__init__(dev, ch)
+        super().__init__(dev, ch, MODEL)
         self.map = m
 
     def put(self, name, v):
@@ -175,13 +178,14 @@ def learn(m, path):
                 msgs.append(cur)
                 cur = None
     print('%d SysEx messages in %s' % (len(msgs), path))
+    head = 3 + len(MODEL)
     for s in msgs:
         h = ' '.join('%02x' % b for b in s)
-        if len(s) < 12 or s[1] != 0x41 or s[3:6] != [0x00, 0x53, 0x12]:
-            print('  not a DT1 of model 00 53: %s' % h)
+        if len(s) < head + 8 or s[1] != 0x41 or s[3:head + 1] != MODEL + [0x12]:
+            print('  not a DT1 of model 00 00 0D: %s' % h)
             continue
-        i = m.named(s[6:10])
-        data = s[10:-2]
+        i = m.named(s[head + 1:head + 5])
+        data = s[head + 5:-2]
         if i is None:
             print('  %s: an address the map has no ID for (data %s)' % (h, data))
         else:
@@ -189,11 +193,29 @@ def learn(m, path):
             print('  %s: %#05x %s = %s' % (h, i, m.names[i], m.text(i, v) if len(data) == 1 else v))
 
 
+TEST_SETS = ('Direct Sound Level', 'OSC 1 Switch', 'MFX Switch', 'Master Level', 'MFX Type')   # test_run sets
+
+
+def unreachable(m):
+    """What the test and the VC-2 runs set that rom.4 takes no DT1 for under PATCH Init's Category: no address, or one
+    whose entry writes under other Categories alone (vc2map.py)."""
+    wanted = set(vc2takes.BASE) | set(TEST_SETS)
+    for takes in vc2takes.RUNS.values():
+        for t in takes():
+            wanted |= set(t['set'])
+    category = vc2takes.BASE.get('Patch Category', m.descriptor(m.id_of('Patch Category'))[1])
+    out = []
+    for name in sorted(wanted):
+        ids = [i for i, n in enumerate(m.names) if n == name]
+        if not any(category in v[4] for i in ids for v in m.addresses(i)):
+            out.append(name)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(REPO, 'analysis/test_files/vc2'))
     ap.add_argument('--rom4', default=os.path.join(FW, 'V-SynthXT.rom.4.bin'))
-    ap.add_argument('--rom2', default=os.path.join(FW, 'V-SynthXT.rom.2.bin'), help="for the map's check")
     ap.add_argument('--dev', type=int, default=17, help='Device ID as the XT shows it, 17-32')
     ap.add_argument('--ch', type=int, default=1, help='MIDI channel, 1-16')
     ap.add_argument('--input-wavs', action='store_true', help="each run's input as one WAV, for a DAW")
@@ -204,18 +226,31 @@ def main():
         for p in a.check:
             check(p)
         return
-    m = Map(a.rom4, a.rom2)
+    m = Map(a.rom4)
     if a.learn:
         return learn(m, a.learn)
     os.makedirs(a.out, exist_ok=True)
     x = vc2probe.probe()
     vc2probe.wav24(os.path.join(a.out, 'vc2probe.wav'), x)
-    with open(os.path.join(a.out, 'vc2_test.mid'), 'wb') as f:
-        f.write(test_run(m, a.dev - 1, a.ch - 1).smf())
-    rows = []
-    runs = [(run, takes(), Vc2Run(a.dev - 1, a.ch - 1, m), lambda t: settings(m, t))
-            for run, takes in vc2takes.RUNS.items()]
+    missing = unreachable(m)
+    rows, runs = [], []
+    if missing:
+        print('rom.4 takes no DT1 under PATCH Init\'s Category for %d of what the VC-2 runs set: %s.  The test '
+              'and runs 1-4 are not written (HARDWARE_FIRMWARE.md, "rom.4\'s SysEx: the VC-2\'s own address map"; '
+              'research/VC2_MODE_PLAN.md, step 5).' % (len(missing), ', '.join(missing)))
+    else:
+        with open(os.path.join(a.out, 'vc2_test.mid'), 'wb') as f:
+            f.write(test_run(m, a.dev - 1, a.ch - 1).smf())
+        runs = [(run, takes(), Vc2Run(a.dev - 1, a.ch - 1, m), lambda t: settings(m, t))
+                for run, takes in vc2takes.RUNS.items()]
     runs.append(('vc2_vsynth', vc2vsynth.takes(), vc2vsynth.VsRun(a.dev - 1, a.ch - 1), vc2vsynth.settings))
+    write_runs(a, runs, x, rows)
+    if missing:
+        raise SystemExit(2)
+
+
+def write_runs(a, runs, x, rows):
+    """Each run's MIDI (and with --input-wavs its input), then the take list."""
     for run, takes, w, text in runs:
         r, cues = build(run, takes, w, text)
         with open(os.path.join(a.out, run + '.mid'), 'wb') as f:

@@ -31,9 +31,13 @@ def addr_add(a, n):
     v += n
     return [(v >> 21) & 127, (v >> 14) & 127, (v >> 7) & 127, v & 127]
 
-def dt1(dev, addr, data):
+V_SYNTH = [0x00, 0x53]                # the V-Synth's model ID, rom.2's
+VC_2 = [0x00, 0x00, 0x0d]             # [FW] rom.4's, 0x20d in its model table (HARDWARE_FIRMWARE.md, "rom.4's SysEx")
+
+
+def dt1(dev, addr, data, model=V_SYNTH):
     body = list(addr) + list(data)
-    return bytes([0xF0, 0x41, dev, 0x00, 0x53, 0x12] + body + [(128 - sum(body) % 128) % 128, 0xF7])
+    return bytes([0xF0, 0x41, dev] + list(model) + [0x12] + body + [(128 - sum(body) % 128) % 128, 0xF7])
 
 def nibbles(v):
     return [(v >> 12) & 15, (v >> 8) & 15, (v >> 4) & 15, v & 15]
@@ -41,12 +45,12 @@ def nibbles(v):
 
 class Run:
     """One millisecond per tick; SysEx paced, so the XT's parser is never rushed: 20 ms, the interval its manual gives for its own packets."""
-    def __init__(self, dev, ch):
-        self.ev, self.ms, self.dev, self.ch = [], 0, dev, ch
+    def __init__(self, dev, ch, model=V_SYNTH):
+        self.ev, self.ms, self.dev, self.ch, self.model = [], 0, dev, ch, model
         self.state = {}
     def wait(self, ms): self.ms += int(ms)
     def sx(self, addr, data):
-        self.ev.append((self.ms, b'S' + dt1(self.dev, addr, data))); self.ms += 20
+        self.ev.append((self.ms, b'S' + dt1(self.dev, addr, data, self.model))); self.ms += 20
     def note(self, on, n): self.ev.append((self.ms, b'N' + bytes([(0x90 if on else 0x80) | self.ch, n, 127 if on else 0])))
     def cue(self, text):
         """A marker (FF 06) here: fxplay --audio starts that part of its input at it."""
@@ -87,8 +91,9 @@ def check(path):
             if kind == 0x2f: break
         elif c == 0xf0:
             ln = var(); m = b[i:i + ln]; i += ln
-            assert m[-1] == 0xf7 and m[:5] == bytes([0x41, m[1], 0x00, 0x53, 0x12]), 'header at %d ms' % t
-            body = m[5:-2]; assert all(x < 128 for x in body), 'a data byte over 127 at %d ms' % t
+            head = 2 + len(next(x for x in (V_SYNTH, VC_2) if list(m[2:2 + len(x)]) == x))
+            assert m[-1] == 0xf7 and m[0] == 0x41 and m[head] == 0x12, 'header at %d ms' % t
+            body = m[head + 1:-2]; assert all(x < 128 for x in body), 'a data byte over 127 at %d ms' % t
             assert (sum(body) + m[-2]) % 128 == 0, 'checksum at %d ms' % t
             sx += 1; first = first or (b'\xf0' + m).hex(' ')
         elif c & 0xf0 in (0x80, 0x90):
