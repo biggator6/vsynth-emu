@@ -52,6 +52,7 @@ class Analysis(Vc2Checks, Vc2Checks2, Vc2Measure, Report, PathChecks, Measure, L
     clean_sides = 1                                     # the direct sound is mono: it may carry one input side alone
     match_floor = 0.25                                  # a dead path silences much of a run; its clicks tell a wrong file
     make_probe = staticmethod(vc2probe.probe)
+    extin_found = True                                  # External In Type found at the XT's panel (guide, step 3)
 
     @property
     def dry(self):
@@ -87,21 +88,35 @@ class Analysis(Vc2Checks, Vc2Checks2, Vc2Measure, Report, PathChecks, Measure, L
         return 'run %d' % (i + 2) if i < 3 else 'the comparison'
 
 
-def analyse(path, run=None, takes_csv=None, start=None, probe=None, only=None):
-    """Everything but writing files: returns the Analysis, with its checks and takes filled in."""
-    rec = Recording(path)
-    if run is None:
-        m = re.search(r'vc2_(run_[1-4]|vsynth)', os.path.basename(path))
-        if not m:
-            raise Bad('Which run is this? Say --run with one of %s.' % ', '.join(RUNS))
-        run = m.group(0)
-    listed = takes_csv or os.path.join(REPO, 'analysis/test_files/vc2/vc2_takes.csv')
-    return analysis_of(Analysis, rec, run, listed, start, probe, only)
+class AnalysisNoExtin(Analysis):
+    """Run 1 when the user found no External In Type at the XT's panel: its four extin takes are repeats at MONO-L+R."""
+    extin_found = False
+
+
+def analyser(cls):
+    """analyse(path, run, takes_csv, start, probe, only) by `cls`: everything but writing files, the analysis returned
+    with its checks and takes filled in."""
+    def analyse(path, run=None, takes_csv=None, start=None, probe=None, only=None):
+        rec = Recording(path)
+        if run is None:
+            m = re.search(r'vc2_(run_[1-4]|vsynth)', os.path.basename(path))
+            if not m:
+                raise Bad('Which run is this? Say --run with one of %s.' % ', '.join(RUNS))
+            run = m.group(0)
+        listed = takes_csv or os.path.join(REPO, 'analysis/test_files/vc2/vc2_takes.csv')
+        return analysis_of(cls, rec, run, listed, start, probe, only)
+    return analyse
+
+
+analyse = analyser(Analysis)
+analyse_extin_not_found = analyser(AnalysisNoExtin)
+NOT_FOUND = ('--extin-not-found', 'run 1: External In Type wasn\'t found at the XT\'s panel (RECORDING_GUIDE.md, '
+             'step 3), so its four extin takes are read as repeats at MONO-L+R', analyse_extin_not_found)
 
 
 def main():
     cli(analyse, 'Checks a recording of a VC-2 run and cuts it into takes.', RUNS,
-        'analysis/test_files/vc2/vc2_takes.csv')
+        'analysis/test_files/vc2/vc2_takes.csv', [NOT_FOUND])
 
 
 if __name__ == '__main__':

@@ -95,6 +95,11 @@ def cases():
         Case('r1_one_take', Vc2Sim(only='main', head=1.3, latency=500), oks=['The wave plays at unity'],
              read=lambda an, t: [] if an.by['main'].mark == t['main']['click'] else ['main\'s click misplaced']),
         Case('r1_from_part_way', Vc2Sim(from_s=300.0), clean=True),
+        # An XT with no External In Type page, and the user saying so: the four extin takes read as repeats
+        Case('r1_extin_none', Vc2Sim(extin_fixed=True, extin_found=False), clean=True,
+             oks=['carry the same sides', '`extin_monol` repeats `extin_monolr`\'s level']),
+        # The user found none, but the takes differ: the XT took the setting after all
+        Case('r1_extin_taken', Vc2Sim(extin_found=False), looks=['the XT took a setting after all']),
         Case('r2_clean', Vc2Sim(**r2), clean=True, read=read_run2),
         Case('r2_analog', Vc2Sim(noise_db=-80.0, drift_ppm=-30.0, fir=18000.0, **r2), oks=['Two clocks']),
         Case('r2_vocoder_dead', Vc2Sim(vocoder_dead=True, **r2), fails=['Every vocoder take is silent']),
@@ -119,7 +124,8 @@ def run_case(xt, c):
     path = os.path.join(WORK, c.sim.run + '_' + c.name + '.wav')
     write_wav(path, x, c.sim)
     del x
-    an = vc2cut.analyse(path, c.sim.checked_as or c.sim.run, TAKES, c.sim.from_s, xt.pr, c.sim.only)
+    analyse = vc2cut.analyse if c.sim.extin_found else vc2cut.analyse_extin_not_found
+    an = analyse(path, c.sim.checked_as or c.sim.run, TAKES, c.sim.from_s, xt.pr, c.sim.only)
     bad = judged(an, c, ('OK', 'INFO'))
     if c.read and not c.fails:
         bad += c.read(an, truth)

@@ -191,8 +191,9 @@ one of the card's.  Restarting the XT undoes it all.
   it back before the next.
 - **External In Type**: the VC-2's code draws it on no page (research/HARDWARE_FIRMWARE.md, "The VC-2's system settings at
   its panel"), so it should stay at the VC-2's default, **MONO-L+R**.  Look for it on SYSTEM > Common > IO all the same.
-  If your XT shows it there, or anywhere else in VC-2 mode, write down where and set it to MONO-L+R.  If not, run 1's
-  four External In Type pauses have nothing to set: let them pass, and tell Claude.
+  **Write down whether you found it**, and where: the check of run 1 reads its four External In Type takes by that.  If
+  your XT shows it, set it to MONO-L+R.  If not, run 1's four External In Type pauses have nothing to set: let them
+  pass, and give the check `--extin-not-found` (step 7).
 - **Receive Program Change ON** and **Receive Bank Select ON**, for the patches.  The runs send these two themselves, so
   this only checks them.
 
@@ -246,7 +247,12 @@ below as that take's LOOK or FAIL: then run 1 again.  Check it before run 2:
 ```bash
 .venv/bin/python3 research/tools/vc2cut.py analysis/test_files/vc2/vc2_run_1.wav
 ```
-The last line says whether to go on.  FAIL lines say what to fix; LOOK lines are worth reading and stop nothing.  A finding that
+If step 3 found no External In Type, add `--extin-not-found`:
+```bash
+.venv/bin/python3 research/tools/vc2cut.py analysis/test_files/vc2/vc2_run_1.wav --extin-not-found
+```
+Then its four External In Type takes are read as repeats of one setting, each held to the others' sides and level.  If
+they differ all the same, a LOOK says the XT took a setting after all.  The last line says whether to go on.  FAIL lines say what to fix; LOOK lines are worth reading and stop nothing.  A finding that
 only the XT can give, such as which input side the direct sound carries, is an INFO or a LOOK, never a FAIL.  The tool also cuts
 the takes into a folder beside the recording.  Or tell Claude, and it'll run this and read the rest.
 

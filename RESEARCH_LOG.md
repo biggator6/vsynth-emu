@@ -4321,3 +4321,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
   first label became "USB Input Type", and the VC-2 keeps its own system file. So the four extin takes may have
   nothing to set in VC-2 mode, which was put to the coordinator. A wait for a key at the cue was left out, because
   the cut and fxplay's input both run on the run's fixed timeline.
+- The coordinator kept the four, with their verdicts made to depend on whether the user found the setting. A seventh
+  argument to `analyse` broke the shape law, so the cutter got a function that makes an analysis by class. The shared CLI
+  now picks one by a flag, which fxcut doesn't use.

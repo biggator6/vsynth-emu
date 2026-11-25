@@ -91,9 +91,10 @@ class Report:
                 f.write(b'data' + struct.pack('<I', len(body)) + body)
 
 
-def cli(analyse, description, runs, takes_default):
+def cli(analyse, description, runs, takes_default, variants=()):
     """A cutter's command line: analyse(recording, run, takes, from, probe, take) -> its analysis; exit 2 for a file
-    it can't read, 1 for any FAIL, else 0."""
+    it can't read, 1 for any FAIL, else 0.  variants: (flag, help, analyse) each, a switch that analyses by its own
+    analyse instead (the VC-2's --extin-not-found)."""
     ap = argparse.ArgumentParser(description=description)
     ap.add_argument('recording')
     ap.add_argument('--run', choices=runs, help='which run; by default, from the file name')
@@ -102,7 +103,12 @@ def cli(analyse, description, runs, takes_default):
     ap.add_argument('--takes', help='the take list; by default %s' % takes_default)
     ap.add_argument('--out', help='where to write; by default a folder beside the recording, named after it')
     ap.add_argument('--no-cut', action='store_true', help='report only')
+    for flag, words, _ in variants:
+        ap.add_argument(flag, action='store_true', help=words)
     a = ap.parse_args()
+    for flag, _, own in variants:
+        if getattr(a, flag.lstrip('-').replace('-', '_')):
+            analyse = own
     if not os.path.exists(a.recording):
         print('FAIL  no file at %s' % a.recording)
         sys.exit(2)

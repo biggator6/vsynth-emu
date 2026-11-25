@@ -1574,8 +1574,10 @@ So its panel path is SYSTEM > Common > IO > Output Gain.
 - rom.4 keeps a system file of its own, "VC-2 System.s00" (rom.2's is "V-Synth System.s00"), so V-Synth mode's
   setting very likely doesn't carry over.
 
-So in VC-2 mode External In Type very likely stays at MONO-L+R: no page, no SysEx, no patch. Not yet seen on an XT; the
-guide (step 3) has the user look for it. Not traced: the screens' field tables, which would show each field's ID (the
+So in VC-2 mode External In Type very likely stays at MONO-L+R: no page, no SysEx, no patch. Not yet seen on an XT. The
+guide (step 3) has the user look for it and write down whether they found it. If not, `vc2cut.py --extin-not-found`
+reads run 1's four extin takes as repeats of one setting, held to each other's sides and level. The plugin's side is
+step 4.5's [gap]. Not traced: the screens' field tables, which would show each field's ID (the
 IO screen's table at `0x895a4574` didn't read plainly as IDs), and whether rom.4 loads 0x7a from "VC-2 System.s00".
 
 **For the cut.** fxplay can't wait for a key at a "hand:" cue without breaking the run's timing:

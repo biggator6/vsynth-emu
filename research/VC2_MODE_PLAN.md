@@ -1396,6 +1396,11 @@ version against rom.4's routines with what it calls hooked:
      host wait (v355): each message goes, as its bytes, into MIDI IN's or USB's receive ring (2048 words,
      preallocated, as rom.4's row 15 builds it), and a full ring drops its backlog for the full marker, as rom.4's does
      (`0x89311e90`); the input task's wait for room is the task's own state, not the audio thread's.
+   - [gap] External In Type (0x7a): rom.4 draws it on no screen (its SYSTEM Com IO has USB Input Type, Output Gain
+     and Digital Output Freq only), it has no SysEx address, and no patch holds it, so in VC-2 mode it likely stays
+     MONO-L+R. Whether the plugin's VC-2 mode should offer a control for it waits on step 5 run 1's hand cue at the
+     user's XT. (Logged 2026-11-25 by the step 5 session, on the coordinator's word; HARDWARE_FIRMWARE.md, "The VC-2's
+     system settings at its panel". The plugin side's: no code changed.)
 
 ### 5. Against the machine
 
@@ -1508,7 +1513,14 @@ VC-2's system settings at its panel").
 **Found on the way, for the coordinator:** rom.4 draws External In Type on no VC-2 page. Output Gain is on SYSTEM >
 Common > IO, as in V-Synth mode (same section). So in VC-2 mode External In Type very likely can't be set at all and
 stays at MONO-L+R. The four extin takes would then all play at it, unless the user's XT shows the setting. The guide
-(step 3) has the user look. What the extin takes are for, if it can't be set, is the coordinator's to decide.
+(step 3) has the user look.
+
+**Decided 2026-11-25, the coordinator's call: the four extin takes and their pauses stay** (80 s of run 1). They still
+show which side reaches the EXT IN tone at MONO-L+R, and they catch an XT that does draw the setting. The guide's step 3
+has the user write down whether they found External In Type. `vc2cut.py --extin-not-found` then reads the four as
+repeats of one setting, held to each other's sides and level (`Vc2Checks.extin_repeats`), with a LOOK if they differ.
+Without the flag they're read as before. vc2cut_test's r1_extin_none and r1_extin_taken hold both. Step 4.5's [gap]
+above is the plugin's side of it.
 
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
