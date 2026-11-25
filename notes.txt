@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The round robin's tie with a put-off dispatch v358 (2026-11-25, on claude/v358-plant-reach from vc2-mode 30cab59;
+  HARDWARE_FIRMWARE.md, "The round robin's tie with a put-off dispatch"): the first of the plants the firmware checks
+  still missed after the merge's whole lists. kn-rr-freeze (missed since v353) changes which task of a level the put-off
+  dispatch names, only between TMU0's interrupt and the watchdog's, whose dispatch reads its level alone and clears it;
+  the check compared only after both. xt_vc2kernel now compares the words between them too, no draw moved: 0 different
+  at 2024/7/31337 (40 and 400), counts as before; kn-rr-freeze caught at each seed. The whole --kernel 42, all caught,
+  clean first; fcheck as baseline; verify.sh green.
+
 LITE's heads past the wave memory's first quarter v357 (2026-11-25, on claude/vc2-part-4-3-rest-773f3e after v356's
   c956952; HARDWARE_FIRMWARE.md, "LITE's heads past the wave memory's first quarter"): the merge's whole --osc list
   missed heads-count (the heads' sample count cut to a quarter). Bisected: caught to c6ea59a, missed from v334

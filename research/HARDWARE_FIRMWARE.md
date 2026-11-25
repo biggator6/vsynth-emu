@@ -1546,6 +1546,33 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The round robin's tie with a put-off dispatch (2026-11-25, v358) {#vc2-kernel-rr-tie}
+
+Step 4.3's eighty-sixth version, the first of the plants the firmware checks still missed after the merge's whole
+lists. `vc2kernel_muts.txt`'s `kn-rr-freeze`, missed since v353: the round robin's (`0x8800fbb0`) test of a put-off
+dispatch, `<=` made `<`, so that one put off for a task of the next's own level is taken over by the next.
+
+**Why the check missed it.** The round robin runs only with the lock 0 (the lock-out's bit is in the holds' half), and
+any release of the lock to 0 runs the put-off dispatch, so freezTask can name a task at the round robin only when the
+same interrupt set it: an event set from an interrupt (or a tick's cyclic handler) wakes a task of level 16, then
+TMU0's interrupt is taken before the watchdog's and its round robin finds the running task at its level's head, its
+count out. For the plant to change anything the woken task must also stand third or later in that queue, ready already
+with its wait left from a set that didn't switch to it. And what freezTask names is read by nothing after but its
+level: the watchdog's interrupt (`0x8800fb60`) dispatches to the first ready from that level on, a wake (`0x8800fd20`)
+and the round robin compare its level. So by the end of the watchdog's interrupt both sides have dispatched alike and
+cleared it, and the check compared the words only then (a tick before the watchdog's interrupt was one service).
+
+**The compare.** Between TMU0's interrupt and the watchdog's the running task runs on, so the words there are a state
+of rom.1's own. xt_vc2kernel now compares every word there as well (`interruptEnd`, Vc2KernelCheck.cpp): a compare
+added, no draw added or moved, the counts at each seed those before. freezTask then differs under the plant: at 2024
+in case 6 (service 95; 113 and 377 too), at 7 in case 278, at 31337 in case 121.
+
+Results:
+- xt_vc2kernel 0 different at 2024, 7 and 31337 (40 and 400 cases), its counts as before (40 cases at 2024: 8,000
+  services, 576 switches, fcheck's line).
+- `kn-rr-freeze` caught at 400 cases at each seed, and at fcheck's 40 at 2024.
+- `mutate_vc2.py --kernel`, the whole list: 42 planted, all caught, clean first.
+
 ### LITE's heads past the wave memory's first quarter (2026-11-25, v357) {#vc2-osc-heads-reach}
 
 Step 4.3's eighty-fifth version. The merge's whole `--osc` list missed v326's `heads-count`, LITE's heads' sample

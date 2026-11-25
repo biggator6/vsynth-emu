@@ -1255,6 +1255,9 @@ version against rom.4's routines with what it calls hooked:
        - [x] The merge's gate (v357): the --osc list's heads-count, missed from v334 as the check's wave memory grew, its
          reach back by a draw of LITE's heads on SOLO's waves (HARDWARE_FIRMWARE.md, "LITE's heads past the wave
          memory's first quarter").
+       - [x] The plants the merge's whole lists still missed (v358 on): the --kernel list's kn-rr-freeze, caught by
+         the words compared between a tick and the watchdog's interrupt (v358; HARDWARE_FIRMWARE.md, "The round
+         robin's tie with a put-off dispatch").
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
