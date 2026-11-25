@@ -1546,6 +1546,68 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 mode's effects (2026-11-25, v458) {#vc2-plugin-fx}
+
+Step 4.5's second half, its fourth version (the coordinator's call, 2026-11-25: in this half, the same shape as the
+V-Synth's). With the Effects switch on in the VC-2 mode, each block the part mixes goes through rom.4's effects:
+`XtFxUnit` on `vc2Fx()`, step 4.4's driver (v259) and frame (v274). With it off, the part plays the copy without the chip
+as before (MAIN and MULTI at 2^-30). The switch is the plugin's one, the V-Synth's too; an XT has no such switch.
+
+**What the driver is given** (`vc2FxGive`, PluginVc2Fx.h). Each ID it reads, as rom.4 would answer it:
+- the patch's from the store the part plays: first-bank IDs where the part reads them (zone 1's, COSM 1's), the effect
+  types' own IDs (typed, 0x56a up to the COSMs' 0x926) from their blocks' slots (`vc2StoreTyped`). No store: every ID's
+  default (`vc2DefaultStore`);
+- the effects' system IDs from the kept system (v457) on the areas the driver reads them on (`vc2FxSystemAreaOf`);
+- IDs 0…2 and 0x34 left at the driver's own defaults.
+
+**Which areas.** Traced, not read off the listing. On a scratch copy of the sources (never committed), the six read
+objects' set-ups were hooked (system B's `0x89320760`, the system's `0x89320790`, C's `0x89320f60`, D's `0x893206f0`,
+part 0's `0x893207b0`, and `0x89320700`), each logging its call. The getters logged each ID read, and `xt_fx <rom.4> vc2`
+ran through the driver's boot, patches and edits. Each read belongs to the set-up called last before it:
+- system B's: 0x40 Master Level, 0x43 Clock Source, 0x67, 0x68, 0x6f…0x72, 0x78 Output Gain, 0x7a External In Type,
+  0x7f USB External In Type (the system reader `0x8935feb0`; its listing sets up 0x89320760 first and reads them all on
+  it);
+- system C's: 0x52b Attenuation;
+- the patch's: `0x89320700` and part 0's `0x893207b0`;
+- IDs 0…2 and 0x34 weren't read in that run (an earlier run with the routines the image answers logged instead had
+  them after `0x89391e50`, the Category's event).
+
+So Master Level and Output Gain now sit on system B's area in the kept system as well. Their defaults are rom.4's
+system's (`vc2SystemDefault`), and all 18 system parameters are kept.
+
+**The threads** (`PluginVc2Fx`). The control thread makes the unit the first time the switch is on in the VC-2 mode. It
+gives the IDs, loads the patch and settles the chip, all before the audio thread has it, then hands the unit over by an
+atomic pointer. Each tick after that, it gives the IDs again when the store or the system moved, and loads the patch
+again when another came (a load, a session). It then runs the driver's tick, the control changes and the pump, as
+`fxTick` does for the V-Synth.
+
+The audio thread sets the player's sink at each host block's start: the unit while the switch is on, else none. Its
+control changes go to the part as before. CC 91 and 93, the ones rom.4's driver keeps (v402: the MFX's Reverb and Chorus
+Sends), also go through a ring to the next tick; with no unit made, they're passed over. Not given: the Matrix's MFX-PRMs
+(rom.4 sends them to the part's mixer, v401) and an outside clock (Clock Source INT until the real-time bytes,
+VC2_MODE_PLAN.md). The chip is given no input: the mic reaches the part by the input frames' stand-in, not through the
+chip's slots (step 4.5's [gap] on the input frames). In the VC-2 mode the control thread no longer ticks the V-Synth's
+rom.2 effects, since only XtSynth's audio takes what that driver sends.
+
+**The check.** VSynthEmuVc2PlayTest's effects run (Vc2PlayFx.cpp) plays 041 Flashback330 with the switch on. The
+reference is the part driven directly through a Vc2Fx of its own, driven by hand as verify.sh's "effects" line drives
+the V-Synth's reference. Both sides tick before every block. In play: MFX Type, the MFX switch off and on, Reverb Type,
+Chorus Type, the Effects switch off for ten blocks, CC 91 and 93 among the host's MIDI. Every sample matches. The run
+differs from the patch's without the effects, and nothing is allocated in processBlock.
+
+After the run, the driver's IDs are rom.4's as its getters read them, stated in the test, not through the plugin's map:
+- the system's on the traced blocks, read by a part given rom.4's defaults alone;
+- the patch's 24 that the readers read (step 4.4's table) by `xtStoreValue`;
+- the types' own by `vc2StoreTyped`.
+
+**The time.** processBlock took 33% of real time with the effects and 15% without (the same patch and run).
+
+7 plants (`vc2play-fx-`), all caught: the unit never heard, the switch ignored, the edits or the control changes not
+reaching the driver, every control change taken, the types' own IDs or the first bank's not given. With them, all 35
+`vc2play-` plants of v455–v458 were caught again. Two more are equivalent and left out: Attenuation read on system
+B's area, and USB External In Type left at the driver's default. Neither is a parameter, so each holds rom.4's default,
+2 and 0, on any area and as its descriptor's. 112 checks.
+
 ### The system's parameters to the VC-2 part (2026-11-25, v457) {#vc2-plugin-system}
 
 Step 4.5's second half, its third version. Of the system's 18 parameters (v451), the part reads 16. Each is read on the
@@ -1648,7 +1710,8 @@ traced. Then:
   5's items 2 and 4, and step 4.5's [gap] "The part's input frames"). A host block's input goes in whole before its
   frames are rendered, so the MIDI's place in it changes nothing.
 - The output: MAIN + MULTI at 2^-30 (rom.4's unit gives a raw word out at ×2 of its 24 bits, v274), DIR and the sends
-  nowhere: no effects yet. `OutputFinite` (v454) as before.
+  nowhere: no effects yet (v458: rom.4's with the Effects switch on, "The VC-2 mode's effects"). `OutputFinite` (v454)
+  as before.
 - A wait inside a pass (the notes' task's on a fade): the blocks the source gives after the one asked for run ahead of
   the host, their input what the host has given at their places, mostly none, the host's input there passed over when
   it comes; their frames wait in XtRateOut's room, a second's, heard first, while the host's messages wait for the next

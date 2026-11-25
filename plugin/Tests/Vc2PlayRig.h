@@ -6,6 +6,7 @@
 #include "../Source/Vc2WavesInUse.h"
 #include "../Source/XtEncoded.h"
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -50,6 +51,24 @@ void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::stri
 // has played beside `direct`, the part reading its parameters' values and its readers' tables the direct part's, and a
 // part made from its session reading the same (Vc2PlaySystem.cpp)
 class Vc2PlayDirect;
+// A part given rom.4's system defaults alone, nothing written over them: what its readers read is rom.4's system
+std::unique_ptr<Vc2Synth> vc2PlayRom4System();
 void vc2PlaySystemDefaults(TestChecks& check, VSynthEmuProcessor& p, const std::string& name);
 void vc2PlaySystemChecks(TestChecks& check, VSynthEmuProcessor& p, const Vc2PlayDirect& direct,
                          const std::string& name);
+
+// A run (Vc2PlayRun.cpp, v458 made one from v455's): kVc2PlayBlocks host blocks at 44.1 kHz of the host's MIDI (a chord,
+// controllers, a bend, notes, a burst past the voices; CC 91 and 93 among them) with the saw on the input, against
+// `direct` (none: nothing compared), `before(b)` ahead of each block b for its edits and the control thread's ticks
+inline constexpr int kVc2PlayBlocks = 190;   // about 2.2 s
+struct Vc2Played {
+    long differ = 0, first = -1, allocations = 0;   // samples unlike the direct part's, the first's frame; processBlock's
+    double peak = 0, sumSquares = 0, seconds = 0;   // seconds: processBlock's, all of them
+    bool finite = true;
+};
+Vc2Played vc2PlayRun(VSynthEmuProcessor& p, Vc2PlayDirect* direct, const std::function<void(int)>& before);
+// A parameter of the processor's moved, halfway down or, when that's where it stands, to the top; its value now
+int vc2PlayMove(VSynthEmuProcessor& p, const juce::String& id);
+// v458: the effects run, on `patch` (Vc2PlayFx.cpp)
+struct DiskPatch;
+void vc2PlayFxChecks(TestChecks& check, const DiskPatch& patch, const juce::File& work);

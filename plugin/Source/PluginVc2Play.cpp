@@ -1,5 +1,6 @@
 // The VC-2 mode's audio on the processor: see PluginVc2Play.h (v455).  Checked by VSynthEmuVc2PlayTest.
 #include "PluginVc2Play.h"
+#include "PluginParamIds.h"
 #include "Vc2WavesInUse.h"
 #include "XtEncoded.h"
 #include <algorithm>
@@ -9,6 +10,7 @@
 
 namespace {
 constexpr uint8_t kChannelFirst = 0x80, kSystemFirst = 0xf0, kClassBits = 0xf0;   // [FW] MIDI's status bytes
+constexpr uint8_t kControlClass = 0xb0;   // [FW] a control change's
 
 // The parameters of `params` that moved since `last` (each of them on a `base` pass), each written into the kept copy
 // (`put`) unless it holds the value already (`holds`); true when one was written
@@ -43,6 +45,7 @@ PluginVc2Play::PluginVc2Play(juce::AudioProcessorValueTreeState& apvts, PluginVc
     }
     keeper_.last.assign(params_.size(), 0);
     keeper_.systemLast.assign(system_.size(), 0);
+    fxOn_ = apvts.getRawParameterValue(Params::kFxOn);
     readMode();
     apvts_.state.addListener(this);
 }
@@ -67,6 +70,8 @@ void PluginVc2Play::tick() {
     if (!vc2_.load() || !xtSynthVc2RomReady() || !xtSynthRomReady()) return;   // the part's ports read rom.2's too
     keepStore();
     keepSystem();
+    const Keeper& k = keeper_;   // v458: the effects given the store and the system as they stand
+    fx_.tick(fxOn_->load() >= 0.5f, k.none ? nullptr : &k.work, k.seq, k.gen, k.system, k.systemSeq);
     const Vc2LoadedWaves* waves = vc2Waves();
     if (owned_ && !owned_->stuck() && (owned_->waves() != nullptr || waves == nullptr)) return;
     made();
@@ -163,6 +168,7 @@ PluginVc2Play::Block::Block(PluginVc2Play& owner, bool on) : owner_(owner), on_(
     owner_.inUse_.store(true);
     p_ = owner_.live_.load();
     if (p_ == nullptr) return;
+    p_->fx = owner_.fxOn_->load() >= 0.5f ? owner_.fx_.sink() : nullptr;   // v458: through the effects, or the copy
     const Posted* s = owner_.taken();
     if (s == nullptr) return;
     if (s->systemSeq > p_->systemSeq) {   // v457: the system first, so that a patch given with it reads it
@@ -188,6 +194,7 @@ void PluginVc2Play::Block::message(const juce::MidiMessage& m) {
     const int size = m.getRawDataSize();
     if (p_ == nullptr || size < 2 || raw[0] < kChannelFirst || raw[0] >= kSystemFirst) return;
     p_->message((uint8_t)(raw[0] & kClassBits), raw[1], size > 2 ? raw[2] : 0);
+    if ((raw[0] & kClassBits) == kControlClass && size > 2) owner_.fx_.controller(raw[1], raw[2]);   // v458
 }
 
 void PluginVc2Play::Block::process(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int inputs) {

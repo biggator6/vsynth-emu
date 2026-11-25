@@ -6,8 +6,10 @@
 // thread, and the store given to the part at the next block's edge.  The store written is kept as the session's, so a
 // session holds what the part played.  v457: the system's parameters the part reads (Clock Source, External In Type, the
 // controller assigns) written over rom.4's system defaults the same way, and given with the front's messages for them
-// (Vc2PartPlayer::systemGiven); Master Level and Output Gain are the effects', not the part's.
+// (Vc2PartPlayer::systemGiven); Master Level and Output Gain are the effects', not the part's.  v458: the effects
+// (PluginVc2Fx), ticked here beside them, heard while the Effects switch is on.
 #include "PluginMode.h"
+#include "PluginVc2Fx.h"
 #include "PluginVc2Patch.h"
 #include "Vc2PartPlayer.h"
 #include "Vc2PatchStore.h"
@@ -60,6 +62,7 @@ public:
     int built() const { return built_; }
     // v456: the part as the editor sees it, any thread, every part made writing this one (Vc2PartView.h)
     const Vc2PartView& view() const { return view_; }
+    const PluginVc2Fx& fx() const { return fx_; }   // v458: the effects, for the checks
 
 private:
     // A VC-2 parameter as the store takes it: its ID, its value, its default
@@ -125,4 +128,6 @@ private:
     std::unique_ptr<Vc2PartPlayer> owned_;
     int built_ = 0;
     Vc2PartView view_;
+    PluginVc2Fx fx_;                          // v458: the effects, rom.4's unit
+    std::atomic<float>* fxOn_ = nullptr;      // v458: the Effects switch, the V-Synth's and the VC-2's one
 };

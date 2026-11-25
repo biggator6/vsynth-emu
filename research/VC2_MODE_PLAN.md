@@ -1360,6 +1360,12 @@ version against rom.4's routines with what it calls hooked:
         system and assignments messages, a part made again on them; their defaults rom.4's system's (the assigns' were
         their descriptors' 0). Master Level and Output Gain are the effects' (HARDWARE_FIRMWARE.md, "The system's
         parameters to the VC-2 part").
+      - done (v458): the effects, the coordinator's call (2026-11-25): rom.4's XtFxUnit behind the one Effects switch,
+        its driver given the store's and the kept system's IDs as rom.4's getters answer them (the system's areas
+        traced), CC 91 and 93, the copy without the chip with the switch off; the played-block test's effects run bit
+        for bit against the part through a Vc2Fx of its own, edited in play; 33% of real time with them, 15% without
+        (HARDWARE_FIRMWARE.md, "The VC-2 mode's effects"). Not yet: a .p02 loaded with the effects playing isn't in the
+        test (the driver's patch load again, `wantPatch`).
       - Before it, done (v550): the VC-2's firmware checks under AddressSanitizer, UBSan and libc++'s bounds
         (`XT_SANITIZE=1 build.sh`), the 21 step 4.3 isn't changing at 40 and 400 cases, three seeds: the voices' noise
         drawn as an XT's keys; the check rig's compare passed to step 4.3 (HARDWARE_FIRMWARE.md, "The VC-2 checks under
@@ -1413,7 +1419,8 @@ version against rom.4's routines with what it calls hooked:
      the mic, kind 6's ring) and word 5 (+0x14, the tracker), the rest 0; silence gives exactly 0 there. A stand-in, the
      coordinator's call (2026-11-25; the user can overturn it): unsourced, as which slot the mic comes back on and which
      inputs the frame's +4 and +0x14 are wait on step 5's captures (items 2 and 4 below). Those captures change that one
-     rule.
+     rule. v458: with the effects on, rom.4's chip is given no input either (the mic reaches the part by this rule,
+     not through the chip's slots); the same captures say what the chip does with it.
    - [gap] 018 FemaleChoirs plays at 9x real time, nearly silent; out of the played-block test until v362 (boundFloat),
      then timed and put back (v455; the coordinator, 2026-11-25). Its time is in its SOLO walk (vc2solo::loadNext through
      Vc2ToneOscLink::boundFloat and Vc2SynthOscOutside::boundFloat), peak 1e-4 against the other patches' 0.07–0.16;

@@ -676,6 +676,14 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VC-2 mode's effects v458 (2026-11-25, after v457; HARDWARE_FIRMWARE.md, "The VC-2 mode's effects"): with the
+  Effects switch on, the part's blocks through rom.4's XtFxUnit (PluginVc2Fx: made on the control thread, given every
+  ID its driver reads as rom.4 answers it, from the store and the kept system on the traced areas, CC 91 and 93 through
+  a ring); off, the copy without the chip as before. Master Level and Output Gain on system B's area. The V-Synth's
+  effects no longer ticked in the VC-2 mode. VSynthEmuVc2PlayTest's effects run (Vc2PlayFx.cpp, the loop made one in
+  Vc2PlayRun.cpp): 041 Flashback330 bit for bit, edited in play, the switch off and on; 33% of real time, 15% without.
+  112/112. Plants: 7 vc2play-fx-, all caught, and all 35 vc2play- again (two more equivalent, left out).
+
 The system's parameters to the VC-2 part v457 (2026-11-25, after v456; HARDWARE_FIRMWARE.md, "The system's parameters
   to the VC-2 part"): Clock Source and External In Type (system B's area) and the controller assigns (the system's)
   kept over rom.4's system defaults and given at a block's edge with the front's system (kind 4) and assignments (5)

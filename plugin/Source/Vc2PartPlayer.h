@@ -23,6 +23,7 @@
 // Audio thread, but the constructor and prepare.
 #include "Vc2PartView.h"
 #include "Vc2Synth.h"
+#include "XtBus.h"
 #include "XtHostInput.h"
 #include "XtRateOut.h"
 #include <array>
@@ -74,6 +75,9 @@ public:
     void systemGiven(const Vc2System& system, bool systemB, bool assigns);
     uint64_t systemSeq = 0;   // v457: the plugin's number of the system given last
     Vc2PartView* view = nullptr;   // v456: written after each block heard (PluginVc2Play's); none, nothing written
+    // v458: the effects a block's frames go through (rom.4's unit, PluginVc2Fx), set at each host block's start; none,
+    // the copy without the chip (MAIN and MULTI at the unit's level)
+    XtBusSink* fx = nullptr;
     // A channel message, before the frames rendered after it; false when the queue is full and it's dropped
     bool message(uint8_t status, uint8_t data1, uint8_t data2);
     // A piece of the host's input, `n` frames, most() at the most (inL and inR, both nullptr for none; inR nullptr with

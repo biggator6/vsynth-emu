@@ -127,11 +127,13 @@ void Vc2PartPlayer::mixed(const float* frames) {
         ++counts_.lost;
         return;
     }
-    for (int i = 0; i < kBlock; ++i) {
-        const float* f = frames + kWords * i;
-        at[2 * i] = (f[kMainL] + f[kMultiL]) * kLevel;
-        at[2 * i + 1] = (f[kMainR] + f[kMultiR]) * kLevel;
-    }
+    if (fx != nullptr) fx->process(frames, at, kBlock);   // v458: through rom.4's effects
+    else
+        for (int i = 0; i < kBlock; ++i) {
+            const float* f = frames + kWords * i;
+            at[2 * i] = (f[kMainL] + f[kMultiL]) * kLevel;
+            at[2 * i + 1] = (f[kMainR] + f[kMultiR]) * kLevel;
+        }
     viewed(at);
 }
 

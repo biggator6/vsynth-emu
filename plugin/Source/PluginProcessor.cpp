@@ -26,10 +26,11 @@ VSynthEmuProcessor::VSynthEmuProcessor()
 class VSynthEmuProcessor::FxThread : public juce::Thread {
 public:
     explicit FxThread(VSynthEmuProcessor& p) : juce::Thread("XT effects"), owner(p) {}
-    // The effects' tick, then the VC-2 mode's: its part and the patch it plays (PluginVc2Play.h, v455)
+    // The effects' tick, then the VC-2 mode's: its part and the patch it plays (PluginVc2Play.h, v455), and from v458 its
+    // own effects; the V-Synth's ticked in the V-Synth mode alone, as only its audio takes what their driver sends
     void run() override {
         while (!threadShouldExit()) {
-            owner.fxTick();
+            if (!owner.vc2Play_.vc2()) owner.fxTick();
             owner.vc2Play_.tick();
             wait(10);
         }

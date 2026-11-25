@@ -174,6 +174,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginVc2Params.cpp
     Source/PluginVc2Patch.cpp
     Source/PluginVc2Play.cpp
+    Source/PluginVc2Fx.cpp
     Source/PluginRender.cpp
     Source/XtHostInput.cpp
     Source/XtFxValueText.cpp
@@ -249,8 +250,8 @@ vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Te
 vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # The VC-2 mode's audio (v455): the processor against the part driven directly, bit for bit, nothing allocated; the
 # part's view (v456) and the system's parameters (v457)
-vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp
-             Tests/Vc2PlaySystem.cpp Tests/TestMain.cpp)
+vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayRun.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp
+             Tests/Vc2PlaySystem.cpp Tests/Vc2PlayFx.cpp Tests/TestMain.cpp)
 # A project's own files (v600 on): a link to a preset wave followed to the wave it names
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
              Tests/TestMain.cpp Tests/TestWave.cpp)

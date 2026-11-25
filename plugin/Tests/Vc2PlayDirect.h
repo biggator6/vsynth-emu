@@ -7,6 +7,7 @@
 // frame, on channel 1 (system and real-time bytes not taken); the nth block takes the input's frames from 32n, the input a
 // block late (32 frames of silence, then the host's), zeros where the host hasn't given them (a block in a wait, run ahead
 // of the host), each frame's words 1 and 5 the mean of its sides.  The bus: MAIN and MULTI × 2^-30.
+#include "../Source/PluginVc2Fx.h"
 #include "../Source/PluginVc2Patch.h"
 #include "../Source/Vc2PartPlayer.h"
 #include "../Source/Vc2SynthOsTasks.h"
@@ -14,19 +15,24 @@
 #include "../Source/Vc2WavesInUse.h"
 #include "../Source/XtHostInput.h"
 #include <algorithm>
+#include <array>
 #include <deque>
+#include <memory>
+#include <string>
 #include <vector>
 
 class Vc2PlayDirect final : public Vc2BlockSink {
 public:
     static constexpr int kBlock = 32, kWords = 8;
     static constexpr uint8_t kRealTimeFirst = 0xf8, kSystemFirst = 0xf0, kChannelBits = 0x0f;   // MIDI's status bytes
+    static constexpr uint8_t kControlChange = 0xb0;
     // A host message at its frame
     struct Message {
         int frame;
         uint8_t status, data1, data2;
     };
-    explicit Vc2PlayDirect(const std::vector<uint8_t>* store) {
+    // v458: with `fxRom`, rom.4's effects of its own (Vc2Fx), started after the patch, ticked by hand (fxTick)
+    explicit Vc2PlayDirect(const std::vector<uint8_t>* store, const std::string* fxRom = nullptr) {
         s_.start();
         if (const Vc2System* system = vc2SystemDefaults()) {
             system_ = *system;
@@ -43,7 +49,19 @@ public:
         stream_.assign(2 * kBlock, 0);   // the input's latency at 44.1 kHz: a block of silence
         if (store != nullptr) store_ = *store;
         s_.patchGiven(store != nullptr ? &store_ : nullptr);
+        if (fxRom == nullptr) return;
+        fx_ = std::make_unique<Vc2Fx>(*fxRom);
+        fx_->start(store_.empty() ? nullptr : &store_, system_);
     }
+    // v458: the effects' tick, as the control thread's between two host blocks: the IDs (given each time: the driver
+    // takes only what moved), the driver's tick, the control changes it keeps heard since the last
+    void fxTick() {
+        if (!fx_) return;
+        fx_->tick(store_.empty() ? nullptr : &store_, system_, true, false, controls_);
+        controls_.clear();
+    }
+    bool fxOk() const { return fx_ && fx_->ok(); }
+    void fxHeard(bool on) { fxHeard_ = on; }   // v458: the Effects switch: off, the copy without the chip, as the player
     // A parameter moved, at a block's edge: written over the store, the patch given again
     void edit(const Vc2HostParam& h, int value) {
         if (store_.empty()) store_ = vc2DefaultStore();
@@ -80,6 +98,9 @@ public:
                 if (m.frame == at_ && m.status < kSystemFirst && m.status < kRealTimeFirst) {
                     queue_.push_back({ (uint8_t)(m.status & ~kChannelBits), m.data1, m.data2, 1 });
                     words_.push_back(0);
+                    const bool control = (m.status & ~kChannelBits) == kControlChange;   // v458: the effects' too
+                    const bool kept = m.data1 == kVc2FxReverbSend || m.data1 == kVc2FxChorusSend;
+                    if (fx_ && control && kept) controls_.push_back({ m.data1, m.data2 });
                 }
             while ((long)out_.size() / 2 <= at_ && !s_.osTasks->os.stuck()) produce();
             const bool made = (long)out_.size() / 2 > at_;
@@ -122,6 +143,12 @@ private:
         return true;
     }
     void mixed(const float* frames) override {
+        if (fx_ && fxHeard_) {   // v458: through the effects
+            std::array<float, 2 * kBlock> lr {};
+            fx_->unit().process(frames, lr.data(), kBlock);
+            out_.insert(out_.end(), lr.begin(), lr.end());
+            return;
+        }
         for (int i = 0; i < kBlock; ++i) {
             const float* w = frames + kWords * i;
             out_.push_back((w[0] + w[4]) * 0x1p-30f);
@@ -138,4 +165,7 @@ private:
     std::vector<float> out_;
     long at_ = 0;
     bool wanted_ = false;
+    std::unique_ptr<Vc2Fx> fx_;              // v458
+    std::vector<Vc2FxControl> controls_;     // v458: the control changes for the next tick
+    bool fxHeard_ = true;
 };
