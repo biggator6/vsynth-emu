@@ -1,6 +1,7 @@
 // The VC-2's part played in the plugin: see Vc2PartPlayer.h (v455).  Checked by VSynthEmuVc2PlayTest against the part
 // driven directly.
 #include "Vc2PartPlayer.h"
+#include "Vc2LegacyTables.h"
 #include "Vc2PatchStore.h"
 #include "Vc2SynthOsTasks.h"
 #include "Vc2SynthVoices.h"
@@ -12,6 +13,16 @@
 
 namespace {
 constexpr uint8_t kMidiIn = 1;   // [FW] a message's source: MIDI IN
+constexpr int kLegacyHeld = 12;  // [FW] a LEGACY analysis band's word: its held envelope
+// [FW] a LEGACY band's stereo words: the second resonator's left and right last outputs (Vc2Legacy::stereo)
+constexpr int kLegacySecondLeft = 4, kLegacySecondRight = 5;
+
+// The largest of `n` samples' sizes
+float peakOf(const float* x, int n) {
+    float peak = 0.0f;
+    for (int i = 0; i < n; ++i) peak = std::max(peak, std::fabs(x[i]));
+    return peak;
+}
 constexpr size_t kRoomSlack = 4 * Vc2PartPlayer::kBlock;   // past a second, the blocks in flight as the room fills
 } // namespace
 
@@ -142,8 +153,7 @@ void Vc2PartPlayer::viewed(const float* lr) {
     if (view == nullptr) return;
     Vc2Synth& s = *part_;
     constexpr auto relaxed = std::memory_order_relaxed;
-    float out = 0.0f;
-    for (int i = 0; i < 2 * kBlock; ++i) out = std::max(out, std::fabs(lr[i]));
+    const float out = peakOf(lr, 2 * kBlock);
     const float in = s.vocoder.stage.peak();
     view->inputPeak.store(in, relaxed);
     view->voiced.store(s.vocoder.stage.voiced(), relaxed);
@@ -154,5 +164,35 @@ void Vc2PartPlayer::viewed(const float* lr) {
     view->outputPeak.store(out, relaxed);
     const int64_t quiet = view->quietFrames.load(relaxed);
     view->quietFrames.store(in >= Vc2PartView::kQuiet ? 0 : quiet + kBlock, relaxed);
+    viewedBands();
     view->playing.store(true, relaxed);
+}
+
+// v459: the engine's bands (Vc2PartView.h), the part running the stereo driver (Vc2SynthBlock): LEGACY's mic envelope
+// its analysis's held one, its output the band's last sample, the second resonator's left or right state at the band's
+// gain (its stereo synthesis sums the bands as it goes and keeps no band's block); HIRESO's mic the analysis's
+// envelope, its output the band's carrier row at the left side's follower and gain; none with the vocoder off
+void Vc2PartPlayer::viewedBands() {
+    const Vc2Vocoder& v = part_->vocoder;
+    constexpr auto relaxed = std::memory_order_relaxed;
+    int bands = 0;
+    if (v.w.mode == Vc2Vocoder::kLegacy) {
+        bands = Vc2LegacyTables::kCarrierBands;
+        for (int b = 0; b < bands; ++b) {
+            const float* st = v.legacy.s.bands[b];
+            const float last = std::max(std::fabs(st[kLegacySecondLeft]), std::fabs(st[kLegacySecondRight]));
+            view->micBands[(size_t)b].store(v.legacy.analysis.s.bands[b][kLegacyHeld], relaxed);
+            view->outBands[(size_t)b].store(last * std::fabs(vc2LegacyTables().gains[b]), relaxed);
+        }
+    } else if (v.w.mode == Vc2Vocoder::kHireso) {
+        const Vc2Hireso& h = v.hireso;
+        bands = Vc2HiresoWords::kBands;
+        for (int b = 0; b < bands; ++b) {
+            const float gain = h.gains[0] != nullptr ? std::fabs(h.gains[0][b] * h.s.weight[b]) : 0.0f;
+            const float carrier = peakOf(h.s.rows[b], Vc2HiresoWords::kRowWords);
+            view->micBands[(size_t)b].store(h.analysis.envelope(b), relaxed);
+            view->outBands[(size_t)b].store(carrier * h.s.left.follower[b] * gain, relaxed);
+        }
+    }
+    view->bands.store(bands, relaxed);
 }

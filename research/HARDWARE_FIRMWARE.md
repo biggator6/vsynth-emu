@@ -1546,6 +1546,38 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VOCODER card's bands (2026-11-25, v459) {#vc2-plugin-bands}
+
+Step 4.5's second half, its fifth version: d-14 as the user decided it (2026-11-22; research/UI_DESIGN_VC2.md). The
+VOCODER card's display shows the engine's bands as they play: LEGACY's 10 or HIRESO's 32 across, each a pair of bars.
+The left bar is the mic's envelope in the band (in `label`), the right one the band's output (in `accent`). Each kind is
+in dB under its own loudest band as held (falling 24 dB a second), 48 dB deep. With the vocoder off it says so, and
+while no part has played it waits, as before.
+
+**What the view carries** (`Vc2PartView`, written by `Vc2PartPlayer::viewedBands` after each block). The engine is the
+vocoder object's mode (+0x00: 1 LEGACY, 2 HIRESO, 0 off). The part always runs the vocoder's stereo driver
+(`0x893f0580`, Vc2SynthBlock), so each engine's stereo words are the ones read:
+- LEGACY: the mic's envelope is the analysis's held one (a band's word 12). Its stereo synthesis (`0x893f2980`) sums the
+  bands as it goes and keeps no band's block, so the output is the band's last sample: the second resonator's left or
+  right state (words 4 and 5), the larger, at the band's gain.
+- HIRESO: the mic's envelope is the analysis's (`0x893eddf0`). The output is the band's carrier row, its peak, at the
+  left side's follower (the envelope the band is given after the formant map, attack and release) and gain (the side's
+  template gain × the band's weight).
+
+The two kinds are on scales of their own: the envelopes and the outputs differ by more than 48 dB on these patches, so
+one shared top put one kind below the floor. Nothing of it is the firmware's beyond the words it copies.
+
+**The check.** VSynthEmuVc2PlayTest's view checks (Vc2PlayView.cpp), on each of the four patches with a note held on the
+saw, draw the bands from the view. LargeChoir 1 and Metal Edge are HIRESO (32 bands), Flashback330 LEGACY (10), cheap
+monks has the vocoder off (none, the line saying OFF). While vocoding, exactly one band of each kind is at the top: each
+is on its own scale, and none clipped. VSynthEmuEditorTest: with no part played, the card's bands wait. 116 checks;
+editor 5225. 8 plants (`vc2play-bands-`, `editor-vc2-bands-never-wait`), all caught: the bands unwritten, each engine's
+mic or output words, HIRESO's count, the output's scale on the mic's, the line not waiting. With them, all 60
+`vc2play-` and `editor-vc2-` plants were caught again. The output-on-mic plant was missed while the check asked only that
+a bar reach the top. Every patch's outputs are louder than its envelopes, so the loudest still clipped to the top; the
+check now asks that one band of each kind alone be there. Not planted: the page never updating the display, which shows
+"waits" either way before any part plays.
+
 ### The VC-2 mode's effects (2026-11-25, v458) {#vc2-plugin-fx}
 
 Step 4.5's second half, its fourth version (the coordinator's call, 2026-11-25: in this half, the same shape as the
@@ -1674,7 +1706,8 @@ own beyond the words it copies.
   Carrier when no voice sounds (NO NOTE); each waits while no part has played, as before v456.
 - The MIC IN card: the input's level in dBFS, VOICED or UNVOICED, the tracked pitch as a note with its lock, Auto Note's
   note, the notes sounding, the output's level (`Vc2Mic::stateLines`); each line waits while no part has played.
-- Still waiting: the VOCODER card's bands (d-14), which the view doesn't carry yet.
+- Still waiting: the VOCODER card's bands (d-14), which the view doesn't carry yet (v459: it does, "The VOCODER card's
+  bands").
 - Checked by VSynthEmuVc2PlayTest on each of its four patches (Vc2PlayView.cpp: a note held on the saw, both checks
   ticked and the card's lines the part's; a second of silence, the mic's check failing, NO MIC with the vocoder on; the
   note let go, fewer notes and the carrier's check agreeing with them, as a vocoder patch may keep a carrier sounding,

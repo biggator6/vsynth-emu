@@ -30,7 +30,8 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   `vc2SystemDefault` (Vc2SystemStore), the keeper's system (PluginVc2Play, one loop with the store's, `keepMoved`),
   `Vc2PartPlayer::systemGiven`. v458: `PluginVc2Fx` (the VC-2 mode's effects: `Vc2Fx`, rom.4's XtFxUnit and what
   its driver is given, `vc2FxGive`, shared with the test's reference; `PluginVc2Fx`, its threads), `vc2FxSystemAreaOf`
-  (Vc2SystemStore). Checked by `VSynthEmuVc2PlayTest` (`plugin/Tests/Vc2PlayTest.cpp`, its
+  (Vc2SystemStore). v459: `UiVc2Bands` (the VOCODER card's bands, d-14, `Vc2BandsView`), the view's bands
+  (`Vc2PartView`, `Vc2PartPlayer::viewedBands`). Checked by `VSynthEmuVc2PlayTest` (`plugin/Tests/Vc2PlayTest.cpp`, its
   reference `Vc2PlayDirect.h`, its set-up `Vc2PlayRig.h`, its run `Vc2PlayRun.cpp`, its timing mode `Vc2PlayTime.cpp`,
   the view's checks `Vc2PlayView.cpp`, the system's `Vc2PlaySystem.cpp`, the effects run `Vc2PlayFx.cpp`).
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.

@@ -9,5 +9,6 @@ target_sources(VSynthEmu PRIVATE
     Source/UiVc2SynthPage.cpp
     Source/UiVc2Pages.cpp
     Source/UiVc2VocoderPage.cpp
+    Source/UiVc2Bands.cpp
     Source/UiVc2FxPage.cpp
 )

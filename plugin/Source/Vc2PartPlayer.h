@@ -103,6 +103,7 @@ private:
     static constexpr size_t kInputs = 16;
     void mixed(const float* frames) override;
     void viewed(const float* lr);   // v456: the view, after a block's frames `lr` (L, R) are out
+    void viewedBands();             // v459: the vocoder engine's bands into the view
     bool next(Vc2PartEvent& e);
     void produce();
     const int32_t* inputOf(long n);

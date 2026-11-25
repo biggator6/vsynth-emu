@@ -378,3 +378,12 @@ vc2play-fx-first-bank-unread|        else if (id >= kVc2FirstStored && id < kVc2
 # (vc2play-fx-attenuation-on-b and -usb-unread, Attenuation read on system B's area and USB External In Type left at the
 # driver's default, are equivalent: neither is a parameter, so each holds rom.4's default, 2 and 0, on any area and as
 # its descriptor's)
+# v459: the VOCODER card's bands (d-14): the view's per engine (Vc2PartPlayer::viewedBands), drawn (UiVc2Bands.cpp)
+vc2play-bands-unwritten|    viewedBands();|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-legacy-mic|            view->micBands[(size_t)b].store(v.legacy.analysis.s.bands[b][kLegacyHeld], relaxed);|            view->micBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-legacy-out|            view->outBands[(size_t)b].store(last * std::fabs(vc2LegacyTables().gains[b]), relaxed);|            view->outBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-hireso-mic|            view->micBands[(size_t)b].store(h.analysis.envelope(b), relaxed);|            view->micBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-hireso-out|            view->outBands[(size_t)b].store(carrier * h.s.left.follower[b] * gain, relaxed);|            view->outBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-hireso-count|        bands = Vc2HiresoWords::kBands;|        bands = Vc2LegacyTables::kCarrierBands;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-out-on-mic|    topOut_ = std::max(loudOut, topOut_ * fall);|    topOut_ = std::max(loudMic, topOut_ * fall);|plugin/Source/UiVc2Bands.cpp|vc2play
+editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : "";|    said_ = bands == 0 ? kOff : "";|plugin/Source/UiVc2Bands.cpp|layout

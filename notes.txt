@@ -676,6 +676,12 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VOCODER card's bands v459 (2026-11-25, after v458; HARDWARE_FIRMWARE.md, "The VOCODER card's bands"): d-14, the
+  engine's bands as they play (LEGACY 10, HIRESO 32), the mic's envelope and the band's output in each, as bars in dB
+  each under its own loudest band (Vc2BandsView, UiVc2Bands.cpp), from the part's view (Vc2PartPlayer::viewedBands);
+  OFF with the vocoder off, waiting before any part plays. VSynthEmuVc2PlayTest 116/116, the editor 5225/5225.
+  Plants: 8 new, all caught; all 60 vc2play- and editor-vc2- again.
+
 The VC-2 mode's effects v458 (2026-11-25, after v457; HARDWARE_FIRMWARE.md, "The VC-2 mode's effects"): with the
   Effects switch on, the part's blocks through rom.4's XtFxUnit (PluginVc2Fx: made on the control thread, given every
   ID its driver reads as rom.4 answers it, from the store and the kept system on the traced areas, CC 91 and 93 through

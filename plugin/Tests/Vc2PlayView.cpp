@@ -2,8 +2,13 @@
 // note held on the saw, both the mic's and the carrier's checks ticked and the MIC IN card's lines the part's; a second
 // and a little more of silence, the mic's check failing and the chip saying NO MIC; the note let go and its release out,
 // fewer notes sounding and the carrier's check ticked only while one does (a vocoder patch may keep a carrier sounding).
+// v459: with the note held, the VOCODER card's bands drawn from the view (UiVc2Bands.h).
 #include "Vc2PlayRig.h"
+#include "../Source/PluginVc2Params.h"
+#include "../Source/UiControls.h"
+#include "../Source/UiVc2Bands.h"
 #include "../Source/UiVc2Mic.h"
+#include <cstdio>
 
 namespace {
 constexpr int kSecond = 87, kReleaseOut = 3 * kSecond;   // host blocks of kVc2PlayBlock frames
@@ -21,6 +26,28 @@ void blocks(VSynthEmuProcessor& p, int n, const juce::MidiMessage* first, bool i
         p.processBlock(buf, midi);
     }
 }
+
+// v459: the VOCODER card's bands (d-14), drawn from the view with a note held on the saw: the engine's count by the
+// patch's Vocoder Sw and Type (LEGACY's 10, HIRESO's 32, none off), and while vocoding the mic's and the output's bars
+void bandsChecks(TestChecks& check, VSynthEmuProcessor& p, const std::string& name) {
+    constexpr int kSwitch = 0x193, kType = 0x194, kLegacy = 0;   // [FW] Vocoder Sw, Vocoder Type and its LEGACY
+    const bool on = Controls::paramValue(p.apvts, vc2HostParamId(kSwitch, 0, 0)) != 0;
+    const bool legacy = Controls::paramValue(p.apvts, vc2HostParamId(kType, 0, 0)) == kLegacy;
+    const int want = !on ? 0 : legacy ? 10 : 32;
+    Vc2BandsView drawn;
+    drawn.update(p.vc2Play().view(), 0.0);
+    int micTop = 0, outTop = 0;   // each kind's loudest band alone at the top: each on its own scale, none clipped
+    for (int b = 0; b < drawn.bands(); ++b) {
+        micTop += drawn.micHeight(b) == 1.0f ? 1 : 0;
+        outTop += drawn.outHeight(b) == 1.0f ? 1 : 0;
+    }
+    const bool mic = micTop == 1, out = outTop == 1;
+    const bool drawnRight = want == 0 ? drawn.said().contains("OFF") : mic && out && drawn.said().isEmpty();
+    check(drawn.bands() == want && drawnRight,
+          name + "the VOCODER card should draw " + std::to_string(want) + " bands, the mic's and the output's, not " +
+              std::to_string(drawn.bands()) + (mic ? "" : ", no mic") + (out ? "" : ", no output"));
+    std::printf("vc2play bands: %s%d bands\n", name.c_str(), drawn.bands());
+}
 } // namespace
 
 void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::string& name) {
@@ -34,6 +61,7 @@ void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::stri
     const auto state = Vc2Mic::stateLines(p);
     check(state[0].endsWith("dBFS") && !state[0].startsWith("-inf") && state[4].getIntValue() > 0,
           name + "the MIC IN card should show the input's level and a note sounding, not " + state[0].toStdString());
+    bandsChecks(check, p, name);
     blocks(p, kSecond + 2, nullptr, false);
     c = Vc2Mic::checks(p);
     const bool vocoding = c[0].state == State::ok && c[1].state == State::ok;   // the chip's words before NO MIC

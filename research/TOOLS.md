@@ -170,7 +170,8 @@ runners (`mutate_panel.py` by name, `mutate_files.py`, `mutate_fx.py`, `mutate_a
   `PluginProcess.cpp`'s VC-2 branch changed (v455): `mutate_panel.py` with the 12 `vc2play-` names (about 7 minutes), and for `Vc2PartView.h`, the view's writes or
   `UiVc2Mic.cpp` (v456) the 7 `vc2play-view-`, `-mic-`, `-carrier-`, `-chip-` names and the 17 `editor-vc2-`; for
   `Vc2SystemStore.*`, the keeper's system or `systemGiven` (v457) the 9 `vc2play-system-` names and
-  `mutate_vc2.py --synth --changed`; for `PluginVc2Fx.*` or `vc2FxSystemAreaOf` (v458) the 9 `vc2play-fx-` names;
+  `mutate_vc2.py --synth --changed`; for `PluginVc2Fx.*` or `vc2FxSystemAreaOf` (v458) the 7 `vc2play-fx-` names;
+  for `UiVc2Bands.*` or `viewedBands` (v459) the 7 `vc2play-bands-` names and `editor-vc2-bands-never-wait`;
   `ab.sh` for `XtRateOut`, whose render XtSynth's is. If `XtFn.h` changed: the VC-2 harnesses it reaches
   (xt_vc2synth, xt_vc2kernel, xt_vc2settings, xt_vc2midi).
 - Before a push: `verify.sh --full`.
