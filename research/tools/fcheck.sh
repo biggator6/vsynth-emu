@@ -198,6 +198,11 @@ if [ -x "$X/xt_vc2midi" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4")
   part xt_vc2midi 'echo "== xt_vc2midi"; "$X/xt_vc2midi" "$ROM4" 40 2024 | grep -v "^  "'
 fi
+# rom.1's kernel's event services against its own (v353): on rom.1, beside rom.4
+if [ -x "$X/xt_vc2kernel" ] && [ -f "$ROM4" ]; then
+  FILES=("$ROM4" "$(dirname "$ROM4")/V-SynthXT.rom.1.bin")
+  part xt_vc2kernel 'echo "== xt_vc2kernel"; "$X/xt_vc2kernel" "$ROM4" 40 2024 | grep -v "^  "'
+fi
 # Vc2Synth's start against rom.4's own static initializers (v314): on rom.4
 if [ -x "$X/xt_vc2synth" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4")

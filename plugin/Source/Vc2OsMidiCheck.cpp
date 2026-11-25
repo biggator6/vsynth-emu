@@ -23,9 +23,6 @@ constexpr int kSteps = 400;
 constexpr uint32_t kSysexRoutine = 0x89310640, kSysexObject = 0x8995dd0c;   // [FW] SysEx's routine, its object
 constexpr uint32_t kGetterAt = 0x89324350;                                  // [FW] the parameters' getter
 constexpr uint32_t kSetUpsAt[] = { 0x89320760, 0x89320790 };                // [FW] the read objects' set-ups
-// [FW] the OS's routines a 0x40 or 0x01 message runs, each given the word's address (SysEx's the object and the word)
-constexpr uint32_t kOsRoutines[] = { 0x89317fe0, 0x89318420, 0x89318210, 0x89318040, 0x89318450,
-                                     0x893154a0, 0x8931a420, 0x8931a460, kSysexRoutine };
 constexpr int16_t kReadIds[] = { 0x45, 0x46 };   // [FW] the two reads' IDs
 
 int32_t answerFor(const MidiSides& s, uint32_t id) {
@@ -130,7 +127,7 @@ MidiSides::MidiSides(Vc2Fw& rig) : fw(rig) {
                             slot == Vc2OsMidiParts::kProgramSlot ? 0 : c.r[6] });
             c.ret(0);
         });
-    for (const uint32_t routine : kOsRoutines)
+    for (const uint32_t routine : Vc2OsMidiParts::kOsRoutines)   // v346: the parts' list
         fw.cpu.hook(routine, [this, routine](Sh4& c) {
             const bool sysex = routine == kSysexRoutine;
             rom.push_back({ kMidiOs, routine, sysex ? c.r[5] : c.rd32(c.r[4]), sysex ? c.r[4] : 0, 0 });

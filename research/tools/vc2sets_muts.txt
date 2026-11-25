@@ -468,9 +468,9 @@ osc-made-kind|w.kind = static_cast<uint8_t>(c.kind);|w.kind = static_cast<uint8_
 osc-made-osc|w.osc = static_cast<uint8_t>(c.index);|w.osc = static_cast<uint8_t>(c.kind);|vc2setoscblock
 osc-made-legato-key|w.legatoKey = legato[1];|w.legatoKey = legato[0];|vc2setoscblock
 osc-made-legato|w.legato = legato[0];|w.legato = legato[1];|vc2setoscblock
-osc-made-step|    w.step = step;\n|\n|vc2setoscblock
-osc-made-count|    step = static_cast<uint16_t>(step + 1);\n|\n|vc2setoscblock
-osc-made-step-which|reads.oscStep(part, w.kind, w.osc);|reads.oscStep(part, w.osc, w.kind);|vc2setoscblock
+osc-made-step|    w.step = reads.nextOscStep(part, w.kind, w.osc);|    reads.nextOscStep(part, w.kind, w.osc);|vc2setoscblock
+osc-made-count|    w.step = reads.nextOscStep(part, w.kind, w.osc);\n|    w.step = reads.nextOscStep(part, w.kind, w.osc);\n    reads.nextOscStep(part, w.kind, w.osc);\n|vc2setoscblock
+osc-made-step-which|reads.nextOscStep(part, w.kind, w.osc);|reads.nextOscStep(part, w.osc, w.kind);|vc2setoscblock
 osc-made-part|    w.part = static_cast<uint8_t>(part);\n|\n|vc2setoscblock
 osc-made-start|    w.startKey = madeStartKey(w, h, v, reads);\n|\n|vc2setoscblock
 osc-made-dispatch|    vc2SetOscStart(w, block, reads);\n    vc2SetOscConvert|    vc2SetOscConvert|vc2setoscblock
@@ -1063,3 +1063,39 @@ sets-key-level|wave[kKeyLevelAt] = byKey.first;|wave[kKeyLevelAt] = byKey.second
 sets-type|wave[kTypeAt] = alias.type;|wave[kTypeAt] = 0;|vc2wavesets
 sets-record-number|vc2WaveLoadedWords(store, alias.number, wave, m, false)|vc2WaveLoadedWords(store, byKey.next, wave, m, false)|vc2wavesets
 sets-written-first|    if (!named) return false;\n|    if (!named \|\| store.loadedRecord(alias.number, m) == 0) return false;\n|vc2wavesets
+# v341: C's reads of the part's memory, moved into the plugin from SetPortParts (vc2setmemory, Vc2SetMemoryReads.cpp,
+# its one-line reads there so each is planted), each read's address or field moved; partWords, a header's, by the
+# tables' reads that use it
+smr-voice|return value<Vc2SetVoice>(channelAt);|return value<Vc2SetVoice>(channelAt + 4);|vc2setmemory
+smr-first|uint8_t Vc2SetMemoryReads::firstByte(uint32_t object) { return rd8(object); }|uint8_t Vc2SetMemoryReads::firstByte(uint32_t object) { return rd8(object + 1); }|vc2setmemory
+smr-channel|uint32_t Vc2SetMemoryReads::channelOf(uint32_t keys) { return rd32(keys); }|uint32_t Vc2SetMemoryReads::channelOf(uint32_t keys) { return rd32(keys + 4); }|vc2setmemory
+smr-bend|return static_cast<int16_t>(rd16(channel));|return static_cast<int16_t>(rd16(channel + 2));|vc2setmemory
+smr-control|rd8(channel + kVc2SetControls + number)|rd8(channel + kVc2SetControls + number + 1)|vc2setmemory
+smr-mode|rd8(kVc2SetModesAt + 16 * part + kind)|rd8(kVc2SetModesAt + 16 * part)|vc2setmemory
+smr-matrix-control|rd8(matrix + kVc2SetMatrixControls + n)|rd8(matrix + kVc2SetMatrixControls)|vc2setmemory
+smr-hold|rd8(keys + kVc2OscHoldAt)|rd8(keys + kVc2OscHoldAt + 1)|vc2setmemory
+smr-legato|{ rd8(word + 1), rd8(word + 2) }|{ rd8(word + 2), rd8(word + 1) }|vc2setmemory
+smr-bend-matrix|rd32(matrix + kVc2OscBendAt)|rd32(matrix + kVc2OscBendAt + 4)|vc2setmemory
+smr-common|kVc2SetCommonsAt + kVc2SetCommonBytes * part|kVc2SetCommonsAt + kVc2SetCommonBytes * (part ^ 1)|vc2setmemory
+smr-envelope|partWords<5>(kVc2SetEnvelopeTable, part, kind, index)|partWords<5>(kVc2SetEnvelopeTable, part, kind, 0)|vc2setmemory
+smr-lfo|partWords<5>(kVc2SetLfoTable, part, kind, index)|partWords<5>(kVc2SetLfoTable, part, 0, index)|vc2setmemory
+smr-mix|partWords<11>(kVc2SetMixTable, part, kind, 0)|partWords<11>(kVc2SetMixTable, 0, kind, 0)|vc2setmemory
+smr-tva|partWords<12>(kVc2SetTvaTable, part, kind, 0)|partWords<12>(kVc2SetTvaTable, part, 0, 0)|vc2setmemory
+smr-cosm|partWords<21>(kVc2SetCosmTable, part, kind, index)|partWords<21>(kVc2SetCosmTable, part, kind, 0)|vc2setmemory
+smr-tva-controls|g.controls = rd8(kVc2SetTvaFlagAt);|g.controls = 0;|vc2setmemory
+smr-tva-gain|static_cast<int8_t>(rd8(kVc2SetTrailerAt))|static_cast<int8_t>(rd8(kVc2SetTrailerAt + 1))|vc2setmemory
+smr-tva-rate|rd16(kVc2SetTrailerAt + 2)|rd16(kVc2SetTrailerAt + 4)|vc2setmemory
+smr-tva-route|g.route = rd8(kVc2SetTrailerAt + 4);|g.route = rd8(kVc2SetTrailerAt + 5);|vc2setmemory
+smr-clock-external|rd8(kVc2SetClockAt + 0x40)|rd8(kVc2SetClockAt + 0x41)|vc2setmemory
+smr-clock-numerator|(int32_t)rd32(kVc2SetClockAt + 0x10)|(int32_t)rd32(kVc2SetClockAt + 0x14)|vc2setmemory
+smr-clock-denominator|(int32_t)rd32(kVc2SetClockAt + 0x14)|(int32_t)rd32(kVc2SetClockAt + 0x10)|vc2setmemory
+smr-clock-period|rd16(kVc2SetClockAt + 0x48)|rd16(kVc2SetClockAt + 0x4a)|vc2setmemory
+smr-osc-header|kVc2OscTableAt + kVc2OscPartRow * part)|kVc2OscTableAt + kVc2OscPartRow * part + 4)|vc2setmemory
+smr-osc-record|kVc2OscRecordBytes * osc;|kVc2OscRecordBytes * (osc ^ 1);|vc2setmemory
+smr-osc-systems|value<std::array<uint8_t, 60>>(kVc2OscSystemsAt)|value<std::array<uint8_t, 60>>(kVc2OscSystemsAt + 4)|vc2setmemory
+smr-glide-table|std::memcpy(&g.table, b.data(), sizeof g.table);|std::memcpy(&g.table, b.data() + 4, sizeof g.table);|vc2setmemory
+smr-glide-poly|g.prevPoly = b[0x1a];|g.prevPoly = b[0x1b];|vc2setmemory
+smr-glide-poly-held|g.prevPolyHeld = b[0x1b];|g.prevPolyHeld = b[0x1a];|vc2setmemory
+smr-glide-mono|g.prevMono = b[0x20];|g.prevMono = b[0x21];|vc2setmemory
+smr-glide-mono-held|g.prevMonoHeld = b[0x21];|g.prevMonoHeld = b[0x20];|vc2setmemory
+smr-trip|+ kVc2OscTripMovingAt);|+ kVc2OscTripMovingAt + 4);|vc2setmemory

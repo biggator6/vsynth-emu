@@ -46,10 +46,39 @@ void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> w
 void vc2OscWordsTo(Vc2OscVoice& v, const void* port, std::span<const XtWord> words, Vc2OscPlace place);
 // v326 (Vc2OscHeads.cpp): LITE's heads' renders, 0x893c6e80 and 0x893c6e8c, on XtLitePlayer
 void vc2OscHeads(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool stereo);
+// v332 (Vc2OscHeads.cpp from v326): a word's place in the voice by its place in rom.2's object, rom.4's object at
+// +0x15c with its word inserted at +0x94, LITE's heads' and the band players' place
+uint32_t vc2OscInRom4(uint32_t at);
+// v332 (Vc2OscBands.cpp): the band players' renders, BACKING's 0x893cadc0 and ENSEMBLE's 0x893ca1f0, on XtMbPlayer
+void vc2OscBands(Vc2OscVoice& v, float* out, Vc2OscParts& parts, bool ensemble);
 // v327 (Vc2OscModeOne.cpp): kind 1's mode 1's render, 0x893c9f60, mono or stereo by the object's byte 0, on the walk
 void vc2OscModeOne(Vc2OscVoice& v, float* out, Vc2OscParts& p);
-// v328 (Vc2OscModeOneStart.cpp): its set-up, 0x893cc760, which LITE's install runs for a wave of type 1
+// v328 (Vc2OscModeOneStart.cpp): its set-up, 0x893cc760, which LITE's install runs for a wave of type 1; and (v333) the
+// loops' rates it runs, 0x893ccf50, which the band players' set-ups run too
 void vc2OscModeOneSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+void vc2OscLoopRates(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+// v333 (Vc2OscBandSetUp.cpp): the band players' set-ups, BACKING's 0x893cd1d0 and ENSEMBLE's 0x893cc8f0, which
+// VariPhrase's start runs for a wave of type 3 or 5; and (Vc2OscBands.cpp) their seek, 0x893cd440, before the beat's
+// reset (Vc2OscBeat.cpp)
+void vc2OscBandSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared, bool ensemble);
+void vc2OscSeekBands(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
+// v334 (Vc2OscSolo.cpp, Vc2OscSoloSetUp.cpp): SOLO's render, 0x893c9450, mono or stereo by the object's byte 0; its
+// set-ups, 0x893cc2e0 (type 1) and 0x893cc310 (type 6), which VariPhrase's start runs; its seek, 0x893cc630, before
+// the beat's reset (Vc2OscBeat.cpp)
+void vc2OscSolo(Vc2OscVoice& v, float* out, Vc2OscParts& p);
+void vc2OscSoloSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared, bool typeSix);
+void vc2OscSeekSolo(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
+// v335 (Vc2OscJump.cpp, Vc2OscJumpRecords.cpp): the period-jump player's render, 0x893ca8b0, mono or stereo by the
+// object's byte 0; its set-up, 0x893ccff0 (type 8), which VariPhrase's start runs; its seek, 0x893cd090, before the
+// beat's reset (Vc2OscBeat.cpp)
+void vc2OscJump(Vc2OscVoice& v, float* out, Vc2OscParts& p);
+void vc2OscJumpSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2ToneShared& shared);
+void vc2OscSeekJump(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);
+// v335 (Vc2OscFrameSteps.cpp): the frames' shared steps, mode 1's, SOLO's and the period-jump player's: a sample
+// between `a` and `b` by `f` (FLOAT, FSUB, FMAC); the gain (the voice's word past `target`) a glide toward its target
+// by its rate (the word past that, FMAC), × `scale`
+float vc2OscBetween(int a, int b, float f);
+float vc2OscGlide(Vc2OscVoice& v, uint32_t target, float scale);
 // v325: the two seeks with no band player in them, given the sample, before the beat's reset (Vc2OscBeat.cpp): Vari
 // off's 0x893c6360 (Vc2OscPlayers.cpp) and LITE's heads' 0x893c6de0 (Vc2OscLite.cpp)
 void vc2OscSeekVariOff(Vc2OscVoice& v, int32_t sample);

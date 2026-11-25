@@ -10,6 +10,7 @@
 // XT_VC2VOCODER_FIRST=1 says where the first case to differ does, XT_VC2VOCODER_STOP=1 stops there.
 // XT_VC2VOCODER_MAIN only.
 #ifdef XT_VC2VOCODER_MAIN
+#include "Vc2CheckVocoder.h"
 #include "Vc2CheckWords.h"
 #include "Vc2Vocoder.h"
 #include "XtSwitches.h"
@@ -32,20 +33,8 @@ struct Counts {
     long modes = 0, settings = 0, pedals = 0, edits = 0, playing = 0, different = 0;
 };
 
-// The vocoder's words, the engine's and the hook's words by the port's engine, the edit words, both engines and the
-// stages, against rom.4's
-std::string vocoderDifference(Vc2Fw& fw, const Vc2Vocoder& v) {
-    std::string what = vc2FirstDifference(fw, kVocoder, &v.w, sizeof v.w, "the vocoder's words");
-    const bool hireso = v.engine == &v.hireso;
-    const uint32_t engine = v.engine == nullptr ? 0 : hireso ? kHiresoAt : kLegacyAt;
-    if (what.empty() && fw.cpu.rd32(kEngineWord) != engine) what = "the engine's word";
-    if (what.empty() && fw.cpu.rd32(kHookWord) != (hireso ? kHiresoHook : kLegacyHook)) what = "the hook's word";
-    if (what.empty()) what = vc2FirstDifference(fw, kEditAt, &v.edit, sizeof v.edit, "the edit words");
-    if (what.empty()) what = vc2HiresoDifference(fw, kHiresoAt, v.hireso);
-    if (what.empty()) what = vc2LegacyDifference(fw, kLegacyAt, v.legacy);
-    if (what.empty()) what = vc2UnvoicedDifference(fw, v.stage);
-    return what;
-}
+// v345: the vocoder's compare is the checks' shared one (Vc2CheckVocoder.h), xt_vc2synth's too
+std::string vocoderDifference(Vc2Fw& fw, const Vc2Vocoder& v) { return vc2VocoderDifference(fw, v); }
 
 // The input stage's reset on the port, for vc2AnalysisCase's start (rom.4's is kStageReset)
 struct StageStart {

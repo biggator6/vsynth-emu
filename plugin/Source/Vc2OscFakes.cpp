@@ -11,82 +11,26 @@
 namespace {
 constexpr uint32_t kOsClock = 0x893018d0;   // [FW] the OS's millisecond word, which a carrier's init reads (v266)
 
-uint32_t settingsOffset(uint32_t at) { return at - kOscSettingsAt; }
 uint32_t outOf(uint32_t at) { return at == kOscOutAt ? 1 : kOscOther; }
-uint8_t byteAt(Sh4& cpu, uint32_t at) {
-    uint8_t b = 0;
-    cpu.read(at, &b, 1);
-    return b;
-}
 
 // How a hooked routine's arguments read into its call, one shape each; each gives the address of the voice the call is
-// on (its object's less the object's offset)
-uint32_t self(Sh4& c, OscCall&, uint32_t) { return c.r[4]; }
-uint32_t routine(Sh4& c, OscCall& t, uint32_t at) {
-    t.a = at;
-    return self(c, t, at);
-}
-// A kind's routine, and the pitch ramp's value and factor as it finds them (v236: its update reads them through the
-// targets, so the ramps' ticks before or after it show)
-uint32_t kindRoutine(Sh4& c, OscCall& t, uint32_t at) {
-    t.b = c.rd32(c.r[4] + kOscRampValueAt);
-    t.c = c.rd32(c.r[4] + kOscRampFactorAt);
-    return routine(c, t, at);
-}
-uint32_t routineSettings(Sh4& c, OscCall& t, uint32_t at) {
-    t.b = settingsOffset(c.r[5]);
-    return routine(c, t, at);
-}
+// on (its object's less the object's offset; v330: a kind's routine on the voice itself went with the last of them)
 uint32_t renderBy(Sh4& c, OscCall& t, uint32_t at) {   // (out, the object, third)
     t.a = at;
     t.b = outOf(c.r[4]);
     t.c = c.r[6];
     return c.r[5] - Vc2OscVoice::kObject;
 }
-uint32_t seek(Sh4& c, OscCall& t, uint32_t at) {   // (the object, at), and the object's flags as the player finds them
-    t.a = at;
-    t.b = c.r[5];
-    t.c = byteAt(c, c.r[4]);
-    return c.r[4] - Vc2OscVoice::kObject;
-}
-uint32_t objectRoutine(Sh4& c, OscCall& t, uint32_t at) {   // a player's routine on the object (v238)
-    t.a = at;
-    return c.r[4] - Vc2OscVoice::kObject;
-}
-uint32_t eventAt(Sh4& c, OscCall& t, uint32_t at) {   // the event lookup's (the object, event, &position, &…) (v238)
-    t.b = c.r[5];
-    return objectRoutine(c, t, at);
-}
 
-// How a hooked routine answers, one shape each: its r0, after what it leaves in fr0 or the object
-uint32_t none(Sh4&, const OscDraws&) { return 0; }
+// How a hooked routine answers: its r0 (v335: a set-up's none and a seek's flags went with the last of them)
 uint32_t rendered(Sh4&, const OscDraws& d) { return d.rendered; }
-uint32_t seekFlags(Sh4& c, const OscDraws& d) {   // the seek's object's byte 0, as a player may leave it
-    c.write(c.r[4], &d.seekFlags, 1);
-    return 0;
-}
-uint32_t positions(Sh4& c, const OscDraws& d) {   // the next of the drawn positions, and a word the caller drops
-    const int32_t position = d.positions[d.romTaken++ % d.positions.size()];
-    c.write(c.r[6], &position, sizeof position);
-    c.write(c.r[7], &d.aside, sizeof d.aside);
-    return 0;
-}
-
-// v328: the event lookup answers as drawn where VariPhrase's note-on calls it (0x893af420…0x893af7a0), whose positions
-// the port's parts draw; elsewhere (SOLO's start in mode 1's set-up) rom.4's own runs, as the port's own lookup does
-bool fromVariNoteOn(uint32_t pr) {
-    constexpr uint32_t kFrom = 0x893af420, kTo = 0x893af7a0;   // [FW]
-    return pr - kFrom < kTo - kFrom;
-}
-
-// A hooked routine: where, what it logs as, how its arguments read, its answer; and (v328) the callers it answers,
-// rom.4's own running for any other, or every caller
+// A hooked routine: where, what it logs as, how its arguments read, its answer (v328's answering by the caller went
+// with v331, the event lookup now the voice's own)
 struct OscHook {
     uint32_t at;
     OscKind kind;
     uint32_t (*decode)(Sh4&, OscCall&, uint32_t);
     uint32_t (*answer)(Sh4&, const OscDraws&);
-    bool (*from)(uint32_t pr) = nullptr;
 };
 // [FW] every routine the voice's frame and the kind's note-on call but the ramps' (v236: rom.4's own run), LITE's
 // and VariPhrase's installs and VariPhrase's note-on (v238), LITE's note-on (v240), the analog's (v242) and its sub
@@ -94,32 +38,13 @@ struct OscHook {
 // settings and render and kind 6's start and render (v266), the vibrato's four (v267), kinds 5's and 6's updates
 // (v321), the EXT IN player's update and two renders (v322), Vari off's two renders (v323), LITE's update and
 // settings (v324), the players' beat start (0x893cbf40) with Vari off's and the heads' seeks (v325), LITE's heads'
-// renders (v326) and kind 1's mode 1's (v327): rom.4's own run, and the routines they call hooked
+// renders (v326) and kind 1's mode 1's (v327) with its set-up (v328) and seek (v329), LITE whole, and VariPhrase's
+// update, players' start and settings (v330) and its note-on's event lookup (v331), the band players' renders (v332),
+// set-ups and seek (v333), SOLO's render, set-ups and seek (v334) and the period-jump player's (v335), VariPhrase's
+// players all, and the analog's 19 renders (v337): rom.4's own run, and the routines they call hooked, each by its
+// address; the check's own renders, which a render word drawn names
 const OscHook kHooks[] = {
-    { 0x893c88b0, kKindCall, kindRoutine, none },
-    { 0x893c8670, kKindCall, kindRoutine, none },   // v328: mode 1's set-up 0x893cc760 rom.4's own
-    { 0x893cc0d0, kEventPosition, eventAt, positions, fromVariNoteOn },
-    { 0x893b0280, kKindSettings, routineSettings, none },
-    // v238: the players' renders LITE's and VariPhrase's installs write (SOLO's, BACKING's, ENSEMBLE's, the
-    // period-jump player's; Vari off's two rom.4's own from v323, LITE's heads' two from v326, mode 1's from v327)
-    { 0x893c9450, kRenderBy, renderBy, rendered },
-    { 0x893cadc0, kRenderBy, renderBy, rendered }, { 0x893ca1f0, kRenderBy, renderBy, rendered },
-    { 0x893ca8b0, kRenderBy, renderBy, rendered },
-    // v248: the analog's renders its install writes by the code (0x893c2ad0's), then those the sub oscillator's
-    // install adds (0x893c3e60's)
-    { 0x893c3890, kRenderBy, renderBy, rendered }, { 0x893c3580, kRenderBy, renderBy, rendered },
-    { 0x893c5680, kRenderBy, renderBy, rendered }, { 0x893c5500, kRenderBy, renderBy, rendered },
-    { 0x893c5f20, kRenderBy, renderBy, rendered }, { 0x893c5260, kRenderBy, renderBy, rendered },
-    { 0x893c5a90, kRenderBy, renderBy, rendered }, { 0x893c5810, kRenderBy, renderBy, rendered },
-    { 0x893c2230, kRenderBy, renderBy, rendered }, { 0x893c4fa0, kRenderBy, renderBy, rendered },
-    { 0x893c4c50, kRenderBy, renderBy, rendered }, { 0x893c5990, kRenderBy, renderBy, rendered },
-    { 0x893c5dc0, kRenderBy, renderBy, rendered }, { 0x893c60e0, kRenderBy, renderBy, rendered },
-    { 0x893c53c0, kRenderBy, renderBy, rendered }, { 0x893c5c90, kRenderBy, renderBy, rendered },
-    { 0x893c4ac0, kRenderBy, renderBy, rendered }, { 0x893c50d0, kRenderBy, renderBy, rendered },
-    { 0x893c4db0, kRenderBy, renderBy, rendered },
     { kOscRendersAt, kRenderBy, renderBy, rendered }, { kOscRendersAt + 0x10, kRenderBy, renderBy, rendered },
-    { 0x893cc830, kSeek, seek, seekFlags }, { 0x893cc630, kSeek, seek, seekFlags },
-    { 0x893cd090, kSeek, seek, seekFlags }, { 0x893cd440, kSeek, seek, seekFlags },
 };
 
 } // namespace
@@ -136,7 +61,6 @@ int oscVoiceNumber(uint32_t at) {
 void oscInstallRom(Vc2Fw& fw, const OscDraws& draws, std::vector<OscCall>& log, int (*voiceOf)(uint32_t)) {
     for (const OscHook& h : kHooks) {
         fw.cpu.hook(h.at, [&draws, &log, h, voiceOf](Sh4& cpu) {
-            if (h.from != nullptr && !h.from(cpu.pr)) return;   // the routine itself, the pc left as it is
             OscCall call { h.kind, -1, 0, 0, 0 };
             call.voice = voiceOf(h.decode(cpu, call, h.at));
             log.push_back(call);

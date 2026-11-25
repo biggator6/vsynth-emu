@@ -42,6 +42,7 @@ void retreat(Vc2WalkWords& w);        // 0x893c9300
 void setWalk(Vc2WalkWords& w, uint8_t bits);
 void clearWalk(Vc2WalkWords& w, uint8_t bits);
 void negateStep(Vc2WalkWords& w, const Vc2WalkWay& way);
+void jumpTail(Vc2WalkWords& w, int32_t pos, uint32_t from);   // 0x893ca1b2… (v334: SOLO's jumps' too)
 void forwardEvent(Vc2WalkWords& w, const Vc2WalkWay& way);    // 0x893c9040…, at the next event
 void backwardEvent(Vc2WalkWords& w, const Vc2WalkWay& way);   // 0x893c9230…, at the current event
 } // namespace vc2walk

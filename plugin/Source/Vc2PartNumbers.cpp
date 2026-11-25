@@ -180,6 +180,8 @@ void Vc2PartNumbers::changed(int32_t number, int source, int32_t channel, int32_
     classAt(*this, objectOf(number)).way(w, { source, channel, value });
 }
 
+void vc2NumbersSoundOff(int source, int32_t channel, Vc2NumberWorld& w) { soundOff(w, { source, channel, 0 }); }
+
 void vc2PartInit(Vc2PartInitWorld& w) {
     Vc2PartObject& object = w.nodes.objects[0];
     for (int s = 0; s < Vc2PartNodes::kSources; ++s) {

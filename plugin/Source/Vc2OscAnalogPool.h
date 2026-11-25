@@ -6,6 +6,7 @@
 // HARDWARE_FIRMWARE.md, "The VC-2's analog note-on", "The VC-2's analog install, update and settings".
 #include "Vc2OscAnalogLine.h"
 #include "Vc2OscAnalogShapePool.h"
+#include "XtAnalogHq.h"
 #include <array>
 
 // One of SQUARE's edge steps: below `bound` (a ratio of the pitch), the step
@@ -58,4 +59,9 @@ struct Vc2OscAnalogPool {
     std::array<float, kVc2AnalogCodes> installed {}, subInstalled {};   // 0x895422f8, 0x89542324
     Vc2OscAnalogSubPool sub;           // the sub oscillator's note-on's (v244)
     Vc2OscShapePool shape;             // the sub oscillator's shape's (v246, Vc2OscAnalogShapePool.h)
+    // the renders' (v337): HQ-SAW's and HQ-SQUARE's impulse and window, end to end where rom.4's pointers 0x8993fbf8 and
+    // 0x8993fbfc lead (0x8954b830 and 0x89558034, each a centre), rom.2's byte for byte
+    std::array<float, XtAnalogHq::kFloats> hq {};
+    XtAnalogHq hqTables() const { return { hq.data() + XtAnalogHq::kAHalf, hq.data() + kHqB }; }
+    static constexpr int kHqB = 2 * XtAnalogHq::kAHalf + 1 + XtAnalogHq::kBHalf;   // B's centre
 };

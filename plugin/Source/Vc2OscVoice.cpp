@@ -60,11 +60,17 @@ struct OwnRender {
     uint32_t at;
     void (*render)(Vc2OscVoice&, float*, Vc2OscParts&);
 };
+// v332: the band players', BACKING's and ENSEMBLE's (Vc2OscBands.cpp), each one routine for mono and stereo
+void bandsBacking(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscBands(v, out, p, false); }
+void bandsEnsemble(Vc2OscVoice& v, float* out, Vc2OscParts& p) { vc2OscBands(v, out, p, true); }
 // v327: kind 1's mode 1's (Vc2OscModeOne.cpp), one routine for mono and stereo
-constexpr std::array<OwnRender, 7> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
-                                                   { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
-                                                   { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo },
-                                                   { 0x893c9f60, vc2OscModeOne } } };
+// v334: SOLO's (Vc2OscSolo.cpp), one routine for mono and stereo
+constexpr std::array<OwnRender, 11> kOwnRenders { { { 0x893c62e0, extInStereo }, { 0x893c61e0, extInMono },
+                                                    { 0x893c63c0, variOffMono }, { 0x893c66e0, variOffStereo },
+                                                    { 0x893c6e80, headsMono }, { 0x893c6e8c, headsStereo },
+                                                    { 0x893c9f60, vc2OscModeOne }, { 0x893cadc0, bandsBacking },
+                                                    { 0x893ca1f0, bandsEnsemble }, { 0x893c9450, vc2OscSolo },
+                                                    { 0x893ca8b0, vc2OscJump } } };   // v335
 } // namespace
 
 bool Vc2OscVoice::renderOwn(uint32_t routine, float* out, Vc2OscParts& parts) {
@@ -109,15 +115,15 @@ void Vc2OscVoice::update(int32_t n, Vc2OscParts& parts, const Vc2ToneShared& sha
     for (size_t ramp = 0; ramp < ramps.size(); ++ramp) {
         if (row.ticks & (1 << ramp)) ramps[ramp].tick(n16, shared);
     }
-    switch (row.updates) {   // the port's (v248, v321, v322), or the kind's by its address
+    switch (row.updates) {   // the port's (v248, v321, v322, v324, v330), or none
         case Vc2OscUpdate::analog: updateAnalog(parts, shared); return;
         case Vc2OscUpdate::carrier: updateCarrier(parts, shared); return;
         case Vc2OscUpdate::kind6: updateKind6(parts, shared); return;
         case Vc2OscUpdate::extIn: updateExtIn(parts, shared); return;
-        case Vc2OscUpdate::lite: updateLite(parts, shared); return;   // v324
-        case Vc2OscUpdate::routine: break;
+        case Vc2OscUpdate::lite: updateLite(parts, shared); return;
+        case Vc2OscUpdate::vari: updateVari(parts, shared); return;
+        case Vc2OscUpdate::none: return;
     }
-    if (row.update != 0) parts.kindCall(row.update);
 }
 
 void Vc2OscVoice::reseek(Vc2OscParts& parts) {
@@ -206,7 +212,10 @@ uint32_t Vc2OscVoice::render(float* out, Vc2OscParts& parts) {
         case Vc2OscRender::byRender:   // v322, v323: the voice's own renders, any other by its address
             if (!renderOwn(tail.render, out, parts)) parts.renderBy(tail.render, out, kRenderThird);
             return 0;
-        case Vc2OscRender::byAnalog: return parts.renderBy(tail.renderAnalog, out, tail.sync);
+        case Vc2OscRender::byAnalog: {   // v337: the analog's renders the voice's own, any other by its address
+            const std::optional<uint32_t> mask = renderAnalog(tail.renderAnalog, out);
+            return mask ? *mask : parts.renderBy(tail.renderAnalog, out, tail.sync);
+        }
         case Vc2OscRender::carrier: carrier.render(out); return 0;                                  // 0x893ebfa0
         case Vc2OscRender::kind6: kind6.render(parts.micRing(), parts.unvoiced(), out); return 0;   // 0x893ec730
     }

@@ -109,11 +109,11 @@ public:
     // + 2 × OSC, Vc2PartRows::steps), the glide key a voice's +0x38 names and a key table's Hold (+0x11c), the legato
     // struct's +1 and +2 that a make's call names, M's bend (+0x174), the Matrix's groups for an OSC by its four getters,
     // the pitch source's ratio (0x89394a40 on 0x89989748) (v391's `unportedOscKind`, the kinds' routines the port
-    // hadn't, went with PCM's start, v397)
+    // hadn't, went with PCM's start, v397); v343: the step count as it was, counted on by one where it lies
     virtual std::array<uint8_t, 32> oscHeader(uint32_t part) = 0;
     virtual std::array<uint8_t, 128> oscRecord(uint32_t part, uint32_t kind, uint32_t osc) = 0;
     virtual std::array<uint8_t, 60> oscSystems() = 0;
-    virtual uint16_t& oscStep(uint32_t part, uint32_t kind, uint32_t osc) = 0;
+    virtual uint16_t nextOscStep(uint32_t part, uint32_t kind, uint32_t osc) = 0;
     virtual Vc2SetGlide glideAt(uint32_t glide) = 0;
     virtual uint8_t holdOf(uint32_t keys) = 0;
     virtual std::array<uint8_t, 2> legatoOf(uint32_t word) = 0;

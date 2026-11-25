@@ -14,10 +14,6 @@
 #include "Vc2SetsChildCheck.h"
 #include "Vc2ToneInput.h"
 
-std::array<uint16_t, 21> SetPortParts::cosmInputOf(uint32_t part, uint32_t kind, uint32_t index) {
-    return partWords<21>(kSetsCosmTable, part, kind, index);
-}
-
 const int16_t* SetPortParts::matrixGroup(uint32_t reader, uint32_t matrix) {
     logged(kSetMatrixSum, reader, { matrix });
     fw_.cpu.read(kSetsSumsAt, group_.data(), sizeof group_);

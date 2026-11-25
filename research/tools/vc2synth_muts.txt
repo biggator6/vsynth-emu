@@ -10,12 +10,12 @@ no-source|kNoSource = { -1, 0, 0.0f };|kNoSource = { 0, 0, 0.0f };|vc2synth
 notes-unread|kNotesUnread = 0x3c199999;|kNotesUnread = 0x3c19999a;|vc2synth
 robot-start|kRobotStart = 1.0f;|kRobotStart = 0.0f;|vc2synth
 counts-set|    rows.voiceCounts = kVoiceCounts;\n|\n|vc2synth
-step-set|    tvas.step = kTvaStep;\n|\n|vc2synth
+step-set|    tvas.step = std::bit_cast<float>(kTvaStep);\n|\n|vc2synth
 elapsed-set|    time.elapsed = kElapsed;\n|\n|vc2synth
 receive-set|    midi.receiveProgram = midi.receiveBank = kReceiveOn;\n|    midi.receiveProgram = kReceiveOn;\n|vc2synth
 nodes-channel|    for (Vc2PartNode& n : nodes.nodes) n.channel = 0;|    for (Vc2PartNode& n : nodes.nodes) n.channel = 1;|vc2synth
 midi-ports|    midi.staticInitPorts();   // the whole table's 0x893179d0\n|\n|vc2synth
-midi-states|    midi.staticInitStates();  // and 0x89317db0, before the part's rows\n|\n|vc2synth
+midi-states|    midi.staticInitStates();  // and 0x89317db0\n|\n|vc2synth
 voices-init|    voices.staticInit();      // row 4|    // row 4|vc2synth
 glides-init|    keys.constructGlides();   // row 7|    // row 7|vc2synth
 trips-init|    trips.staticInit();       // row 11|    // row 11|vc2synth
@@ -30,5 +30,388 @@ chaos-set|    chaos = Vc2ToneLfo::kChaosStart;   // row 47|    // row 47|vc2synt
 lfos-init|    freeLfos.construct();     // row 54|    // row 54|vc2synth
 autonote-init|    autoNote.init();          // row 83|    // row 83|vc2synth
 ring-init|    ring.setGlobals();        // row 85|    // row 85|vc2synth
-static-state-back|        std::memcpy(m_.state.data(), &s, sizeof s);\n|\n|vc2synth
-static-state-channel|        vc2ChannelSetUp(s, (uint8_t)channel);|        vc2ChannelSetUp(s, (uint8_t)(channel + 1));|vc2synth
+static-state-back|        std::memcpy(s_.staticM.state.data(), &c, sizeof c);\n|\n|vc2synth
+static-state-channel|        vc2ChannelSetUp(c, (uint8_t)channel);|        vc2ChannelSetUp(c, (uint8_t)(channel + 1));|vc2synth
+# v340: the tones' hosts on the part's words (vc2synth: the LFOs' generator in their common; step-set above on the
+# step's new text, a float).  Not planted: the voices' outside (Vc2SynthTone.cpp) and each host's number (its own
+# address and tail), which no make reaches (host-number, every host tone 0, missed): the tasks' version's renders
+# and note-ons run them; a common's reference to another word builds no mutant (a temporary bound to it)
+host-chaos|freeLfos, chaos, tvas.step|freeLfos, rows.robot, tvas.step|vc2synth
+# v342: the part's memory by address (vc2synthmemory, Vc2SynthMemory.cpp: its region table, moved from the check, and
+# its read by address, which no part reads yet: the part's reads, next, run it).  A region the start leaves 0 on both
+# sides (the rings, the tones' tails, the buffers) moved shows nowhere yet (mem-region-ring, -tail, -buffers missed)
+mem-region-at|vc2SynthRegion(0x89998a14, r.bytes, "the part's bytes")|vc2SynthRegion(0x89998a18, r.bytes, "the part's bytes")|vc2synthmemory
+mem-region-step|vc2SynthRegion(Vc2SetTvas::kStepAt, s.tvas.step|vc2SynthRegion(Vc2SetTvas::kStepAt + 4, s.tvas.step|vc2synthmemory
+mem-region-counts|vc2SynthRegion(0x8993d02c, r.voiceCounts|vc2SynthRegion(0x8993d02e, r.voiceCounts|vc2synthmemory
+# v343: C's reads of the part (vc2synthreads, Vc2SynthReads.cpp), by xt_vc2synth's reads part: a child's row to the
+# part's pool (the placements), a Matrix group by its reader on M by address (the readers, the getters, the sums), the
+# sources' world (M's channel, G's assignments, the part's byte); the step count and the children's other routines
+# reach nothing in the reads part (the whole check's); the new regions and the part table's start (the start's)
+sr-pool-mix|    case kMix: f(s_.mixes); break;|    case kMix: f(s_.tvas); break;|vc2synthreads
+sr-pool-lfo|    case kLfo: f(s_.lfos); break;|    case kLfo: f(s_.envelopes); break;|vc2synthreads
+sr-pool-cosm|    case kCosmInput: f(s_.cosmInputs); break;|    case kCosmInput: f(s_.lfos); break;|vc2synthreads
+sr-pool-osc|    case kOscBlock: f(s_.oscBlocks); break;|    case kOscBlock: f(s_.cosmInputs); break;|vc2synthreads
+sr-place-common|            object = p.addressOf(number);|            object = p.addressOf(number + 1);|vc2synthreads
+sr-place-index|            object = p.placeOf(number, index);|            object = p.placeOf(number, 0);|vc2synthreads
+sr-static-m|    return matrix == Vc2StaticMatrix::kAt ? &s_.staticM.m : nullptr;|    return nullptr;|vc2synthreads
+sr-pool-m|        return &s_.sets.matrices.items[from / Ms::kBytes].m;|        return &s_.sets.matrices.items[from / Ms::kBytes / 2].m;|vc2synthreads
+sr-links|value<Vc2MatrixLinks>(matrix + kLinksAt);|value<Vc2MatrixLinks>(matrix + kLinksAt + 2);|vc2synthreads
+sr-channel|    read(links.channel, &channel_, sizeof channel_);|    read(links.channel + 2, &channel_, sizeof channel_);|vc2synthreads
+sr-assigns|    std::memcpy(state.assigns.data(), s_.g.assigns, sizeof s_.g.assigns);\n||vc2synthreads
+sr-part-table|kVc2OscPartTableAt + 4u * (uint32_t)(int32_t)links.part|kVc2OscPartTableAt + 4u * (uint32_t)(int32_t)(links.part + 1)|vc2synthreads
+sr-part-byte|    state.partByte = rd8(record + kPartByteAt);|    state.partByte = rd8(record + kPartByteAt + 1);|vc2synthreads
+sr-group|vc2MatrixGroups()[(size_t)(found - kVc2MatrixReaders.begin())]|vc2MatrixGroups()[(size_t)(found - kVc2MatrixReaders.begin()) / 2]|vc2synthreads
+sr-sum-offset|reinterpret_cast<const uint8_t*>(sums) + offset, sizeof sum);|reinterpret_cast<const uint8_t*>(sums) + offset + 2, sizeof sum);|vc2synthreads
+sr-getter-osc|matrixGroup(kVc2OscGetters[second], matrix)|matrixGroup(kVc2OscGetters[0], matrix)|vc2synthreads
+sr-getter-lfo|matrixGroup(kVc2LfoGetters[second], matrix)|matrixGroup(kVc2LfoGetters[1 - second], matrix)|vc2synthreads
+mem-region-table|vc2SynthRegion(0x8993d040, s.partTable|vc2SynthRegion(0x8993d044, s.partTable|vc2synthmemory
+mem-region-seed|vc2SynthRegion(Vc2SetOscBlocks::kSeedAt, s.oscBlocks.seed|vc2SynthRegion(Vc2SetOscBlocks::kSeedAt + 2, s.oscBlocks.seed|vc2synthmemory
+host-part-table|        partTable[k] = Vc2TripRecords::kAt + (uint32_t)sizeof(Vc2TripRecord) * k;|        partTable[k] = Vc2TripRecords::kAt + (uint32_t)sizeof(Vc2TripRecord) * (k + 1);|vc2synth
+# v345: the part's start, settings and voices wired (vc2synthsettings, Vc2SynthSettings.cpp; vc2synth, Vc2Synth.cpp;
+# vc2synthnumbers, Vc2PartNumbers.cpp's sound off under xt_vc2synth), by xt_vc2synth's load part; the voices' and notes'
+# parts (Vc2SynthVoices.cpp, the headers' bodies) reach little in a load, their plants with the notes' part next
+# Missed by the load, seen only with a note sounding, the Matrix's M made or a system store: the levels' copy
+# (ss-levels-static, -mixer, -targets: the Matrix's init, the update task's and a note's), All Sound Off over
+# empty key tables (ss-sound-off, syn-sound-off), the receiving channel (ss-receiving: Part 1 Receive Switch's
+# default off); the notes' part's to catch
+ss-default-centre|    return d != nullptr ? d->def - d->centre : 0;|    return d != nullptr ? d->def : 0;|vc2synthsettings
+ss-typed-default|        return t != nullptr ? t->def : 0;|        return t != nullptr ? t->def + 1 : 0;|vc2synthsettings
+ss-in-patch|b == Block::kKindB \|\| b == Block::kKindC; }|b == Block::kKindB; }|vc2synthsettings
+ss-zone|block == Block::kPart ? 0 : kind, 0);|block == Block::kPart ? 0 : 0, 0);|vc2synthsettings
+ss-cosm-zone|    return xtStoreValue(vc2Store(), *s_.patch, id, kind, cosm);\n}|    return xtStoreValue(vc2Store(), *s_.patch, id, kind, 0);\n}|vc2synthsettings
+ss-cosm-typed|return vc2StoreTyped(*s_.patch, id, kind, cosm);|return vc2StoreTyped(*s_.patch, id, kind, 0);|vc2synthsettings
+ss-levels-static|    s_.staticM.levels = setup.levelsOut;\n||vc2synthsettings
+ss-levels-mixer|    std::memcpy(&s_.mixer.offsets, setup.levelsOut.values.data(), sizeof s_.mixer.offsets);\n||vc2synthsettings
+ss-levels-targets|    s_.mixer.targets();\n}\n\n// [FW] 0x893b1be0|}\n\n// [FW] 0x893b1be0|vc2synthsettings
+ss-stereo|    s_.mixer.w.stereo = stereo;\n||vc2synthsettings
+ss-sound-off|vc2NumbersSoundOff(source, channel, w);|vc2NumbersSoundOff(source, channel + 1, w);|vc2synthsettings
+ss-receiving|t.states[(size_t)(16 * t.sources[0] + channel)]|t.states[(size_t)(16 * t.sources[3] + channel)]|vc2synthsettings
+ss-part-message|settings.partParameters(w, kind, part);|settings.partParameters(w, kind, 0);|vc2synthsettings
+ss-message|settings.parameters(w, kind, byte1);|settings.parameters(w, kind, 0);|vc2synthsettings
+ss-routing|return settings.routing(w, on);|return settings.routing(w, false);|vc2synthsettings
+syn-task-hook|    notes.hook = kVc2SynthEndedHook;|    notes.hook = 0;|vc2synth
+syn-task-gate|    noteGate = 0;\n    tempoClock()|    noteGate = 1;\n    tempoClock()|vc2synth
+syn-make-tone|return tones.make(id, h) != nullptr ? taken : 0;|return tones.make(id, h) != nullptr ? taken + 4 : 0;|vc2synth
+syn-static-enqueue|override { s_.queue.enqueue(node, s_.voices, *s_.voiceParts); }|override {}|vc2synth
+syn-reload-read|{ return s_.settings->readPart(part); }|{ return part == 0; }|vc2synth
+syn-sound-off|soundOff(w, { source, channel, 0 }); }|soundOff(w, { source, channel, 1 }); }|vc2synthnumbers
+# v346: the part's MIDI note path (vc2synthmidi, Vc2SynthMidi.cpp; vc2synth, Vc2Synth.cpp's audio task's object and
+# SysEx's flag; vc2synthmemory, their regions), by xt_vc2synth's notes part; and the voices' and notes' parts v345 left
+# for it (vc2synthvoices, Vc2SynthVoices.cpp).  Not planted: Vc2SynthMidi.h's bodies (the parameters' word's two bytes,
+# DC cut, all notes off), a header's; the held class's test (v347: every object a note reaches is held after part 0's
+# message, the four sources' nodes on one object); the OS MIDI's listeners read from the part's memory (listenerOf,
+# nextListener), as no routine of the part's installs one, so every port's list is empty on both sides.  Missed in
+# v346 (no system store yet), caught from v347 but these: the notes' block pass's mix and COSM setters (svo-block-mix, -cosm,
+# the update task's), the ended hook (svo-ended, the renders' ended scan), the plain voice class's routines
+# (svo-destroy-end, -note, -updated, svo-prepare-plain, svo-keyoff-plain: no voice of the notes' is plain), the
+# note-on's fix-up written back (svo-noteon-back) and the legato's struct's second byte (svo-legato), equal in the
+# notes drawn
+smi-ways|{ partNoteOff, partNoteOn, partHeard,|{ partNoteOn, partNoteOff, partHeard,|vc2synthmidi
+smi-heard|    vc2ChannelHeard(w, source, channel);|    vc2ChannelHeard(w, source, channel ^ 1);|vc2synthmidi
+smi-controller|(int32_t)number, (int32_t)value);|(int32_t)number, (int32_t)value / 2);|vc2synthmidi
+smi-note-off|    vc2ChannelNoteOff(w, source, channel, key, velocity);|    vc2ChannelNoteOff(w, source, channel, key + 3, velocity);|vc2synthmidi
+smi-note-on|    vc2ChannelNoteOn(w, source, channel, key, velocity);|    vc2ChannelNoteOn(w, source, channel, key, velocity ^ 1);|vc2synthmidi
+smi-object-key|{ object, table, word, (int32_t)key, velocity }|{ object, table, word, (int32_t)key + 1, velocity }|vc2synthmidi
+smi-object-word|{ object, table, word, 0, 0 }|{ object, table, 0, 0, 0 }|vc2synthmidi
+smi-handle|{ s_.midi.handle(m, word, *this, *s_.settings); }|{}|vc2synthmidi
+smi-dispatch|    vc2MidiDispatch(w, m, word);|    (void)w;|vc2synthmidi
+syn-audio-class|kAudioClass = 0x898cd394;|kAudioClass = 0x898cd370;|vc2synth
+syn-dc-start|kDcCutStart = 1;|kDcCutStart = 0;|vc2synth
+syn-sysex|kSysexOn = 1;|kSysexOn = 0;|vc2synth
+syn-midi-message|{ midiParts->message(m, word); }|{ midiParts->message(m, 0); }|vc2synth
+smem-audio|vc2SynthRegion(0x8998a480, s.audioTask,|vc2SynthRegion(0x8998a484, s.audioTask,|vc2synthmemory
+smem-sysex|vc2SynthRegion(0x8992e3d1, s.sysexOn,|vc2SynthRegion(0x8992e3d0, s.sysexOn,|vc2synthmemory
+svo-noteon-back|Vc2NoteWords& w = s_.notes.at(s_.notes.addressOf(&note));|Vc2NoteWords w = note;|vc2synthvoices
+svo-block-osc|t.setOscBlock(row.n, block, h); break;|t.setOscBlock(0, block, h); break;|vc2synthvoices
+svo-block-mix|    case Vc2NoteBlock::mix: t.setMixBlock(block, h); break;\n|\n|vc2synthvoices
+svo-block-cosm|t.setCosmBlock(row.n, block, h); break;|t.setCosmBlock(0, block, h); break;|vc2synthvoices
+svo-block-env|t.setEnvelopeBlock(row.n, block, h); break;|t.setEnvelopeBlock(0, block, h); break;|vc2synthvoices
+svo-block-lfo|t.setLfoBlock(row.n, block, h); break;|t.setLfoBlock(0, block, h); break;|vc2synthvoices
+svo-block-tva|    case Vc2NoteBlock::tva: t.setTvaBlock(block, h); break;\n|\n|vc2synthvoices
+svo-ended|if (routine == kVc2SynthEndedHook) s_.post(|if (routine != kVc2SynthEndedHook) s_.post(|vc2synthvoices
+svo-destroy-end|    s_.notes.end(n.note, *s_.noteParts);\n|\n|vc2synthvoices
+svo-destroy-note|    n.note = 0;\n    n.updated = 0;|    n.updated = 0;|vc2synthvoices
+svo-destroy-updated|    n.note = 0;\n    n.updated = 0;|    n.note = 0;|vc2synthvoices
+svo-legato|s_.legato = { legato.found, legato.marked, legato.onByte, 0 };|s_.legato = { legato.found, legato.found, legato.onByte, 0 };|vc2synthvoices
+svo-prepare-plain|        s_.voices.at(voice).updated = 0;\n        return;|        return;|vc2synthvoices
+svo-prepare-kind|kVc2SynthLegatoAt, call.passed, call.kind };|kVc2SynthLegatoAt, call.passed, 0 };|vc2synthvoices
+svo-retune|s_.classes.retune(voice, message, value,|s_.classes.retune(voice, message, 0,|vc2synthvoices
+svo-keyoff-plain|    if (note != 0) s_.notes.release(note, *s_.noteParts);|    (void)note;|vc2synthvoices
+svo-changed|? s_.classes.changed(voice, s_.voices, *this) : 0;|? 0 : 0;|vc2synthvoices
+svo-table|/ sizeof(Vc2KeyGlide)].table;|/ sizeof(Vc2KeyGlide) + 1].table;|vc2synthvoices
+svo-reload|(uint32_t)sizeof(Vc2Reload) * part);|(uint32_t)sizeof(Vc2Reload) * (part + 1));|vc2synthvoices
+# v347: the part's system store (vc2systemstore, Vc2SystemStore.cpp: each area's base, the defaults' routines, the read
+# by area), the part given it (vc2synth), the settings' system blocks from it (vc2synthsettings), its areas and the OS's
+# part objects as regions (vc2synthmemory), the OS's part objects' start (vc2synthosmidi, Vc2OsMidi.cpp under
+# xt_vc2synth).  Not planted: Vc2SystemStore.h's areas, a header's.  v345's Matrix levels' copy (ss-levels-static,
+# -mixer, -targets) is still missed: M's init runs on the update task, v349's
+sys-b-base|{ { { 0, kLastId, Vc2System::kRecord, 0 } },|{ { { 0, kLastId, Vc2System::kRecord + 1, 0 } },|vc2systemstore
+sys-block-base|Vc2System::kRecord + kSystemBlock, 0 } },|Vc2System::kRecord + kSystemBlock + 1, 0 } },|vc2systemstore
+sys-c-base|{ { 0, kLastId, Vc2System::kC, 0 } },|{ { 0, kLastId, Vc2System::kC + 1, 0 } },|vc2systemstore
+sys-d-base|{ { 0, kLastId, Vc2System::kD, 0 } } };|{ { 0, kLastId, Vc2System::kD + 1, 0 } } };|vc2systemstore
+sys-defaults-d|{ 0x89328d60, 0x89329190, 0x89328d20 };|{ 0x89328d60, 0x89329190, 0x89329190 };|vc2systemstore
+sys-read-at|image.read(a.at, s->bytes.data() + a.from|image.read(a.at + 1, s->bytes.data() + a.from|vc2systemstore
+sys-value-area|return xtStoreValue(kLayouts[(size_t)area], s.bytes, id);|return xtStoreValue(kLayouts[0], s.bytes, id);|vc2systemstore
+syn-give-system|    hasSystem = true;\n|\n|vc2synth
+syn-give-bytes|given.bytes.data(), system.bytes.size());|given.bytes.data(), Vc2System::kRecordBytes);|vc2synth
+syn-os-parts|    midi.staticInitParts();   // v347: and 0x89318140, before the part's rows\n|\n|vc2synth
+osp-index|partObjects[k] = { (uint8_t)k, kOs, kClass };|partObjects[k] = { (uint8_t)(k + 1), kOs, kClass };|vc2synthosmidi
+osp-os|kOs = { 1, 0xff, 0 };|kOs = { 1, 0xfe, 0 };|vc2synthosmidi
+osp-class|kClass = 0x898c872c;|kClass = 0x898c8660;|vc2synthosmidi
+ss-system-sys|{ { Block::kSystem, Vc2SystemArea::kSystem },|{ { Block::kSystem, Vc2SystemArea::kB },|vc2synthsettings
+ss-system-b|{ Block::kSystemB, Vc2SystemArea::kB },|{ Block::kSystemB, Vc2SystemArea::kSystem },|vc2synthsettings
+ss-system-c|{ Block::kSystemC, Vc2SystemArea::kC },|{ Block::kSystemC, Vc2SystemArea::kD },|vc2synthsettings
+ss-system-d|{ Block::kSystemD, Vc2SystemArea::kD } };|{ Block::kSystemD, Vc2SystemArea::kC } };|vc2synthsettings
+ss-has-system|&& s_.hasSystem) return vc2SystemValue|&& !s_.hasSystem) return vc2SystemValue|vc2synthsettings
+smem-os-parts|vc2SynthRegion(Vc2OsMidi::kPartObjectsAt, s.midi.partObjects,|vc2SynthRegion(Vc2OsMidi::kPartObjectsAt + 8, s.midi.partObjects,|vc2synthmemory
+smem-system|out.push_back({ a.at, s.system.bytes.data() + a.from,|out.push_back({ a.at + 1, s.system.bytes.data() + a.from,|vc2synthmemory
+smem-legato-own|"the legato's struct", true },|"the legato's struct", false },|vc2synthmemory
+# v349: the update task on the part (vc2synthupdate, Vc2SynthUpdate.cpp: a node's update by what it is, the pitch
+# source, the voices' update; vc2synth, the pass; vc2synthreads, M's refresh by address), by xt_vc2synth's notes part's
+# update passes.  Not planted: the tones' +0x30 and +0x3c and the free LFOs' clock, the schedule's (the notes' task's,
+# not yet run).  upd-glue's period is the tracker's 0 plus 100: the check renders nothing, so the tracker's period
+# stays 0 and its ratio's quotient infinite, where any period below about 50 (A440's 100.227 over it above 2) clamps
+# the same way
+upd-stays|constexpr uint32_t kStays = 1;|constexpr uint32_t kStays = 0;|vc2synthupdate
+upd-pitch-event|constexpr uint32_t kPitchEvent = 0x100;|constexpr uint32_t kPitchEvent = 0x200;|vc2synthupdate
+upd-static-init|        s_.settings->setup.init(s_.staticM.m, s_.staticM.links, s_.g, refresh);\n|        (void)refresh;\n|vc2synthupdate
+upd-voice-class|.vtable == Vc2Assigner::kNoteVtable) s_.classes.update|.vtable != Vc2Assigner::kNoteVtable) s_.classes.update|vc2synthupdate
+upd-pitch-depth|    s_.pitch.depth = s_.rows.robot;|    s_.pitch.depth = 0.0f;|vc2synthupdate
+upd-pitch-switch|if (s_.autoNote.w.onSwitch != 0 \|\| s_.rows.robot > 0.0f)|if (s_.rows.robot > 0.0f)|vc2synthupdate
+upd-pitch-robot|\|\| s_.rows.robot > 0.0f)|\|\| s_.rows.robot >= 0.0f)|vc2synthupdate
+upd-glue|s_.vocoder.glue(carried, s_.tracker.period());|s_.vocoder.glue(carried, s_.tracker.period() + 100.0f);|vc2synthupdate
+upd-refresh|{ reads_.refreshMatrix(Vc2StaticMatrix::kAt); }|{}|vc2synthupdate
+syn-update-events|    vc2UpdateTaskPass(w, events);|    vc2UpdateTaskPass(w, events & 1);|vc2synth
+srd-refresh|    core.refresh(*m);\n}|}|vc2synthreads
+# v350: the notes' task's pass on the part (vc2synth, the pass and its world; vc2synthmidi, the part's MIDI parts as
+# the pass's: the ended scan, a source's reset by the dispatcher's 0x70 way, the schedule, Auto Note's release;
+# vc2synthupdate, the voices' schedule on the sounding list), by xt_vc2synth's notes part's notes' task's passes.  Not
+# planted: the queue's drain, an empty override in the header (rom.4's drain hooked to return as it).  Missed until
+# the block: smi-ended-scan (the ended scan frees a voice whose tone's TVA has ended, which takes the renders)
+syn-notes-keys|autoNoteKeys[0], autoNoteKeys[1], nodes|autoNoteKeys[1], autoNoteKeys[0], nodes|vc2synth
+syn-notes-events|    vc2NotesTaskPass(w, events);|    vc2NotesTaskPass(w, events & ~0x10u);|vc2synth
+smi-ended-scan|void Vc2SynthMidi::endedScan() { s_.voices.endedScan(*s_.voiceParts); }|void Vc2SynthMidi::endedScan() {}|vc2synthmidi
+smi-reset-status|constexpr uint8_t kResetStatus = 0x70;|constexpr uint8_t kResetStatus = 0x71;|vc2synthmidi
+smi-reset-source|{ kResetStatus, 0, 0, (uint8_t)source }|{ kResetStatus, 0, 0, (uint8_t)(source + 1) }|vc2synthmidi
+smi-schedule|void Vc2SynthMidi::schedule() { s_.updateParts->schedule(); }|void Vc2SynthMidi::schedule() {}|vc2synthmidi
+smi-release|void Vc2SynthMidi::autoNoteRelease() { s_.autoNote.askRelease(); }|void Vc2SynthMidi::autoNoteRelease() {}|vc2synthmidi
+upd-schedule|{ s_.mixer.scheduleTones(s_.toneParts->tasksTones(), *this); }|{}|vc2synthupdate
+upd-voices-tones|{ s_.mixer.updateTones(s_.toneParts->tasksTones(), *this); }|{}|vc2synthupdate
+# v351: the part's block (vc2synthtones, Vc2SynthTones.cpp: the sounding tones as the mixer takes them, v349's
+# upd-sounding-next and upd-tone-update moved here as tns-sounding-next and tns-update; vc2synthblock,
+# Vc2SynthBlock.cpp: the mixer's parts and Auto Note's host; vc2synth, the block and the audio task's start), by
+# xt_vc2synth's notes part's blocks and the load part's start.  Not planted: the node's row (source 3's and source 4's
+# part 0 nodes on one channel throughout, as the system's receive channels set them).  Missed until the check gives the
+# part waves: tns-count (an OSC voice's count moves only where a VariPhrase player asks it, kCounts)
+tns-sounding-next|at = s_.tones.at(at).head.next) {|at = 0) {|vc2synthtones
+tns-update|tone().update(n, host());|tone().update(n + 1, host());|vc2synthtones
+tns-clock|tone().clock(seconds, host());|tone().clock(seconds + seconds, host());|vc2synthtones
+tns-count|tone().count(x, host());|tone().count(x + 1, host());|vc2synthtones
+tns-carrier|return tone().sounds(host());|return !tone().sounds(host());|vc2synthtones
+tns-render-carrier|tone().renderWhole(&frames->left, s_.buffers, host());|tone().render(&frames->left, s_.buffers, host());|vc2synthtones
+tns-held|return tone().held(host());|return false;|vc2synthtones
+tns-render|{ tone().render(&frames->left, s_.buffers, host()); }|{ tone().renderWhole(&frames->left, s_.buffers, host()); }|vc2synthtones
+tns-voices|voices_[n++] = toneAt(at);|voices_[n++] = &tones_[0];|vc2synthtones
+tns-first|{ return toneAt(s_.lists.sounding); }|{ return nullptr; }|vc2synthtones
+tns-next|tone().head.next); }|tone().head.prev); }|vc2synthtones
+blk-input|second, kBlockSamples, s_.pitch|second, kBlockSamples - 1, s_.pitch|vc2synthblock
+blk-ring|s_.ring.write(mic, s_.tracker.period());|s_.ring.write(mic, s_.tracker.period() + 1.0f);|vc2synthblock
+blk-engine|return s_.vocoder.engine != nullptr;|return s_.vocoder.engine == nullptr;|vc2synthblock
+blk-unvoiced|{ s_.vocoder.stage.block(mic); }|{}|vc2synthblock
+blk-ring-block|return s_.vocoder.stage.micBlock();|return s_.vocoder.stage.micBlock() + 1;|vc2synthblock
+blk-vocoder-ring|s_.vocoder.block(ring, &frames->left|s_.vocoder.block(ring + 1, &frames->left|vc2synthblock
+blk-vocoder-level|kStereo, s_.mixer.offsets.level);|kStereo, s_.mixer.offsets.mfx);|vc2synthblock
+blk-reset-tracker|{ s_.tracker.reset(); }|{}|vc2synthblock
+blk-reset-unvoiced|{ s_.vocoder.stage.reset(); }|{}|vc2synthblock
+blk-reset-ring|{ s_.ring.reset(); }|{}|vc2synthblock
+blk-keys-source|constexpr uint32_t kKeysSource = 2;|constexpr uint32_t kKeysSource = 1;|vc2synthblock
+blk-channel|s_.nodes.nodes[kAutoNoteNode].channel;|s_.nodes.nodes[kAutoNoteNode].channel + 1;|vc2synthblock
+blk-keys-held|kLowKey, kHighKey) >= 0) return false;|kLowKey + 64, kHighKey) >= 0) return false;|vc2synthblock
+blk-on-key|s_.autoNoteKeys[0] = (uint32_t)(note + kOctave);|s_.autoNoteKeys[0] = (uint32_t)(note + kOctave + 1);|vc2synthblock
+blk-on-event|kNoteOnEvent);\n    return true;|kNoteOffEvent);\n    return true;|vc2synthblock
+blk-off-key|s_.autoNoteKeys[1] = (uint32_t)(note + kOctave);|s_.autoNoteKeys[1] = (uint32_t)(note + kOctave + 1);|vc2synthblock
+blk-off-event|s_.post(kVc2SynthNotesTask, kNoteOffEvent);|s_.post(kVc2SynthNotesTask, kNoteOnEvent);|vc2synthblock
+syn-block-input|input != nullptr ? input : kSilence.data()|kSilence.data()|vc2synth
+syn-block-frames|frames.data(), toneParts->voices()|frames.data() + 8, toneParts->voices()|vc2synth
+syn-audio-start|void Vc2Synth::audioStart() { mixer.reset(*blockParts); }|void Vc2Synth::audioStart() {}|vc2synth
+# v354: the part's clock and tempo timers (vc2synthclock, Vc2SynthClock.cpp: the clock object as row 20 builds it, its
+# ms, the clock task's pass, the schedule's firing and arming; vc2tempotimers, Vc2TempoTimers.cpp: the list's set and
+# advance; vc2synth, the start's and the notes' task's start's calls), by the start's compare and xt_vc2synth's notes
+# part's clock events.  Not planted: the waiter (+0x3c, its event a task's not the part's, never drawn), the since
+# count's end (65535 ms, past what the draws reach), the arming's count of 0 (0 from the start already), a fired timer
+# marked off rather than fired (with the schedule alone on the list, set links it to itself again just the same), the
+# firing's class test (the schedule alone on the list), and two of the advance's that the schedule alone can't tell
+# apart: its early return a tick later (the walk then finds nothing due and keeps the same soonest) and its soonest of
+# those not due (the schedule alone is due whenever the walk runs).
+clk-class|o.klass = kClockClass;|o.klass = kClockClass + 4;|vc2synthclock
+clk-perclock|o.perClock = kPerClock;|o.perClock = kPerClock + 1;|vc2synthclock
+clk-quarter|o.quarterMs = kQuarterMs;|o.quarterMs = kQuarterMs + 1;|vc2synthclock
+clk-speed|o.speed = kSpeed;|o.speed = kSpeed + 1;|vc2synthclock
+clk-seen|    o.seen = kNoneSeen;\n    o.outCount|    o.seen = 0;\n    o.outCount|vc2synthclock
+clk-outcount|o.outCount = kOutCount;\n    o.six|o.outCount = kOutCount - 1;\n    o.six|vc2synthclock
+clk-six|o.six = kSix;|o.six = kSix + 1;|vc2synthclock
+clk-schedule-class|t.timer.klass = Vc2ScheduleTimer::kClass;|t.timer.klass = 0;|vc2synthclock
+clk-external|if (o.sync == 0 && o.external != 0) {|if (o.external != 0) {|vc2synthclock
+clk-out-switch|if (ticks != 0 && o.sendOut != 0) {|if (ticks != 0) {|vc2synthclock
+clk-out-wrap|left > 0 ? left : left + kOutCount);|left > 0 ? left : left + kOutCount - 1);|vc2synthclock
+clk-out-pending|(left > 0 ? 0 : 1));|(left > 0 ? 0 : 2));|vc2synthclock
+clk-out-send|if (o.outPending != 0 && parts.sendClock()) --o.outPending;|if (o.outPending != 0) --o.outPending;|vc2synthclock
+clk-since|o.since = (uint16_t)(was + 1);|o.since = (uint16_t)(was + 2);|vc2synthclock
+clk-since-seen|if (o.seen >= 0) {   // 0x8931319e|if (o.seen > 0) {   // 0x8931319e|vc2synthclock
+clk-raise|parts.raise(kTask, kTakeEvent);|parts.raise(kTask, 4);|vc2synthclock
+clk-fire-count|++schedule.count;|schedule.count += 2;|vc2synthclock
+clk-fire-post|parts.post(kNotesTask, kScheduleEvent);|parts.post(kNotesTask, 0x20);|vc2synthclock
+clk-fire-step|schedule.at += kScheduleStep;|schedule.at += kScheduleStep + 1;|vc2synthclock
+clk-take-event|if ((events & kTakeEvent) != 0) {|if ((events & kAlarmEvent) != 0) {|vc2synthclock
+clk-take-store|        store(object, t);\n        if (ticks != 0) timers()|        if (ticks != 0) timers()|vc2synthclock
+clk-arm-at|schedule.at = list.clock + kScheduleStep;|schedule.at = list.clock + kScheduleStep + 1;|vc2synthclock
+clk-ramp-read|    t.ramp = o.ramp;\n    return t;|    return t;|vc2synthclock
+clk-remainder-kept|    o.remainder = t.remainder;\n|\n|vc2synthclock
+tt-later|return (int32_t)a > (int32_t)b;|return (int32_t)a >= (int32_t)b;|vc2tempotimers
+tt-set-due|    if (later(list.nextDue, time)) list.nextDue = time;\n}|}|vc2tempotimers
+tt-advance-clock|list.clock += (uint32_t)ticks;|list.clock += (uint32_t)ticks + 1;|vc2tempotimers
+tt-advance-reset|    list.nextDue = Vc2TempoTimer::kOff;\n    const uint32_t first|    const uint32_t first|vc2tempotimers
+tt-advance-fired|t.fired = t.time;|t.fired = list.clock;|vc2tempotimers
+syn-clock-built|    Vc2SynthClock::build(clockObject);        // v354|    // v354|vc2synth
+syn-schedule-built|    Vc2SynthClock::buildSchedule(schedule);   // and|    // and|vc2synth
+syn-schedule-armed|    tempoClock().armSchedule();   // v354|    // v354|vc2synth
+syn-clock-ms|void Vc2Synth::clockMs() { tempoClock().ms(); }|void Vc2Synth::clockMs() {}|vc2synth
+syn-schedule-count|noteGate, pitch, schedule.count,|noteGate, pitch, schedule.at,|vc2synth
+# v355: the part's tasks on rom.1's kernel (vc2synthos, Vc2SynthOs.cpp: the start, a task's first run and its passes,
+# the runs a post, an interrupt's end and a wait inside a pass give; vc2synthostasks, Vc2SynthOsTasks.cpp: the
+# prologues' parts, the audio task's passes, the cyclic handler, TMU0's handler, the DMA's interrupts, a block's ticks,
+# a message as the OS MIDI task's work and the hub's tell, the notes' mailbox), the clock's MIDI listener and its 0x40
+# pass (vc2synthclock), the part mixer's walk of the sounding list (vc2synthmixer), the forwarding to the OS model and
+# the clock's settings (vc2synth, vc2synthmidi), by xt_vc2synth's whole part against rom.4's tasks on rom.1.  Not
+# planted: a block missed (+0x2c: the output's interrupt with the audio task busy, which the events never give, a block
+# always done before the next) and so the busy flag's set (+0x28, cleared again in the same block before any compare),
+# and the clock task's own alarm off (its event 1: no alarm of its is ever set).
+os-first-run|        started_[t] = true;\n|\n|vc2synthos
+os-pass-events|parts_.pass(task, took_[t]);|parts_.pass(task, 0);|vc2synthos
+os-wait-mask|    uint16_t mask = kMasks[t];|    uint16_t mask = kMasks[t] & ~2u;|vc2synthos
+os-idle-advance|            parts_.advance();|            stuck_ = true;|vc2synthos
+os-stuck-idle|stuck_ = task != kIdle;|stuck_ = true;|vc2synthos
+os-post-run|    else runUntil(poster);|    else (void)poster;|vc2synthos
+os-gives-way|    if (kGivesWay[(size_t)poster]) gaveWay_|    if (kGivesWay[(size_t)poster] && poster == kInput) gaveWay_|vc2synthos
+os-gave-way|    if (std::exchange(gaveWay_[t], false) \|\| stuck_) return;|    if (std::exchange(gaveWay_[t], false) && stuck_) return;|vc2synthos
+os-pass-mask|        mask = parts_.pass(task, took_[t]);|        parts_.pass(task, took_[t]);|vc2synthos
+os-unlock-run|    took(s);\n    if (s.switched) runUntil(me);|    took(s);|vc2synthos
+os-raise-audio|    if (t >= 0) kernel.raise(t, (uint16_t)flags);|    if (t > 0) kernel.raise(t, (uint16_t)flags);|vc2synthos
+os-tick-app|    parts_.appTick();\n|\n|vc2synthos
+os-end-taken|    if (kernel.watchdog) took(kernel.interruptEnd());|    if (kernel.watchdog) kernel.interruptEnd();|vc2synthos
+os-wait-in-pass|    took(kernel.wait(mask));\n    runUntil(me);|    took(kernel.wait(mask));\n    runUntil(kIdle);|vc2synthos
+ost-record|kUpdateRecord = 10, kUpdateHandler = 0,|kUpdateRecord = 9, kUpdateHandler = 0,|vc2synthostasks
+ost-ticks|kUpdateOn = 1, kUpdateTicks = 10;|kUpdateOn = 1, kUpdateTicks = 11;|vc2synthostasks
+ost-lock|kUpdateLock = 0x880f3dc0u;|kUpdateLock = 0x880f3dc4u;|vc2synthostasks
+ost-started|    s_.updateStarted = 1;|    s_.updateStarted = 2;|vc2synthostasks
+ost-queue-post|s_.queue.q.post = Os::kObjects[Os::kUpdate];|s_.queue.q.post = Os::kObjects[Os::kNotes];|vc2synthostasks
+ost-notes-alarm|    os.kernel.setInterval(0);\n    s_.taskStart();|    os.kernel.setInterval(1);\n    s_.taskStart();|vc2synthostasks
+ost-input-at|(s_.dmaBuffers[kInput] << kBufferShift)|((s_.dmaBuffers[kInput] ^ 1) << kBufferShift)|vc2synthostasks
+ost-input-frames|        s_.input = input_;|        s_.input = nullptr;|vc2synthostasks
+ost-busy-off|        s_.audioTask[kBusyWord] = 0;\n|\n|vc2synthostasks
+ost-cyclic-ticks|    ++s_.ticks;\n|\n|vc2synthostasks
+ost-cyclic-event|os.raise(Os::kObjects[Os::kUpdate], kUpdateEvent);|os.raise(Os::kObjects[Os::kUpdate], 1);|vc2synthostasks
+ost-clock|s_.clock = (int32_t)os.kernel.time;|s_.clock = (int32_t)os.kernel.time + 1;|vc2synthostasks
+ost-input-toggle|    s_.dmaBuffers[kInput] ^= 1;\n|\n|vc2synthostasks
+ost-output-toggle|        s_.dmaBuffers[kOutput] ^= 1;\n|\n|vc2synthostasks
+ost-output-flag|s_.outputFlag = 0;   // 0x893f36d0|s_.outputFlag = 1;   // 0x893f36d0|vc2synthostasks
+ost-blocks|    ++w[kBlocksWord];\n|\n|vc2synthostasks
+ost-ms-edge|for (; msAcc_ >= kFramesPerMs;|for (; msAcc_ > kFramesPerMs;|vc2synthostasks
+ost-interrupts-order|    interrupt([this] { inputDone(); });\n    interrupt([this] { outputDone(); });|    interrupt([this] { outputDone(); });\n    interrupt([this] { inputDone(); });|vc2synthostasks
+ost-cyclic-sensing|        midi.sensing();\n|\n|vc2synthostasks
+ost-two-bytes|const size_t count = cls == kProgram \|\| cls == kPressure ? 2 : 3;|const size_t count = cls == kProgram ? 2 : 3;|vc2synthostasks
+ost-usb|if (channel && (m.source == kMidiIn \|\| m.source == kUsb)) {|if (channel && m.source == kMidiIn) {|vc2synthostasks
+ost-midi-on|    os.start();\n    midi.midiOn();|    os.start();|vc2synthostasks
+ost-notes-link|    midi.notesStart();\n|\n|vc2synthostasks
+ost-audio-mask|    return Os::kMasks[Os::kAudio];|    return Os::kMasks[Os::kAudio] & ~4u;|vc2synthostasks
+clk-heard-kind|kSyncKindA = 4, kSyncKindB = 6;|kSyncKindA = 4, kSyncKindB = 5;|vc2synthclock
+clk-heard-part|(cls == kPartParameters && kind == 0)|(cls == kPartParameters && kind == 1)|vc2synthclock
+clk-heard-event|parts.post(kTask, kSettingsEvent);|parts.post(kTask, kTakeEvent);|vc2synthclock
+clk-settings-pass|if ((events & kSettingsEvent) != 0) {|if ((events & kSettingsEvent) == 0) {|vc2synthclock
+clk-source-int|if (source == 0 && o.external != 0) {|if (source == 2 && o.external != 0) {|vc2synthclock
+clk-source-unlink|        xtRingUnlink(midiIn, 0u, kAt, nodeAt);\n|\n|vc2synthclock
+clk-source-midi|} else if (source == 1 && o.external == 0) {|} else if (source == 3 && o.external == 0) {|vc2synthclock
+clk-source-seen|        o.seen = kNoneSeen;\n        o.since = 0;|        o.seen = 0;\n        o.since = 0;|vc2synthclock
+clk-source-six|        o.six = kSix;\n        o.ramp = 0;|        o.six = kSix + 1;\n        o.ramp = 0;|vc2synthclock
+clk-source-ramp|        o.ramp = 0;\n        xtRingLink|        o.ramp = 1;\n        xtRingLink|vc2synthclock
+clk-source-link|        xtRingLink(midiIn, 0u, kAt, nodeAt);\n|\n|vc2synthclock
+clk-source-out|if (o.external == 0) o.sendOut = (uint16_t)out;|if (o.external != 0) o.sendOut = (uint16_t)out;|vc2synthclock
+clk-tempo|parts.patchValue(kPatchTempo) / kTempoTenths;|parts.patchValue(kPatchTempo) / kTempoTenths + 1;|vc2synthclock
+clk-tempo-sync|if (object.sync == 0) object.quarterMs|if (object.sync == 1) object.quarterMs|vc2synthclock
+clk-tempo-scale|kQuarterAtOne = 3000;|kQuarterAtOne = 3001;|vc2synthclock
+mix-walk-next|        tone = tones.next(at);   // v355: before its update, which may end it and give the notes' task its turn\n        at->update(n);|        at->update(n);\n        tone = tones.next(at);|vc2synthmixer
+syn-system-b|settings->value(Vc2ParamBlock::kSystemB, 0, 0, id); }|settings->value(Vc2ParamBlock::kSystem, 0, 0, id); }|vc2synth
+syn-patch-part|settings->value(Vc2ParamBlock::kPart, 0, 0, id); }|settings->value(Vc2ParamBlock::kPart, 1, 0, id); }|vc2synth
+syn-post-os|    if (osTasks) osTasks->post(object, flags);   // v355|    // v355|vc2synth
+syn-raise-os|    if (osTasks) osTasks->raise(object, flags);   // v355|    // v355|vc2synth
+syn-fade-os|    if (osTasks) osTasks->waitFade();|    if (osTasks && osTasks->blocks < 0) osTasks->waitFade();|vc2synth
+smi-drain-os|if (s_.osTasks) s_.osTasks->drain(|if (s_.osTasks && s_.osTasks->blocks < 0) s_.osTasks->drain(|vc2synthmidi
+# v355, the XT's MIDI input path on both sides (the coordinator's call (a)): the receive objects (vc2midireceive,
+# Vc2MidiReceive.cpp: the parser's channel way, the ring's put and its full marker, the markers, the take, the sensing
+# check), a hub listener's queue (vc2osqueue, Vc2OsQueue.cpp), the senders, listeners, waits and drains
+# (vc2synthmidipath, Vc2SynthOsMidi.cpp), the path's build, the prologues' links, the MIDI on and the input task's
+# settings (vc2synthmidistart, Vc2SynthOsMidiStart.cpp), the part's nodes of it (vc2synth), by xt_vc2synth's whole part
+# with its bursts and floods. Not planted: the running status (the check gives every message its status byte), the
+# take's word (no listener reads it for a channel message or a reset), USB-MIDI Thru's diversion and its markers' iset
+# or set (the check keeps Thru off: its MIDI out side isn't modelled), a waiters' list's order (one sender per list in
+# the draws), the drain's flag (no compare falls inside a drain), the fade's end with the model stuck (only a cut wait
+# reaches it, after its compare). Missed in v355 (229 changed plants, 223 caught): the sensing check's call and its
+# mark's clear (ost-cyclic-sensing, rcv-sensing-mark: the settings move the check to the second USB port's object at
+# the first parameters' message, long before its first 512 ticks, and that object takes no bytes), a full ring's count
+# (rcv-full-stop: only a running status shows it, and the check gives every status byte), the wait for empty's
+# draining test (mp-empty-draining: no sender tests the OS MIDI task's queue mid-drain), the word before the channel
+# states (kt-state-before: a channel state's notify reaches no listener, the OS MIDI's lists empty on both sides, v346;
+# the read kept for the out-of-bounds one it ended), and tns-count as before (v351)
+rcv-full-code|vc2ReceiveMarker(r, 2, false, parts);|vc2ReceiveMarker(r, 3, false, parts);|vc2midireceive
+rcv-full-stop|        vc2ReceiveMarker(r, 2, false, parts);\n        return false;|        vc2ReceiveMarker(r, 2, false, parts);\n        return true;|vc2midireceive
+rcv-put-event|    r.w.write = a;\n    giveTask(r, false, parts);|    r.w.write = a;|vc2midireceive
+rcv-length|return cls == kProgram \|\| cls == kPressure ? 2 : 3;|return cls == kProgram ? 2 : 3;|vc2midireceive
+rcv-enabled|    if (r.w.enabled == 0) return true;|    if (r.w.enabled != 0) return true;|vc2midireceive
+rcv-marker-skip|    while (a == r.w.read) a = after(r.w, a);\n|\n|vc2midireceive
+rcv-marker-running|r.w.running = r.w.sensing = r.w.mark = 0;|r.w.sensing = r.w.mark = 0;|vc2midireceive
+rcv-take-reset|message = (message & ~0xffu) \| kReset;|message = (message & ~0xffu) \| 0x72;|vc2midireceive
+rcv-sensing-mark|        r.w.mark = 0;\n        return;|        return;|vc2midireceive
+rcv-mark|    r.w.mark = 1;\n|\n|vc2midireceive
+rcv-wrap|a + 4 >= w.end ? w.start : a + 4; }|a + 4 >= w.end ? w.start + 4 : a + 4; }|vc2midireceive
+rcv-source|        r.w.built[3] = r.w.source;|        r.w.built[3] = 1;|vc2midireceive
+rcv-marker-source|    bytes[3] = r.w.source;|    bytes[3] = 0;|vc2midireceive
+q-one-word|kOneWordAbove = 0x6f;|kOneWordAbove = 0x70;|vc2osqueue
+q-full-one|        if (first == q.w.read) return false;|        if (first == q.w.read && q.w.end == 0) return false;|vc2osqueue
+q-full-two|if (first == q.w.read \|\| second == q.w.read) return false;|if (first == q.w.read) return false;|vc2osqueue
+q-take-order|    q.w.read = after(q.w, q.w.read);\n    word = at(q, q.w.read);|    word = at(q, q.w.read);\n    q.w.read = after(q.w, q.w.read);|vc2osqueue
+q-wrap|a + 4 >= w.end ? w.start : a + 4; }|a + 4 >= w.end ? w.start + 4 : a + 4; }|vc2osqueue
+mp-wake-event|        os_.post(Os::kObjects[(size_t)w.list[i]->task], kWaitEvent);|        os_.post(Os::kObjects[(size_t)w.list[i]->task], 0x4000);|vc2synthmidipath
+mp-send-post|    os_.post(owner, kListenerEvent);\n    return true;|    os_.post(owner, 4);\n    return true;|vc2synthmidipath
+mp-room-count|        ++roomWaits;\n|\n|vc2synthmidipath
+mp-empty-count|        ++emptyWaits;\n|\n|vc2synthmidipath
+mp-out-kinds|kOutKinds[] = { 4, 5 };|kOutKinds[] = { 4 };|vc2synthmidipath
+mp-out-post|os_.post(kInputTcb, kInputSettings);|os_.post(kInputTcb, 2);|vc2synthmidipath
+mp-os-classes|kOsClasses[] = { 0x01, 0x70, 0xa0,|kOsClasses[] = { 0x01, 0x72, 0xa0,|vc2synthmidipath
+mp-os-kinds|kOsKinds[] = { 0, 4, 5 };|kOsKinds[] = { 0, 4 };|vc2synthmidipath
+mp-notes-classes|kNotesClasses[] = { 0x01, 0x40, 0x41, 0x70,|kNotesClasses[] = { 0x01, 0x40, 0x70,|vc2synthmidipath
+mp-notes-owner|    s_.midiPath.notes.w.owner = kNotesTcb;   // 0x89390216\n|\n|vc2synthmidipath
+mp-empty-draining|if (p.osMidi.w.draining != 0 \|\| !vc2QueueEmpty(p.osMidi.w)) {|if (!vc2QueueEmpty(p.osMidi.w)) {|vc2synthmidipath
+mp-ring-node|    if (t.node == Path::kHubNodeAt) {|    if (t.node == Path::kClockAt) {|vc2synthmidipath
+mp-drain-two|if (vc2QueueMessageWords((uint8_t)message) == 2 && !vc2QueueTake|if (vc2QueueMessageWords((uint8_t)message) == 3 && !vc2QueueTake|vc2synthmidipath
+mp-front-way|front_ = Sender { Os::kFront, Stage::emptyWait,|front_ = Sender { Os::kFront, Stage::hubListener,|vc2synthmidipath
+mp-second-port|takeInput(s_.midiPath.usb, false);|takeInput(s_.midiPath.midiIn, false);|vc2synthmidipath
+mp-room-retry|    t.stage = Stage::hubListener;\n    return true;\n}\n\n// The hub's|    t.stage = Stage::idle;\n    return true;\n}\n\n// The hub's|vc2synthmidipath
+ms-sensing-ticks|kSensingTicks = 0x200, kFlushTicks = 0x100;|kSensingTicks = 0x1ff, kFlushTicks = 0x100;|vc2synthmidistart
+ms-flush-record|kFlushRecord = 8, kFlushHandler = 2;|kFlushRecord = 9, kFlushHandler = 2;|vc2synthmidistart
+ms-hub-class|kHubClass = 0x898c82dcu;|kHubClass = 0x898c82e0u;|vc2synthmidistart
+ms-receive-event|kMidiInEvent = 2, kUsbEvent = 4,|kMidiInEvent = 4, kUsbEvent = 4,|vc2synthmidistart
+ms-out-link|    hubLink(s_, Path::kOutAt);\n|\n|vc2synthmidistart
+ms-settings-active|        p.words.active = Path::kUsb2At;\n|\n|vc2synthmidistart
+ms-thru-off|kThruOn = 2, kThruOff = 3;|kThruOn = 2, kThruOff = 1;|vc2synthmidistart
+ms-thru-markers|        vc2ReceiveMarker(p.usb, kSettingsMarker, true, *this);\n|\n|vc2synthmidistart
+ms-dummy|const uint8_t flag = s_.systemBValue(kUsbDummy) != 0 ? 1 : 0;|const uint8_t flag = s_.systemBValue(kUsbDummy) != 0 ? 0 : 1;|vc2synthmidistart
+ms-linked|    p.hub.linked = 1;\n|\n|vc2synthmidistart
+ms-give-event|os_.raise(Vc2SynthOs::kObjects[Vc2SynthOs::kFront], kFrontEvent);|os_.raise(Vc2SynthOs::kObjects[Vc2SynthOs::kFront], 2);|vc2synthmidistart
+ms-usb-byte|vc2ReceiveByte(source == kUsbSource ? s_.midiPath.usb : s_.midiPath.midiIn, byte, *this);|vc2ReceiveByte(s_.midiPath.midiIn, byte, *this);|vc2synthmidistart
+ms-enable-usb2|p.usb2.w.enabled = p.midiIn.w.enabled = p.usb.w.enabled = 1;|p.midiIn.w.enabled = p.usb.w.enabled = 1;|vc2synthmidistart
+ms-queue-handler|kOsMidiClass, kOsMidiTcb, kOsMidiHandler);|kOsMidiClass, kOsMidiTcb, 0);|vc2synthmidistart
+syn-midi-part|    midiPath.buildPart();                     // v355|    // v355|vc2synth
+syn-midi-os|    midiPath.buildOs();\n|\n|vc2synth
+syn-hub-clock|: at == Vc2MidiPath::kClockAt ? p.clock.node|: at == Vc2MidiPath::kClockAt ? p.out.node|vc2synth
+syn-midiin-node|return at == Vc2SynthClock::kAt ? clockObject.node : midiPath.hub.node;|return midiPath.hub.node;|vc2synth
+kt-state-before|    return (at < 0 ? k.stateBefore : k.states|    return (at < 0 ? k.states[0] : k.states|vc2synthchannel

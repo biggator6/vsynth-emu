@@ -50,6 +50,10 @@ static_assert(sizeof(Vc2MidiPort) == 16, "rom.4's layout, a port object");
 class Vc2OsMidiParts {
 public:
     static constexpr uint32_t kProgramSlot = 0x0c, kControllerSlot = 0x18, kRpnSlot = 0x24, kNrpnSlot = 0x30;
+    // [FW] osRoutine's: the OS's routines a 0x40 or 0x01 message runs, each given the word's address (SysEx's, the
+    // last, its object 0x8995dd0c and the word); the checks hook them (v346: xt_vc2synth's too)
+    static constexpr uint32_t kOsRoutines[] = { 0x89317fe0, 0x89318420, 0x89318210, 0x89318040, 0x89318450,
+                                                0x893154a0, 0x8931a420, 0x8931a460, 0x89310640 };
     virtual ~Vc2OsMidiParts() = default;
     virtual uint32_t listenerOf(uint32_t node) = 0;    // the node's +0
     virtual uint32_t nextListener(uint32_t node) = 0;  // its +0xc
@@ -68,14 +72,26 @@ void vc2ChannelBend(Vc2ChannelState& s, uint8_t lsb, uint8_t msb);    // 0x89317
 void vc2ChannelPoly(Vc2ChannelState& s, uint8_t key, uint8_t value);  // 0x89317cc0: keys below 128
 void vc2ChannelPressure(Vc2ChannelState& s, uint8_t value);       // 0x89317cf0
 
+// [FW] v347: one of the OS's 16 part objects (from 0x89960b7c, the OS row 0x89318140: 0x893186c0 on each by its index):
+// +0 the part's index, which C reads through a voice's part word (the part nodes' +8, the first's), +1…+3 the OS's
+// own (its constructor's 1, 0xff and 0; 0x893186e0 writes +2 and +3 on a parameters' message), +4 its class
+struct Vc2OsPartObject {
+    uint8_t index = 0;
+    std::array<uint8_t, 3> os {};
+    uint32_t vtable = 0;
+};
+static_assert(sizeof(Vc2OsPartObject) == 8, "rom.4's layout, a part object of the OS's");
+
 class Vc2OsMidi {
 public:
     static constexpr uint32_t kPortsAt = 0x8995eaf4, kStatesAt = 0x8995edf8, kFlagsAt = 0x8992e3e8;   // [FW]
-    static constexpr int kPorts = 48, kStates = 32;
+    static constexpr uint32_t kPartObjectsAt = 0x89960b7c;                                          // [FW] v347
+    static constexpr int kPorts = 48, kStates = 32, kPartObjects = 16;
     static constexpr uint16_t kNone = 0x7f7f;   // [FW] no RPN or NRPN
 
     void staticInitStates();    // 0x89317d00 (on 0x8995edf4): rows 0 and 1, each channel set up
     void staticInitPorts();     // 0x89317910 (on 0x8995eaf0): rows 0…2 on the states of sources 1…3
+    void staticInitParts();     // v347: 0x89318140 (on 0x89960b78): each part object by its index
     // 0x89314e90: a message (its source the row of port objects) and the word beside it
     void handle(const Vc2MidiMessage& m, uint32_t word, Vc2OsMidiParts& parts, Vc2PartParams& params);
     void controlChange(uint32_t port, uint8_t cc, uint8_t value, Vc2OsMidiParts& parts);   // 0x893172e0
@@ -99,4 +115,5 @@ public:
     std::array<Vc2MidiPort, kPorts> ports {};
     std::array<Vc2ChannelState, kStates> states {};
     uint8_t receiveProgram = 0, receiveBank = 0;   // 0x8992e3e8, 0x8992e3e9
+    std::array<Vc2OsPartObject, kPartObjects> partObjects {};   // v347
 };

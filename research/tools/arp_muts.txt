@@ -1,5 +1,5 @@
 # The arpeggiator's planted errors: name|old|new|port (arp XtArpeggio.cpp, arpstep XtArpeggioStep.cpp, arpmotif
-# XtArpeggioMotifs.cpp, ticks XtTempoTicks.cpp: the tempo ticks it steps on, v189).  mutate_arp.py runs them, each through xt_arp against the firmware's own object.
+# XtArpeggioMotifs.cpp, ticks XtTempoTicks.cpp: the tempo ticks it steps on, v189; arpring XtRing.h, the keys' ring, v354).  mutate_arp.py runs them, each through xt_arp against the firmware's own object.
 key-numbers|keys[k].key = (uint8_t)k;|keys[k].key = (uint8_t)(k + 1);|arp
 shuffle-8th-span|const int span = 120 * r / 100;|const int span = 121 * r / 100;|arp
 shuffle-8th-tail|(2 * span + 2 * k - k * span / 60 - 120)|(2 * span + 2 * k - k * span / 60 - 119)|arp
@@ -13,8 +13,8 @@ switch-stops|        on = s.on;\n        stop();|        on = s.on;|arp
 settings-pedal|    makeShuffle(rate, res);\n    pedalCheck();|    makeShuffle(rate, res);|arp
 hold-new-chord|        dropKeys();   // held by Hold|        ;   // held by Hold|arp
 pedal-at-64|else if ((hold != 0 \|\| pedalValue >= kPedalDown) && !anyHeld())|else if ((hold != 0 \|\| pedalValue > kPedalDown) && !anyHeld())|arp
-unlink-head|        keyHead = prev;|        keyHead = keys[k].next;|arp
-link-tail|    n.prev = tail;|    n.prev = keyHead;|arp
+unlink-head|        head = prev;|        head = n.next;|arpring
+link-tail|    n.prev = tail;|    n.prev = head;|arpring
 repress-current|        if (curNode == key) curNode = n.prev;\n        n.vel = 0;\n        unlinkKey(key);\n        if (keyHead < 0) {|        if (curNode == key) curNode = n.next;\n        n.vel = 0;\n        unlinkKey(key);\n        if (keyHead < 0) {|arp
 velocity-zero|    if (velocity <= 0) return;|    if (velocity < 0) return;|arp
 last-velocity|    lastVelocity = (uint8_t)velocity;|    lastVelocity = 100;|arp

@@ -4151,6 +4151,100 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The patch EQ's Q from its string would have been 0.5, 2.0, 3.5…: even steps fit 0.5~8.0 over six values. rom.2's routine on its EQ Mid 1 Q gives 0.5, 0.7, 1.0, 2.0, 4.0, 8.0, and rom.4's driver puts the patch EQ in those mid bands, so the editor asks rom.2's routine for both bands' Freq and Q.
 - Pad Mode's box beside Pad Hold cut TIME-TRIP at every size; it has a row of its own.
 
+### Session 25 (2026-11-23) — v334 on: step 4.3's rest
+
+- A fresh session for step 4.3's rest (SOLO, the period-jump player, the analog's renders, Vc2Synth), from c6ea59a in
+  its own worktree. The worktree had no JUCE: it was checked out from the main checkout's copy, its URL left as
+  `.gitmodules` names it.
+- SOLO could not go on `XtSoloVoice` as the hand-over expected: its state is a model (doubles, records by index, a
+  plan) that can't be laid back onto rom.4's object words, which the check compares. It went as mode 1's did, rom.4's
+  code on the words, and `XtSoloVoice` was left as it was.
+- The kit refused the band players' tail copied into SOLO's set-ups (template-law), so both run one `vc2WalkSetUp`.
+- The first seeds at 400 cases met SOLO's set-up taking FTRC of a NaN rate. Rather than guess, a -O0 -g build of the
+  check under lldb, stopped on that NaN, showed the two causes: a drawn header rate of 0, and rom.4's exp2 past its
+  seven octaves. A SOLO note-on now gets a tone's ranges. (A -O0 build of xt_vc2tone wasn't usable for this: it
+  differed throughout.)
+- v334 went in as two commits on the coordinator's word (no rewrite): ee08ad9, saved at the usage limit, and 3ed4d17.
+- v335, the period-jump player. The kit's template-law took the shared code out of SOLO and mode 1 a piece at a time
+  (the record block, the walk's crossing and held position, the half step, the block, the lerp and gain glide, the
+  row's jumps), each refused until its copies were gone. Writing the shared file I first overwrote an existing check
+  file of the same name (`Vc2OscRecords.cpp`); it was restored from the commit and the new code named
+  `Vc2OscRecordBlock`.
+- The first difference was the compare after a walk: rom.4's r1 after `0x893c9380` is the crossing both ways. The rest
+  were the check's: the jump's read leaving the wave. lldb hung this time (no CPU, likely waiting on the debugger's
+  authorisation), so a marker word the check wrote on both sides switched a frame trace in the port for one render;
+  AddressSanitizer found xt_vc2tone's host crash (the tone mixer fed an ∞ from the jump's gain glide).
+- The first plant run missed eight plants v334 caught: type 8 had joined SOLO's family and drawn from its generator,
+  moving SOLO's draws. Type 8 got a family of its own (its part, waves, generator, room), and SOLO's part drew as
+  v334's again. The jump's own part then found the glide's negative period (a record left behind, the next far
+  longer); waves of smooth periods, as a voice's are, ended it, and the loops could stay on.
+- v336 was to split XtAnalog.cpp, but a split moves its 334 over-long lines and its 2053-line check into files the
+  guards judge, as with PluginEditor. The analog's renders run on XtAnalogOsc by a word table instead, which needs
+  only XtAnalog.h opened: that header was split, the .cpp left whole.
+- v337: the analog's 19 renders were rom.2's code, so they run on XtAnalogOsc; the surprise was downstream. Real
+  analog output past full scale sent FM's delay index out of the mix's rings (a crash), which on the XT reads the rings
+  beside it, and drawn words gave analog states no XT has (NaNs whose sign xtf and the interpreter carry differently);
+  the check keeps an analog render's words an XT's, or gives the block the check's render.
+- v338: the AddressSanitizer build that measured v337's coverage also found v332's band draw reading the first
+  of an empty list; its draws differ from -O2's (other float arithmetic), so it reaches states the -O2 seeds don't.
+- v339: its other finding, VariPhrase's +0x1d0, was v330's NaN class through the target: an exp2 the check's depths
+  took past its table. A steer that draws nothing kept every generator's stream as it was.
+- v340 began Vc2Synth whole: the 24 tones' hosts as the part's, checked by making each tone on both sides. Its plan,
+  in the shared notes, runs the part on one thread block by block, a wait in the notes' task rendering its block in
+  place; the whole check against rom.4's three tasks will test that order.
+- v341 moved C's reads by address into the plugin, the sets check deriving from them: the part's reads will be the
+  same code on its own words, and the kit refused the copy it would otherwise have been.
+- v342 and v343 put those reads on the part's own memory. The first thing v343's check asked, that no two regions
+  share a byte, found the part mixer's offsets inside the static M (its levels, 0x89997290): three ports keep one
+  rom.4 memory, which the block's wiring has to make one. A planted error that the drawn placements reached only by
+  chance at the list's one case made the placements a sweep.
+- v344 ported the three voice loops the settings call out. Its part came after the voice class's, which had unhooked
+  the queue's wait and the note voice's virtuals to run them as rom.4's own: the first runs differed (a wait logged on
+  one side) and then faulted in rom.4's queue on drawn links, until the part put the earlier hooks back.
+- v345 wired the part's settings and voices. Its load part passed at once, but at the plant list's one case it saw
+  little, because a read of an unchanged store changes nothing; drawing part of the store again before each event,
+  and at least 16 cases, made 15 of 21 plants visible. The other six (the Matrix levels' copy, All Sound Off, the
+  receiving channel) need a note sounding or a system store, which the load has neither of.
+- v346 routed MIDI through the part. Its notes part passed at every seed at once, too easily: a count of the voices
+  started said none. Part 1 Receive Switch is a system ID, and with no system store both sides read its default, off,
+  so part 0 receives no channel and every plant on the voice path went unseen. A pass needs a count of what it
+  reached beside it. The parameters' messages added to the draws reached an OS routine the harness never set up, now
+  hooked as xt_vc2midi hooks it. Next, the system store.
+- v347 gave the part rom.4's system store, and the notes reached the voices. Each step behind it was a table or an
+  object the harness had never needed, since no note had reached C: the OSC converters' tables, rom.2's tables the
+  part's ports read beside rom.4's, the OS's part objects (found by making a read past the part's memory fail the
+  step), and the OS's wait a stolen voice makes for its fade. The system's own defaults, not the descriptors', turn
+  Part 1's receive on.
+- v348 took the sanitizer sweep's finding in the rig, red first: xt_vc2sets passed at -O2 while ASan saw 32,000
+  writes past one region. A compare that passes can still be reading the wrong bytes; the sanitizers see that.
+- v349 ran the update task on the part, and two of its findings went to the user. With Part 1 Receive Switch off,
+  M's init reads below 0x200 (an XT's boot flash), which nothing here holds; the check draws Receive on and step 4.5
+  decides. And a patch that changes a sounding VOCODER note's OSC Type to PCM makes rom.4's own carrier NaN, the
+  sides then differing in the NaN's sign alone. A steer on the check's draw was asked for only if the word came from
+  the draw; a run with every field in range showed it didn't, so it went to the user, who deferred it. The check now
+  keeps such a note's Type, and the plugin's guard against NaN samples is step 4.5's.
+- v350 ran the notes' task's pass on the part. A plant of v349's that the list had caught went unseen again, and the
+  cause was the check: the flags each side posted the task only gathered, so after the first 0x100 a missing one could
+  not show. An XT's wait takes them; the check's now does. A check that only accumulates can stop seeing.
+- v351 rendered the part's tones in a block against rom.4's. The first block that sounded differed, both sides
+  making the same NaN in kind 6 and parting on its sign; the cause was a start the check had skipped: an XT resets the
+  tracker in the audio task's prologue, so its period is never 0 when kind 6 renders. A NaN in a check is a question
+  about state before it is one about arithmetic.
+- v352 to v355 loaded rom.1, the kernel (the user's "Load rom.1"), ported its event services against its own, then
+  ran rom.4's four tasks on it in one interpreter against the part on its model. The whole machine showed three things
+  the part's checks of one task at a time could not. Every task's prologue waits at a start barrier that only the
+  idle task's first hook releases. v354 had misread a routine (`0x89313cb0`) that only a listener on the OS MIDI's
+  hub reaches. And the notes' task runs inside the update task's pass whenever a tone ends, so the update's walk of
+  the sounding list has to read each next as rom.4 does, not take the list first. A check that calls one task's loop
+  body fixes the order of work; another task's turn inside it shows only on the machine. What the model leaves out
+  (the semaphores, a suspend, a restart) is now counted on rom.1, so leaving it out is a claim the check holds.
+  The MIDI input path then came in on both sides (the coordinator's call), and the machine kept teaching. A sender
+  mid-tell is preempted by the task it posts, so a port on one C++ stack has to keep the sender's place as state
+  rather than as a frame. A truncated tone that never renders makes rom.4's notes' task wait for good, and the check
+  has to cut that wait rather than draw events forever. USB-MIDI Thru sends MIDI IN to an out nobody drains on the
+  rig. Each looked like a port bug for a while and was the firmware's own behaviour; the machine was the only way to
+  tell. Filling a queue on purpose (bursts, a flood) was what proved the waits for room are rom.4's.
+
 ### Session 25 (2026-11-24) — v600, v601: a project's wave links; the patch box browses a project
 
 - The user asked for three V-Synth items beside the VC-2 work: .w00, projects browsed, patches and projects saved. Their

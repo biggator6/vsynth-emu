@@ -14,9 +14,11 @@ constexpr uint32_t kSettings = 0x893ae780, kLegato = 0x893ae9b0, kRender = 0x893
 // [FW] the block's words LITE's two heads' steer reads: its kind, the wave's type, the records (the block's draw is
 // oscDrawNoteBlock's, Vc2OscDraws.cpp from v319)
 constexpr int kKindWord = 0, kWaveWord = 0xb0 / 4, kHeaderWord = 0xd4 / 4, kLoopWord = 0xdc / 4;
+constexpr int kFlagsWord = 0xe4 / 4;   // [FW] v331: the block's flags (the voice's +0x138), its low byte
 constexpr int kKinds = 8;
 constexpr uint32_t kCountSign = 0x8000;   // [FW] the update's count is its low half, signed (exts.w)
 constexpr uint32_t kCarrierKind = 5, kKind6Kind = 6;   // [FW] v266's kinds, counted
+constexpr uint32_t kVariPhrase = 2;                    // [FW] v330: whose update steps its words to their targets
 using Answer = OscAnswer;
 
 std::string onConstruct(OscSides& s, std::mt19937&, int v) {
@@ -38,9 +40,8 @@ std::string onInstall(OscSides& s, std::mt19937& rng, int v) {
     }
     if (pick == 3) oscMakeAnalog(s, rng, v);
     else oscSteerAnalog(s, rng, v);   // a kind-3 voice found: its words so (a settings' copy leaves noise at +0x138)
-    constexpr uint32_t kLite = 1, kModeOne = 1;   // [FW] v328: LITE's install sets mode 1 up, the voice's own
-    Vc2OscVoice& o = s.voices[(size_t)v];
-    if (o.kind() == kLite && o.u32(Vc2OscVoice::kWave) == kModeOne) {
+    Vc2OscVoice& o = s.voices[(size_t)v];   // v328: LITE's install sets mode 1 up, the voice's own
+    if (oscIsModeOne(o)) {
         constexpr uint8_t kInSamples = 0x80;   // [FW] byte 0's
         oscSteerModeOneSetUp(o, s.shared, oscVoiceAt(v));
         oscWriteVoice(s, v);
@@ -75,7 +76,13 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
     else oscSteerAnalog(s, rng, v);
     n = steerFactor(s.voices[(size_t)v], rng, n);
     oscHoldVibrato(s.voices[(size_t)v].vibrato.w, (int16_t)n);   // v267: a count this long can't overshoot its fade
-    oscWriteVoice(s, v);
+    Vc2OscVoice& seeking = s.voices[(size_t)v];   // v329: a seek pending re-seeks once the level has fallen
+    if (seeking.tail.seekPending != 0) oscSteerBandSeek(seeking, s.shared);   // v333: through the band players' seek
+    if (seeking.kind() == kVariPhrase) s.n.variDrawn += oscSteerVariWords(seeking, s.shared.renders);   // v330
+    if (seeking.kind() == kVariPhrase) {   // v339
+        s.n.variFormants += oscSteerVariFormant(seeking, s.parts[(size_t)v], s.romShared);
+    }
+    oscSteerSeek(s, v, oscIsModeOne(seeking) && seeking.tail.seekPending != 0);
     ++s.n.updates;
     constexpr uint32_t kLite = 1, kLiteTypes = 3;   // [FW] v324: LITE's kind and the wave types its update has ways for
     const Vc2OscVoice& o = s.voices[(size_t)v];
@@ -87,6 +94,8 @@ std::string onUpdate(OscSides& s, std::mt19937& rng, int v) {
 }
 
 std::string onReseek(OscSides& s, std::mt19937&, int v) {
+    oscSteerBandSeek(s.voices[(size_t)v], s.shared);          // v333: by the band players' seek
+    oscSteerSeek(s, v, oscIsModeOne(s.voices[(size_t)v]));   // v329: by mode 1's seek, with the bit or without
     return oscBothSides(s, kReseek, { oscVoiceAt(v) }, Answer::none, [&] {
         s.voices[(size_t)v].reseek(s.parts[(size_t)v]);
         return 0u;
@@ -111,6 +120,19 @@ std::string onNoteOn(OscSides& s, std::mt19937& rng, int v) {
         oscAnalogObject(s.voices[(size_t)v], rng);
         oscWriteVoice(s, v);
     }
+    if (block[kKindWord] == kVariPhrase) s.n.variDrawn += oscSteerVariWords(s.voices[(size_t)v], s.shared.renders);
+    oscSteerBandBlock(block, s.shared);   // v333: a band player's set-up reads its records
+    if (oscSteerSoloNote(block, s.shared, &s.voices[(size_t)v]) != 0) {   // v334: SOLO's set-up's FTRCs
+        oscWriteRecords(s.fw, s.shared.records);
+        oscWriteVoice(s, v);
+    }
+    const bool byEvents = oscVariByEvents((uint8_t)block[kFlagsWord], block[kWaveWord]);   // v331
+    if (block[kKindWord] == kVariPhrase && byEvents) {
+        oscSteerVariTable(s.voices[(size_t)v], s.shared.records.events);
+        oscHoldVariBlockEvents(block, s.shared.records.events);
+        ++s.n.variByEvents;
+    }
+    oscSteerSeek(s, v, oscBlockIsModeOne(block.data()));   // v329: LITE's note-on seeks on the object as it finds it
     const uint32_t legato = rng() % 3 == 0 ? (uint32_t)rng() : rng() % 2;
     s.fw.cpu.write(kOscBlockAt, block.data(), sizeof block);
     ++s.n.noteOns;
@@ -195,6 +217,16 @@ std::string onRender(OscSides& s, std::mt19937& rng, int v) {
         s.voices[(size_t)v].tail.render = (pick == 0 ? kOscVariOffRenders : kOscHeadsRenders)[s.shared.renders() % 2];
     }
     if (pick == 2) s.voices[(size_t)v].tail.render = kOscModeOneRenders[0];
+    // v332: else, half the time from the band players' generator, BACKING's or ENSEMBLE's, which VariPhrase's install
+    // writes for its types 3 and 5
+    if (pick == 3 && s.shared.bandRng() % 2) s.voices[(size_t)v].tail.render = kOscBandRenders[s.shared.bandRng() % 2];
+    // v334: else, half the time from SOLO's generator, SOLO's, which VariPhrase's install writes for its types 1 and 6;
+    // v335: else, half the time from its own generator, the period-jump player's, which it writes for type 8
+    else if (pick == 3 && s.shared.soloRng() % 2) s.voices[(size_t)v].tail.render = kOscSoloRenders[0];
+    else if (pick == 3 && s.shared.jumpRng() % 2) s.voices[(size_t)v].tail.render = kOscJumpRenders[0];
+    s.n.bandBlocks += oscRendersBy(s.voices[(size_t)v], kOscBandRenders);
+    s.n.soloBlocks += oscRendersBy(s.voices[(size_t)v], kOscSoloRenders);
+    s.n.jumpBlocks += oscRendersBy(s.voices[(size_t)v], kOscJumpRenders);   // v335
     s.n.extInBlocks += oscRendersBy(s.voices[(size_t)v], kOscExtInRenders);       // v322
     s.n.variOffBlocks += oscRendersBy(s.voices[(size_t)v], kOscVariOffRenders);   // v323
     s.n.headsBlocks += oscRendersBy(s.voices[(size_t)v], kOscHeadsRenders);       // v326
@@ -224,4 +256,9 @@ const OscEvent kEvents[] = { onConstruct, onInstall, onUpdate, onUpdate, onResee
 } // namespace
 
 std::span<const OscEvent> oscEvents() { return kEvents; }
+
+void oscSteerSeek(OscSides& s, int v, bool seeks) {
+    s.n.modeOneSeeks += oscSteerModeOneSeek(s.voices[(size_t)v], s.shared, seeks);
+    oscWriteVoice(s, v);
+}
 #endif

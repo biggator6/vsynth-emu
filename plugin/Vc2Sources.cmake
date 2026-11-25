@@ -60,11 +60,23 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OscWalkEvents.cpp
     Source/Vc2OscWalkStart.cpp
     Source/Vc2OscModeOneStart.cpp
+    Source/Vc2OscVari.cpp
+    Source/Vc2OscBands.cpp
+    Source/Vc2OscBandSetUp.cpp
+    Source/Vc2OscSolo.cpp
+    Source/Vc2OscSoloFrame.cpp
+    Source/Vc2OscSoloRecords.cpp
+    Source/Vc2OscSoloSetUp.cpp
+    Source/Vc2OscRecordBlock.cpp
+    Source/Vc2OscFrameSteps.cpp
+    Source/Vc2OscJump.cpp
+    Source/Vc2OscJumpRecords.cpp
     Source/Vc2OscAnalog.cpp
     Source/Vc2OscAnalogLa.cpp
     Source/Vc2OscAnalogSub.cpp
     Source/Vc2OscAnalogShape.cpp
     Source/Vc2OscAnalogUpdate.cpp
+    Source/Vc2OscAnalogRender.cpp
     Source/Vc2PitchRamp.cpp
     Source/Vc2PitchRampTick.cpp
     Source/Vc2RampTables.cpp
@@ -112,6 +124,7 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2VoiceClass.cpp
     Source/Vc2NoteMatrix.cpp
     Source/Vc2Sets.cpp
+    Source/Vc2SetMemoryReads.cpp
     Source/Vc2SetCommon.cpp
     Source/Vc2SetEnvelope.cpp
     Source/Vc2SetEnvelopeTables.cpp
@@ -162,6 +175,25 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2OsMidiHandler.cpp
     Source/Vc2OsMidiTables.cpp
     Source/Vc2Synth.cpp
+    Source/Vc2SynthTone.cpp
+    Source/Vc2SynthMemory.cpp
+    Source/Vc2SynthReads.cpp
+    Source/Vc2SynthVoices.cpp
+    Source/Vc2SynthSettings.cpp
+    Source/Vc2SynthMidi.cpp
+    Source/Vc2SystemStore.cpp
+    Source/Vc2SynthUpdate.cpp
+    Source/Vc2SynthTones.cpp
+    Source/Vc2SynthBlock.cpp
+    Source/Vc2Kernel.cpp
+    Source/Vc2TempoTimers.cpp
+    Source/Vc2SynthClock.cpp
+    Source/Vc2SynthOs.cpp
+    Source/Vc2SynthOsTasks.cpp
+    Source/Vc2OsQueue.cpp
+    Source/Vc2MidiReceive.cpp
+    Source/Vc2SynthOsMidi.cpp
+    Source/Vc2SynthOsMidiStart.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
 )

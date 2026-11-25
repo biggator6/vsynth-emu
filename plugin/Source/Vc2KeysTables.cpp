@@ -20,6 +20,7 @@ struct Read : Vc2KeysTables {
             { 0x89535518, curves.data(), sizeof curves }, { 0x89535918, masks.data(), sizeof masks },
             { 0x89535938, bits.data(), sizeof bits },     { 0x89535958, zero.data(), sizeof zero },
             { 0x8950d6d9, sources.data(), sizeof sources }, { 0x8950d6e0, states.data(), sizeof states },
+            { 0x8950d6dc, &stateBefore, sizeof stateBefore },
         });
     }
     // The tables and the word; usable when every bit is its own, each source's row is one read, and every state has an

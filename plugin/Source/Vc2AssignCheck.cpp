@@ -193,9 +193,14 @@ void AssignPortParts::waitQueue(uint32_t queue, uint32_t voice) {
 
 void AssignPortParts::keyOff(uint32_t voice) { slotCalled(kVoicesKeyOff, voice, kAssignKeyOffEntry, {}); }
 
-void AssignPortParts::changed(uint32_t voice, uint32_t part) {
+uint32_t AssignPortParts::changed(uint32_t voice, uint32_t part) {
     slotCalled(kVoicesChanged, voice, kAssignChangeEntry, { part });
+    return s_.draws.next(s_.draws.port).ended;
 }
+
+void AssignPortParts::allNotesOff() { voicesLog(s_.mine, called(kVoicesOs, kAssignNotesOffAt, 0, {})); }
+
+uint32_t assignChangedAnswer(VoicesSides& s) { return s.draws.next(s.draws.rom).ended; }
 
 uint8_t AssignPortParts::partSetting(uint32_t part, uint32_t offset) {
     return s_.fw.cpu.rd8(kAssignSettingsAt + kAssignSettingBytes * part + offset);

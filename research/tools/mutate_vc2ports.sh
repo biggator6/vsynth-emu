@@ -38,7 +38,13 @@
 # xt_vc2patch; the wave index's parse (vc2waveindex, v500) and the sets' data read by address (vc2wavesetsdata,
 # Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its records and chunks (vc2waverecords, v502) under
 # xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's answers (vc2wavekernel) and its files
-# (vc2bootfiles) under its fourth part.
+# (vc2bootfiles) under its fourth part; rom.1's kernel's event services (vc2kernel, v353) under xt_vc2kernel, on rom.1
+# beside rom.4; the part's clock (vc2synthclock, v354) and the tempo timers (vc2tempotimers) under xt_vc2synth; the
+# part's tasks on the kernel (vc2synthos, v355), their parts on the part (vc2synthostasks) and the part mixer's walk of
+# the tones (vc2synthmixer, Vc2PartMixer.cpp: only the whole part's preemption tells where it reads a next) under it too;
+# the XT's MIDI input path (v355: vc2midireceive, vc2osqueue, vc2synthmidipath Vc2SynthOsMidi.cpp, vc2synthmidistart
+# Vc2SynthOsMidiStart.cpp) and a channel state's lookup (vc2synthchannel, Vc2PartChannel.cpp: the notes' task's own
+# messages on a channel of -1) under it.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -119,6 +125,20 @@ VC2PORTS=(
     "vc2oscwalk|Vc2OscWalk.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscwalkevents|Vc2OscWalkEvents.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscwalkstart|Vc2OscWalkStart.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscvari|Vc2OscVari.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscbands|Vc2OscBands.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtband|XtMultiBandPlayer.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscbandsetup|Vc2OscBandSetUp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscsolo|Vc2OscSolo.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscsoloframe|Vc2OscSoloFrame.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscsolorecords|Vc2OscSoloRecords.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscsolosetup|Vc2OscSoloSetUp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscrecordblock|Vc2OscRecordBlock.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscframesteps|Vc2OscFrameSteps.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscjump|Vc2OscJump.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscjumprecords|Vc2OscJumpRecords.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2oscanalogrender|Vc2OscAnalogRender.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
+    "vc2xtanalog|XtAnalog.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2oscmodeonestart|Vc2OscModeOneStart.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramp|Vc2PitchRamp.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
     "vc2ramptick|Vc2PitchRampTick.cpp|XT_VC2OSC_MAIN|vc2osc_obj|VC2OSC"
@@ -169,7 +189,30 @@ VC2PORTS=(
     "vc2osmidihandler|Vc2OsMidiHandler.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2osmiditables|Vc2OsMidiTables.cpp|XT_VC2MIDI_MAIN|vc2midi_obj|VC2MIDI"
     "vc2synth|Vc2Synth.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmemory|Vc2SynthMemory.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthreads|Vc2SynthReads.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthsettings|Vc2SynthSettings.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthvoices|Vc2SynthVoices.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthnumbers|Vc2PartNumbers.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmidi|Vc2SynthMidi.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2systemstore|Vc2SystemStore.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthosmidi|Vc2OsMidi.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthupdate|Vc2SynthUpdate.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthtones|Vc2SynthTones.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthblock|Vc2SynthBlock.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2kernel|Vc2Kernel.cpp|XT_VC2KERNEL_MAIN|vc2kernel_obj|VC2KERNEL"
+    "vc2synthclock|Vc2SynthClock.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2tempotimers|Vc2TempoTimers.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthos|Vc2SynthOs.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthostasks|Vc2SynthOsTasks.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmixer|Vc2PartMixer.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2midireceive|Vc2MidiReceive.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2osqueue|Vc2OsQueue.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmidipath|Vc2SynthOsMidi.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmidistart|Vc2SynthOsMidiStart.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthchannel|Vc2PartChannel.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
+    "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2notematrix|Vc2NoteMatrix.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setcommon|Vc2SetCommon.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setenvelope|Vc2SetEnvelope.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

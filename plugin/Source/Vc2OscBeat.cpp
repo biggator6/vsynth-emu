@@ -2,13 +2,16 @@
 // instruction for instruction, run as XtBeat's start and reset (XtMultiBandPlayer.cpp) on the object's words; and the
 // seeks the voice has as its own, one table by address as its renders are: the two with no band player in them, Vari
 // off's 0x893c6360 and LITE's heads' 0x893c6de0, each rom.2's on rom.4's object four bytes up (Vc2OscPlayers.cpp's and
-// Vc2OscLite.cpp's) and ending in the reset.  Any other seek goes out by its address.  From v326 the beat's block,
+// Vc2OscLite.cpp's) and ending in the reset, and from v329 mode 1's 0x893cc830 (Vc2OscWalkStart.cpp), which ends in it
+// too, from v333 the band players' 0x893cd440 (Vc2OscBands.cpp), whose reset comes before its bands' part, which
+// reads nothing of the beat.  Any other seek goes out by its address.  From v326 the beat's block,
 // 0x893c8990, which a player's render runs first: XtBeat's block (rom.2's 0x8950c280, but for its steer giving up four
 // steps past the target, XtBeat::pastShift), the loop's positions read through the record the object names, then the
 // block's tail, the step's word by the object's byte 3; and the copy of a rom.2 port's words to and from the voice's,
 // the beat's and (Vc2OscHeads.cpp) XtLitePlayer's.  Every address is rom.4's; every offset the voice's.
 // HARDWARE_FIRMWARE.md, "The VC-2's players' beat and seeks", "The VC-2's LITE heads".  Audio thread.
 #include "Vc2OscPlayers.h"
+#include "Vc2OscWalk.h"
 #include "XtBeat.h"
 #include "XtFloat.h"
 #include <algorithm>
@@ -90,14 +93,22 @@ int32_t beatStep(Vc2OscVoice& v, float w) {
     return (b3 & kTurned) != 0 ? negated(word) : word;
 }
 
-// [FW] the seeks the voice has as its own, each given the sample (the position ×16 shifted down by 4, as both begin)
+// [FW] the seeks the voice has as its own, each given the word as the voice's callers give it: Vari off's and the
+// heads' take the sample (the position ×16 shifted down by 4, as both begin), mode 1's (v329) and the band players'
+// (v333, Vc2OscBands.cpp) the word itself
+constexpr int kSampleShift = 4;
+void variOffSeek(Vc2OscVoice& v, Vc2OscParts&, int32_t at) { vc2OscSeekVariOff(v, at >> kSampleShift); }
+void headsSeek(Vc2OscVoice& v, Vc2OscParts&, int32_t at) { vc2OscSeekHeads(v, at >> kSampleShift); }
 struct Vc2OscOwnSeek {
     uint32_t at;
-    void (*seek)(Vc2OscVoice&, int32_t);
+    void (*seek)(Vc2OscVoice&, Vc2OscParts&, int32_t);
 };
-constexpr std::array<Vc2OscOwnSeek, 2> kOwnSeeks { { { 0x893c6360, vc2OscSeekVariOff },
-                                                     { 0x893c6de0, vc2OscSeekHeads } } };
-constexpr int kSampleShift = 4;
+constexpr std::array<Vc2OscOwnSeek, 6> kOwnSeeks { { { 0x893c6360, variOffSeek },
+                                                     { 0x893cc830, vc2OscSeekModeOne },
+                                                     { 0x893c6de0, headsSeek },
+                                                     { 0x893cd440, vc2OscSeekBands },
+                                                     { 0x893cc630, vc2OscSeekSolo },        // v334: SOLO's
+                                                     { 0x893cd090, vc2OscSeekJump } } };   // v335: the jump's
 } // namespace
 
 void vc2OscWordsFrom(const Vc2OscVoice& v, void* port, std::span<const XtWord> words, Vc2OscPlace place) {
@@ -142,12 +153,11 @@ void Vc2OscVoice::beatReset() {
     setBeat(*this, b);
 }
 
+// From v335 every seek the voice's callers name is the voice's own (the period-jump player's the last); one it has
+// none of is not a player's, and does nothing
 void Vc2OscVoice::seekBy(uint32_t routine, int32_t at, Vc2OscParts& parts) {
     const auto* own = std::ranges::find(kOwnSeeks, routine, &Vc2OscOwnSeek::at);
-    if (own == kOwnSeeks.end()) {
-        parts.seek(routine, at);
-        return;
-    }
-    own->seek(*this, at >> kSampleShift);
+    if (own == kOwnSeeks.end()) return;
+    own->seek(*this, parts, at);
     beatReset();
 }

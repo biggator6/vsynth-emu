@@ -29,6 +29,7 @@ struct ToneCounts {
     long starts = 0, started = 0, listMoves = 0, leaves = 0;   // the part's lists: starts, tones started, moves, leaves
     long bounds = 0;   // v268: the words the OSC voice and the TVA read
     long mixPlays = 0;                                     // v269: a mix's note-on, install and blocks run alone
+    long mixPastFull = 0;                                  // v337: a delay's OSC 2 drawn past full scale
     std::array<long, kVc2MixRoutines.size()> mixBlocks {};   // and the blocks each of its eight renders ran
     // v319: the OSC voices' note-ons by kind, the settings that reached a voice, the mic's blocks before kind 6's renders,
     // and the calls they made beyond the tone, by xt_vc2osc's kinds of call
@@ -38,7 +39,11 @@ struct ToneCounts {
     long headsBlocks = 0;                      // v326: and through LITE's heads'
     long liteSettings = 0, bothVari = 0;   // v324: LITE's settings on a type with a way, tones drawn two VariPhrases
     long modeOneSetUps = 0, modeOneTaken = 0;   // v328: mode 1's set-ups at an install, those through a take's head
+    long staleHeads = 0;   // v333: the earlier tone's mode 1 voices steered, their head on a voice since noted otherwise
     long settingsTaken = 0;                     // v328: and the LITE settings through a take's head
+    long modeOneSeeks = 0, bandReseeks = 0;     // v329: the OSCs steered for mode 1's seek, VariPhrase's re-seeks
+    long variDrawn = 0;                         // v330: VariPhrase's update's words drawn finite
+    long variByEvents = 0;                      // v331: its note-ons by events, their table steered
     std::array<long, kOscKinds> oscCalls {};
 };
 
@@ -147,6 +152,14 @@ void toneMakeOscAnalog(ToneSides& s, int i, int osc, uint32_t code, std::mt19937
 // records, head and tempo words steered on both sides as its note-on leaves them (oscSteerModeOneSetUp)
 bool toneOscModeOne(ToneSides& s, int i, int osc);
 void toneSteerModeOne(ToneSides& s, int i, int osc);
+// v329 (Vc2ToneSides.cpp): tone i's OSC voices before an event that can reach mode 1's seek (0x893cc830) on their own
+// object, their mode 1 words drawn on both sides (oscSteerModeOneSeek) and counted: before a note-on those whose block
+// is LITE's of type 1 (LITE's note-on seeks before any take), else (an update) the mode 1 voices with a seek pending.
+// And before an update one VariPhrase voice in four given a seek pending, its level 0, so that it re-seeks: its band
+// players' seeks are the only ones still going out by address (through the link's seek), and nothing else here set one
+// until v330 (VariPhrase's settings were hooked).  From v330 (toneSteerSeeks until then) before a note-on of a
+// VariPhrase block and an update of a VariPhrase voice, its update's words drawn finite (oscSteerVariWords)
+void toneSteerOscs(ToneSides& s, int i, bool noteOn);
 // v328: the voice whose records tone i's OSC's LITE settings read: the one its head names when that is another pool
 // tone's LITE voice holding a loop record's address, as a take leaves it (counted), else its own, as v324's steer made it
 uint32_t toneSettingsVoice(ToneSides& s, int i, int osc);

@@ -9,6 +9,7 @@
 // VC-2's Matrix core".  The tone generator's thread.
 #include "Vc2CosmInput.h"
 #include "Vc2MatrixTables.h"
+#include <array>
 #include <cstdint>
 #include <span>
 
@@ -54,6 +55,13 @@ inline constexpr Vc2MatrixGroup kVc2MatrixCosm1 { 8, 46, 0x7ff }, kVc2MatrixCosm
 // 0x893a2750, COSM's two (v235) and 0x893a2bf0, destinations 68…78 (its 76…78 the getter's sum inline).  No reader
 // takes group 7 (uses +0x1a): destinations 1…78 run on through the others
 std::span<const Vc2MatrixGroup> vc2MatrixGroups();
+// [FW] each group's reader, in vc2MatrixGroups()' order (xt_vc2matrix's until v343, when the part's reads by reader
+// took it); the OSC's two getters of its group and its LFO's, OSC 1's then OSC 2's
+inline constexpr std::array<uint32_t, 10> kVc2MatrixReaders { 0x893a23b0, 0x893a2440, 0x893a24d0, 0x893a2550,
+                                                              0x893a26b0, 0x893a2750, 0x893a28b0, 0x893a2960,
+                                                              0x893a2aa0, 0x893a2bf0 };
+inline constexpr std::array<uint32_t, 2> kVc2OscGetters { kVc2MatrixReaders[0], kVc2MatrixReaders[1] };
+inline constexpr std::array<uint32_t, 2> kVc2LfoGetters { kVc2MatrixReaders[4], kVc2MatrixReaders[6] };
 
 // The refresh the readers call first (0x893a2230): the Matrix core's, which reads the sources again into `terms` and,
 // when one moved, sets every group's dirty bits to its uses

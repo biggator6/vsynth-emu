@@ -11,23 +11,8 @@
 #include "Vc2SetTva.h"
 #include "Vc2SetsChildCheck.h"
 
-std::array<uint16_t, 12> SetPortParts::tvaOf(uint32_t part, uint32_t kind) {
-    return partWords<12>(kSetsTvaTable, part, kind, 0);
-}
-
 // rom.4's curve in the interpreter, its registers kept (SetKeptShared, v390)
 int SetPortParts::velocityCurve(int velocity, int sens, int curve) { return kept_.velocity(velocity, sens, curve); }
-
-uint8_t SetPortParts::matrixControl(uint32_t matrix, uint32_t n) { return fw_.cpu.rd8(matrix + kSetsControlsAt + n); }
-
-Vc2SetTvaGlobals SetPortParts::tvaGlobals() {
-    Vc2SetTvaGlobals g;
-    g.controls = fw_.cpu.rd8(kSetsTvaFlagAt);
-    g.gain = static_cast<int8_t>(fw_.cpu.rd8(kSetsTrailerAt));
-    g.rate = static_cast<int16_t>(fw_.cpu.rd16(kSetsTrailerAt + 2));
-    g.route = fw_.cpu.rd8(kSetsTrailerAt + 4);
-    return g;
-}
 
 namespace {
 using Tvas = Vc2SetTvas;

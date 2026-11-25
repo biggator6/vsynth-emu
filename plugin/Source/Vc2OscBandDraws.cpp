@@ -1,0 +1,217 @@
+// The band players' waves and states for xt_vc2osc and xt_vc2tone (v332): a band wave built into the wave memory (its
+// parts Vc2OscBandVpdt.cpp's), the object's words as VariPhrase's note-on leaves them before a band player's set-up,
+// rom.4's own set-up on them, and the states it leaves, captured before any hook.  From v334 SOLO's the same, by the
+// wave's type (kOscPlayers); the steers to them are Vc2OscPlayerSteers.cpp's (Vc2OscDraws.h says what each draws).
+// XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
+#if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
+#include "Vc2OscDraws.h"
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+
+namespace {
+constexpr int kBands = 6;
+constexpr int32_t kSixteen = 16;
+constexpr uint32_t kRateFwdAt = 0x14, kRateBwdAt = 0x16;   // [FW] a loop record's rates, tenths of a cent
+// [FW] the head's records in the voice (its +0x108 on, VariPhrase's note-on's): the vpdt, the bands' data, the header,
+// the loop record, the cached events; the head itself (+0x1a0, the object's +0x44)
+constexpr uint32_t kHeadOf = 0x108, kHeadAt = 0x1a0, kBandsOf = 0x10c, kHeaderOf = 0x128, kLoopOf = 0x130;
+constexpr uint32_t kCachedOf = 0x134;
+// [FW] the object's words a note-on gives (the voice's offsets): byte 0, byte 2, byte 3, the range by events and in
+// samples, the tempos, the pitch, the walk, the gain's target and the gain; v334: SOLO's formant, Energy and Robot
+// Voice's depth
+constexpr uint32_t kFlagsAt = 0x15c, kEventBitsAt = 0x15e, kWalkBitsAt = 0x15f, kFirstEventAt = 0x170;
+constexpr uint32_t kLastEventAt = 0x172, kStartAt = 0x174, kEndAt = 0x178, kOrigAt = 0x1a4, kTempoAt = 0x1a8;
+constexpr uint32_t kPitchAt = 0x1cc, kWalkAt = 0x1d8, kTargetAt = 0x1dc;   // v335: the gain past the target
+constexpr uint32_t kFormantAt = 0x1d0, kEnergyAt = 0x1d4, kDepthAt = 0x1f0;
+// [FW] byte 0: the loops on, Tempo Sync, Time Trip, the wrap, Robot Voice (SOLO's), Vari off, stereo, the range in
+// samples
+constexpr uint8_t kLoopsOn = 0x01, kSync = 0x02, kTrip = 0x04, kWraps = 0x08, kRobot = 0x10, kVariOff = 0x20;
+constexpr uint8_t kStereo = 0x40, kInSamples = 0x80;
+constexpr uint32_t kLeastTempo = 400000, kTempoSpan = 2100000;   // [FW] 40…250 BPM, ×10000
+constexpr uint32_t kEnsembleType = 5, kJumpType = 8;   // [FW] ENSEMBLE's and the period-jump player's wave types
+constexpr uint32_t kVoiceTargetAt = 0xdc;   // [FW] v335: the voice's gain's target, gain and rate the jump's render glides
+
+uint32_t aligned4(uint32_t at) { return (at + 3) & ~3u; }
+
+// The gain's target and the gain at `target` and past it, 0…2/65536
+void gainWords(Vc2OscVoice& o, uint32_t target, std::mt19937& rng) {
+    for (uint32_t at : { target, target + 4 }) o.setF32(at, oscWithin(rng, 0.0f, 2.0f) / 65536.0f);
+}
+
+// Byte 0, Vari off never with Tempo Sync or Time Trip: under the beat Vari off reads at the walk's step alone, which
+// the beat's factor takes up to 32 times, past a record a step (bandSegments).  ENSEMBLE's loops off: walking back
+// below the backward loop's start with them on, the next crossing is that point, One Way's jump takes the position
+// below 0, and ENSEMBLE reads its frames' index unsigned, far from the wave (BACKING runs the same loops' code)
+uint8_t bandFlags(const OscBandWave& w, bool ensemble, std::mt19937& rng) {
+    uint8_t f = w.stereo ? kStereo : 0;
+    if (rng() % 4 != 0) f |= kInSamples;
+    if (w.looped && !ensemble && rng() % 3 != 0) f |= kLoopsOn;
+    if (rng() % 8 == 0) f |= kSync;
+    if (rng() % 8 == 0) f |= kTrip;
+    if (rng() % 4 == 0 && (f & (kSync | kTrip)) == 0) f |= kVariOff;
+    if (rng() % 4 == 0) f |= kWraps;
+    return f;
+}
+
+float bandWalk(std::mt19937& rng) {
+    if (rng() % 8 == 0) return 0.0f;
+    return (rng() % 2 ? 1.0f : -1.0f) * oscWithin(rng, 0.1f, 1.5f);
+}
+
+// v334: SOLO's words a note gives besides: Robot Voice one time in four, the formant ½…2, the Energy (0 one time in
+// four, else to 1.5), Robot Voice's depth 0…1
+void soloNoteWords(Vc2OscVoice& o, std::mt19937& rng) {
+    if (rng() % 4 == 0) o.setU8(kFlagsAt, o.u8(kFlagsAt) | kRobot);
+    o.setF32(kFormantAt, std::exp2(oscWithin(rng, -1.0f, 1.0f)));
+    o.setF32(kEnergyAt, rng() % 4 == 0 ? 0.0f : oscWithin(rng, 0.0f, 1.5f));
+    o.setF32(kDepthAt, oscWithin(rng, 0.0f, 1.0f));
+}
+
+// Before any hook, a family's notes on its own waves: two (mono, then stereo) in its region's two halves, and on each
+// four notes of each of its types set up by rom.4 at `voiceAt`, their objects into the shared states
+std::string captureOn(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt, std::span<const uint32_t> types,
+                      std::vector<OscBandWave>& waves, std::mt19937& rng) {
+    constexpr int kNotes = 4;
+    const OscFamily family = oscPlayerOf(types[0])->family;   // v335: its room and records by its family
+    const uint32_t at = oscFamilyRoom(family), room = kOscSoloBytes;
+    Vc2OscVoice o {};
+    for (uint32_t half = 0; half < 2; ++half) {
+        OscBandWave w {};
+        do w = oscDrawBandWave(fw, shared, at + half * room / 2, room / 2, rng, oscFamilyRecords(family));
+        while (w.stereo != (half == 1));
+        waves.push_back(w);
+        for (int n = 0; n < (int)types.size() * kNotes; ++n) {
+            const uint32_t type = types[(size_t)(n / kNotes)];
+            oscBandNote(o, w, voiceAt, type, rng);
+            const std::string what = oscBandSetUp(fw, o, voiceAt, type);
+            if (!what.empty()) return what;
+            OscBandState st { type, {} };
+            std::memcpy(st.object.data(), o.at(Vc2OscVoice::kObject), st.object.size());
+            shared.bandStates.push_back(st);
+        }
+    }
+    return "";
+}
+} // namespace
+
+const OscPlayerRow* oscPlayerOf(uint32_t type) {
+    const auto* row = std::ranges::find(kOscPlayers, type, &OscPlayerRow::type);
+    return row == kOscPlayers.end() ? nullptr : row;
+}
+
+uint32_t oscFamilyRoom(OscFamily f) {
+    return f == OscFamily::band ? kOscBandAt : f == OscFamily::solo ? kOscSoloAt : kOscJumpAt;
+}
+OscWaveRecords oscFamilyRecords(OscFamily f) {
+    return f == OscFamily::band ? OscWaveRecords::band : f == OscFamily::solo ? OscWaveRecords::solo
+                                                                                : OscWaveRecords::periods;
+}
+
+std::vector<uint32_t> oscTypesRendering(uint32_t render) {
+    std::vector<uint32_t> types;
+    for (const OscPlayerRow& row : kOscPlayers) {
+        if (row.render == render) types.push_back(row.type);
+    }
+    return types;
+}
+
+// The range's last event: the first or one past it, never past the wave's last (the wrap would read an entry from what
+// follows the table, which rom.4's set-up doesn't hold the range to); ENSEMBLE's the wave's last, where a backward wrap
+// lands at the end: from an event before its step back the position goes below 0
+uint16_t oscBandLastEvent(const OscBandWave& w, uint32_t first, bool ensemble, std::mt19937& rng) {
+    if (ensemble) return (uint16_t)(w.events - 1);
+    return (uint16_t)(first + rng() % ((uint32_t)w.events - first));
+}
+
+OscBandWave oscDrawBandWave(Vc2Fw& fw, OscShared& shared, uint32_t at, uint32_t room, std::mt19937& rng,
+                            OscWaveRecords records) {
+    const bool solo = records != OscWaveRecords::band, periods = records == OscWaveRecords::periods;
+    OscBandWave w { at, room, rng() % 2 == 0, false, solo, 0, 2 + (int)(rng() % 7), at, 0, 0, 0, {}, {}, periods };
+    w.frames = 600 + (int)(rng() % 4200);
+    std::vector<OscBandSegment> zero;
+    std::vector<uint8_t> vpdt = oscBandVpdt(w.frames, w.events, w.stereo, rng, records, &zero);
+    while (oscBandRoom(w.frames, w.stereo, (uint32_t)vpdt.size(), solo) > room) {
+        w.frames = w.frames * 3 / 4;
+        vpdt = oscBandVpdt(w.frames, w.events, w.stereo, rng, records, &zero);
+    }
+    w.positions = oscBandPositions(vpdt, w.stereo, solo);
+    std::vector<uint8_t> image(room, 0);
+    std::memcpy(image.data(), vpdt.data(), vpdt.size());
+    uint32_t next = aligned4((uint32_t)vpdt.size());
+    const XtLoop loop = oscBandLoop(w.frames, rng);
+    w.looped = loop.on;
+    w.cached = at + next;
+    if (solo) oscSoloCachedEvents(image.data() + next, w.positions, zero, loop);
+    else oscBandCachedEvents(image.data() + next, vpdt, w.stereo, loop);
+    next += kOscBandCachedBytes;
+    w.loop = at + next;
+    for (uint32_t rate : { kRateFwdAt, kRateBwdAt }) {
+        const int16_t tenths = (int16_t)((int32_t)(rng() % 2401) - 1200);
+        std::memcpy(image.data() + next + rate, &tenths, sizeof tenths);
+    }
+    w.header = w.loop + kOscBandRecordRoom;
+    next += 2 * kOscBandRecordRoom;
+    for (int k = 0; k < (solo ? 1 : kBands); ++k) {
+        next += kOscBandTail;
+        w.bands[(size_t)k] = at + aligned4(next);
+        next = aligned4(next) + oscBandFrames(k, w.frames) * (w.stereo ? 4 : 2);
+    }
+    for (uint32_t i = w.bands[0] - at; i + 1 < next; i += 2) {
+        const int16_t x = (int16_t)((int32_t)(rng() % 16384) - 8192);
+        std::memcpy(image.data() + i, &x, sizeof x);
+    }
+    std::memcpy(reinterpret_cast<uint8_t*>(shared.wave.data()) + (at - kOscWaveAt), image.data(), room);
+    fw.cpu.write(at, image.data(), room);
+    return w;
+}
+
+void oscBandNote(Vc2OscVoice& o, const OscBandWave& w, uint32_t voiceAt, uint32_t type, std::mt19937& rng) {
+    const bool ensemble = type == kEnsembleType;
+    const auto object = o.own.begin() + (Vc2OscVoice::kObject - Vc2OscVoice::kOwn);
+    std::fill(object, object + Vc2OscVoice::kObjectBytes, 0);
+    o.setU32(kHeadAt, voiceAt + kHeadOf);
+    o.setU32(kHeadOf, w.vpdt);
+    for (int k = 0; k < kBands; ++k) o.setU32(kBandsOf + 4 * (uint32_t)k, w.bands[(size_t)k]);
+    for (const auto& [at, word] : { std::pair { kHeaderOf, w.header }, { kLoopOf, w.loop }, { kCachedOf, w.cached } }) {
+        o.setU32(at, word);
+    }
+    o.setU8(kFlagsAt, bandFlags(w, ensemble, rng));
+    o.setU8(kEventBitsAt, rng() % 4 == 0 ? (uint8_t)(rng() & 7) : 0);
+    o.setU8(kWalkBitsAt, (uint8_t)rng());
+    const uint32_t first = rng() % (uint32_t)w.events;
+    o.setU16(kFirstEventAt, (uint16_t)first);
+    o.setU16(kLastEventAt, oscBandLastEvent(w, first, ensemble, rng));
+    const int32_t start = kSixteen * (int32_t)(rng() % (uint32_t)(w.frames / 2));
+    o.setU32(kStartAt, (uint32_t)start);
+    o.setU32(kEndAt, (uint32_t)(start + kSixteen * (1 + (int32_t)(rng() % (uint32_t)(w.frames - start / kSixteen)))));
+    for (uint32_t at : { kOrigAt, kTempoAt }) o.setU32(at, kLeastTempo + (uint32_t)(rng() % kTempoSpan));
+    o.setF32(kPitchAt, std::exp2(oscWithin(rng, -2.0f, 2.0f)));
+    o.setF32(kWalkAt, bandWalk(rng));
+    gainWords(o, kTargetAt, rng);
+    if (w.solo) soloNoteWords(o, rng);
+    if (type != kJumpType) return;
+    gainWords(o, kVoiceTargetAt, rng);   // v335: the voice's, the jump's render's, with its rate 0…1
+    o.setF32(kVoiceTargetAt + 8, oscWithin(rng, 0.0f, 1.0f));
+    // v335: no Tempo Sync or Time Trip, whose beat takes the walk up to 32 times: past a period a frame the walk
+    // outruns its records, and the glide below a record takes the read out of the wave (OscBandWave::periods)
+    o.setU8(kFlagsAt, o.u8(kFlagsAt) & (uint8_t)~(kSync | kTrip));
+}
+
+std::string oscBandSetUp(Vc2Fw& fw, Vc2OscVoice& o, uint32_t voiceAt, uint32_t type) {
+    fw.cpu.write(voiceAt + Vc2OscVoice::kOwn, o.own.data(), o.own.size());
+    if (!fw.call(oscPlayerOf(type)->setUp, { voiceAt + Vc2OscVoice::kObject })) {
+        return "rom.4's player's set-up faults: " + fw.cpu.error();
+    }
+    fw.cpu.read(voiceAt + Vc2OscVoice::kOwn, o.own.data(), o.own.size());
+    return "";
+}
+
+std::string oscCaptureBandStates(Vc2Fw& fw, OscShared& shared, uint32_t voiceAt) {
+    constexpr std::array<uint32_t, 2> kBandTypes { 3, 5 }, kSoloTypes { 1, 6 };
+    constexpr std::array<uint32_t, 1> kJumpTypes { 8 };   // v335: the period-jump player's, its own family
+    std::string what = captureOn(fw, shared, voiceAt, kBandTypes, shared.bandWaves, shared.bandRng);
+    if (what.empty()) what = captureOn(fw, shared, voiceAt, kSoloTypes, shared.soloWaves, shared.soloRng);
+    return what.empty() ? captureOn(fw, shared, voiceAt, kJumpTypes, shared.jumpWaves, shared.jumpRng) : what;
+}
+#endif

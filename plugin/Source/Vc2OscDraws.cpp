@@ -3,6 +3,7 @@
 // kinds 5's and 6's from Vc2OscKindsCheck.cpp).  XT_VC2OSC_MAIN or XT_VC2TONE_MAIN only.
 #if defined(XT_VC2OSC_MAIN) || defined(XT_VC2TONE_MAIN)
 #include "Vc2OscDraws.h"
+#include "Vc2OscTargets.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -180,5 +181,28 @@ void oscDrawVoicedVoice(Vc2OscVoice& o, std::mt19937& rng) {
 
 void oscDrawVoicedWords(std::span<uint32_t> words, std::mt19937& rng, uint32_t below) {
     drawNoteWords([&](uint32_t at, float x) { words[(at - below) / 4] = std::bit_cast<uint32_t>(x); }, rng);
+}
+
+long oscSteerVariWords(Vc2OscVoice& o, std::mt19937& rng) {
+    constexpr std::array<uint32_t, 6> kStepped { 0x1cc, 0x1d0, 0x1d4, 0x1d8, 0x1dc, 0x6c };   // [FW]
+    long drawn = 0;
+    for (uint32_t at : kStepped) {
+        if (std::isfinite(o.f32(at))) continue;
+        o.setF32(at, oscDrawFloat(rng, OscRange::moderate));
+        ++drawn;
+    }
+    return drawn;
+}
+
+// The formant's target (0x893afeb0, the port's: no call logged, the shared exp2 rom.4's on both sides) not finite: the
+// base, the two depths and the factor a plain note's, 0, 0, 0 and 1, drawing nothing, so the other draws stay.  The
+// depths' moderate ±1000 over outputs of as much (a coverage build's case 383 at seed 7: 151843 octaves) take exp2 past
+// its table, where rom.4 reads a NaN's bits, which the update's FSUB keeps and xtf::sub's TwoSum doesn't; the XT holds
+// its depths within ±1 (0x8939c260) and its envelopes' and LFOs' outputs within ±1
+long oscSteerVariFormant(Vc2OscVoice& o, Vc2OscParts& parts, const Vc2ToneShared& shared) {
+    if (std::isfinite(Vc2OscTargets(o, parts, shared).formant())) return 0;
+    for (uint32_t at : { kFormantBase, kFormantEnvelope, kFormantLfo }) o.setF32(at, 0.0f);
+    o.tail.formantFactor = 1.0f;
+    return 1;
 }
 #endif

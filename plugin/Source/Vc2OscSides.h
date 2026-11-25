@@ -10,13 +10,20 @@
 
 struct OscCounts {
     long events = 0, noteOns = 0, plain = 0, sampled = 0, updates = 0, takes = 0, renders = 0, settings = 0;
-    long getters = 0, seeks = 0, kindCalls = 0, gliding = 0, lookups = 0;
+    long getters = 0, gliding = 0;   // v331: the event lookups went; v335: the seeks
+    long variDrawn = 0;              // v330: VariPhrase's words drawn finite (v335: its players' set-ups went)
+    long variFormants = 0;           // v339: its formant's base, depths and factor drawn where its target isn't finite
+    long variByEvents = 0;                 // v331: its note-ons by events, their table steered
     long carrierStarts = 0, carrierBlocks = 0, carrierSettings = 0, kind6Starts = 0, kind6Blocks = 0;   // v266
     long voicedSounding = 0, voicedNotFinite = 0;   // v266: those blocks with a sample that isn't 0, or isn't finite
     long extInBlocks = 0, variOffBlocks = 0;        // v322, v323: the renders through the EXT IN player's, Vari off's
     long headsBlocks = 0;                           // v326: and through LITE's heads'
     long modeOneBlocks = 0;                         // v327: and through kind 1's mode 1's
+    long bandBlocks = 0;                            // v332: and through the band players', steered to a state
+    long soloBlocks = 0;                            // v334: and through SOLO's, the same
+    long jumpBlocks = 0;                            // v335: and through the period-jump player's
     long modeOneSetUps = 0, setUpsInSamples = 0;    // v328: its set-ups, and those with the range in samples
+    long modeOneSeeks = 0;                           // v329: the events steered for its seek
     long liteUpdates = 0, liteSettings = 0;         // v324: LITE's update and settings on a type with a way
 };
 
@@ -77,8 +84,19 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v);
 void oscMakeAnalog(OscSides& s, std::mt19937& rng, int v);
 // The port's voice `v`'s own words and tail written into rom.4's memory, so both sides start an event the same
 void oscWriteVoice(OscSides& s, int v);
+// v329 (Vc2OscEvents.cpp): before an event that `seeks` through mode 1's seek, voice `v`'s mode 1 words drawn
+// (oscSteerModeOneSeek), counted, and the voice written
+void oscSteerSeek(OscSides& s, int v, bool seeks);
 // v327 (Vc2OscModeOneCheck.cpp): the mode 1 part, after the hooks' install and before the voice part
 void oscModeOnePart(OscSides& s, const Vc2Run& run, Vc2Tally& tally);
+// v329 (the same, v333 its own): a seek's word by a way drawn from eight, about the events at `positions` of `count`:
+// in samples about an event's position half the time, on one a quarter, below 0 or past the last an eighth each; by
+// events a number up to two past the last, one time in eight 0x8000 up, one in four with high bits besides
+int32_t oscSeekWord(bool inSamples, std::span<const int32_t> positions, int count, std::mt19937& rng);
+// v332 (Vc2OscBandsCheck.cpp): the band part, the band players' renders on voice 0, before any hook; from v333 their
+// set-ups and seek too; v334: SOLO's part the same, its render, set-ups and seek; v335: the period-jump player's, each
+// a family's part (`family`)
+void oscPlayersPart(OscSides& s, const Vc2Run& run, Vc2Tally& tally, OscFamily family);
 // v267 (Vc2OscVibratoCheck.cpp): the vibrato against rom.4's own, before any hook; its words as a note leaves them
 void oscVibratoPart(Vc2Fw& fw, const Vc2Run& run, Vc2Tally& tally);
 void oscDrawVibratoWords(Vc2VibratoWords& w, std::mt19937& rng);

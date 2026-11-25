@@ -103,6 +103,15 @@ public:
     virtual void count(uint32_t x) = 0;      // +0x3c: its OSC voices' count
 };
 
+// v355: the tones' list as it stands each time it is read: its first, and a tone's next (its +0), nullptr at its end.
+// A task the update preempts for (the notes' task, on a tone's end) can change it while the loop runs
+class Vc2MixerTones {
+public:
+    virtual ~Vc2MixerTones() = default;
+    virtual Vc2MixerTone* first() = 0;
+    virtual Vc2MixerTone* next(Vc2MixerTone* tone) = 0;
+};
+
 // What the voices' update and schedule call beyond the tones (v311)
 class Vc2MixerTaskParts {
 public:
@@ -129,9 +138,10 @@ public:
     void reset(Vc2MixerParts& parts);       // 0x893b1680: the tracker's, the detector's and the ring's resets
     // v311: the voices' update 0x893b16a0 (the blocks since its last in 10 ms ticks, at least 1, to each tone's
     // update, then the glue) and schedule 0x893b1710 (the blocks since its last in seconds, a block's when none, to
-    // the free LFOs' clock and each tone's clock and count of 1); the tones given as the list stands
-    void updateTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts);
-    void scheduleTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts);
+    // the free LFOs' clock and each tone's clock and count of 1); v355: the list walked as it stands, the update reading
+    // a tone's next before its update (0x893b16de), the schedule after its count (0x893b1768)
+    void updateTones(Vc2MixerTones& tones, Vc2MixerTaskParts& parts);
+    void scheduleTones(Vc2MixerTones& tones, Vc2MixerTaskParts& parts);
 
     Vc2MixerWords w {};
     Vc2MixerBuffers b {};

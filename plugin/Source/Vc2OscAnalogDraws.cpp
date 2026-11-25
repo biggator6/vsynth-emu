@@ -96,6 +96,23 @@ void steerLaCode(Vc2OscVoice& o, std::mt19937& rng) {
     o.setU32(kCode, kLaFirst + (uint32_t)rng() % kLaCodes);
     o.setF32(kSubOn, 0.0f);
 }
+
+// v331: LA-SQUARE's corners (0x893c4840, and the note-on's and update's) keyfollowed by the Tone KF: one time in two its
+// index any of the table's 15, the Tone 60…100, a pitch near the root and Fat 0…1 octave alone, so the corners sit
+// between the wave's Hz and the 20 kHz most, where each corner's own keyfollow ratio shows; with the sub oscillator on
+// as drawn, whose shape (0x893c4020) takes LA's way (the shape's second corner's pool word, shape-pool-sq-kf2, had been
+// caught by one case's chance; turning the sub on over words drawn without it gave a NaN's sign, its inputs not drawn
+// as its converter gives them)
+void steerLaCorner(Vc2OscVoice& o, std::mt19937& rng) {
+    // [FW] the block's words: the Tone, its KF, Fat and its depths; the Tone KF's table
+    constexpr uint32_t kTone = 0x140, kToneKf = 0x144, kFat = 0x108, kFatEnvelope = 0x10c, kFatLfo = 0x114, kKfs = 15;
+    constexpr float kToneLeast = 60.0f, kToneSpan = 40.0f;
+    steerPitch(o, rng, 0.0f);
+    o.setF32(kToneKf, (float)(rng() % kKfs));
+    o.setF32(kTone, kToneLeast + kToneSpan * vc2Unit(rng));
+    o.setF32(kFat, vc2Unit(rng));
+    for (uint32_t at : { kFatEnvelope, kFatLfo }) o.setF32(at, 0.0f);
+}
 } // namespace
 
 // v242: kind 3's, the analog's, block words drawn; a pitch near the root half the time, then half of those SQUARE
@@ -118,6 +135,8 @@ void oscSteerAnalog(OscSides& s, std::mt19937& rng, int v) {
     oscAnalogObject(o, rng);
     steerSub(o, rng);
     steerLaCode(o, rng);
+    constexpr uint32_t kSubOn = 0x138;   // [FW] v331: the sub oscillator's switch
+    if (o.u32(kCode) == kLaFirst && std::trunc(o.f32(kSubOn)) != 0.0f && rng() % 2) steerLaCorner(o, rng);
     if (o.u32(kCode) - kLaFirst < 2 && rng() % 2) {
         o.setF32(kImpact, 0.5f * vc2Unit(rng));
         o.setF32(kUnwritten, 2.0f + 100.0f * vc2Unit(rng));

@@ -112,11 +112,7 @@ void oscDrawAnswers(Vc2Fw& fw, OscShared& shared, std::mt19937& rng) {
     d.peak = rng() % 4 == 0 ? 0.0f : vc2DrawLevel(rng);
     fw.cpu.wr32(kPeakAt, std::bit_cast<uint32_t>(d.peak));
     d.rendered = (uint32_t)rng();
-    d.seekFlags = (uint8_t)rng();
-    for (int32_t& p : d.positions) p = (int32_t)rng();   // v238: the event lookup's, each side from the first
-    d.aside = (uint32_t)rng();
-    d.romTaken = 0;
-    shared.positionsTaken = 0;
+    rng();   // v335: the seek's flags byte drew here until the seeks were the voice's own; kept, so the draws after stay
     shared.calls.clear();
     constexpr uint32_t kFramesPointerAt = 0x8993eadc;   // [FW] where the part reads the effect chip's frames from
     for (int32_t& w : d.frames) w = (int32_t)shared.renders();
@@ -247,6 +243,8 @@ void oscSteerRenders(Vc2OscVoice& o, OscShared& shared) {
     if (oscRendersBy(o, kOscVariOffRenders)) oscDrawVariOffWords(o, rng, kOscWaveAt);   // v323
     if (oscRendersBy(o, kOscHeadsRenders)) oscDrawHeadsWords(o, rng, kOscWaveAt);       // v326
     if (oscRendersBy(o, kOscModeOneRenders)) oscDrawModeOneWords(o, rng, shared.records, kOscWaveAt);   // v327
+    oscSteerBands(o, shared);                                                                           // v332
+    oscSteerAnalogRender(o, shared);                                                                    // v337
     if (!oscRendersBy(o, kOscExtInRenders)) return;
     for (uint32_t at : { kLevelAt, kTargetAt }) {
         if (!(std::fabs(o.f32(at)) <= 1.0f)) o.setF32(at, vc2Unit(rng));
@@ -263,12 +261,14 @@ bool oscSteerLiteSettings(Vc2OscVoice& o, std::span<uint32_t> settings, uint32_t
     for (uint32_t at : kSwitches) {
         if (rng() % 2) settings[kTypeWord + at / 4] = rng() % 2;
     }
+    oscSteerLiteAsk(o, settings.subspan(kTypeWord));   // v332: lite-set-ask-at had been one case's chance
     return settings[kTypeWord] < kTypes;
 }
 
 void oscDrawWave(Vc2Fw& fw, OscShared& shared) {
-    oscDrawHalfwords(shared.wave, shared.renders);
-    fw.cpu.write(kOscWaveAt, shared.wave.data(), shared.wave.size() * sizeof(int16_t));
+    const std::span<int16_t> wave(shared.wave.data(), kOscWaveHalfwords);   // v332: the band waves above it stay
+    oscDrawHalfwords(wave, shared.renders);
+    fw.cpu.write(kOscWaveAt, wave.data(), wave.size_bytes());
     oscDrawEventTable(fw, shared);   // v327
 }
 

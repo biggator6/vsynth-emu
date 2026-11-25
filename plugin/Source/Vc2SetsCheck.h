@@ -6,6 +6,7 @@
 // two sides.  The children's parts' shared steps in Vc2SetsChildCheck.h (v283).  XT_VC2SETS_MAIN only.
 #include "Vc2CheckMain.h"
 #include "Vc2RomShared.h"
+#include "Vc2SetMemoryReads.h"   // v341
 #include "Vc2Sets.h"
 #include "Vc2WaveSets.h"   // v398, v399
 #include <cstring>
@@ -20,28 +21,21 @@ inline constexpr uint32_t kSetsVoiceBytes = 0x60, kSetsKeyBytes = 0x40, kSetsCha
 inline constexpr uint32_t kSetsPartBytes = 0x10, kSetsChildBytes = 0x40;
 inline constexpr int kSetsObjects = 4, kSetsChildren = 64;
 inline constexpr uint32_t kSetsVoiceWords = 0x34, kSetsByteAt = 0x53;   // [FW] the voice's words a call points at
-inline constexpr uint32_t kSetsModesAt = 0x89998a14;                // [FW] the part's bytes by kind
 inline constexpr uint32_t kSetsMatrixAt = 0x89997108;               // [FW] the part's own M
-inline constexpr uint32_t kSetsControls = 0x84;                     // [FW] a channel's controllers
 inline constexpr uint32_t kSetsSettingsAt = 0x89997398;             // [FW] the Matrix's settings G
-inline constexpr uint32_t kSetsCommonsAt = 0x89997090, kSetsCommonBytes = 6;   // [FW] the parts' words for the common
-inline constexpr uint32_t kSetsClockAt = 0x8995cb40;                // [FW] the clock object (v282)
 inline constexpr uint32_t kSetsSumsAt = 0x8C035000;                  // in Vc2Fw's RAM: the Matrix's sums drawn
-
-// [FW] the parts' words for a child, by part, kind and index (an index's the words' count apart): where they start, a
-// part's and a kind's stride, how many a kind has; the envelopes' (v282), the LFOs' (v283) and the mix's (v284)
-struct SetPartTable {
-    uint32_t at, part, kind, perKind;
-};
-inline constexpr SetPartTable kSetsEnvelopeTable { 0x89e2765c, 2080, 130, 13 };
-inline constexpr SetPartTable kSetsLfoTable { 0x89e2f85c, 800, 50, 5 };
-inline constexpr SetPartTable kSetsMixTable { 0x89e32a60, 352, 22, 1 };
-inline constexpr SetPartTable kSetsTvaTable { 0x89e4987c, 384, 24, 1 };
-// [FW] the TVA's globals (v285): the part's controllers' flag, the part table's trailer; in Vc2Fw's RAM, the Ms its
-// draws aim at (their controllers at +0x178)
-inline constexpr uint32_t kSetsTvaFlagAt = 0x89997fcc, kSetsTrailerAt = 0x89e4b07c, kSetsControlsAt = 0x178;
+// v341: the part's addresses C reads, the plugin's (Vc2SetMemoryReads.h), by the names the draws use
+inline constexpr uint32_t kSetsModesAt = kVc2SetModesAt, kSetsControls = kVc2SetControls;
+inline constexpr uint32_t kSetsCommonsAt = kVc2SetCommonsAt, kSetsCommonBytes = kVc2SetCommonBytes;
+inline constexpr uint32_t kSetsClockAt = kVc2SetClockAt;
+using SetPartTable = Vc2SetPartTable;
+inline constexpr SetPartTable kSetsEnvelopeTable = kVc2SetEnvelopeTable, kSetsLfoTable = kVc2SetLfoTable;
+inline constexpr SetPartTable kSetsMixTable = kVc2SetMixTable, kSetsTvaTable = kVc2SetTvaTable;
+inline constexpr SetPartTable kSetsCosmTable = kVc2SetCosmTable;
+inline constexpr uint32_t kSetsTvaFlagAt = kVc2SetTvaFlagAt, kSetsTrailerAt = kVc2SetTrailerAt;
+inline constexpr uint32_t kSetsControlsAt = kVc2SetMatrixControls;
+// In Vc2Fw's RAM, the Ms the TVA's draws aim at (their controllers at +0x178)
 inline constexpr uint32_t kSetsTvaMatricesAt = 0x8C036000, kSetsTvaMatrixBytes = 0x200;
-inline constexpr SetPartTable kSetsCosmTable { 0x89e2003c, 0x540, 84, 2 };   // [FW] the COSM inputs' 42 bytes (v390)
 
 // The calls logged: C's children's methods, a Matrix group's reader (v282, the envelopes' part) and an OSC kind's routine
 // not ported (v391)
@@ -88,8 +82,9 @@ private:
     const RomShared& rom_;
 };
 
-// The port's parts: rom.4's memory read where the draws wrote it, the children's calls logged and answered
-class SetPortParts final : public Vc2SetParts {
+// The port's parts: rom.4's memory read where the draws wrote it (from v341 by the plugin's Vc2SetMemoryReads, on
+// rom.4's memory), the children's calls logged and answered
+class SetPortParts final : public Vc2SetMemoryReads {
 public:
     SetPortParts(Vc2Fw& fw, std::mt19937& answers, std::vector<SetCall>& log)
         : fw_(fw), answers_(answers), log_(log), shared_(fw), kept_(fw, shared_) {}
@@ -101,39 +96,17 @@ public:
     void copy(const Vc2SetChild& c, uint32_t object, uint32_t noteAt) override;
     void release(const Vc2SetChild& c, uint32_t object, uint32_t velocity, uint32_t noteAt) override;
     uint32_t refresh(const Vc2SetChild& c, uint32_t object, const Vc2SetCall& call) override;
-    Vc2SetVoice voiceAt(uint32_t channelAt) override;
-    uint8_t firstByte(uint32_t object) override { return fw_.cpu.rd8(object); }
-    uint32_t channelOf(uint32_t keys) override { return fw_.cpu.rd32(keys); }
-    int16_t bendOf(uint32_t channel) override { return static_cast<int16_t>(fw_.cpu.rd16(channel)); }
-    uint8_t controlOf(uint32_t channel, uint32_t number) override;
-    uint8_t modeOf(uint32_t part, uint32_t kind) override;
-    std::array<uint16_t, 3> commonOf(uint32_t part) override;
-    std::array<uint16_t, 5> envelopeOf(uint32_t part, uint32_t kind, uint32_t index) override;
-    std::array<uint16_t, 5> lfoOf(uint32_t part, uint32_t kind, uint32_t index) override;
-    std::array<uint16_t, 11> mixOf(uint32_t part, uint32_t kind) override;
     // The TVA's (v285, Vc2SetTvaCheck.cpp): the velocity curve rom.4's own in the interpreter
-    std::array<uint16_t, 12> tvaOf(uint32_t part, uint32_t kind) override;
     int velocityCurve(int velocity, int sens, int curve) override;
-    uint8_t matrixControl(uint32_t matrix, uint32_t n) override;
-    Vc2SetTvaGlobals tvaGlobals() override;
-    Vc2SetClock clock() override;
     int16_t matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) override;
     // The COSM inputs' (v390, Vc2SetCosmInputCheck.cpp): the shared routines rom.4's own, a reader's call logged and
     // answered as the hooked readers answer it
-    std::array<uint16_t, 21> cosmInputOf(uint32_t part, uint32_t kind, uint32_t index) override;
     const Vc2ToneShared& shared() override { return kept_; }
     const int16_t* matrixGroup(uint32_t reader, uint32_t matrix) override;
     // The OSC blocks' (v391, Vc2SetOscBlockCheck.cpp): the step counts the port's own (`oscSteps`), the groups and the
     // pitch source unlogged, a kind's routine not ported logged (from v397 none: the wave store's routines PCM's start
     // calls, logged, answered and filling the wave's words from the answers, as their hooks do)
-    std::array<uint8_t, 32> oscHeader(uint32_t part) override;
-    std::array<uint8_t, 128> oscRecord(uint32_t part, uint32_t kind, uint32_t osc) override;
-    std::array<uint8_t, 60> oscSystems() override;
-    uint16_t& oscStep(uint32_t part, uint32_t kind, uint32_t osc) override;
-    Vc2SetGlide glideAt(uint32_t glide) override;
-    uint8_t holdOf(uint32_t keys) override;
-    std::array<uint8_t, 2> legatoOf(uint32_t word) override;
-    int32_t matrixBend(uint32_t matrix) override;
+    uint16_t nextOscStep(uint32_t part, uint32_t kind, uint32_t osc) override;
     Vc2MatrixGroups oscGroups(uint32_t matrix, uint32_t osc) override;
     float pitchSource() override;
     // v398: the store the port's own (`store`, written into rom.4's memory with the blocks before each event), the
@@ -143,10 +116,12 @@ public:
     const Vc2WaveStore& waveStore() override { return store; }
     const Vc2WaveMemory& waveMemory() override;
     Vc2WaveSets& waveSets() override { return sets; }
-    uint32_t tripMoving(uint8_t part) override;   // v395: through rom.4's part table, as the draws aim it
     std::array<uint16_t, 512> oscSteps {};   // the step counts at 0x89989c84, 16 parts' 64 bytes
     Vc2WaveStore store {};
     Vc2WaveSets sets {};
+
+protected:
+    void read(uint32_t at, void* to, size_t bytes) override { fw_.cpu.read(at, to, bytes); }
 
 private:
     // rom.4's memory as the store's, its reads counted since the last use
@@ -160,20 +135,6 @@ private:
         Vc2Fw& fw_;
     };
     void logged(int32_t kind, uint32_t routine, std::array<uint32_t, 8> args);
-    // N bytes of rom.4's memory at `at` (v391)
-    template <size_t N>
-    std::array<uint8_t, N> bytesAt(uint32_t at) {
-        std::array<uint8_t, N> b;
-        fw_.cpu.read(at, b.data(), N);
-        return b;
-    }
-    // The part's N words for a child by `t`, where the draws wrote them
-    template <size_t N>
-    std::array<uint16_t, N> partWords(const SetPartTable& t, uint32_t part, uint32_t kind, uint32_t index) {
-        std::array<uint16_t, N> words;
-        fw_.cpu.read(t.at + t.part * part + t.kind * kind + sizeof words * index, words.data(), sizeof words);
-        return words;
-    }
     Vc2Fw& fw_;
     std::mt19937& answers_;
     std::vector<SetCall>& log_;

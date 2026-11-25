@@ -374,15 +374,15 @@ mixr-tap-near|int near = position - whole, far = near - 1;|int near = position -
 mixr-tap-far|int near = position - whole, far = near - 1;|int near = position - whole, far = near;|vc2tonemixrender
 mixr-tap-near-wrap|    if (near < 0) near += Vc2ToneMixRings::kSamples;\n||vc2tonemixrender
 mixr-tap-far-wrap|    if (far < 0) far += Vc2ToneMixRings::kSamples;\n||vc2tonemixrender
-mixr-tap-weights|add(mul(ring[(size_t)near], sub(1.0f, part)), mul(ring[(size_t)far], part))|add(mul(ring[(size_t)near], part), mul(ring[(size_t)far], sub(1.0f, part)))|vc2tonemixrender
+mixr-tap-weights|add(mul(rings.at(ring, near), sub(1.0f, part)), mul(rings.at(ring, far), part))|add(mul(rings.at(ring, near), part), mul(rings.at(ring, far), sub(1.0f, part)))|vc2tonemixrender
 mixr-next-wrap|position + 1 >= Vc2ToneMixRings::kSamples ? 0 : position + 1|position + 2 >= Vc2ToneMixRings::kSamples ? 0 : position + 1|vc2tonemixrender
 mixr-next-to|position + 1 >= Vc2ToneMixRings::kSamples ? 0 : position + 1|position + 1 >= Vc2ToneMixRings::kSamples ? 1 : position + 1|vc2tonemixrender
 mixr-mono-write-first|        position = nextPosition(position);\n        ring[(size_t)position] = m.a[s];|        ring[(size_t)position] = m.a[s];\n        position = nextPosition(position);|vc2tonemixrender
 mixr-mono-delay-order|div(mul(mul(add(m.b[s], t.fullScale), g[0]), t.delaySpan), t.fullScale)|div(mul(mul(add(m.b[s], t.fullScale), t.delaySpan), g[0]), t.fullScale)|vc2tonemixrender
 mixr-mono-delay-gain|add(m.b[s], t.fullScale), g[0])|add(m.b[s], t.fullScale), g[1])|vc2tonemixrender
 mixr-mono-delay-right|mul(mul(add(m.b[s], t.fullScale), g[0])|mul(mul(add(m.b[s + 1], t.fullScale), g[0])|vc2tonemixrender
-mixr-mono-dry|add(mul(m.a[s], g[1]), delayedSample(ring, position, delay))|add(mul(m.a[s], g[2]), delayedSample(ring, position, delay))|vc2tonemixrender
-mixr-mono-no-dry|add(mul(m.a[s], g[1]), delayedSample(ring, position, delay))|delayedSample(ring, position, delay)|vc2tonemixrender
+mixr-mono-dry|add(mul(m.a[s], g[1]), delayedSample(m.rings, ring, position, delay))|add(mul(m.a[s], g[2]), delayedSample(m.rings, ring, position, delay))|vc2tonemixrender
+mixr-mono-no-dry|add(mul(m.a[s], g[1]), delayedSample(m.rings, ring, position, delay))|delayedSample(m.rings, ring, position, delay)|vc2tonemixrender
 mixr-mono-level|m.out[s] = m.out[s + 1] = mul(wet, g[2]);|m.out[s] = m.out[s + 1] = mul(wet, g[1]);|vc2tonemixrender
 mixr-mono-right|m.out[s] = m.out[s + 1] = mul(wet, g[2]);|m.out[s] = mul(wet, g[2]);|vc2tonemixrender
 mixr-mono-position|        m.out[s] = m.out[s + 1] = mul(wet, g[2]);\n    });\n    m.w.position = position;|        m.out[s] = m.out[s + 1] = mul(wet, g[2]);\n    });|vc2tonemixrender
@@ -390,8 +390,8 @@ mixr-stereo-rings|{ &m.rings.a(m.w.ringA), &m.rings.b(m.w.ringB) }|{ &m.rings.a(
 mixr-stereo-depth|const float depth = mul(g[0], t.delaySpan);|const float depth = mul(g[1], t.delaySpan);|vc2tonemixrender
 mixr-stereo-write-left|(*rings[c])[(size_t)position] = m.a[s + c];|(*rings[c])[(size_t)position] = m.a[s];|vc2tonemixrender
 mixr-stereo-moved-left|div(mul(add(m.b[s + c], t.fullScale), depth), t.fullScale)|div(mul(add(m.b[s], t.fullScale), depth), t.fullScale)|vc2tonemixrender
-mixr-stereo-dry|add(mul(m.a[s + c], g[1]), delayedSample(*rings[c], position, delay))|add(mul(m.a[s], g[1]), delayedSample(*rings[c], position, delay))|vc2tonemixrender
-mixr-stereo-tap|delayedSample(*rings[c], position, delay)|delayedSample(*rings[0], position, delay)|vc2tonemixrender
+mixr-stereo-dry|add(mul(m.a[s + c], g[1]), delayedSample(m.rings, *rings[c], position, delay))|add(mul(m.a[s], g[1]), delayedSample(m.rings, *rings[c], position, delay))|vc2tonemixrender
+mixr-stereo-tap|delayedSample(m.rings, *rings[c], position, delay)|delayedSample(m.rings, *rings[0], position, delay)|vc2tonemixrender
 mixr-stereo-level|m.out[s + c] = mul(wet, g[2]);|m.out[s + c] = mul(wet, g[1]);|vc2tonemixrender
 mixr-stereo-position|            m.out[s + c] = mul(wet, g[2]);\n        }\n    });\n    m.w.position = position;|            m.out[s + c] = mul(wet, g[2]);\n        }\n    });|vc2tonemixrender
 mixr-follower-run|constexpr int kFollowerRun = 8, kHoldFrames = 4;|constexpr int kFollowerRun = 4, kHoldFrames = 4;|vc2tonemixrender
@@ -759,7 +759,8 @@ mods-word-at-lfo|boundWordIn(lfos, lfo, kLfoBytes, lfo % kLfoBytes, word);|bound
 host-build-osc|else voice(oscOfPiece(piece)).construct();|else voice(0).construct();|vc2tonehost
 host-build-osc-none|else voice(oscOfPiece(piece)).construct();|else {}|vc2tonehost
 host-links-osc2|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 1)|Vc2ToneOscLink(*this, 0), Vc2ToneOscLink(*this, 0)|vc2tonehost
-host-update-osc-link|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n, link(1 - osc), c_.shared);|vc2tonehostosc
+# v335: host-update-osc-link dropped: an update calls nothing through the link now (its re-seek the voice's own),
+# so the other OSC's link gives the same
 host-update-osc-count|voice(osc).update(n, link(osc), c_.shared);|voice(osc).update(n + 1, link(osc), c_.shared);|vc2tonehostosc
 host-osc-value|{ return voice(osc).f32(kRatio); }|{ return voice(osc).f32(kRatio + 4); }|vc2tonehostosc
 host-render-osc-buffer|{ voice(osc).render(buffer, link(osc)); }|{ voice(osc).render(buffer + 2, link(osc)); }|vc2tonehostosc
@@ -786,10 +787,10 @@ host-key-off-osc|vibrato.w.active = 0;|vibrato.w.falling = 0;|vc2tonehostosc
 host-osc-cost|{ return voice(osc).tail.installed; }|{ return voice(osc).tail.factor; }|vc2tonehostosc
 host-osc-word168|{ return voice(osc).word168(); }|{ return voice(1 - osc).word168(); }|vc2tonehostosc
 host-osc-position|{ return voice(osc).position(); }|{ return (uint32_t)voice(osc).word168(); }|vc2tonehostosc
-link-kind-call|{ outside().kindCall(routine); }|{ outside().kindCall(routine + 4); }|vc2tonehostosc
-link-kind-settings|outside().kindSettings(routine, from);|outside().kindSettings(routine, from + 1);|vc2tonehostosc
-link-render-by|return outside().renderBy(routine, out, third);|return outside().renderBy(routine, out, 0);|vc2tonehostosc
-link-seek|outside().seek(routine, at);|outside().seek(routine, at + 16);|vc2tonehostosc
+# v335: link-object-call and link-seek went with the object call and the seek out: every player's set-up and seek
+# the voice's own (the period-jump player's the last), so the link passes neither on
+# v335: link-render-by dropped: every render by its word is the voice's own from v335, and the analog's renders go
+# out with the sync word as their third, which xt_vc2tone's tones leave 0 (the analog's own renders come next)
 link-os-clock|{ return outside().osClock(); }|{ return outside().osClock() + 1; }|vc2tonehostosc
 link-mic-ring|{ return outside().micRing(); }|{ static Vc2MicRing other; return other; }|vc2tonehostosc
 link-unvoiced|{ return outside().unvoiced(); }|{ return outside().unvoiced() + 1; }|vc2tonehostosc
@@ -797,7 +798,6 @@ link-bound-tone|return host_.mods.boundFloat(self, part, offset);|return host_.m
 link-bound-in-tone|if (part - self < Vc2Tone::kSize)|if (part - self < Vc2Tone::kSize / 2)|vc2tonehostosc
 link-bound-outside|return outside().boundFloat(part, offset);|return 0.0f;|vc2tonehostosc
 link-address|{ return host_.self() + kOscsAt[(size_t)osc_]; }|{ return host_.self() + kOscsAt[0]; }|vc2tonehostosc
-link-event-position|{ return outside().eventPosition(event); }|{ return outside().eventPosition(event + 1); }|vc2tonehostosc
 link-wave-header|{ return outside().waveHeader(at); }|{ return outside().waveHeader(at + 4); }|vc2tonehostosc
 link-loop-record|{ return outside().loopRecord(at); }|{ return outside().loopRecord(at + 4); }|vc2tonehostosc
 # v321: the input stage's peak, which kind 5's update (ported in the voice) asks of the link (vc2tonehostosc)
@@ -817,3 +817,14 @@ link-voice-own|return host_.hostOf(pool.indexOf(at)).oscs[osc].f32(in);|return h
 link-voice-osc|- kOscsAt[osc];|- kOscsAt[0];|vc2tonehostosc
 link-voice-end|<= Vc2OscVoice::kOwnEnd - Vc2OscVoice::kOwn - sizeof(float)) {|<= 0xb0 - sizeof(float)) {|vc2tonehostosc
 link-voice-pool|pool.holds(at) && osc < kOscsAt.size()|false && osc < kOscsAt.size()|vc2tonehostosc
+# v330: link-object-call is back where link-kind-call stood (VariPhrase's players' set-ups go out on the object again);
+# link-kind-call and link-kind-settings went with the kind's routine and settings by address, VariPhrase's the last
+# v331: link-event-position went with the link's event lookup, VariPhrase's note-on reading the voice's own
+# v337: the delay lines' reads beside a ring (vc2tonemixrender: the rings end to end, A's then B's, OSC 2 past full
+# scale as an analog OSC's Impact takes it now its renders are the voice's own), and the five plants above on
+# delayedSample's new text
+mixr-beside-none|    if (n < 0 \|\| n >= (long)rings_.size() * kSamples) return 0.0f;|    if (n < 0 \|\| n >= (long)rings_.size() * kSamples \|\| i < 0 \|\| i >= kSamples) return 0.0f;|vc2tonemixrender
+mixr-beside-ring|(long)(&ring - rings_.data()) * kSamples + i|(long)(&ring - rings_.data()) * kSamples + i % kSamples|vc2tonemixrender
+mixr-beside-first|(long)(&ring - rings_.data()) * kSamples + i|(long)i|vc2tonemixrender
+mixr-b-after-a|return rings_[kTones + (address - kBAt) / kBytes];|return rings_[(address - kBAt) / kBytes];|vc2tonemixrender
+mixr-a-from|return rings_[(address - kAAt) / kBytes];|return rings_[(address - kAAt) / kBytes + 1];|vc2tonemixrender

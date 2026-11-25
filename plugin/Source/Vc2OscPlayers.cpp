@@ -3,10 +3,13 @@
 // and what VariPhrase's note-on shares with LITE's (v240, Vc2OscPlayers.h; LITE's in Vc2OscLite.cpp).  The players' own
 // routines (their renders, setups, seeks, updates, the event lookup) stay rom.4's by address through Vc2OscParts.
 // Every address is rom.4's; every offset the voice's.  HARDWARE_FIRMWARE.md, "The VC-2's players' installs and
-// VariPhrase's note-on".
+// VariPhrase's note-on".  From v330 the players' update, start and settings are the voice's own (Vc2OscVari.cpp), from
+// v331 the event lookup (Vc2OscWalkStart.cpp); their renders, set-ups and seeks but the band players' (v332, v333) and
+// LITE's still go out.
 #include "Vc2OscPlayers.h"
 #include "Vc2OscTables.h"
 #include "Vc2OscTargets.h"
+#include "Vc2OscWalk.h"
 #include "XtFloat.h"
 #include <array>
 #include <bit>
@@ -53,7 +56,7 @@ constexpr uint32_t kFrom = 0x13c, kTo = 0x140, kSeekTo = 0x144, kCopy16 = 0x170,
 constexpr uint32_t kSelf = 0x1a0, kSelfAt = 0x108, kHeaderWord = 0x1a4, kTimes = 0x1a8, kTimesFrom = 0xb4;
 constexpr uint32_t kHeaderAt = 0x128, kLoopAt = 0x130, kPairAt = 0x134, kPairWord = 0x2d0, kSamplesFrom = 0x10c;
 constexpr uint32_t kPitch = 0x1cc, kFormant = 0x1d0, kLevel = 0x1d4, kLevelFrom = 0x6c, kWalk = 0x1d8, kZero = 0x1f0;
-constexpr uint32_t kUpdate = 0x893c88b0, kAfterUpdate = 0x893c8670, kSeek = 0x893c6360;
+constexpr uint32_t kSeek = 0x893c6360;
 constexpr uint32_t kZeroAt = 0x248, kPosition = 0x24c, kSamples = 0x250, kEnd = 0x254, kLoop = 0x258, kRateFwd = 0x264;
 constexpr uint32_t kFwdMode = 0x268, kStart = 0x26c, kBwd = 0x270, kRateBwd = 0x27c, kBwdMode = 0x280, kOne = 0x284;
 constexpr uint32_t kPositionCopy = 0x288;
@@ -66,15 +69,16 @@ void setLoop(Vc2OscVoice& v, uint32_t at, uint32_t first, uint32_t second, uint3
     v.setU32(at + 8, span);
 }
 
-// [FW] 0x893af590…: the range by events, each event's position (0x893cc0d0) in samples, the end's less 1; the loops'
-// modes one-way by the object's 0x08, their rates 1; a seek to the third event's position when it isn't the first
+// [FW] 0x893af590…: the range by events, each event's position (0x893cc0d0, from v331 the voice's own) in samples, the
+// end's less 1; the loops' modes one-way by the object's 0x08, their rates 1; a seek to the third event's position when
+// it isn't the first
 void byEvents(Vc2OscVoice& v, Vc2OscParts& parts) {
-    const auto a = (uint32_t)(parts.eventPosition(v.u16(kFrom)) >> 4);
-    const auto b = (uint32_t)((parts.eventPosition(v.u16(kTo)) >> 4) - 1);
+    const auto a = (uint32_t)(vc2OscEventPosition(v, parts, v.u16(kFrom)) >> 4);
+    const auto b = (uint32_t)((vc2OscEventPosition(v, parts, v.u16(kTo)) >> 4) - 1);
     const uint32_t mode = (v.u8(Vc2OscVoice::kObject) & kEventLoops) != 0 ? 1 : 0;
     vc2OscSetVariOff(v, { .start = a, .end = b, .loopStart = a, .loopEnd = b, .bwdEnd = b, .bwdStart = a,
                           .fwdMode = mode, .bwdMode = mode, .fwdRate = 1.0f, .bwdRate = 1.0f });
-    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, parts.eventPosition(v.u16(kSeekTo)), parts);
+    if (v.u16(kSeekTo) != v.u16(kFrom)) v.seekBy(kSeek, vc2OscEventPosition(v, parts, v.u16(kSeekTo)), parts);
 }
 
 // [FW] 0x893af660…: the range in samples, the end's less 1, with the loop record's words; the backward's rate factor
@@ -130,8 +134,8 @@ void Vc2OscVoice::noteOnVari(Vc2OscParts& parts, const Vc2ToneShared& shared) {
     setU32(kLevel, u32(kLevelFrom));
     setF32(kZero, 0.0f);
     setF32(kWalk, Vc2OscTargets(*this, parts, shared).walk());
-    parts.kindCall(kUpdate);
-    parts.kindCall(kAfterUpdate);
+    updateVari(parts, shared);   // v330: 0x893c88b0 and 0x893c8670, the voice's own (Vc2OscVari.cpp)
+    startVari(parts, shared);
     const uint32_t type = u32(kWave) - 1;   // unsigned: type 0 and past 8 go no further
     if (type >= kVariOffTypes.size() || !kVariOffTypes[type] || (u8(kFlagsByte) & kVariOff) == 0) return;
     if (inSamples) bySamples(*this, parts, shared);

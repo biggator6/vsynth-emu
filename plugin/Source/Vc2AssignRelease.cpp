@@ -14,6 +14,7 @@ constexpr uint8_t kPedalDown = 64;                 // [FW]
 constexpr int8_t kOneOfKind = 1;                   // [FW] the kind released apart
 constexpr uint32_t kKindOneHeld = 0x18;            // [FW] part 0's settings byte that keeps a kind-1 voice
 constexpr int32_t kKeysTo = 127;
+constexpr uint16_t kUpdateAsked = 1;               // [FW] a voice's +0x30 bit 0 (v344)
 
 // After a held bit is cleared: with no pedal holding, the age word's bit 28
 void afterHeld(Vc2VoiceNode& n) {
@@ -97,11 +98,48 @@ void Vc2Assigner::sostenutoOff(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, 
     pedalOff(table, keys.table(table).sostenuto, kSostenutoHeld, v, parts);
 }
 
+void Vc2Assigner::truncateQueued(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts) {
+    truncateVoice(voice, v, parts);
+    parts.waitQueue(kQueuesAt + kQueueBytes * v.at(voice).queue, voice);
+}
+
 void Vc2Assigner::truncateTable(uint32_t table, Vc2PartVoices& v, Vc2AssignParts& parts) {
-    eachOf(table, v, [&](uint32_t voice) {
-        truncateVoice(voice, v, parts);
-        parts.waitQueue(kQueuesAt + kQueueBytes * v.at(voice).queue, voice);
-    });
+    eachOf(table, v, [&](uint32_t voice) { truncateQueued(voice, v, parts); });
+}
+
+// v344: released 0 and an update asked for, then the truncation and the wait
+void Vc2Assigner::truncateAsked(uint32_t voice, Vc2PartVoices& v, Vc2AssignParts& parts) {
+    Vc2VoiceNode& n = v.at(voice);
+    n.released = 0;
+    n.updated = (uint16_t)(n.updated | kUpdateAsked);
+    truncateQueued(voice, v, parts);
+}
+
+void Vc2Assigner::truncatePart(uint32_t word, Vc2PartVoices& v, Vc2AssignParts& parts) {
+    const auto ofWord = [word](const Vc2VoiceNode& n) { return n.part == word; };
+    eachWhere(v, ofWord, [&](uint32_t voice) { truncateAsked(voice, v, parts); });
+}
+
+void Vc2Assigner::truncateAll(Vc2PartVoices& v, Vc2AssignParts& parts) {
+    const auto any = [](const Vc2VoiceNode&) { return true; };
+    eachWhere(v, any, [&](uint32_t voice) { truncateAsked(voice, v, parts); });
+}
+
+// [FW] the walk begun again from the list's first after each stop, as the free list's move takes the voice off it
+void Vc2Assigner::stopPart(uint32_t word, Vc2PartVoices& v, Vc2AssignParts& parts) {
+    const uint32_t sounding = v.g.lists[V::kSounding];
+    bool stopped = false;
+    uint32_t voice = v.at(sounding).next;
+    while (voice != sounding) {
+        if (v.at(voice).part != word || parts.changed(voice, word) == 0) {
+            voice = v.at(voice).next;
+            continue;
+        }
+        v.toFree(voice, parts);
+        stopped = true;
+        voice = v.at(sounding).next;
+    }
+    if (stopped) parts.allNotesOff();
 }
 
 void Vc2Assigner::releaseBut(uint32_t table, Vc2Keys& keys, Vc2PartVoices& v, Vc2AssignParts& parts) {

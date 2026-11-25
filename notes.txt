@@ -335,6 +335,278 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part's tasks on the kernel v355 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v354's b306173;
+  HARDWARE_FIRMWARE.md, "The part's tasks on the kernel"); Vc2Synth whole done. Vc2SynthOs (the audio, clock, notes
+  and update tasks, the MIDI input task, the OS MIDI task and the front's stand-in on Vc2Kernel at their levels, the
+  idle below; a post's woken task run at once, a sender's pass ending at a post that switches, interrupts with the
+  idle running, a wait inside a pass taking the next outside event) and Vc2SynthOsTasks (their prologues' and
+  passes' parts, the cyclic handlers, TMU0's handler with the OS clock, the DMA's interrupts, a MIDI message as its
+  bytes' receive interrupts or the front's), Vc2Synth::runOnOs. The XT's MIDI input path on both sides, the
+  coordinator's call (a) under the 0-different rule: Vc2MidiReceive (rom.4's receive objects; MIDI IN's ring is
+  0x8995662c+0x40, 2048 words, full it drops its backlog for marker 2, 0x89311e90), Vc2OsQueue (a hub listener's
+  queue, the notes' 127 messages), Vc2SynthOsMidi (the input, OS MIDI and front tasks, the hub's and the MIDI IN
+  ring's listeners, the senders' waits for empty and room as state, the drains' wakes). The clock task's MIDI listener
+  (0x89313cb0, v354 took it for the real-time bytes) and its 0x40 pass (Clock Source, Clock Out, the tempo); the
+  update's walk of the sounding list as it stands (Vc2MixerTones), since the notes' task preempts it. Found: a
+  truncated tone that never renders makes the notes' task wait for good, on rom.4 too (the check cuts such a wait and
+  goes on with a fresh pair); a channel of -1 reads the word before the states table (0x8950d6dc); USB-MIDI Thru sends
+  MIDI IN to USB out, which nothing drains on the rig (kept off). xt_vc2synth's whole part: a fresh pair against
+  rom.4's tasks on rom.1's kernel in one interpreter (Vc2MachineRig: rom.1's switch with three hooks, rom.4's start
+  and prologues, the idle's first hook releasing the start's barrier, the front's stand-in), the kernel's words
+  (Vc2KernelWords, shared with xt_vc2kernel), the services the model holds as nothing and the senders' waits counted
+  on rom.1, bursts that fill the notes' queue and floods that fill MIDI IN's ring; 0 different at 2024/7/31337/3/4/5
+  (40 cases), 160 to 368 waits for room each. Plants: --synth --changed 229, 223 caught (the three tempo plants
+  caught; missed the sensing check's two, a full ring's count, the draining test, the word before the channel
+  states, tns-count: none reachable by the draws); --mixer 45, --keys 6, --settings 31 changed, all caught; --kernel
+  whole 42, all caught but kn-rr-freeze (v353). fcheck's baseline updated; verify.sh green.
+
+The part's clock and tempo timers v354 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v353's 5ef5045;
+  HARDWARE_FIRMWARE.md, "The part's clock and tempo timers"): found, the clock object 0x8995cb40 is built by rom.4's
+  row 20 (0x893133d0), which the part's start didn't run (its copy 0; C's tempo read zeros): now 120 BPM as on an XT.
+  Vc2SynthClock (its ms 0x89313000 by XtTempoTicks on the object's words, the clocks out's count, the waiter, the
+  since count, event 2 to the clock task; the clock task's take into the tempo timers), Vc2TempoTimers (the ring at
+  0x8992e328, set and advance) with the notes' schedule 0x89981b40 (each MIDI clock: its count, the notes' 0x10), the
+  ring one template with the arpeggio's (XtRing.h). xt_vc2synth: row 20 in the start, the clock object's 0x50 bytes,
+  the ring and the schedule's timer in the regions, a clock event in the notes part; 0 different at 2024/7/31337.
+  Plants: --synth --changed 94, all caught; mutate_arp.py 92, all caught, the ring's two on port arpring (XtRing.h).
+  fcheck's baseline updated; verify.sh green.
+
+The kernel's event services v353 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v352's 403a6a9;
+  HARDWARE_FIRMWARE.md, "The kernel's event services"): Vc2Kernel, rom.1's services hand-ported (the TCBs' words,
+  readyQueue by level, the wait, the event sets from a task and an interrupt, the put-off dispatch and the watchdog's
+  interrupt, the tick's round robin, alarms and cyclic handlers, a task's own alarm, the holds and lock-out).
+  xt_vc2kernel (new): rom.1 in the interpreter beside rom.4 (Vc2KernelRig, its switch hooked), 200 drawn services a
+  case on drawn tasks, every word compared after each; 0 different at 2024/7/31337 (400 cases). Plants --kernel 42,
+  all caught but kn-rr-freeze (not reached by the draws; not reachable in the part). build.sh's part checks moved to
+  build_vc2part.sh (its size). fcheck's baseline gains the section; verify.sh green.
+
+rom.1, the kernel v352 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v351's 3596c4d; the user's "Load
+  rom.1"; HARDWARE_FIRMWARE.md, "rom.1, the kernel"): what rom.1 is, by research/tools/kernelmap.py on its bytes at
+  run time: it runs at 0x88000000 (the VBR its reset code sets, its vectors there, its jump into itself), its .data
+  and .bss by its C start-up's words, its kernel's names from its debug dump (the system's words, a TCB's fields),
+  its service table's 359 slots; all 346 slot words rom.4 loads and v503's 27 answers on slots' starts. Its event
+  services read: priority by level from the dispatchers' scan, the wait, the event sets, the 1 ms tick's alarms and
+  cyclic handlers. Found: the update task's 0x1 is its own 10-tick alarm (0x89301800(10)), v349's 0x893018a0 the
+  task restart, not a wake. No plugin code; verify.sh green.
+
+The part's block v351 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v350's 2be3ae0;
+  HARDWARE_FIRMWARE.md, "The part's block"): the part mixer's block on the part (Vc2Synth::block), its voices the
+  sounding tones (Vc2SynthTones, the update's and schedule's adapters moved there), its parts the tracker's input
+  stage with Auto Note, the mic ring, the detector and the vocoder's driver (Vc2SynthBlock, with Auto Note's host
+  0x89391dc0 and 0x89391e20); the audio task's start, the mixer's reset 0x893b1680 (Vc2Synth::audioStart), whose
+  absence left the tracker's period 0 and kind 6 rendering NaN. xt_vc2synth's notes part a block one event in 13;
+  the tasks' steps in their own file (Vc2SynthTasksCheck.cpp). 0 different at 2024/7/31337, about 80% of the blocks
+  sounding, none not finite; plants --synth --changed 87 at the list's now 400 cases, all caught but tns-count
+  (needs waves) and upd-glue (400 cases at 7, 31337); fcheck's baseline updated; verify.sh green.
+
+The part's notes' task v350 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v349's 66d2c16;
+  HARDWARE_FIRMWARE.md, "The part's notes' task"): v309's pass on the part (Vc2Synth::notesPass), its parts the
+  part's MIDI parts (Vc2SynthMidi: the queue's drain none, as the part dispatches a message as it comes; the ended
+  scan; a source's reset by the dispatcher's 0x70 way; the voices' schedule, Vc2SynthUpdate::schedule; Auto Note's
+  release). xt_vc2synth's notes part a notes' task's pass one event in 13 (rom.4's loop body, its drain a bare
+  return, its wait taking what each side posted), the gate, the schedule's count and Auto Note's words drawn for it;
+  robot depth 0 one patch in 4. 0 different at 2024/7/31337; plants --synth --changed 73, all caught but the ended
+  scan's (the renders end a tone) and upd-glue (caught at 400 cases); fcheck's baseline updated; verify.sh green.
+
+The part's update task v349 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v348's a7d4336;
+  HARDWARE_FIRMWARE.md, "The part's update task"): the update task's pass on the part (Vc2SynthUpdate: a node's
+  update by what it is, the static M's M's init answering 1, a voice's by its class answering 0; the pitch source;
+  the voices' update on the sounding list, then the vocoder's glue), Vc2Synth::updatePass, M's refresh by address;
+  xt_vc2synth's notes part an update pass one event in 13, Part 1 receiving always, robot depth 0 one patch in 8.
+  Two findings: Part 1 Receive Switch off reads the boot flash (VC2_MODE_PLAN.md, step 4.5's [gap]); a sounding
+  VOCODER note's OSC Type changed to PCM makes rom.4's carrier NaN, the sides apart in its sign alone (deferred by
+  the user, step 4.3's [deferred]; the check keeps such a note's Type, vocoderTypesKept; the NaN sample to the host
+  step 4.5's [gap]). 0 different at 2024/7/31337; plants --synth --changed 74, all caught at the list's 40 cases (16
+  until now); fcheck's baseline updated; verify.sh green.
+
+The checks' region compare on a part word v348 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v347's
+  0e421b1; HARDWARE_FIRMWARE.md, "The checks' region compare on a part word"): vc2FirstDifference's vectors take a
+  region's bytes rounded up to words, so the sets' counts (6 bytes) are no longer written past and their third
+  halfword is compared (the v550 sweep's finding). xt_vc2sets under ASan: 32,000 reports before, none after at
+  2024/7/31337; at -O2 0 different, its output as before; fcheck as its baseline; verify.sh green. The update task on
+  the part, planned as v348, is v349.
+
+The part's system store v347 (2026-11-24, on claude/vc2-part-4-3-rest-773f3e after v346's 115c238;
+  HARDWARE_FIRMWARE.md, "The part's system store"): rom.4's three system areas (Vc2System, vc2SystemValue), their
+  defaults run once in an image (vc2LoadSystem), the part given them (giveSystem) and reading the system's blocks from
+  them; the OS's 16 part objects (Vc2OsPartObject, the OS row 0x89318140); a read no region holds fails a step; the
+  legato's struct the part's own. Notes now reach the voices: xt_vc2synth 0 different at 2024/7/31337 with thousands
+  voiced, on rom.4's OSC converters' tables and rom.2's port tables, the fade's wait rendered at once; xt_vc2midi 0
+  different; plants --synth --changed 85 (82 caught; the Matrix levels' copy for v349), v346's voice path 14 of 24 now
+  caught, --midi --changed 58 all caught; fcheck's baseline updated; verify.sh green.
+
+The part's MIDI note path v346 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v345's 984e5c3;
+  HARDWARE_FIRMWARE.md, "The part's MIDI note path"): a message through the OS MIDI's handler and the dispatcher on the
+  part's ports (Vc2SynthMidi, Vc2Synth::midiMessage), a part object's note-on and note-off by its class, the
+  parameters' words, the audio task's object (row 16's start) and SysEx's flag; the OS routines' list shared
+  (Vc2OsMidiParts::kOsRoutines). xt_vc2synth's notes part 0 different at 2024/7/31337, xt_vc2midi 0 different; no
+  voice starts yet (Part 1 Receive Switch a system ID, read as its default, off, with no system store: v347's); plants
+  --synth --changed 78, 54 caught, the 24 missed the voice path's; fcheck's baseline updated; verify.sh green.
+
+The part's settings and voices wired v345 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v344's 14a0228;
+  HARDWARE_FIRMWARE.md, "The part's settings and voices wired"): the notes' task's start on the part, its parameters
+  by read object (the defaults with no store), the settings' readers and messages, and the voices', notes' and
+  controllers' parts on the part's ports (Vc2SynthSettings, Vc2SynthVoices, Vc2SynthControls); the vocoder's compare
+  shared (Vc2CheckVocoder.h). xt_vc2synth's load part 0 different at 2024/7/31337; plants 21 new (15 caught, 6
+  seen only with a note sounding or a system store), the changed 52 of 58 caught (the 6), voices 8, settings 63 and
+  vocoder 45 all caught; fcheck's baseline updated; verify.sh green.
+
+The part's voices' stops and truncations v344 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v343's 7334770;
+  HARDWARE_FIRMWARE.md, "The part's voices' stops and truncations"): rom.4's 0x89390f70, 0x89390fd0 and 0x89391120 in
+  Vc2Assigner, the +0x48 virtual's answer and all notes off through Vc2AssignParts; xt_vc2voices' eighth part, 0
+  different at 2024/7/31337; plants --voices --changed 50, 0 missed; fcheck's baseline updated (the stops line);
+  verify.sh green.
+
+C's reads in the part v343 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v342's 0bfeb1f; HARDWARE_FIRMWARE.md,
+  "C's reads in the part"): Vc2SynthReads, C's reads and its children's routines on the part (the children by row to
+  the part's pools, with the OSC blocks' and COSM inputs' now in Vc2Synth; a Matrix group by its reader on M by
+  address; the getters; nextOscStep for v391's reference; the waves given); the part table, clock object and wave sets
+  as regions; the mixer's offsets found to be the static M's levels (one owner now). xt_vc2synth's reads part; 0
+  different at 2024/7/31337, xt_vc2sets too; plants --synth --changed 54 and --sets --changed 76, 0 missed;
+  fcheck's baseline updated; verify.sh green.
+
+The part's memory by address v342 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v341's 32413db;
+  HARDWARE_FIRMWARE.md, "The part's memory by address"): a move. xt_vc2synth's region table is the plugin's
+  (vc2SynthRegions, Vc2SynthMemory, a read by address over it), the check calling it; v340's buffers and frames in it.
+  xt_vc2synth 0 different at 2024/7/31337 (135 regions); 3 new plants, 0 missed; fcheck's baseline updated; verify.sh
+  green.
+
+C's reads of the part's memory in the plugin v341 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v340's
+  85cdfe9; HARDWARE_FIRMWARE.md, "C's reads of the part's memory in the plugin"): a move. SetPortParts' reads of
+  rom.4's memory by address are the plugin's Vc2SetMemoryReads, over a memory its deriving class gives (xt_vc2sets on
+  rom.4's interpreter, the part next on its own words). xt_vc2sets as its baseline; 33 new plants, 0 missed; verify.sh
+  green.
+
+Vc2Synth's tones v340 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v339's d6b79ca; HARDWARE_FIRMWARE.md,
+  "Vc2Synth's tones"): Vc2Synth whole's first version. The part holds its 24 tones' hosts (Vc2SynthTone, on the
+  part's own words) and is their world; their OSC voices read the part's clock word, mic ring, input stage, chip
+  frames and the waves it is given (the wiring's, from vc2Waves()). The tones' render buffers and the mixer's frames
+  join the part; C's TVA step a float, C's envelope words Vc2SetEnvelopeWords. The tail routines and the wait are the
+  tasks' version's. xt_vc2synth makes the 24 tones on both sides, 0 different at 2024/7/31337; the changed plants 31 (synth) and 153 (sets), 0 missed; fcheck's
+  baseline updated (the new line); verify.sh green.
+
+VariPhrase's formant target finite v339 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v338's e5a26b5;
+  HARDWARE_FIRMWARE.md, "VariPhrase's formant target finite before its update"): a coverage build's seed 7 case 383
+  wrote +0x1d0 rom.4 0xffffa8ea, the port 0x7fc00000. The check's formant depths (±1000 over outputs as wide) took
+  rom.4's exp2 past its table to a NaN's bits, which the update's FSUB keeps and xtf's TwoSum doesn't. No XT reaches
+  it (depths and outputs within ±1), so the draw: oscSteerVariFormant gives a voice whose formant target isn't
+  finite a plain note's formant before its update. xt_vc2osc 0 different at 2024/7/31337 and in the coverage build;
+  fcheck's baseline updated (xt_vc2osc's count lines); no port changed; verify.sh green.
+
+The band waves' segments distinct v338 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after the merge 8ab70ab;
+  HARDWARE_FIRMWARE.md, "The band waves' segments distinct"): v332's band wave draw took front() of a segment with
+  no records when two drawn starts fell alike (undefined behaviour; an AddressSanitizer build faulted at seed 7);
+  bandSegments' starts distinct now. -O2's draws unchanged (fcheck as baseline, the 400-case counts as v337's);
+  under AddressSanitizer both checks 0 different, no error; verify.sh green.
+
+The VC-2's analog renders v337 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v336's 31c5019;
+  HARDWARE_FIRMWARE.md, "The VC-2's analog renders"): step 4.3's sixty-fifth version. The analog OSC's 19 renders
+  (0x893c2230…0x893c60e0) the voice's own: rom.2's code with the object's words four bytes up from +0x94 and HQ's
+  tables through rom.4's pointers 0x8993fbf8/fc (rom.2's byte for byte), so XtAnalogOsc runs on the voice's words
+  through a friend's word table (XtAnalogWords.h), the routine by its address (Vc2OscAnalog::routineAt over the
+  installs' tables, moved to Vc2OscAnalog.h), HQ's tables given through its block's frame (XtAnalogHq.h; XtAnalog.cpp
+  changed in place, no line added), rom.4's read into Vc2OscAnalogPool::hq. Found and fixed: FM's delay lines read
+  beside a ring when OSC 2 passes full scale (an analog OSC's Impact): Vc2ToneMixRings one array, A's then B's end to
+  end as rom.4's, a read beside a ring in the rings around it, 0 past them (the port's index had left its arrays: a
+  crash in xt_vc2tone, and in the plugin's audio thread once the analog sounded). The checks: the 19 hooks gone, the
+  analog's render words steered to an XT's (oscSteerAnalogRender, its own generator), the mix's delays given an OSC 2
+  past full scale. Both checks 0 different at 2024/7/31337 (about 400 blocks through the 19 at 400 cases, every line
+  of the 19 reached); the changed plants 365 and 80, mutate_tone.py's 11 and rom4-no-osc, 0 missed (two re-aimed);
+  fcheck's baseline updated (count lines and the analog lines); verify.sh green.
+
+XtAnalog.h's split v336 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v335's 7a63925; HARDWARE_FIRMWARE.md,
+  "XtAnalog.h's split"): step 4.3's sixty-fourth version, a move. XtAnalog.h (438 lines) split by part so the
+  analog's renders can open XtAnalogOsc to the voice's words: the MOD section and the tone's render order into
+  XtToneMod.h, the knobs and the converter's block into XtAnalogBlock.h, XtAnalog.h including both (242 lines).
+  XtAnalog.cpp (3749 lines) isn't split: its 334 lines past 120 columns and its 2053-line check would have to be
+  rewritten to pass the kit's guards, as PluginEditor's did (42dfd60), and the renders need nothing changed in it.
+  Every build, fcheck and verify.sh as they were.
+
+The VC-2's period-jump player v335 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v334's 3ed4d17;
+  HARDWARE_FIRMWARE.md, "The VC-2's period-jump player"): step 4.3's sixty-third version. VariPhrase's type 8 is the
+  voice's own: its render 0x893ca8b0 (the walk's step, a read kept within a period of the walk, its two taps a period
+  apart crossfaded, the voice's gain), its set-up 0x893ccff0 and its seek 0x893cd090 (Vc2OscJump*.cpp), its row of the
+  walk. The record block's code is SOLO's and the jump's one code (Vc2OscRecordBlock.cpp), and the frames' half step,
+  lerp, gain glide and block on the walk mode 1's, SOLO's and the jump's (Vc2OscFrameSteps.cpp). With it every
+  player's set-up and seek is the voice's own: Vc2OscParts::seek and objectCall are gone with their hooks. Found:
+  after a walk the jump compares the new crossing, not the position; it glides the voice's gain words (the object's
+  −0x80), not the ones its set-up writes; its read can lag or lead the walk far (seeks in samples, One Way, a stuck
+  backward walk, a position outside the range), reading what memory holds there, which the port's sample reader now
+  reaches by the physical address as the SH-4 does. The checks play type 8 as a family of its own on waves of periods
+  (smooth record lengths), Tempo Sync and Time Trip off.
+  0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
+The VC-2's SOLO v334 (2026-11-23, on claude/vc2-part-4-3-rest-773f3e after v333's c6ea59a; HARDWARE_FIRMWARE.md, "The
+  VC-2's SOLO"): step 4.3's sixty-second version. SOLO, VariPhrase's types 1 and 6, is the voice's own: its render
+  0x893c9450 (the block's rates, the frame's step, the anchor's records, the trigger, the grains' reads, the second
+  tap, the Energy filter, the gain), its set-ups 0x893cc2e0 and 0x893cc310 and its seek 0x893cc630, rom.4's code on the
+  object's words (Vc2OscSolo*.cpp) with its row of the players' walk. Found: type 1's and type 6's set-ups differ only
+  in byte 3's 0x80, which gates the next record's length, the period's glide and the second tap (type 6 is rom.2's
+  SOLO); rom.4's Robot Voice sounds the grains at the pitch ratio × 440 Hz, its smoothed period's swing scaled by the
+  word at +0x94 that VariPhrase's note-on writes 0. The band players' tail and SOLO's set-ups share the walk's set-up
+  (vc2WalkSetUp). The checks no longer hook SOLO: xt_vc2osc has a SOLO part, the band players' captures and steers are
+  the players' (SOLO's waves in their own room, from their own generator), and a SOLO note-on is given a real wave's
+  header and a tone's ranges, as its set-up takes FTRC of the rate. 0 different at seeds 2024, 7 and 31337. Not in the
+  sound yet. Committed in two: ee08ad9 ("v334 WIP", the port and the checks) and v334 on it (the brief segments,
+  the baseline, the results).
+
+The VC-2's band players' set-ups and seek v333 (2026-11-23, on claude/vc2-part-4-3 after v332; HARDWARE_FIRMWARE.md,
+  "The VC-2's band players' set-ups and seek"): step 4.3's sixty-first version. BACKING's set-up 0x893cd1d0 and
+  ENSEMBLE's 0x893cc8f0, which VariPhrase's start runs for a wave of type 3 or 5, are the voice's own
+  (Vc2OscBandSetUp.cpp, on the object's words: the head's records, each band's words from rom.4's six tables, the
+  walk's start with the band row, the tree's state cleared, the loops' rates and the beat's start, ENSEMBLE's first
+  frames), and their seek 0x893cd440 too (mode 1's seek's code, now one routine over the row, then rom.2's startAt's
+  bands' part, moved into XtMbState.h as State::startBands, on a copy). Found: neither set-up writes band 0's shift and
+  stride; their gains and byte 3's 0x40 and the seek's clear of the position show in no word. The checks no longer
+  hook them: xt_vc2osc's band part sets each note up on both sides over noise and seeks now and then; a note-on of a
+  band player's block is given a captured band wave's records, a band re-seek a captured state; and xt_vc2tone steers
+  the legato's earlier mode 1 voice whose head a take left on a voice since noted otherwise, an older hazard the moved
+  draws met. 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
+The VC-2's band players' renders v332 (2026-11-22, on claude/vc2-part-4-3 after v331; HARDWARE_FIRMWARE.md, "The
+  VC-2's band players' renders"): step 4.3's sixtieth version. BACKING's 0x893cadc0 and ENSEMBLE's 0x893ca1f0 are the
+  voice's own (Vc2OscBands.cpp): rom.4's beat block, then XtMbPlayer's block on a copy of the object's words, mapped
+  word by word, its vpdt, cached loop events and bands read from the wave memory; its crossings by the voice's walk with
+  the band row (index 16) and the walk list's wrap at an end (byte 0's 0x08), which the rom.2 port had left out, the
+  VC-2's. XtMultiBandPlayer.cpp split first: its state into XtMbState.h, the step at blockImpl's head with it,
+  blockImpl public, the crossing through State::cross (rom.2's own when nothing is outside). xt_vc2osc's band part
+  runs rom.4's own set-up on drawn band waves, then blocks through the renders on both sides; the voice part and
+  xt_vc2tone steer a band render to a state rom.4's set-ups left before the hooks. 0 different at seeds 2024, 7 and
+  31337. Not in the sound yet.
+
+The VC-2's VariPhrase event lookup v331 (2026-11-22, on claude/vc2-part-4-3 after v330; HARDWARE_FIRMWARE.md, "The
+  VC-2's VariPhrase event lookup"): step 4.3's fifty-ninth version. VariPhrase's note-on's range by events reads the
+  event lookup 0x893cc0d0 as the voice's own (v328's lookup, vc2OscEventPosition), so Vc2OscParts::eventPosition and
+  the lookup's hook are gone, v328's answering by the caller with them. The checks draw the object's events' table and
+  hold the block's three events within it before a note-on by events, which the still hooked set-ups would otherwise
+  have written (Vc2OscVariDraws.cpp). 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
+The VC-2's VariPhrase update, start and settings v330 (2026-11-22, on claude/vc2-part-4-3 after v329;
+  HARDWARE_FIRMWARE.md, "The VC-2's VariPhrase update, start and settings"): step 4.3's fifty-eighth version, the first
+  piece of item 11's fifth part. Kind 2's update 0x893c88b0 (five words 0.7 of the way to their targets by FSUB and
+  FMAC), its players' start 0x893c8670 (the gain's and level's targets, the player's set-up by the wave's type, the band
+  seek to the block's seek point, a number in events and the point x 16 in samples) and its settings 0x893b0280 (the
+  new flags, the object's bits and their side effects, Vari off's bit kept) are the voice's own (Vc2OscVari.cpp), the
+  row's ways. They were the last of a kind's routines by address: kindCall, kindSettings and the rows' update and
+  settings words are gone, the kinds' settings a table of ways; the players' set-ups go out on the object again
+  (objectCall) until the players come. The checks no longer hook them and hook the set-ups instead; before an update or
+  note-on of VariPhrase, its words drawn finite again (a NaN's sign through FSUB is the host's, which the unoptimized
+  coverage build met); xt_vc2tone's COSM setter past 1 draws its block as COSM 1's. 0 different at seeds 2024, 7 and
+  31337. Not in the sound yet.
+
+The VC-2's mode 1 seek v329 (2026-11-22, on claude/vc2-part-4-3 after vc2-mode's 650bf26; HARDWARE_FIRMWARE.md, "The
+  VC-2's mode 1 seek"): step 4.3's fifty-seventh version, the last piece of item 11's fourth part; LITE whole. Mode 1's
+  seek 0x893cc830 is the voice's own (Vc2OscWalkStart.cpp, vc2OscSeekModeOne), with the find 0x893cc100: in samples the
+  word held to 0…the last event's position, the event found, mode 1's jump, the position; by events the number's low
+  half held to the last, the jump; then the beat's position × 32 and its reset. A row of the voice's seeks, each row now
+  given the word as its callers give it; the start's seek through the table. Found: LITE's note-on seeks on the object
+  its last set-up left, and the install pass's set-up writes it all again; by events the seek takes a position as an
+  event's number (the note-on's seek point × 16, the re-seek's beat position over 32); from a start's words the find
+  never reaches its stop at the last event. The checks no longer hook it: xt_vc2osc's mode 1 part plays 16 runs from a
+  seek (the last event's position raised one time in four), and both checks steer a mode 1 voice's words before a
+  note-on, a re-seek or an update that can reach it; xt_vc2tone asks a VariPhrase voice's re-seek now and then, its band
+  seeks the only ones left going out by address. 0 different at seeds 2024, 7 and 31337. Not in the sound yet.
+
 A project saved v603 (2026-11-24, on claude/vsynth-files after v602; HARDWARE_FIRMWARE.md, "A project saved"; the
   user's choice: a plain WAV copied as it is, named for the XT to import). PluginProjectSave: Save Project As… makes a
   new NAME.prj: the browsed project's .s00, patches and waves (links among them) copied byte for byte, each PCM OSC's

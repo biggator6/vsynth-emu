@@ -15,9 +15,9 @@ import sys
 import mutlist
 
 D = os.path.dirname(os.path.abspath(__file__))
-PORTS = ('arp', 'arpstep', 'arpmotif', 'ticks')
+PORTS = ('arp', 'arpstep', 'arpmotif', 'ticks', 'arpring')   # v354: arpring XtRing.h, the keys' ring, a header
 SOURCE = {'arp': 'XtArpeggio::reset', 'arpstep': 'XtArpeggio::tick', 'arpmotif': 'XtArpeggio::playLine',
-          'ticks': 'XtTempoTicks::take'}
+          'ticks': 'XtTempoTicks::take', 'arpring': 'xtRingUnlink'}
 args = sys.argv[1:]
 cases = args.pop(0) if args and args[0].isdigit() else '1000'   # fcheck's
 muts = mutlist.plants(D + '/arp_muts.txt', args, 'mutate_arp', defaults=('arp',))

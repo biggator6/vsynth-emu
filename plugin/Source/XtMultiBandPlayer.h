@@ -120,7 +120,8 @@ public:
     int32_t position() const;
 
     struct Band;   // a band's player state (firmware struct, 0x88 bytes)
-    struct State;
+    struct State;  // XtMbState.h (v332)
+    const State* state() const { return s; }   // v332: as a note-on left it, the VC-2's check's band state
 private:
     State* s = nullptr;
     XtLoop loopCfg;
@@ -130,8 +131,10 @@ private:
     int32_t startCfg = 0;
     bool eventCfg = false;
     uint16_t evFirstCfg = 0, evLastCfg = 0;
-    static void blockImpl(State& S, float* out);
 public:
+    // One block on a state, in the caller's rounding (block's round to zero, the SH-4's).  v332: public, the VC-2's
+    // voice runs it on its own object's words, the walk step its own (State::stepGiven)
+    static void blockImpl(State& S, float* out);
     XtMbPlayer();
     ~XtMbPlayer();
     XtMbPlayer(const XtMbPlayer&) = delete;

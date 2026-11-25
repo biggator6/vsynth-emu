@@ -1,0 +1,50 @@
+# Planted errors in rom.1's kernel's event services (v353), for mutate_vc2.py --kernel: each must make xt_vc2kernel, on
+# rom.1 beside rom.4, say something differs.  name|old|new[|port[|seed]]; port vc2kernel (Vc2Kernel.cpp).  Not planted:
+# a task made ready twice, an alarm put on the list twice, or a task left in its queue as it waits (each makes a list
+# go round, and the walks after it never end, in rom.1's code as in the port's); the scan off readyQueue's end (the
+# idle task at 31 is always ready). Not planted as no state the services reach tells them apart: the start's count
+# (its makeReady sets each count again), the event set's test by the task's events or by the bits set (a waiting task
+# never holds one of its waited events), the round robin's test of the holds' half or of the whole lock (the lock-out
+# bit is in that half), and the tick's test of a record's on bit (a record off is due at 0, never a tick's time).
+kn-start-order|for (int t = (int)tasks.size() - 1; t >= 0; --t) makeReady(t);|for (int t = 0; t < (int)tasks.size(); ++t) makeReady(t);|vc2kernel
+kn-ready-head|    k.readyNext = heads[k.level];\n    heads[k.level] = t;|    k.readyNext = kNone;\n    heads[k.level] = t;|vc2kernel
+kn-ready-count|k.count = k.quantum != 0 ? 1 : 0;|k.count = k.quantum;|vc2kernel
+kn-unready-stat|    k.ready = 0;\n    k.readyNext = kNone;|    k.readyNext = kNone;|vc2kernel
+kn-rotate-tail|tasks[last].readyNext = t;|tasks[last].readyNext = kNone;|vc2kernel
+kn-switch-clear|    k.event ^= answer;\n    k.wait = 0;|    k.wait = 0;|vc2kernel
+kn-switch-wait|    k.wait = 0;\n    return { true, t, answer };|    return { true, t, answer };|vc2kernel
+kn-scan-from|for (int l = level; l < kLevels; ++l)|for (int l = level + 1; l < kLevels; ++l)|vc2kernel
+kn-wait-lock|if (lock != 0) return { false, current, 0 };|if ((lock & 0xffff) != 0) return { false, current, 0 };|vc2kernel
+kn-wait-sibling|if (now != 0 && t.readyNext == kNone) {|if (now != 0) {|vc2kernel
+kn-wait-clear|        t.event ^= now;\n        return { false, current, now };|        return { false, current, now };|vc2kernel
+kn-wait-mask|    t.wait = mask;\n    return switchTo(firstReady(t.level));|    t.wait = mask & 0xff;\n    return switchTo(firstReady(t.level));|vc2kernel
+kn-set-lock|    if (lock != 0) {\n        raise(task, bits);|    if (lock >= kLockOut) {\n        raise(task, bits);|vc2kernel
+kn-set-level|if (tasks[current].level >= t.level) return switchTo(task);|if (tasks[current].level > t.level) return switchTo(task);|vc2kernel
+kn-raise-test|if ((t.wait & bits) != 0) wake(task);|if ((t.wait & t.event) != 0) wake(task);|vc2kernel
+kn-wake-freeze|if (freeze != kNone && tasks[freeze].level <= tasks[t].level) return;|if (freeze != kNone && tasks[freeze].level < tasks[t].level) return;|vc2kernel
+kn-wake-watchdog|    watchdog = true;\n    freeze = t;|    freeze = t;|vc2kernel
+kn-putoff-clear|    freeze = kNone;\n    if (tasks[f].level|    if (tasks[f].level|vc2kernel
+kn-putoff-level|if (tasks[f].level > tasks[current].level) return {};|if (tasks[f].level >= tasks[current].level) return {};|vc2kernel
+kn-putoff-from|return switchTo(firstReady(tasks[f].level));|return switchTo(f);|vc2kernel
+kn-irq-watchdog|    watchdog = false;\n    return lock != 0|    return lock != 0|vc2kernel
+kn-irq-lock|return lock != 0 ? Switch{} : putOffDispatch();|return putOffDispatch();|vc2kernel
+kn-rr-count|if (--t.count != 0) return;|if (--t.count > 1) return;|vc2kernel
+kn-rr-reload|    t.count = t.quantum;\n    const int next|    t.count = 1;\n    const int next|vc2kernel
+kn-rr-current|if (current != h \|\| (freeze|if (current == h \|\| (freeze|vc2kernel
+kn-rr-freeze|tasks[freeze].level <= tasks[next].level)) return;|tasks[freeze].level < tasks[next].level)) return;|vc2kernel
+kn-alarm-order|tasks[p].alarmAt < at;|tasks[p].alarmAt <= at;|vc2kernel
+kn-alarm-at|const uint32_t at = time + ticks;|const uint32_t at = time + ticks + 1;|vc2kernel
+kn-alarmoff-link|= tasks[p].alarmNext;\n            return;|= kNone;\n            return;|vc2kernel
+kn-tick-time|    ++time;\n    roundRobin(roundLevel);|    roundRobin(roundLevel);|vc2kernel
+kn-tick-rr|roundRobin(roundLevel);|roundRobin(0);|vc2kernel
+kn-tick-event|raise(t, kAlarmEvent);|raise(t, 2);|vc2kernel
+kn-tick-rearm|alarmOn(t, tasks[t].interval);|alarmOn(t, tasks[t].interval + 1);|vc2kernel
+kn-tick-due|        c.due += c.interval;\n        run(c.handler);|        run(c.handler);|vc2kernel
+kn-interval-event|t.event &= (uint16_t)~kAlarmEvent;|t.event &= (uint16_t)~2;|vc2kernel
+kn-interval-kept|    t.interval = ticks;\n    alarmOff(current);|    alarmOff(current);|vc2kernel
+kn-cyclic-owner|c.owner = current;|c.owner = kNone;|vc2kernel
+kn-cyclic-made|if (c.handler == kNone) return;|if (c.handler == 0) return;|vc2kernel
+kn-cyclic-off|c.due = (on & 1) != 0 ? time + c.interval : 0;|c.due = (on & 1) != 0 ? time + c.interval : c.due;|vc2kernel
+kn-cyclic-clear|void Vc2Kernel::cyclicClear(int k) { cyclics[k] = Vc2KernelCyclic {}; }|void Vc2Kernel::cyclicClear(int k) { cyclics[k].on = 0; }|vc2kernel
+kn-release|    lock -= kHold;\n    return lock == 0 ? putOffDispatch() : Switch{};|    lock -= kHold;\n    return Switch{};|vc2kernel
+kn-unlock|lock &= ~kLockOut;|lock &= ~kHold;|vc2kernel

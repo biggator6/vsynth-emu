@@ -87,15 +87,20 @@ elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu|fx4c|fx4i|fx4u|fx4in)$ ]]; then
     esac
     [[ "$PORT" == fx4* ]] && IMAGE="$ROM4"
     fxParts XtFxChip "${KEEP[@]}"
-elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
+elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks|arpring)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
         arpstep) F=XtArpeggioStep.cpp ;;
         arpmotif) F=XtArpeggioMotifs.cpp ;;
+        arpring) F=XtRing.h ;;   # v354: the keys' ring, a header: every part built from a copy (below)
         *) F=XtArpeggio.cpp ;;
     esac
     harnessParts XT_ARP_MAIN arp_obj XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases \
                  XtTempoTicks XtTempoTicksCheck XtArpeggioPatch
+    PARTS=(XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases XtTempoTicks XtTempoTicksCheck
+           XtArpeggioPatch XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer
+           XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup)
+    TONE=(-DXT_ARP_MAIN -DXT_HARNESS_SWITCHES)   # the header's plant's flags, as the tone's own
 elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     # The Multi Step Modulator against xt_msm: XtMsm.cpp, with PORT=msmtrack XtMsmTrack.cpp, with PORT=msmpatch
     # XtMsmPatch.cpp; [cases] its random cases, SEED its seed (default 2024), XT_MSM_STOP its first case that differs

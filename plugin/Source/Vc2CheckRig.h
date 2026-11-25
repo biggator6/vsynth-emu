@@ -27,10 +27,11 @@ inline constexpr int kVc2FadeBlocks = 1600;
 
 struct Vc2Fw {
     Sh4 cpu;
-    // rom.4 loaded, and RAM for the stack, the arguments and the buffers, as xt_vc2params has them
+    // rom.4 loaded, and RAM for the stack, the arguments and the buffers, as xt_vc2params has them; from v335 2 MB,
+    // the period-jump player's waves in xt_vc2osc above the first (its read leads the walk past a wave)
     bool start(const char* rom) {
         if (!cpu.loadRom(rom)) return false;
-        cpu.mapRam(0x8C000000, 0x00100000);
+        cpu.mapRam(0x8C000000, 0x00200000);
         return true;
     }
     bool call(uint32_t f, std::initializer_list<uint32_t> args, uint32_t* r0 = nullptr) {
@@ -146,9 +147,11 @@ inline void vc2CarrierFrames(Vc2Signal& left, Vc2Signal* right, float* frames) {
     }
 }
 
-// The first word of `bytes` at `at` in rom.4's memory that differs from the port's `mine`, as text; empty when none does
+// The first word of `bytes` at `at` in rom.4's memory that differs from the port's `mine`, as text; empty when none does.
+// v348: the words rounded up, so a region that isn't whole words (the sets' counts, 6 bytes) is read and compared to
+// its last byte on both sides, the rest of its last word 0 on both, not written past
 inline std::string vc2FirstDifference(Vc2Fw& fw, uint32_t at, const void* mine, size_t bytes, const char* what) {
-    std::vector<uint32_t> theirs(bytes / 4), ours(bytes / 4);
+    std::vector<uint32_t> theirs((bytes + 3) / 4), ours((bytes + 3) / 4);
     fw.cpu.read(at, theirs.data(), bytes);
     std::memcpy(ours.data(), mine, bytes);
     const auto [a, b] = std::ranges::mismatch(theirs, ours);

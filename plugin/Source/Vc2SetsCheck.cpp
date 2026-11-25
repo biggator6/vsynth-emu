@@ -183,45 +183,6 @@ uint32_t SetPortParts::refresh(const Vc2SetChild& c, uint32_t object, const Vc2S
     return setAnswer(kSetRefresh, answers_);
 }
 
-Vc2SetVoice SetPortParts::voiceAt(uint32_t channelAt) {
-    Vc2SetVoice v;
-    fw_.cpu.read(channelAt, &v, sizeof v);
-    return v;
-}
-
-uint8_t SetPortParts::controlOf(uint32_t channel, uint32_t number) {
-    return fw_.cpu.rd8(channel + kSetsControls + number);
-}
-
-uint8_t SetPortParts::modeOf(uint32_t part, uint32_t kind) { return fw_.cpu.rd8(kSetsModesAt + 16 * part + kind); }
-
-std::array<uint16_t, 3> SetPortParts::commonOf(uint32_t part) {
-    std::array<uint16_t, 3> words;
-    fw_.cpu.read(kSetsCommonsAt + kSetsCommonBytes * part, words.data(), sizeof words);
-    return words;
-}
-
-std::array<uint16_t, 5> SetPortParts::envelopeOf(uint32_t part, uint32_t kind, uint32_t index) {
-    return partWords<5>(kSetsEnvelopeTable, part, kind, index);
-}
-
-std::array<uint16_t, 5> SetPortParts::lfoOf(uint32_t part, uint32_t kind, uint32_t index) {
-    return partWords<5>(kSetsLfoTable, part, kind, index);
-}
-
-std::array<uint16_t, 11> SetPortParts::mixOf(uint32_t part, uint32_t kind) {
-    return partWords<11>(kSetsMixTable, part, kind, 0);
-}
-
-Vc2SetClock SetPortParts::clock() {
-    Vc2SetClock c;
-    c.external = fw_.cpu.rd8(kSetsClockAt + 0x40);
-    c.numerator = (int32_t)fw_.cpu.rd32(kSetsClockAt + 0x10);
-    c.denominator = (int32_t)fw_.cpu.rd32(kSetsClockAt + 0x14);
-    c.period = fw_.cpu.rd16(kSetsClockAt + 0x48);
-    return c;
-}
-
 int16_t SetPortParts::matrixSum(uint32_t reader, uint32_t matrix, uint32_t offset) {
     logged(kSetMatrixSum, reader, { matrix });
     return (int16_t)fw_.cpu.rd16(kSetsSumsAt + offset);
@@ -233,10 +194,7 @@ long vc2SetsFurther(SetSides& s, const Vc2Run& run) {
     return children + kinds + vc2SetOscBlockPart(s, run);
 }
 
-uint32_t* setsPortWords(SetSides& s, uint32_t at) {
-    auto* notes = reinterpret_cast<uint8_t*>(s.notes.notes.data());
-    return reinterpret_cast<uint32_t*>(notes + (at - Vc2Notes::kNotesAt));
-}
+uint32_t* setsPortWords(SetSides& s, uint32_t at) { return s.notes.wordsAt(at); }
 
 Vc2SetCall setsCallAt(SetSides& s, uint32_t at) {
     Vc2SetCall call;

@@ -27,8 +27,12 @@ struct Vc2WalkWords {
     uint32_t memory(uint32_t address) const { return std::bit_cast<uint32_t>(p.boundFloat(address, 0)); }
     int16_t memoryHalf(uint32_t address) const;
 };
-// The SH-4's sum of two words, wrapping
+// The SH-4's sum of two words, wrapping, and (v335) their difference
 inline int32_t vc2WalkPlus(int32_t a, int32_t b) { return (int32_t)((uint32_t)a + (uint32_t)b); }
+inline int32_t vc2WalkMinus(int32_t a, int32_t b) { return (int32_t)((uint32_t)a - (uint32_t)b); }
+// v335 (Vc2OscFrameSteps.cpp; mode 1's, SOLO's and the period-jump player's frames): half `step` onto a position (×16)
+// and its fraction (20 bits): the position the carry on, `frac` what stays below it
+int32_t vc2WalkHalfStep(int32_t at, int32_t& frac, int32_t step);
 
 // From v328 the start's two besides (the tables at 0x8993fc00 and 0x8993fc14, .data): the seek to a position and the
 // jump to the event +0xc names
@@ -39,12 +43,43 @@ struct Vc2WalkWay {
     void (*seekTo)(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);           // the start's, to a position ×16
     void (*startJump)(Vc2OscVoice& v, Vc2OscParts& p);                    // the start's, to the event +0xc names
 };
-// index 0: 0x893ca190, 0x893ca1a0; the start's 0x893cc830 (still rom.4's, through the parts) and 0x893ca160 (its
-// wrapper of 0x893ca190)
+// index 0: 0x893ca190, 0x893ca1a0; the start's 0x893cc830 (from v329 the voice's own, by Vc2OscVoice::seekBy) and
+// 0x893ca160 (its wrapper of 0x893ca190)
 extern const Vc2WalkWay kVc2ModeOneWalk;
+// v333 (Vc2OscBands.cpp, v332's row): index 16, the band players', 0x893cbdd0, 0x893cbdf0; the start's 0x893cd440 and
+// 0x893cbda0
+extern const Vc2WalkWay kVc2BandWalk;
+// v334 (Vc2OscSoloRecords.cpp): indexes 4 and 8, SOLO's, 0x893c9e90, 0x893c9eb0; the start's 0x893cc630 and 0x893c9e70
+extern const Vc2WalkWay kVc2SoloWalk;
+// v335 (Vc2OscJumpRecords.cpp): index 12, the period-jump player's, 0x893cad20, 0x893cad40; the start's 0x893cd090
+// and 0x893cacf0
+extern const Vc2WalkWay kVc2JumpWalk;
 
-// one-off: four routines' declarations, alike only in taking the voice, its parts and a player's row
+// v334: the events' layout a set-up gives the object: the first half word, the stride mono and stereo (half words)
+struct Vc2WalkLayout {
+    uint8_t first, mono, stereo;
+};
+// the band players' (their tail 0x893cd370's) and SOLO's (0x893cc2e0's and 0x893cc310's), Vc2OscWalkStart.cpp's
+extern const Vc2WalkLayout kVc2BandLayout, kVc2SoloLayout;
+// v334 (Vc2OscWalkStart.cpp): the events' table and the loops' cached events from the head's words, the layout and a
+// frame's bytes by byte 0's stereo, then the walk's start with the player's row; the band players' tail's and SOLO's
+// set-ups' alike
+void vc2WalkSetUp(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkLayout& layout, const Vc2WalkWay& way);
+
+// one-off: seven routines' declarations, alike only in taking the voice and its parts
 void vc2WalkCrossing(Vc2OscVoice& v, Vc2OscParts& p);                          // 0x893c9380
 void vc2WalkForward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);    // 0x893c8f50
 void vc2WalkBackward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);   // 0x893c9140
+// v335: the walk that way and the next crossing; forward the position, back the crossing (Vc2OscWalk.cpp)
+int32_t vc2WalkCrossed(Vc2WalkWords& w, const Vc2WalkWay& way, bool forward);
+// v335: the position and its fraction, held at `end` that way and ended there; the position (Vc2OscWalk.cpp)
+int32_t vc2WalkHeld(Vc2WalkWords& w, int32_t pos, int32_t frac, int32_t end, bool forward);
+// v335 (Vc2OscFrameSteps.cpp): SOLO's and the period-jump player's block on the walk, the player's head of the block
+// and its frame (`lr` a frame's two words)
+using Vc2WalkHead = void (*)(Vc2WalkWords& w);
+using Vc2WalkFrame = void (*)(Vc2WalkWords& w, const Vc2OscSamples& wave, float* lr);
+void vc2WalkBlock(Vc2OscVoice& v, float* out, Vc2OscParts& p, Vc2WalkHead head, Vc2WalkFrame frame);
 void vc2WalkStart(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way);      // 0x893cc1a0 (v328, Vc2OscWalkStart.cpp)
+void vc2OscSeekModeOne(Vc2OscVoice& v, Vc2OscParts& p, int32_t at);            // 0x893cc830 (v329, Vc2OscWalkStart.cpp)
+void vc2WalkSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at, const Vc2WalkWay& way);   // its code (v333, the same)
+int32_t vc2OscEventPosition(Vc2OscVoice& v, Vc2OscParts& p, uint32_t event);   // 0x893cc0d0's position (v331, the same)

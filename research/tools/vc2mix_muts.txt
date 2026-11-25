@@ -93,7 +93,7 @@ mx-blocks-since|static_cast<uint32_t>(blocks) - static_cast<uint32_t>(at)|static
 mx-at-kept|    at = blocks;\n    return d;|    return d;|vc2mix
 mx-update-scale|t.blockSeconds), t.updateSeconds);|t.blockSeconds), t.blockSeconds);|vc2mix
 mx-update-least|ticks > 1.0f ? static_cast<int32_t>(ticks) : 1;|ticks > 1.0f ? static_cast<int32_t>(ticks) : 0;|vc2mix
-mx-update-n|tone->update(n);|tone->update(n + 1);|vc2mix
+mx-update-n|at->update(n);|at->update(n + 1);|vc2mix
 mx-glue|parts.glue(w.carried);|parts.glue(0.0f);|vc2mix
 mx-schedule-zero|    if (seconds == 0.0f) seconds = t.blockSeconds;\n|\n|vc2mix
 mx-schedule-at|blocksSince(w.scheduledAt, w.blocks)|blocksSince(w.updatedAt, w.blocks)|vc2mix

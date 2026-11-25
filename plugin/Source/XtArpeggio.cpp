@@ -2,6 +2,7 @@
 // pedal, the shuffle's table.  The timer, the step and what it sends are XtArpeggioStep.cpp's; which key a step plays,
 // XtArpeggioMotifs.cpp's.  Each routine is the firmware's at the address beside it; HARDWARE_FIRMWARE.md, "The arpeggiator".
 #include "XtArpeggio.h"
+#include "XtRing.h"
 #include <algorithm>
 #include <cstring>
 
@@ -68,32 +69,14 @@ bool XtArpeggio::anyHeld() const {
     return std::ranges::any_of(held, [](uint16_t w) { return w != 0; });
 }
 
-// 0x893040a0: a key at the end of the order played
+// 0x893040a0: a key at the end of the order played (v354: the ring of XtRing.h)
 void XtArpeggio::linkKey(int k) {
-    XtArpKeyNode& n = keys[k];
-    if (keyHead < 0) {
-        n.prev = n.next = keyHead = (int16_t)k;
-        return;
-    }
-    const int16_t tail = keys[keyHead].prev;
-    n.prev = tail;
-    n.next = keyHead;
-    keys[keyHead].prev = (int16_t)k;
-    keys[tail].next = (int16_t)k;
+    xtRingLink<int16_t>(keyHead, -1, (int16_t)k, [this](int16_t i) -> XtArpKeyNode& { return keys[i]; });
 }
 
 // 0x893040c0: a key out of it.  Taking out the first makes the one before it (the last played) the first.
 void XtArpeggio::unlinkKey(int k) {
-    const int16_t prev = keys[k].prev;
-    if (keyHead == k) {
-        if (prev == k) {
-            keyHead = -1;
-            return;
-        }
-        keyHead = prev;
-    }
-    keys[prev].next = keys[k].next;
-    keys[keys[k].next].prev = prev;
+    xtRingUnlink<int16_t>(keyHead, -1, (int16_t)k, [this](int16_t i) -> XtArpKeyNode& { return keys[i]; });
 }
 
 // Every key out of it (0x893038a8, 0x89303af6)

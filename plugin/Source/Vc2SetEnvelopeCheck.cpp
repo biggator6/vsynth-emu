@@ -53,7 +53,7 @@ std::array<uint16_t, 5> envelopeWordsDrawn(std::mt19937& rng) {
              pairOf((uint8_t)envelopeSens(rng), (uint8_t)envelopeSens(rng)), (uint16_t)envelopeFollow(rng) };
 }
 
-void envelopeWordsOf(Vc2EnvelopeWords& w, std::mt19937& rng) {
+void envelopeWordsOf(Vc2SetEnvelopeWords& w, std::mt19937& rng) {
     setsNoise(w, rng);
     w.index = (uint8_t)(rng() % 4 ? rng() % 13 : rng());
     w.attack = envelopeTime(rng);
@@ -71,7 +71,7 @@ void envelopeDraw(EnvelopeSides& e, std::mt19937& rng, bool all) {
     setsPartWordsDrawn(e.s.fw, rng, all, kSetsEnvelopeTable, envelopeWordsDrawn);
     if (all || rng() % 8 == 0) setsClockDrawn(e.s.fw, rng);
     setsSumsDrawn(e.s.fw, rng, all);
-    for (Vc2EnvelopeWords& w : e.port.items)
+    for (Vc2SetEnvelopeWords& w : e.port.items)
         if (all || rng() % 8 == 0) envelopeWordsOf(w, rng);
 }
 

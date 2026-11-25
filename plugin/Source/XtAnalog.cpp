@@ -19,7 +19,7 @@ constexpr uint32_t kDescTab = 0x897a167c, kLevelTab = 0x897cfcb8;
 // and its window (B, ±8192), end to end in rom.2; the routines reach them
 // through the pointers at 0x8987c898/0x8987c89c, set at startup
 constexpr uint32_t kHqA = 0x897d94dc, kHqB = 0x897e5ce0;
-constexpr int kHqAHalf = 4608, kHqBHalf = 8192, kHqN = 2 * kHqAHalf + 1 + 2 * kHqBHalf + 1;
+constexpr int kHqAHalf = XtAnalogHq::kAHalf, kHqBHalf = XtAnalogHq::kBHalf, kHqN = XtAnalogHq::kFloats;
 // the LA waveforms' Tone Keyfollow, by its value 0…14
 constexpr uint32_t kLaToneKf = 0x897d4c6c;
 // SUPER-SAW's Detune curve (128 shorts)
@@ -1156,25 +1156,25 @@ XtAnalogOsc::HqFrame XtAnalogOsc::hqFrame() const {
     float g = sub(kHalf, div(K(0x3fb6d75a), fmac(h.pc, K(0x37ffffff), -1.0f)));
     if (0.25f > g) g = 0.25f;
     h.k1 = div(8192.0f, h.pc);
-    h.k2 = div(mul(g, K(0x3affffff)), h.k1);                                   // 2^−9, a unit below
+    h.k2 = { div(mul(g, K(0x3affffff)), h.k1), hq_ };                          // 2^−9, a unit below
     h.k3 = mul(g, K(0x380f1a9f));
     h.leak = add(div(K(0xc6645a1d), h.p), 1.0f);                                // 1 − 14614.5/P
     return h;
 }
 
 namespace {
-// The impulse's place for x (0x89506080): A at x·k2, interpolated, and B at x
+// The impulse's place for x (0x89506080): A at x·k2, interpolated, and B at x; in k2's tables, else rom.2's (v337)
 struct HqTap {
     const float* a = nullptr;
     const float* b = nullptr;
     float frac = 0;
-    void at(float x, float k2) {
+    void at(float x, const XtAnalogHqScale& k2) {
         if (!(8192.0f > x) || !(add(x, 8192.0f) > 0.0f)) { a = nullptr; return; }
-        const float t = mul(k2, x);
+        const float t = mul(k2.k, x);
         const int i = ftrc(t);
-        a = T.hqA + i;
+        a = (k2.t.a ? k2.t.a : T.hqA) + i;
         frac = sub(t, flt(i));
-        b = T.hqB + ftrc(x);
+        b = (k2.t.b ? k2.t.b : T.hqB) + ftrc(x);
     }
     float value() const { return mul(fmac(sub(a[1], a[0]), frac, a[0]), *b); }
 };

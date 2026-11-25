@@ -11,10 +11,13 @@ constexpr uint32_t kStateWord = 2;                      // [FW] a channel's stat
 constexpr uint8_t kNoteSeen = 0xff;                     // [FW] the table's +0x130 after a note-on
 } // namespace
 
+// [FW] v355: a node's channel of -1 (none, the notes' task's own messages on it) reads the word before its row's, which
+// for row 0 is the word before the table
 uint32_t vc2ChannelStateOf(int32_t source, int32_t channel) {
     const Vc2KeysTables& k = vc2KeysTables();
-    const auto row = static_cast<size_t>(k.sources[static_cast<size_t>(source - 1)]);
-    return k.states[Vc2Keys::kChannels * row + static_cast<size_t>(channel)] + kStateWord;
+    const int32_t row = k.sources[static_cast<size_t>(source - 1)];
+    const int32_t at = Vc2Keys::kChannels * row + channel;
+    return (at < 0 ? k.stateBefore : k.states[static_cast<size_t>(at)]) + kStateWord;
 }
 
 uint32_t vc2ChannelTableOf(int32_t source, int32_t channel) {

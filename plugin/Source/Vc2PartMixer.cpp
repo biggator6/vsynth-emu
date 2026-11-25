@@ -78,20 +78,24 @@ int32_t blocksSince(int32_t& at, int32_t blocks) {
 }
 } // namespace
 
-void Vc2PartMixer::updateTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts) {
+void Vc2PartMixer::updateTones(Vc2MixerTones& tones, Vc2MixerTaskParts& parts) {
     const Vc2PartMixerTables& t = vc2MixerTables();
     const float ticks = xtf::div(mul(xtf::flt(blocksSince(w.updatedAt, w.blocks)), t.blockSeconds), t.updateSeconds);
     const int32_t n = ticks > 1.0f ? static_cast<int32_t>(ticks) : 1;
-    for (Vc2MixerTone* tone : tones) tone->update(n);
+    for (Vc2MixerTone* tone = tones.first(); tone != nullptr;) {
+        Vc2MixerTone* const at = tone;
+        tone = tones.next(at);   // v355: before its update, which may end it and give the notes' task its turn
+        at->update(n);
+    }
     parts.glue(w.carried);
 }
 
-void Vc2PartMixer::scheduleTones(std::span<Vc2MixerTone* const> tones, Vc2MixerTaskParts& parts) {
+void Vc2PartMixer::scheduleTones(Vc2MixerTones& tones, Vc2MixerTaskParts& parts) {
     const Vc2PartMixerTables& t = vc2MixerTables();
     float seconds = mul(xtf::flt(blocksSince(w.scheduledAt, w.blocks)), t.blockSeconds);
     if (seconds == 0.0f) seconds = t.blockSeconds;
     parts.freeLfosClock(seconds);
-    for (Vc2MixerTone* tone : tones) {
+    for (Vc2MixerTone* tone = tones.first(); tone != nullptr; tone = tones.next(tone)) {
         tone->clock(seconds);
         tone->count(1);
     }

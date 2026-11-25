@@ -29,8 +29,30 @@ auto oscWords(Vc2OscTables& t) {
         { 0x893c6420, &t.variOffScale }, { 0x893c6764, &t.variOffFold }, { 0x893c6424, &t.variOffGlide },
         { 0x893c6428, &t.variOffFade }, { 0x893c84a0, &t.liteUpdateFilter }, { 0x893c8650, &t.liteSettingsTwo32 },
         { 0x893c6e60, &t.headsSeekHalf }, { 0x893ca150, &t.modeOneFraction }, { 0x893ca154, &t.modeOneScale },
-        { 0x893cc8c0, &t.modeOneSetUpWord }, { 0x893ccfd4, &t.modeOneTenths },
+        { 0x893cc8c0, &t.modeOneSetUpWord }, { 0x893ccfd4, &t.modeOneTenths }, { 0x893c8960, &t.variStep },
+        { 0x893cd424, &t.bands.gainRate },
     });
+}
+
+// [FW] the band players' set-ups' tables (v333), six a band, each where the set-ups read it, byte for byte as the image
+// holds it (little-endian, as the host)
+template <class Word>
+std::span<uint8_t> bytesOf(std::array<Word, Vc2OscBandTables::kBands>& a) {
+    return { reinterpret_cast<uint8_t*>(a.data()), sizeof a };
+}
+
+void readBandTables(Sh4& image, Vc2OscBandTables& b) {
+    const std::array<std::pair<uint32_t, std::span<uint8_t>>, 6> tables { {
+        { 0x895602f0, bytesOf(b.frameShift) },
+        { 0x89560308, bytesOf(b.fractionShift) },
+        { 0x89560314, bytesOf(b.stepShift) },
+        { 0x89560320, bytesOf(b.startOffset) },
+        { 0x89560338, bytesOf(b.mask) },
+        { 0x89560350, bytesOf(b.stride) },
+    } };
+    for (const auto& [at, out] : tables) {
+        for (uint32_t i = 0; i < out.size(); ++i) out[i] = image.rd8(at + i);
+    }
 }
 // [FW] each word where its routine reads it; an address of 0 is a word the routine doesn't read, left 0
 void readWords(Sh4& image, std::span<const Vc2PoolWord> words) {
@@ -173,8 +195,46 @@ auto vibratoWords(Vc2OscVibratoPool& v) {
     });
 }
 
+// [FW] SOLO's (v334): the block's rates', the frame's and grains', the grain parameters', the repeat's cost, the set-ups'
+auto soloWords(Vc2OscSoloPool& s) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x893c9b30, &s.offScale }, { 0x893c9b34, &s.offQ }, { 0x893c9b4c, &s.liftLow }, { 0x893c9b50, &s.liftTop },
+        { 0x893c9b38, &s.cubic }, { 0x893c9b3c, &s.cubicBase }, { 0x893c9b40, &s.coefScale }, { 0x893c9b44, &s.glide },
+        { 0x893c9b48, &s.sumMost }, { 0x893c9b20, &s.windowHalf }, { 0x893c9b24, &s.windowScale },
+        { 0x893c9b28, &s.ageUnit }, { 0x893c9b2c, &s.sixteenth }, { 0x893c9b54, &s.sampleScale },
+        { 0x893c9da0, &s.periodFloor }, { 0x893c9da4, &s.robotGlide }, { 0x893c9da8, &s.robotSwing },
+        { 0x893c9dac, &s.robotScale }, { 0x893c9db0, &s.rateFloor }, { 0x893c9db4, &s.triggerMost },
+        { 0x893c9db8, &s.triggerScale }, { 0x893c9dbc, &s.stepScale }, { 0x893c9dc0, &s.windowSteps },
+        { 0x893c9dc4, &s.cutoffScale }, { 0x893c9dc8, &s.cutoffMost }, { 0x893c9f40, &s.costAnchor },
+        { 0x893c9f44, &s.costWalk }, { 0x893c9f48, &s.costLowSlope }, { 0x893c9f4c, &s.costLowBase },
+        { 0x893c9f50, &s.costHighSlope }, { 0x893c9f54, &s.costHighBase }, { 0x893c9f58, &s.costScale },
+        { 0x893cc610, &s.setUpGain }, { 0x893cc61c, &s.setUpWindow }, { 0x893cc620, &s.setUpHalf },
+        { 0x893cc624, &s.setUpQ },
+    });
+}
+// [FW] the period-jump player's (v335): its render's (0x893caba0…0x893cabb4) and its set-up's gain rate (0x893cd190)
+auto jumpWords(Vc2OscJumpPool& j) {
+    return std::to_array<Vc2PoolWord>({
+        { 0x893caba0, &j.fadeTop }, { 0x893caba4, &j.fadeBottom }, { 0x893caba8, &j.fadeScale },
+        { 0x893cabac, &j.sixteenth }, { 0x893cabb0, &j.rateScale }, { 0x893cabb4, &j.sampleScale },
+        { 0x893cd190, &j.setUpGain },
+    });
+}
+
+// [FW] the analog renders' HQ tables (v337): where rom.4's two pointers lead after its startup's copy, A's centre and
+// B's, B right after A as in rom.2; else none
+constexpr uint32_t kHqPointers = 0x8993fbf8;
+bool readHq(Sh4& image, Vc2OscAnalogPool& a) {
+    const uint32_t first = image.rd32(kHqPointers) - 4u * XtAnalogHq::kAHalf;
+    if (image.rd32(kHqPointers + 4) != first + 4u * Vc2OscAnalogPool::kHqB) return false;
+    vc2ReadFloats(image, { first, XtAnalogHq::kFloats }, a.hq.data());
+    return true;
+}
+
 struct Read : Vc2OscTables {
     bool read(Sh4& image) {
+        vc2ReadPool(image, soloWords(solo));
+        vc2ReadPool(image, jumpWords(jump));
         vc2ReadPool(image, vibratoWords(vibrato));
         vc2ReadFloats(image, { kVc2VibratoWavesAt, (int)vibrato.waves.size() }, vibrato.waves.data());
         vc2ReadPool(image, oscWords(*this));
@@ -191,7 +251,8 @@ struct Read : Vc2OscTables {
         vc2ReadPool(image, shapeWords(analog.shape));
         readShapeWaves(image, analog.shape.waves);
         vc2ReadFloats(image, kShapeToneKf, analog.shape.toneKf.data());
-        return true;
+        readBandTables(image, bands);
+        return readHq(image, analog);
     }
 };
 

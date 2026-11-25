@@ -21,17 +21,24 @@ struct Vc2MixWords {
 };
 static_assert(sizeof(Vc2MixWords) == 0x40, "rom.4's layout, the mix's words before the tone's tail");
 
-// The delay lines, one pair a tone by its index: rom.4's at 0x8a0af984 and 0x8a0bb384
+// The delay lines, one pair a tone by its index: rom.4's at 0x8a0af984 and 0x8a0bb384, end to end, A's 24 then B's 24.
+// A read a ring's delay puts past either end of it (OSC 2 past full scale, as an analog OSC's Impact takes it: from
+// v337, its renders the voice's own) reads on into the rings beside it, as on the XT (rom.2's FM lines the same,
+// XtModShared), and past them all memory the port has as 0.
 class Vc2ToneMixRings {
 public:
     static constexpr int kSamples = 0x1f0, kTones = 24;
     static constexpr uint32_t kAAt = 0x8a0af984, kBAt = 0x8a0bb384, kBytes = (uint32_t)kSamples * sizeof(float);
+    static_assert(kBAt == kAAt + kTones * kBytes, "B's rings right after A's");
     using Ring = std::array<float, kSamples>;
-    Ring& a(uint32_t address) { return a_[(address - kAAt) / kBytes]; }
-    Ring& b(uint32_t address) { return b_[(address - kBAt) / kBytes]; }
+    // A's ring and B's by their addresses, and the sample `i` places from `ring`'s first (v337), in it or beside it
+    // (Vc2ToneMixRender.cpp)
+    Ring& a(uint32_t address);
+    Ring& b(uint32_t address);
+    float at(const Ring& ring, int i) const;
 
 private:
-    std::array<Ring, kTones> a_ {}, b_ {};
+    std::array<Ring, 2 * kTones> rings_ {};
 };
 
 class Vc2ToneMix {

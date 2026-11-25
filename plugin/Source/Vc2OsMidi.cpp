@@ -94,6 +94,12 @@ void Vc2OsMidi::staticInitStates() {
             if (const uint32_t at = rows[(size_t)(row * 16 + c)]; at != 0) vc2ChannelSetUp(state(at), (uint8_t)c);
 }
 
+void Vc2OsMidi::staticInitParts() {
+    constexpr std::array<uint8_t, 3> kOs = { 1, 0xff, 0 };   // [FW] 0x89317fc0's
+    constexpr uint32_t kClass = 0x898c872c;                    // [FW] 0x893186c0's
+    for (size_t k = 0; k < partObjects.size(); ++k) partObjects[k] = { (uint8_t)k, kOs, kClass };
+}
+
 void Vc2OsMidi::staticInitPorts() {
     const Vc2OsMidiTables& t = vc2OsMidiTables();
     const Vc2KeysTables& k = vc2KeysTables();

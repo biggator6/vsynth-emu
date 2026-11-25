@@ -194,9 +194,10 @@ struct Ahead {
 constexpr Ahead kAheadFwd { kNext, kBounceBack, kBackEnd, kFwdEnd, true };       // [FW] 0x893c9386…
 constexpr Ahead kAheadBack { kPrev, kBounceFwd, kFwdStart, kBackStart, false };  // [FW] 0x893c93f0…
 bool past(const Ahead& a, int32_t x, int32_t y) { return a.forward ? x > y : y > x; }   // x past y, the way it walks
+} // namespace
 
 // [FW] 0x893ca1b2…: the walk at `pos`, its fraction 0; the next event's kind and position read `stride` half words
-// past `from`, or, the current the last, none and 16 past the last event's position
+// past `from`, or, the current the last, none and 16 past the last event's position.  v334: SOLO's jumps' too
 void jumpTail(Vc2WalkWords& w, int32_t pos, uint32_t from) {
     w.setWord(kPos, pos);
     w.setWord(kFrac, 0);
@@ -206,6 +207,8 @@ void jumpTail(Vc2WalkWords& w, int32_t pos, uint32_t from) {
     w.setByte(kNextKind, e.kind);
     w.setWord(kNext, e.pos);
 }
+
+namespace {
 // [FW] 0x893ca190: mode 1's jump to the current event: loaded, the walk at its position; the next read from its entry's
 // +8 (rom.4's −8 is taken off r4, which nothing reads after it, where 0x893ca1a0 takes it off r6)
 void modeOneJump(Vc2OscVoice& v, Vc2OscParts& p) {
@@ -226,14 +229,15 @@ void modeOneCached(Vc2OscVoice& v, Vc2OscParts& p, uint32_t cached) {
 } // namespace vc2walk
 
 namespace {
-// [FW] the start's seek for index 0, 0x893cc830, still rom.4's (v328), through the parts
-void modeOneSeekOut(Vc2OscVoice&, Vc2OscParts& p, int32_t at) {
+// [FW] the start's seek for index 0, 0x893cc830, from v329 the voice's own (vc2OscSeekModeOne, Vc2OscWalkStart.cpp)
+// with the beat's reset it ends in, by the voice's seeks' table
+void modeOneSeek(Vc2OscVoice& v, Vc2OscParts& p, int32_t at) {
     constexpr uint32_t kModeOneSeek = 0x893cc830;
-    p.seek(kModeOneSeek, at);
+    v.seekBy(kModeOneSeek, at, p);
 }
 } // namespace
 
-const Vc2WalkWay kVc2ModeOneWalk { vc2walk::modeOneJump, vc2walk::modeOneCached, false, modeOneSeekOut,
+const Vc2WalkWay kVc2ModeOneWalk { vc2walk::modeOneJump, vc2walk::modeOneCached, false, modeOneSeek,
                                    vc2walk::modeOneJump };
 
 // [FW] 0x893c9380: the next crossing (+0x2c): from the next event (forward) or the current (back); bouncing, nearer
@@ -264,4 +268,27 @@ void vc2WalkForward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way) {
 
 void vc2WalkBackward(Vc2OscVoice& v, Vc2OscParts& p, const Vc2WalkWay& way) {
     vc2walk::crossed(v, p, way, vc2walk::kCrossBack);
+}
+
+// [FW] v335 (mode 1's v327, SOLO's and the period-jump player's): crossing the next crossing, the walk's crossing that
+// way by the row and the next crossing found; what the frame then compares, forward the position, back the crossing
+// (rom.4's r1 after 0x893c9380, not the position)
+int32_t vc2WalkCrossed(Vc2WalkWords& w, const Vc2WalkWay& way, bool forward) {
+    (forward ? vc2WalkForward : vc2WalkBackward)(w.v, w.p, way);
+    vc2WalkCrossing(w.v, w.p);
+    return w.word(forward ? vc2walk::kPos : vc2walk::kCross);
+}
+
+// [FW] v335 (SOLO's v334, the period-jump player's): the position and its fraction; at or past `end` that way held
+// there, its fraction 0, ended that way (1, or −1 before the start); the position
+int32_t vc2WalkHeld(Vc2WalkWords& w, int32_t pos, int32_t frac, int32_t end, bool forward) {
+    using namespace vc2walk;
+    if (forward ? pos >= end : end >= pos) {
+        w.setByte(kEnded, forward ? 1 : kBefore);
+        pos = end;
+        frac = 0;
+    }
+    w.setWord(kPos, pos);
+    w.setWord(kFrac, frac);
+    return pos;
 }

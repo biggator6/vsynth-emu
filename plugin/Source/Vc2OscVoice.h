@@ -18,6 +18,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 
 // What the note-on reads of the wave's header the block's +0xd4 points at, by its offsets
 struct Vc2OscWaveHeader {
@@ -73,20 +74,23 @@ struct Vc2OscSamples {
     const int16_t* samples = nullptr;
     uint32_t address = 0;
     uint32_t count = 0;
+    // [FW] v335: by its 29-bit physical address, as the SH-4's areas P0…P3 mirror physical memory with the MMU off
+    // (Sh4::phys): a read that wraps past 2^32 (the period-jump player's read behind the wave's first sample) lands on
+    // the bytes below the samples, as on the XT
     int at(uint32_t word) const {
-        const uint32_t index = (word - address) / 2;
+        constexpr uint32_t kPhysical = 0x1fffffffu;
+        const uint32_t index = ((word & kPhysical) - (address & kPhysical)) / 2;
         return index < count ? samples[index] : 0;
     }
 };
 
-// What the voice calls on its parts and reads from them; a kind's routine by its rom.4 address
+// What the voice calls on its parts and reads from them; a player's render by its rom.4 address (a kind's routine on
+// the voice and its settings went with v330, VariPhrase's update and settings the last; the players' seeks and set-ups
+// on the object with v335, the period-jump player's the last)
 class Vc2OscParts {
 public:
     virtual ~Vc2OscParts() = default;
-    virtual void kindCall(uint32_t routine) = 0;              // routine(voice): an install, an update, a note-on
-    virtual void kindSettings(uint32_t routine, const uint32_t* from) = 0;   // routine(voice, the settings' +0xb0)
     virtual uint32_t renderBy(uint32_t routine, float* out, uint32_t third) = 0;   // routine(out, the object, third)
-    virtual void seek(uint32_t routine, int32_t at) = 0;      // a player's, routine(the object, at)
     // v266: what the voice's carrier and kind 6 read from outside it: the OS's millisecond word (0x893018d0), where a
     // carrier's phase starts; the mic ring (0x8a0f31cc), which the part's block mixer writes; the input stage's
     // unvoiced decision for the block, a float a sample (0x899d99dc, by 0x893ed500)
@@ -97,14 +101,13 @@ public:
     // v322: the effect chip's frames as the part reads them ([0x8993eadc], the part mixer's too: a block's 32 of 8
     // words), which the EXT IN player plays
     virtual const int32_t* inputFrames() = 0;
-    // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read
+    // v323: the wave memory the object's samples' address (+0xf4) points into, which Vari off's renders read; from
+    // v332 the band players' too, their vpdt, cached loop events and bands in it (its bytes, Vc2OscBands.cpp)
     virtual Vc2OscSamples waveSamples() = 0;
     virtual float boundFloat(uint32_t part, uint32_t offset) = 0;   // a bound envelope's or LFO's word, by address
-    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0);
-    // 0x893cc0d0(the object, event, &position, &…), an event's position ×16 (a player's routine on the object went
-    // with v328, mode 1's set-up its last)
+    // v238: the voice's address as rom.4's memory holds it (VariPhrase's note-on keeps its +0x108's at +0x1a0).  The
+    // event lookup 0x893cc0d0 went with v331, the voice's own
     virtual uint32_t address() = 0;
-    virtual int32_t eventPosition(uint32_t event) = 0;
     virtual Vc2OscWaveHeader waveHeader(uint32_t at) = 0;
     virtual Vc2OscLoopRecord loopRecord(uint32_t at) = 0;
 };
@@ -134,6 +137,11 @@ public:
     // v324 (Vc2OscLite.cpp): LITE's update 0x893c8280 and settings 0x893c8390 (given the settings' +0xb0)
     void updateLite(Vc2OscParts& parts, const Vc2ToneShared& shared);
     void settingsLite(const uint32_t* from, Vc2OscParts& parts);
+    // v330 (Vc2OscVari.cpp): VariPhrase's update 0x893c88b0, its players' start 0x893c8670 (its note-on's) and its
+    // settings 0x893b0280 (given the settings' +0xb0)
+    void updateVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void startVari(Vc2OscParts& parts, const Vc2ToneShared& shared);
+    void settingsVari(const uint32_t* from);
     void noteOnAnalog(Vc2OscParts& parts, const Vc2ToneShared& shared);   // 0x893c22e0 (v242, Vc2OscAnalog.cpp)
     // v248 (Vc2OscAnalogUpdate.cpp): the analog's install 0x893c2ad0, update 0x893c2ce0 and settings 0x893c3460
     // (given the settings' +0xb0)
@@ -151,6 +159,9 @@ public:
     // v323: the renders the voice has as its own, run when `routine`, the address an install writes, is one of them:
     // the EXT IN player's two and Vari off's two (v261); false, nothing done, for any other
     bool renderOwn(uint32_t routine, float* out, Vc2OscParts& parts);
+    // v337 (Vc2OscAnalogRender.cpp): the analog's 19 renders, by the routine an install writes (+0xa48), its mask; none,
+    // nothing done, for any other
+    std::optional<uint32_t> renderAnalog(uint32_t routine, float* out);
     // v325 (Vc2OscBeat.cpp): the players' beat, 0x893cbf40 (its start, from the position +0x194) and 0x893cbfe0 (its
     // reset, where a seek ends), XtBeat's on the object's words; and a seek by the routine's address, given the
     // position ×16: the voice's own (Vari off's 0x893c6360, LITE's heads' 0x893c6de0) or, any other, out through parts

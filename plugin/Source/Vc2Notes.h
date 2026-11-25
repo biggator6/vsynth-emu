@@ -76,6 +76,10 @@ public:
     uint32_t addressOf(uint32_t n) const;   // 0x893964f0, of any n
     Vc2NoteWords& at(uint32_t note) { return notes[(note - kNotesAt) / sizeof(Vc2NoteWords)]; }
     uint32_t addressOf(const void* word) const;   // where a byte of the notes is in rom.4's memory
+    // v343: the notes' words from rom.4's address `at` on (a child's block, as C gives it; xt_vc2sets' until v343)
+    uint32_t* wordsAt(uint32_t at) {
+        return reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(notes.data()) + (at - kNotesAt));
+    }
 
     void staticInit();                                                          // 0x89396960
     void construct(uint32_t note, uint32_t part, uint32_t kind, Vc2NoteParts& parts);   // 0x89396520

@@ -16,9 +16,10 @@ enum class Vc2OscNoteOn : uint8_t { none, one, extIn, carrier, kind6, vari, lite
 // kind's own install by its address)
 enum class Vc2OscInstall : uint8_t { frame, lite, vari, analog };
 // 0x893ae1c0's and 0x893ae780's last steps (v248): the kind's update and settings by their addresses, or the analog's
-// ported; from v321 kinds 5's and 6's updates ported too, from v322 the EXT IN player's
-enum class Vc2OscUpdate : uint8_t { routine, analog, carrier, kind6, extIn, lite };   // lite from v324
-enum class Vc2OscSettings : uint8_t { routine, analog, lite };
+// ported; from v321 kinds 5's and 6's updates ported too, from v322 the EXT IN player's, from v324 LITE's; from v330
+// VariPhrase's, the last that went by an address, so a kind's update and settings are none or the port's
+enum class Vc2OscUpdate : uint8_t { none, analog, carrier, kind6, extIn, lite, vari };
+enum class Vc2OscSettings : uint8_t { none, analog, lite, vari };
 
 struct Vc2OscKindRow {
     Vc2OscInstall installs = Vc2OscInstall::frame;   // 0x893ae0f0: its own install in the frame's place, or none
@@ -28,13 +29,11 @@ struct Vc2OscKindRow {
     bool waits = false;            // 0x893ae1c0: the update waits on a pending seek
     bool extInFirst = false;       // the EXT IN player's update (0x893c6260) before the ramps' ticks (v322; kind 6's)
     uint8_t ticks = 0;             // the ramps the update ticks, by bit
-    uint32_t update = 0;           // its update after them; 0 none
-    Vc2OscUpdate updates = Vc2OscUpdate::routine;       // that by its address, or the port's (v248)
+    Vc2OscUpdate updates = Vc2OscUpdate::none;     // its update after them
     Vc2OscRecords records = Vc2OscRecords::none;   // 0x893ae370
     bool flagByWave = false;       // the note-on's flag from the wave's type (+0x104) at 1
     bool ramp = false;             // 0x893ae610's start, and 0x893ae780's set when the block's byte +4 moves
-    uint32_t settings = 0;         // 0x893ae780: its settings routine; 0 none
-    Vc2OscSettings settingsWay = Vc2OscSettings::routine;   // that by its address, or the port's (v248)
+    Vc2OscSettings settingsWay = Vc2OscSettings::none;   // 0x893ae780: its settings
     bool carrier = false;          // the settings' copy into +0x104 and the carrier's settings
     Vc2OscRender renders = Vc2OscRender::byRender;   // 0x893ae9f0: its default, +0xa44
     Vc2OscPitch pitch = Vc2OscPitch::none;           // 0x893aeb20
