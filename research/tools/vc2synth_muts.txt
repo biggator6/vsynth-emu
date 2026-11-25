@@ -448,3 +448,10 @@ wav-zero-record|            s.r[14] = kZeroRecord;\n|\n|vc2synthwaves|3
 # sample load past the waves 0 wherever it lands, and wav-zero-pages with them; wav-far-count follows the hook's text
 wav-sample-pc|< kTableReach;   // v363|< kTableReach \|\| pc == 0x893c6a0cu;   // v363|vc2synthwaves
 wav-mapped-skip|            s.r[n] = 0;\n            s.pc += kHalf;\n|\n|vc2synthwaves|5
+# v364: the tone mix's delay index driven far out (HARDWARE_FIRMWARE.md, "The tone mix's delay index driven far out"),
+# at seed 4, whose notes case 315 reaches it: the read's address back in a long with no wrap for an index that far
+# out (vc2synthmixrender), the port's count of reads past the rings cut, and rom.4's skip of them removed (the load
+# still counted). The int subtract's overflow isn't planted: what it gives is the compiler's choice
+mix-ring-wrap|    if (k < (uint32_t)rings_.size() * kSamples) return|    if (k < (uint32_t)rings_.size() * kSamples && i > -0x10000 && i < 0x10000) return|vc2synthmixrender|4
+mix-ring-count|    if (past != nullptr) ++*past;|    if (past != nullptr) {}|vc2synthmixrender|4
+wav-ring-skip|            s.fb[(s.fpscr >> kBankBit) & 1u][n] = 0;\n            s.pc += kHalf;\n|\n|vc2synthwaves|4

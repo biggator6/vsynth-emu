@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The tone mix's delay index driven far out v364 (2026-11-25, on claude/v358-plant-reach after v363; HARDWARE_FIRMWARE.md,
+  "The tone mix's delay index driven far out: rom.4's 32-bit address"): seed 4's last difference. An OSC overflowing
+  drives the delay's index to about -2^31; rom.4 forms the index and the address in 32 bits, so its reads wrap back
+  into the rings and past them into the free LFOs. The port now forms both in 32 bits (its int subtract overflowed,
+  undefined in C++), and rom.4's reads past the rings get (A)'s zeros, counted on both sides. Red first at seed 4
+  (reads past the rings 190 against 2,148); the six seeds 0 different at 16, 40 and 400 cases. No factory patch
+  reaches it. ftrc on a NaN left as a [gap].
+
 Sample loads past the waves v363 (2026-11-25, on claude/v358-plant-reach after v362; HARDWARE_FIRMWARE.md, "Sample
   loads past the waves: zeros wherever they land, the factory patches' cases"): the coordinator's call (A). A render's
   sample load past the waves, wherever it lands (rom.4's .text and .bss, unmapped memory), skipped with its register 0

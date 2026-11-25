@@ -4273,3 +4273,28 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - For v602, rom.2's own save path was found by the patch file's header strings (SVD0, PATa, KATE): the writer
   0x8948fc30, the store-to-file routine 0x8947de90 (825 of 825 full-length files back byte for byte, every store back
   from its written file, 1,327 of 1,327) and the setters 0x894818b0 and 0x89481e20.
+
+### Session 26 (2026-11-25) — v358 to v364: the plants the firmware checks still missed
+
+- The coordinator's brief: each plant the merge's whole lists still missed is either caught by a reach of its own or
+  shown out of reach on the firmware. kn-rr-freeze needed a compare between a tick and the watchdog's interrupt
+  (v358). Six of the --synth list's were shown out of reach on rom.4 and taken out (v359). Seven were caught by draws
+  on generators of their own (v360). check-pad-cc was caught by replays after the last case, so no draw of the run
+  moved (v361).
+- tns-count was the one that changed the check. Its reach was the part given real waves. With both sides given the
+  disk image's waves by rom.4's own load, the renders showed two wiring faults within a run: giveWaves gave no
+  samples, and the voices' outside read 0 for a word in the waves, so Tempo Sync's beat never wrapped. tns-count was
+  then caught with no steer (v362). The second fault was step 4.5's factory patch 018 at 9x real time: its SOLO seek
+  walked a billion records that read 0.
+- The waves showed where the firmware reads memory the port doesn't model. A player walking past its wave reads
+  unmapped pages, rom.4's own code and its .bss as samples. LITE reads a loop record through a stale pointer into
+  area 7. The project's model is that the port plays 0 there, so the check gives rom.4 zeros, narrowly, and counts
+  both sides. The counts found the reads into mapped memory where the compares alone didn't (v362, v363). What looked
+  like a vocoder fault at 31337 was one of those reads playing code as samples.
+- The lesson check refused a literal table of the 46 sample loads. The rule that replaced it (every indexed halfword
+  load in the renders but those reading their own tables) is better than the table was, and its count is its test.
+  The refusal itself was wrong (addresses aren't ROM bytes), and is marked so.
+- Seed 4's last difference was the tone mix's delay line on an overflowing OSC. rom.4 forms its read index and address
+  in 32 bits, so an index near -2^31 wraps back into the rings and past them into the free LFOs. The port computed it
+  in a long and an int subtract that overflowed. That overflow is undefined in C++: a print added to `at` changed what
+  the compiler made of it, which is how it showed (v364).

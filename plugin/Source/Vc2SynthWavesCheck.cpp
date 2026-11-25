@@ -12,6 +12,8 @@
 //   0x893c859a): its loads through r14 (0x893c7f00…0x893c8700) given a zero record there, counted, against the port's
 //   records at an address its waves don't hold.
 // v363: the factory patches read from the same disk image for the notes part's cases on them (vc2SynthFactoryPatches).
+// v364: the tone mix's delay reads past all its rings (an index driven far out wraps there in 32 bits) skipped with
+// their register 0, counted against the port's (Vc2ToneMixRings::past), the counts printed on a line of their own.
 // HARDWARE_FIRMWARE.md, "The part given the disk image's waves" and "Sample loads past the waves". XT_VC2SYNTH_MAIN
 // only.
 #ifdef XT_VC2SYNTH_MAIN
@@ -20,6 +22,7 @@
 #include "Vc2PatchFile.h"
 #include "Vc2WaveBoot.h"
 #include "XtFiles.h"
+#include <array>
 #include <vector>
 
 namespace {
@@ -38,6 +41,13 @@ constexpr uint16_t kRecordLongMask = 0xf0f0, kRecordLong = 0x50e0;   // [FW] mov
 constexpr uint16_t kRecordHalfMask = 0xfff0, kRecordHalf = 0x85e0;   // [FW] mov.w @(disp,r14),r0
 constexpr uint32_t kLong = 4, kHalf = 2;
 constexpr uint32_t kTableReach = 0x100;   // the sample loads' rule, above
+// [FW] v364: the tone mix's delay renders' ring reads (fmov.s @(r0,Rm),FRn, none in a delay slot): delayMono's pair at
+// 0x893e47d4, then delayStereo's two at 0x893e48c2 and 0x893e490e
+constexpr std::array<uint32_t, 6> kRingLoads { { 0x893e47d4u, 0x893e47deu, 0x893e48c2u, 0x893e48ccu, 0x893e490eu,
+                                                  0x893e4918u } };
+constexpr uint32_t kRingsAt = Vc2ToneMixRings::kAAt;
+constexpr uint32_t kRingsBytes = 2u * Vc2ToneMixRings::kTones * Vc2ToneMixRings::kBytes;
+constexpr uint32_t kBankBit = 21;   // FPSCR.FR, the float bank FRn is in
 
 // v363: a render's sample load past the waves skipped with its register 0, counted
 void farReadsCounted(Sh4& c, const Vc2WavePool& pool, Vc2SynthPast& p) {
@@ -74,6 +84,21 @@ void recordsGivenZeros(Sh4& c, long& count) {
     }
 }
 
+// v364: a delay render's ring read past all the rings (rom.4's other memory: the free LFOs from 0x8a0c6d84) skipped
+// with its register 0, counted
+void ringReadsGivenZeros(Sh4& c, long& count) {
+    for (const uint32_t pc : kRingLoads) {
+        const auto op = (uint16_t)c.rd16(pc);
+        const uint32_t n = (op >> 8) & 0xfu, m = (op >> 4) & 0xfu;
+        c.hook(pc, [n, m, &count](Sh4& s) {
+            if (s.r[0] + s.r[m] - kRingsAt < kRingsBytes) return;
+            s.fb[(s.fpscr >> kBankBit) & 1u][n] = 0;
+            s.pc += kHalf;
+            ++count;
+        });
+    }
+}
+
 bool diskOpened(const char* rom4, XtDiskImage& disk) {
     const std::string r = rom4;
     return disk.open(r.substr(0, r.find_last_of('/') + 1) + kDiskImage);
@@ -93,11 +118,13 @@ void vc2SynthWavesWritten(Sh4& c, const Vc2LoadedWaves& w, Vc2SynthPast& past) {
     if (!w.pool.memory.empty()) c.write(w.pool.words.base, w.pool.memory.data(), w.pool.memory.size());
     farReadsCounted(c, w.pool, past);
     recordsGivenZeros(c, past.romRecords);
+    ringReadsGivenZeros(c, past.romRings);
 }
 
 void vc2SynthWavesGiven(Vc2Synth& s, const Vc2LoadedWaves& w, Vc2SynthPast& past) {
     s.giveWaves(w);
     s.samples.far = &past.portFar;
+    s.rings.past = &past.portRings;
 }
 
 bool vc2SynthWavesBoth(const char* rom4, Vc2Fw& fw, Vc2Synth& s, Vc2LoadedWaves& w, Vc2SynthPast& past) {
@@ -139,6 +166,9 @@ long vc2SynthPastDifference(const Vc2SynthPast& past) {
                 "%ld, the port %ld\n",
                 past.romFar, past.portFar, past.romRecords, past.portRecords);
     std::printf("synth waves: the renders' own table reads %ld (v363: the sample loads' rule)\n", past.romTables);
-    return past.romFar != past.portFar || past.romRecords != past.portRecords ? 1 : 0;
+    std::printf("synth waves: the tone mix's delay reads past its rings, given zeros: rom.4 %ld, the port %ld (v364)\n",
+                past.romRings, past.portRings);
+    const bool equal = past.romFar == past.portFar && past.romRecords == past.portRecords;
+    return equal && past.romRings == past.portRings ? 0 : 1;
 }
 #endif

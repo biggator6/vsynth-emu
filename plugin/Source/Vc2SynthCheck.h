@@ -19,6 +19,7 @@ struct Vc2LoadedWaves;
 struct Vc2SynthPast {
     long romFar = 0, portFar = 0, romRecords = 0, portRecords = 0;
     long romTables = 0;   // v363: the renders' loads of their own tables, which aren't samples
+    long romRings = 0, portRings = 0;   // v364: the tone mix's delay reads past its rings
 };
 // The waves loaded by rom.4's own loaders from the disk image beside `rom4`, written into `fw` and given `s`; false,
 // said, when they can't be

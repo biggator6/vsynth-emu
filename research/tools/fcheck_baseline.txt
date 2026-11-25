@@ -910,6 +910,7 @@ synth reads: 1 cases, 40 events: 16 memory reads, 60 readers, 10 getters, 8 sums
 synth whole: the start on both OSes; 16 cases on 1 pairs, 1920 events: 6899 blocks (5606 ticks, 376 sounding), 7163 messages (5 bursts, 1 floods); 15 waits in a pass, 0 cut; 2 patches under a VOCODER's tone, 2 Types kept; on rom.1 52727 contexts loaded, 111 suspends, 16909 semaphore waits; the senders' 42 waits for room, 862 for empty; markers 0 0 1 0 3; v360: 888 lead-ins' events, 1 compares at MIDI IN's full ring, 9 cases on a pitch
 synth waves: the reads past them, given zeros: far reads rom.4 16, the port 16; records past rom.4 0, the port 0
 synth waves: the renders' own table reads 2684 (v363: the sample loads' rule)
+synth waves: the tone mix's delay reads past its rings, given zeros: rom.4 0, the port 0 (v364)
 xt_vc2synth: 0 different
 == xt_vc2patch
 sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)

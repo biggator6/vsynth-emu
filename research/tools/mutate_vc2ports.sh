@@ -45,7 +45,8 @@
 # the XT's MIDI input path (v355: vc2midireceive, vc2osqueue, vc2synthmidipath Vc2SynthOsMidi.cpp, vc2synthmidistart
 # Vc2SynthOsMidiStart.cpp) and a channel state's lookup (vc2synthchannel, Vc2PartChannel.cpp: the notes' task's own
 # messages on a channel of -1) under it; v362 the voices' outside (vc2synthtone, Vc2SynthTone.cpp) and the check's own
-# hooks on the waves (vc2synthwaves, Vc2SynthWavesCheck.cpp) under it.
+# hooks on the waves (vc2synthwaves, Vc2SynthWavesCheck.cpp) under it; v364 the tone mix's delay reads in 32 bits
+# (vc2synthmixrender, Vc2ToneMixRender.cpp: only xt_vc2synth's notes part drives an index that far out) under it.
 
 # Each check's files, without .cpp: mutate_vc2files.sh (moved out as they stood, v391)
 source "$(dirname "${BASH_SOURCE[0]}")/mutate_vc2files.sh"
@@ -213,6 +214,7 @@ VC2PORTS=(
     "vc2synthmidistart|Vc2SynthOsMidiStart.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthtone|Vc2SynthTone.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthwaves|Vc2SynthWavesCheck.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
+    "vc2synthmixrender|Vc2ToneMixRender.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2synthchannel|Vc2PartChannel.cpp|XT_VC2SYNTH_MAIN|vc2synth_obj|VC2SYNTH"
     "vc2sets|Vc2Sets.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"
     "vc2setmemory|Vc2SetMemoryReads.cpp|XT_VC2SETS_MAIN|vc2sets_obj|VC2SETS"

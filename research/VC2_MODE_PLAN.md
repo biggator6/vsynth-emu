@@ -1278,6 +1278,9 @@ version against rom.4's routines with what it calls hooked:
          `xtf::sub`, which rom.2's ports share; XtFloat.h is unchanged and there is no VC-2-only subtract. Meanwhile
          xt_vc2synth's notes part keeps a sounding VOCODER OSC's Type in a new patch (`vocoderTypesKept`,
          Vc2SynthNotesCheck.cpp). What the NaN does to the audio: step 4.5's "A NaN sample to the host" (closed by v454).
+       - [gap] `ftrc` of a NaN (seen in v364, not its cause): XtFloat's `xtf::ftrc` gives 0, the interpreter's FTRC
+         (`ftrcF`, Sh4Interp.cpp) 0x80000000. XtFloat is shared with rom.2's ports, so it is left as it is. What a real
+         SH-4's FTRC gives for a NaN is to be read from its manual; not decided (the coordinator's call, 2026-11-25).
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
@@ -1414,7 +1417,9 @@ version against rom.4's routines with what it calls hooked:
      those addresses; the .bss part would need the part's memory as rom.4 lays it out. Not done: the check gives rom.4
      zeros there (v363; HARDWARE_FIRMWARE.md, "Sample loads past the waves"). The walk past the wave reaches unmapped
      memory too (physical 0x07959e08, 0x08704e30, 0x09085420, 0x0ca1e0e8; 31337's factory notes case 69 reads
-     0xaca1e0e8), where an XT reads whatever is there, and the port plays 0 (v362).
+     0xaca1e0e8), where an XT reads whatever is there, and the port plays 0 (v362). And a tone mix delay index driven
+     far out (an OSC overflowing to ~−3e18) wraps in 32 bits past the rings into the free LFOs; the port plays 0 there
+     (v364; HARDWARE_FIRMWARE.md, "The tone mix's delay index driven far out").
    - [gap] A LITE voice reused across kinds reads its loop record through a stale pointer (0x893c859a); on an XT that
      read lands in area 7's on-chip registers (P4), whose values the port doesn't model; the port reads 0. Reached by
      seed 3's noise draws (xt_vc2synth's notes case 28, through 0x3ea7ffcb), by no factory patch in the runs at 2024, 7

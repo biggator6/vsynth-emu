@@ -1546,6 +1546,59 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The tone mix's delay index driven far out: rom.4's 32-bit address (2026-11-25, v364) {#vc2-mix-delay-wrap}
+
+Step 4.3's ninety-first version, seed 4's last difference at 400 cases after v363 (notes case 315: the mixer's
+`carrier[1].right`, 0x8999f2dc, the port 00 against rom.4's ff). The coordinator's call: the wrap in the port, and
+(A)'s zeros for the reads past the rings.
+
+**What it is.** A tone with OSC 2 overflowing (kind 3, about -2.9e18) through the mix's delay (`delayStereo`,
+0x893e4820; `delayMono`, 0x893e4740, the same). The delay `(b + fullScale)·depth/fullScale` is hugely negative, so
+`ftrc` gives 0x80000000 and the read's index is near -2^31. rom.4 forms the index and the address in 32 bits: `near`
+by `sub` (0x893e48a8), `far` by `add #-1` (0x893e48b0), each brought back by the line's 496 when negative, then
+`ring + 4·index` (`shll2`, `fmov.s @(r0,Rm)`). 4·(-2^31 + k) wraps to 4·k, so its reads land in the next ring, and from
+the last B ring (47) past all 48, in the free LFOs (0x8a0c6d84 on: their list words, 0x8a0c6f14 and 0xffffffff, read
+as floats). The port had three differences there:
+1. `Vc2ToneMixRings::at` formed `ring·kSamples + i` in a `long`, found it past every ring and read 0. Now it forms the
+   address as rom.4 does, in 32 bits, so a read that wraps back into the rings is exact.
+2. `delayedSample`'s `position - whole` overflowed an `int` at a whole of -2^31: undefined in C++, and clang folded the
+   `near < 0` tests differently from rom.4's wrap, depending on what was inlined (a probe's print in `at` moved the
+   port's count from 162 to 190). Now `near` and `far` are formed in 32-bit unsigned arithmetic, as rom.4's.
+3. The reads past all the rings, into rom.4's other memory: (A)'s treatment (the coordinator's call), as for the sample
+   loads (v363). The check skips rom.4's six delay ring loads (0x893e47d4, 0x893e47de, 0x893e48c2, 0x893e48cc,
+   0x893e490e, 0x893e4918, `kRingLoads`, none in a delay slot) with their register 0 when the address is past the
+   rings, and counts them against the port's reads past (`Vc2ToneMixRings::past`, a check's pointer). The counts are
+   printed and held equal. Step 4.5's [gap] has a line for it.
+
+With the wrap and the free LFOs' bytes read past the rings (a probe), case 315 agreed. The next difference was case
+316's vocoder word 0x8999b3b4, 7fffffff against ffffffff: the free LFOs' -1 words as NaNs, then the user's deferred
+NaN sign (xtf::sub against FSUB). Under (A) those reads are zeros on both sides, so it doesn't arise.
+
+**Who reaches it.** The notes part's drawn cases alone: seed 4's 190 such reads and seed 7's 24 all fall there. The
+factory patches' cases reach none at any of the six seeds (400 cases).
+
+**`ftrc` on a NaN**, seen on the way, not this fault's cause: XtFloat's `ftrc` gives 0, the interpreter's FTRC
+0x80000000. XtFloat is shared with rom.2's ports, so it's left as it is: a [gap] beside the [deferred] VOCODER NaN's
+sign in VC2_MODE_PLAN.md.
+
+Red first: with the check's ring hooks and the port's count, but the port's old arithmetic, seed 4 at 400 cases is 1
+different, the reads past the rings rom.4 190 against the port's 2,148 (its `long` index finds far more of them past).
+Then the six seeds are 0 different at 16, 40 and 400 cases, every count equal (seed 4: 190 and 190; seed 7: 24 and 24).
+The counts are printed on a line of their own, which fcheck holds.
+
+Plants (the new port `vc2synthmixrender`, Vc2ToneMixRender.cpp under xt_vc2synth, and the check's `vc2synthwaves`),
+each at seed 4: `mix-ring-wrap` (the address with no wrap for an index that far out), `mix-ring-count` (the port's
+count cut) and `wav-ring-skip` (rom.4's skip removed, the load still counted). The `int` subtract's overflow isn't
+planted: what it gives is the compiler's choice.
+
+Results:
+- fcheck `--update` moved xt_vc2synth's one new line alone; xt_vc2tone, which runs the mix's renders, at its baseline.
+- `mutate_vc2.py --synth`, the whole list, clean first: 332 planted, 332 caught, 0 errors (about an hour).
+- `mutate_vc2.py --tone --changed` (the plants in Vc2ToneMixRender.cpp): 85 of 85 caught. Five (mixr-tap-near,
+  mixr-tap-far and the three mixr-beside plants) planted v337's text of `at` and `delayedSample`; they were re-aimed
+  at the new text, each with its meaning as before, and caught.
+- `verify.sh`: clean (fcheck as baseline, every test holding, auval).
+
 ### Sample loads past the waves: zeros wherever they land, the factory patches' cases (2026-11-25, v363) {#vc2-synth-sample-loads}
 
 Step 4.3's ninetieth version, the coordinator's call (A) on v362's far reads in mapped memory.
