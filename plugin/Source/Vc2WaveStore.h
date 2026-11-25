@@ -20,6 +20,8 @@ class Vc2WaveMemory {
 public:
     virtual ~Vc2WaveMemory() = default;
     virtual uint8_t byte(uint32_t at) const = 0;
+    // v362: whether the memory holds `at` (a check's count of the reads past it); one that doesn't say holds all
+    virtual bool holds(uint32_t) const { return true; }
     uint16_t half(uint32_t at) const;
     uint32_t word(uint32_t at) const;
 };

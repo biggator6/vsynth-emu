@@ -13,9 +13,27 @@
 // v355: rom.4's start as main runs it, on a fresh image: its initializers (how many in `rows`; the OS's rows main's, or
 // `osRows` in the table's order), then the system's start; what faulted, or none
 std::string vc2SynthRomStart(Vc2Fw& fw, int& rows, std::span<const uint32_t> osRows = {});
+// v362: the disk image's waves on both sides (Vc2SynthWavesCheck.cpp), and the reads past them each side counted: a
+// player's sample reads, LITE's loop records
+struct Vc2LoadedWaves;
+struct Vc2SynthPast {
+    long romFar = 0, portFar = 0, romRecords = 0, portRecords = 0;
+};
+// The waves loaded by rom.4's own loaders from the disk image beside `rom4`, written into `fw` and given `s`; false,
+// said, when they can't be
+bool vc2SynthWavesBoth(const char* rom4, Vc2Fw& fw, Vc2Synth& s, Vc2LoadedWaves& w, Vc2SynthPast& past);
+// The waves' bytes into a machine's memory at their addresses, the zero pages past them, rom.4's reads there counted
+void vc2SynthWavesWritten(Sh4& c, const Vc2LoadedWaves& w, Vc2SynthPast& past);
+// The waves given the part (giveWaves), its reads past the samples counted
+void vc2SynthWavesGiven(Vc2Synth& s, const Vc2LoadedWaves& w, Vc2SynthPast& past);
+// The part's records past the waves, added before it goes
+void vc2SynthPortRecords(const Vc2Synth& s, Vc2SynthPast& past);
+// The counts printed; 1 when a side's differ from the other's
+long vc2SynthPastDifference(const Vc2SynthPast& past);
 // v355: the whole part (Vc2SynthWholeCheck.cpp): a fresh pair on their OSes, the port's model and rom.1's kernel with
-// rom.4 (Vc2MachineRig, rom.1 beside `rom4`); how many differ
-long vc2SynthWholePart(const char* rom4, const Vc2Run& run);
+// rom.4 (Vc2MachineRig, rom.1 beside `rom4`); how many differ. v362: each pair given `waves`, its reads past them
+// counted in `past`
+long vc2SynthWholePart(const char* rom4, const Vc2Run& run, const Vc2LoadedWaves& waves, Vc2SynthPast& past);
 // The first byte of the region that differs from rom.4's at its address, said; none
 std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r);
 // The first region of the part that differs, said; none

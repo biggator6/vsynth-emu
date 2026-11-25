@@ -169,6 +169,10 @@ void Vc2Synth::giveWaves(const Vc2LoadedWaves& w) {
     waves = &w;
     store = &w.store;
     waveSets = w.sets;
+    // v455: the samples the players read, the pool's memory as rom.4's halfwords from its address (the loaders put every
+    // sample the library's waves use there)
+    samples = { reinterpret_cast<const int16_t*>(w.pool.memory.data()), w.pool.words.base,
+                (uint32_t)(w.pool.memory.size() / 2) };
 }
 
 void Vc2Synth::start() {

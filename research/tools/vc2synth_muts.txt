@@ -204,8 +204,8 @@ upd-voices-tones|{ s_.mixer.updateTones(s_.toneParts->tasksTones(), *this); }|{}
 # upd-sounding-next and upd-tone-update moved here as tns-sounding-next and tns-update; vc2synthblock,
 # Vc2SynthBlock.cpp: the mixer's parts and Auto Note's host; vc2synth, the block and the audio task's start), by
 # xt_vc2synth's notes part's blocks and the load part's start.  Not planted: the node's row (source 3's and source 4's
-# part 0 nodes on one channel throughout, as the system's receive channels set them).  Missed until the check gives the
-# part waves: tns-count (an OSC voice's count moves only where a VariPhrase player asks it, kCounts)
+# part 0 nodes on one channel throughout, as the system's receive channels set them).  tns-count (an OSC voice's count
+# moves only where a VariPhrase player asks it, kCounts) missed until the check gave the part waves (v362)
 tns-sounding-next|at = s_.tones.at(at).head.next) {|at = 0) {|vc2synthtones
 tns-update|tone().update(n, host());|tone().update(n + 1, host());|vc2synthtones
 tns-clock|tone().clock(seconds, host());|tone().clock(seconds + seconds, host());|vc2synthtones
@@ -430,3 +430,14 @@ kt-state-before|    return (at < 0 ? k.stateBefore : k.states|    return (at < 0
 # svo-block-cosm by each tone's COSM objects compared (masked as xt_vc2tone's but for the targets) and a patch in 2 with
 # both COSMs of a kind on one type; kt-state-before by a case turning Part 1 Receive Switch off by the routing's reset
 # under voices on channel 0, then the notes' task's own poly pressure. tns-count still missed: the part has no waves
+# v362: the part given the disk image's waves on both sides (HARDWARE_FIRMWARE.md, "The part given the disk image's
+# waves"): the samples giveWaves gives (v455's lines, vc2synth), the voices' outside's word in the waves and its count
+# of records past them (vc2synthtone, Vc2SynthTone.cpp), and the check's own hooks (vc2synthwaves,
+# Vc2SynthWavesCheck.cpp: the zero pages, rom.4's count of its reads there, LITE's zero record). tns-count, above, is
+# caught by the waves alone; the steer planned for it wasn't needed
+syn-waves-samples|                (uint32_t)(w.pool.memory.size() / 2) };|                0 };|vc2synth
+stn-bound-waves|    if (!pool_.holds(at)) return waves != nullptr ? std::bit_cast<float>(waves->word(at)) : 0.0f;|    if (!pool_.holds(at)) return waves != nullptr ? 0.0f : 0.0f;|vc2synthtone
+stn-records-count|!w_.waveMemory()->holds(at)) ++recordsPast;|!w_.waveMemory()->holds(at)) {}|vc2synthtone|3
+wav-zero-pages|    const auto zeros = zerosMapped(c);|    const auto zeros = std::make_shared<const Zeros>();|vc2synthwaves
+wav-far-count|count += inZeros(*zeros, s.r[0] + s.r[m]) ? 1 : 0;|count += 0;|vc2synthwaves
+wav-zero-record|            s.r[14] = kZeroRecord;\n|\n|vc2synthwaves|3

@@ -33,6 +33,9 @@ struct Vc2LoadedWaves : public Vc2WaveMemory {
     Vc2WaveSets sets;
     Vc2WavePool pool;
     uint8_t byte(uint32_t at) const override;
+    bool holds(uint32_t at) const override {   // v362: the sets' data and the pool
+        return sets.dataAt(at) != nullptr || at - pool.words.base < pool.memory.size();
+    }
 };
 
 class Vc2WaveBoot {

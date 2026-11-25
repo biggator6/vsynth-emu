@@ -1546,6 +1546,85 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The part given the disk image's waves: two wiring faults, tns-count caught (2026-11-25, v362) {#vc2-synth-waves}
+
+Step 4.3's eighty-ninth version. Until now xt_vc2synth gave the part no waves. PCM's start then leaves the OSC kind 0,
+so the whole part never rendered a VariPhrase wave, and `tns-count` (an OSC voice's count moves only where a
+VariPhrase player asks it) was out of reach. Its reach is the part given waves (the coordinator's call).
+
+**Both sides the same waves** (`Vc2SynthWavesCheck.cpp`, `vc2SynthWavesBoth`). The disk image's waves are loaded by
+rom.4's own loaders (`vc2LoadWaves`, v503) from the image beside rom.4, at run time, about 2.5 s a run. The port gets
+them through `giveWaves`. Each of rom.4's machines (main's, and each whole pair's after its start) gets the same bytes at
+their addresses: the store's and the pool's words, the sets' counts, tables, buffers, velocity and key data, and the
+pool's 33.5 MB at 0x8dffffe8. They're given after the tones part, before the load part. Without the disk image the
+check stops, said.
+
+**The reads past the waves.** The project's model reads 0 there, as rom.2's band reads past a wave are given zeros
+(`xtFwHookBandReads`). rom.4 is given zeros narrowly, and each side counts the reads it made so. A run prints the
+counts, and unequal counts are a difference:
+- A player's sample read past the waves. Areas 1 to 3's pages that nothing maps become zeros; area 0, where an XT's
+  boot flash lies, stays unmapped, so a read there still faults. rom.4's halfword loads in the players' renders
+  (`mov.w @(r0,Rm),Rn`, 0x893c6000…0x893c8000) that land in those pages are counted. The port counts its reads outside
+  its samples (`Vc2OscSamples::far`, a check's pointer, none in the plugin).
+- LITE's loop record read through a pointer that leaves mapped memory, a stale word on a voice reused across kinds
+  (0x893c859a, through 0x3ea7ffcb). Its loads through r14 (`mov.l @(disp,r14)`, `mov.w @(disp,r14),r0`,
+  0x893c7f00…0x893c8700) are given a zero record there (0x8C1FE000) and counted. The port counts its loop records at an
+  address its waves don't hold (`Vc2WaveMemory::holds`, new: `Vc2LoadedWaves`' sets' data and pool).
+
+**Two faults the waves showed**, each red first at fcheck's count (16 cases), the six seeds:
+1. `giveWaves` gave the store and the sets but not the samples the players read, so every sample read 0. With neither
+   fix, 1 to 3 different at every seed, the port counting 128 to 110,080 reads past its samples and rom.4 none. Fixed by
+   step 4.5's v455 lines, letter for letter (its session's text, the coordinator's call): the pool's memory as rom.4's
+   halfwords from its address. With them alone, 2024, 4 and 3 still differ (an OSC voice's words); 31337, 7 and 5 are 0.
+2. `Vc2SynthOscOutside::boundFloat` gave 0 for an address in no tone. VariPhrase's Tempo Sync beat (`Vc2OscBeat.cpp`)
+   reads its four loop events (+0x4, +0xb8, +0x16c, +0x220 of the block at the voice's +0x1c8) through it, from the
+   wave's cached loop events in the wave memory, so its beat never wrapped. Now it reads the word the waves hold there
+   (0 with none given, as before). Step 4.5's played-block test had factory patch 018 FemaleChoirs at 9× real time and
+   nearly silent (peak 1e-4), all its time under one note-on's SOLO seek: `vc2OscSoloSetUp`'s record seek,
+   `vc2SeekRecords`' last loop calling `loadNext` on records that read 0 through `boundFloat`. 018 played on the part
+   on its OS model with the waves and v455's samples given (C4 at 100 for a second, then a second's release): with
+   `boundFloat` 0 the note-on's seek runs 1,048,854,689 `loadNext` steps (9.6 s), the peak 12,915; with v362's 0
+   steps, the peak 1.19e8 (the part's units), the blocks 0.27 s for each second of audio.
+
+With both: xt_vc2synth 0 different at the six seeds at 16 cases. The far reads, rom.4's and the port's: 2024 0/0,
+7 0/0, 31337 0/0, 3 8/8, 4 4/4, 5 8/8; at 40 cases 2024 16/16, 7 0/0, 31337 4/4, 3 8/8, 4 4/4, 5 8/8. The records past:
+1/1 at seed 3 (the notes case 28), 0 elsewhere. At 400 cases 2024 (36/36), 7 (16/16), 31337 (40/40) and 3 (68/68,
+records 1/1) are 0. Seeds 4 and 5 differ at 400 (their notes cases 315 and 395, a block's buffers), the port counting
+4 reads past its samples more than rom.4 each. Those reads land in rom.4's mapped memory, so rom.4 reads what's there
+and the port reads 0. That's v363's (the coordinator's call (A): rom.4 given zeros there too). Seed 4 has a second
+difference of its own, v364's.
+
+**What reaches them.** With the factory patches in the notes part (a probe: `Internal.vc2/Patch` from the disk image,
+`vc2LoadPatchFiles` and `vc2PatchRead`, at 400 cases), the far walk is reached: 31337's notes case 69, read at
+0xaca1e0e8. The stale pointer was reached only by seed 3's noise draws, with no records past in the factory runs at
+2024, 7 and 31337. Both are step 4.5's [gap]s (VC2_MODE_PLAN.md): on an XT the far read takes whatever is there and
+the stale pointer's read lands in area 7's on-chip registers, and the port reads 0 for both. The factory runs also
+show 2024's far reads 4 against 12 (the reads past in mapped memory above) and 31337's notes case 258, the vocoder
+object's word 0x8999cef0 (00000000 against 494afe99), which goes with them (v363).
+
+**tns-count caught** by the waves alone, no steer: at 2024, 400 cases, the notes case 1, tone 15's OSC 2 voice, byte
+0x899c3e08 04 against 02. Its list line's note ("missed until the check gives the part waves") is gone.
+
+The files: the check's `Vc2SynthWavesCheck.cpp` (new), `Vc2SynthCheck.cpp` and `.h`, `Vc2SynthWholeCheck.cpp`;
+`build_vc2part.sh` and `mutate_vc2files.sh` link rom.4's load of the waves (`Vc2WaveBoot`, `Vc2WaveBootKernel`,
+`Vc2BootFiles`) and `XtDiskImage` into xt_vc2synth. The port: `Vc2Synth.cpp` (v455's lines), `Vc2SynthTone.cpp` and
+`.h` (`boundFloat`; the records' count), `Vc2WaveStore.h` and `Vc2WaveBoot.h` (`holds`), `Vc2OscVoice.h` (`far`).
+
+Plants (vc2synth_muts.txt; two new ports, vc2synthtone for Vc2SynthTone.cpp and vc2synthwaves for the check's own
+hooks), each caught first in a scratch build: syn-waves-samples (v455's count 0), stn-bound-waves (the waves' word 0
+again), stn-records-count (at seed 3, the records' count cut), wav-zero-pages (rom.4 faults at a8704e30, pc
+893c6a0c), wav-far-count (rom.4's count cut), wav-zero-record (at seed 3: rom.4 faults at notes case 28, read32 at
+3ea7ffcb, pc 893c859a). `Vc2OscVoice.h`'s count isn't planted: a header's plant builds from the unplanted sources.
+
+Results:
+- xt_vc2synth as above; fcheck `--update` moved xt_vc2synth's two new lines alone (the waves given, and the counts).
+- `mutate_vc2.py --synth`, the whole list, clean first: 328 planted, 328 caught, 0 errors (37 minutes; tns-count
+  among them). Its first run failed at the clean build: `XtDiskImage` linked twice, as `harnessParts` already adds it;
+  `mutate_vc2files.sh` names only the check's file.
+- The other lists `--changed` the version before: no plant of theirs changed. fcheck ran every harness at its baseline
+  (xt_vc2osc, xt_vc2tone, xt_vc2sets and xt_vc2waves read the changed headers).
+- `verify.sh`: clean (fcheck as baseline, every test holding, auval).
+
 ### Time Trip's pad by a controller alone: check-pad-cc caught (2026-11-25, v361) {#tone-pad-cc-reach}
 
 `tone_muts.txt`'s `check-pad-cc`, the tone list's open [gap] since v189: xt_tone's live edit not giving the

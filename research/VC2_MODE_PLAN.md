@@ -1261,13 +1261,12 @@ version against rom.4's routines with what it calls hooked:
          of reach on rom.4 and taken out (v359; "The plain voice and the drain's flag: out of the part's reach");
          seven more of the --synth list's caught by draws and compares of their own (v360; "The part's reach: seven of
          xt_vc2synth's misses caught").
-       - [gap] tns-count (--synth): an OSC voice's count moves only where a VariPhrase player asks it, and xt_vc2synth
-         gives the part no waves (PCM's start leaves the OSC kind 0 without one). Its reach is the part given waves:
-         the coordinator's call (2026-11-25), its own version after check-pad-cc. Both sides the disk image's waves, the
-         port through `giveWaves` and rom.4's RAM by rom.4's own load (v503's, in the interpreter), read at run time
-         beside rom.4; the steer on generators of their own; a real difference the renders show fixed red first as a
-         version of its own; Vc2Synth's wiring, the Vc2SynthOs* and Vc2Midi* files and the plugin's asked first (step
-         4.5's session). Xt_vc2synth's whole part has never rendered a VariPhrase wave until then.
+       - [x] tns-count (--synth): an OSC voice's count moves only where a VariPhrase player asks it, caught once the
+         part has waves (v362; HARDWARE_FIRMWARE.md, "The part given the disk image's waves"). Both sides get the disk
+         image's waves, the port through `giveWaves` and rom.4's machines by rom.4's own load (v503's), read at run time
+         beside rom.4, and rom.4's reads past them are given zeros and counted on both sides. The renders showed two
+         faults, each fixed red first in v362: the samples `giveWaves` didn't give (step 4.5's v455 lines) and
+         `boundFloat`'s word for an address in no tone (Tempo Sync's beat). No steer was needed.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
@@ -1409,6 +1408,15 @@ version against rom.4's routines with what it calls hooked:
      host wait (v355): each message goes, as its bytes, into MIDI IN's or USB's receive ring (2048 words,
      preallocated, as rom.4's row 15 builds it), and a full ring drops its backlog for the full marker, as rom.4's does
      (`0x89311e90`); the input task's wait for room is the task's own state, not the audio thread's.
+   - [gap] A player's read past the waves (v362). rom.4's players walk past a wave's samples in some states
+     (xt_vc2synth's far reads, at physical 0x07959e08, 0x08704e30, 0x09085420 and 0x0ca1e0e8), and a factory patch
+     reaches it: with the factory patches in xt_vc2synth's notes part, 31337's notes case 69 reads 0xaca1e0e8. On an XT
+     that read takes whatever is there, and the port plays 0. xt_vc2synth gives rom.4 zeros there and holds the two
+     sides' counts equal (HARDWARE_FIRMWARE.md, "The part given the disk image's waves").
+   - [gap] A LITE voice reused across kinds reads its loop record through a stale pointer (0x893c859a); on an XT that
+     read lands in area 7's on-chip registers (P4), whose values the port doesn't model; the port reads 0. Reached by
+     seed 3's noise draws (xt_vc2synth's notes case 28, through 0x3ea7ffcb), by no factory patch in the runs at 2024, 7
+     and 31337. xt_vc2synth gives rom.4 a zero record there and counts both sides (v362).
 
 ### 5. Against the machine
 

@@ -24,6 +24,7 @@
 #include "Vc2PatchStore.h"
 #include "Vc2SynthWholeCheck.h"   // v360
 #include "Vc2SystemStore.h"
+#include "Vc2WaveBoot.h"   // v362
 #include <algorithm>
 #include <memory>
 
@@ -160,10 +161,17 @@ struct Pair {
     std::unique_ptr<Whole> w;
 };
 
+// The waves a pair is given, and its reads past them counted (v362)
+struct PairWaves {
+    const Vc2LoadedWaves& waves;
+    Vc2SynthPast& past;
+};
+
 // A fresh pair (the last one's counts tallied), each started as the check's main starts its own, then each on its OS;
-// v360: then its lead-in
-std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, std::mt19937& own, WholeCounts& n) {
+// v360: then its lead-in; v362: each given the waves after its start
+std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, std::mt19937& own, WholeCounts& n, PairWaves g) {
     if (p.rig) n.tally(*p.rig);
+    if (p.s) vc2SynthPortRecords(*p.s, g.past);
     p = Pair {};
     p.rig = std::make_unique<Rig>();
     std::string why, d;
@@ -171,8 +179,10 @@ std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, std::mt19937&
     if (d.empty()) d = p.rig->prepare();
     int rows = 0;
     if (d.empty()) d = vc2SynthRomStart(p.rig->fw, rows, kRigRows);
+    if (d.empty()) vc2SynthWavesWritten(p.rig->fw.cpu, g.waves, g.past);
     p.s = std::make_unique<Vc2Synth>();
     p.s->start();
+    vc2SynthWavesGiven(*p.s, g.waves, g.past);
     if (vc2SystemDefaults() != nullptr) p.s->giveSystem(*vc2SystemDefaults());
     if (d.empty()) d = p.rig->begin();
     p.w.reset(new Whole { *p.rig, *p.s, rng, n, own });
@@ -186,22 +196,24 @@ std::string pairMade(const char* rom4, Pair& p, std::mt19937& rng, std::mt19937&
 }
 } // namespace
 
-long vc2SynthWholePart(const char* rom4, const Vc2Run& run) {
+long vc2SynthWholePart(const char* rom4, const Vc2Run& run, const Vc2LoadedWaves& waves, Vc2SynthPast& past) {
     std::mt19937 rng((uint32_t)run.seed + 5);
     std::mt19937 own((uint32_t)run.seed + 15);   // v360
     WholeCounts n;
     Pair p;
-    std::string d = pairMade(rom4, p, rng, own, n);
+    const PairWaves g { waves, past };
+    std::string d = pairMade(rom4, p, rng, own, n, g);
     if (!d.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the whole part: %s\n", d.c_str());
     std::vector<uint8_t> store((size_t)kVc2StoreBytes);
     int c = 0;
     for (; c < std::min(vc2SynthCaseCount(run), kMostCases) && d.empty(); ++c) {
         d = wholeCase(*p.w, store);
-        if (d.empty() && p.w->cutting) d = pairMade(rom4, p, rng, own, n);   // the cut pair can't go on
+        if (d.empty() && p.w->cutting) d = pairMade(rom4, p, rng, own, n, g);   // the cut pair can't go on
         if (!d.empty() && xtSwitch("XT_VC2SYNTH_FIRST")) std::printf("  the whole part: case %d, %s\n", c, d.c_str());
     }
     vc2SynthPatchDropped(p.rig->fw, *p.s);
     n.tally(*p.rig);
+    vc2SynthPortRecords(*p.s, past);
     std::printf("synth whole: the start on both OSes; %d cases on %ld pairs, %ld events: %ld blocks (%ld ticks, %ld "
                 "sounding), %ld messages (%ld bursts, %ld floods); %ld waits in a pass, %ld cut; %ld patches under a "
                 "VOCODER's tone, %ld Types kept; on rom.1 %ld contexts loaded, %ld suspends, %ld semaphore waits; the "

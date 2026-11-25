@@ -74,13 +74,16 @@ struct Vc2OscSamples {
     const int16_t* samples = nullptr;
     uint32_t address = 0;
     uint32_t count = 0;
+    long* far = nullptr;   // v362: a check's count of the reads outside them (none: not counted)
     // [FW] v335: by its 29-bit physical address, as the SH-4's areas P0…P3 mirror physical memory with the MMU off
     // (Sh4::phys): a read that wraps past 2^32 (the period-jump player's read behind the wave's first sample) lands on
     // the bytes below the samples, as on the XT
     int at(uint32_t word) const {
         constexpr uint32_t kPhysical = 0x1fffffffu;
         const uint32_t index = ((word & kPhysical) - (address & kPhysical)) / 2;
-        return index < count ? samples[index] : 0;
+        if (index < count) return samples[index];
+        if (far != nullptr) ++*far;
+        return 0;
     }
 };
 

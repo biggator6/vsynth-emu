@@ -6,7 +6,8 @@
 // Then Vc2Synth built and started, and every member compared with rom.4's memory at its address, byte for byte: the
 // whole objects, the tables a field at a time, the tone pool's tones by the words a tone holds (its head and tail),
 // the vocoder by v219's shared compares (its engines and stages) with its engine and hook words.  The start is one,
-// so the run is one case whatever [cases] says.  XT_VC2SYNTH_FIRST=1 says what differs.  XT_VC2SYNTH_MAIN only.
+// so the run is one case whatever [cases] says.  v362: after the tones, the disk image's waves on both sides
+// (Vc2SynthWavesCheck.cpp), the reads past them counted.  XT_VC2SYNTH_FIRST=1 says what differs.  XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
 #include "Vc2CheckRig.h"
 #include "Vc2CheckVocoder.h"   // v345
@@ -14,6 +15,7 @@
 #include "Vc2Synth.h"
 #include "Vc2SynthCheck.h"    // v343
 #include "Vc2SynthMemory.h"   // v342: the part's regions
+#include "Vc2WaveBoot.h"      // v362
 #include "Vc2AutoNoteTables.h"
 #include "Vc2CarrierTables.h"
 #include "Vc2CosmTables.h"
@@ -265,6 +267,9 @@ int main(int argc, char** argv) {
     std::printf("synth: %d tones made through the part's hosts, their words compared, then given back\n", made);
     Vc2SynthPosts posts;   // v346: the OS's hooks, the parts' one rig
     vc2SynthInstallOs(fw, posts);
+    const auto waves = std::make_unique<Vc2LoadedWaves>();   // v362: the disk image's waves on both sides
+    Vc2SynthPast past;
+    if (!vc2SynthWavesBoth(argv[1], fw, *synth, *waves, past)) return 1;
     // v355: with XT_VC2SYNTH_STOP, the parts after the first that differs left (a plant's run)
     long tally = (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1);
     const bool stop = xtSwitch("XT_VC2SYNTH_STOP") != nullptr;
@@ -275,8 +280,10 @@ int main(int argc, char** argv) {
         next([&] { return vc2SynthLoadPart(fw, *synth, *run, posts); });    // v345
         next([&] { return vc2SynthNotesPart(fw, *synth, *run, posts); });   // v346
         next([&] { return vc2SynthReadsPart(fw, *synth, *run); });          // v343: after the load, its noise last
-        next([&] { return vc2SynthWholePart(argv[1], *run); });             // v355: a fresh pair, on their OSes
+        next([&] { return vc2SynthWholePart(argv[1], *run, *waves, past); });   // v355: a fresh pair, on their OSes
     }
+    vc2SynthPortRecords(*synth, past);   // v362: the reads past the waves, each side's
+    tally += vc2SynthPastDifference(past);
     std::printf("xt_vc2synth: %ld different\n", tally);
     return 0;
 }

@@ -5,6 +5,7 @@
 #include "XtWord.h"
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstddef>
 
 namespace {
@@ -61,10 +62,12 @@ const int32_t* Vc2SynthOscOutside::inputFrames() {
     return frames != nullptr ? frames : kNoFrames.data();
 }
 
-// Another tone's envelope's or LFO's word, its host's; 0 for an address in no tone
+// Another tone's envelope's or LFO's word, its host's; v362: for an address in no tone, the word the waves hold there
+// (a loop record's events, which VariPhrase's Tempo Sync beat reads, Vc2OscBeat.cpp), 0 with none given
 float Vc2SynthOscOutside::boundFloat(uint32_t part, uint32_t offset) {
     const uint32_t at = part + offset;
-    if (!pool_.holds(at)) return 0.0f;
+    const Vc2WaveMemory* waves = w_.waveMemory();
+    if (!pool_.holds(at)) return waves != nullptr ? std::bit_cast<float>(waves->word(at)) : 0.0f;
     const int tone = pool_.indexOf(at);
     return w_.host(tone).mods.boundFloat(pool_.addressOf(tone), part, offset);
 }
@@ -74,6 +77,7 @@ Vc2OscWaveHeader Vc2SynthOscOutside::waveHeader(uint32_t at) {
 }
 
 Vc2OscLoopRecord Vc2SynthOscOutside::loopRecord(uint32_t at) {
+    if (w_.waveMemory() != nullptr && !w_.waveMemory()->holds(at)) ++recordsPast;   // v362: a check's count
     return fromWaves<Vc2OscLoopRecord>(w_.waveMemory(), at, kLoopFields);
 }
 

@@ -47,6 +47,7 @@ public:
     uint32_t address() override { return 0; }                    // the link's, never asked here
     Vc2OscWaveHeader waveHeader(uint32_t at) override;
     Vc2OscLoopRecord loopRecord(uint32_t at) override;
+    long recordsPast = 0;   // v362: the loop records read at an address the waves don't hold (xt_vc2synth's count)
 
 private:
     Vc2SynthToneWorld& w_;
@@ -59,6 +60,7 @@ public:
     void ended() override { w_.ended(tone()); }
     void waitFade() override { w_.waitFade(tone()); }
     void truncated() override { w_.truncated(tone()); }
+    long recordsPast() const { return outside_.recordsPast; }   // v362
 
 protected:
     const Vc2ToneHost& hostOf(int tone) override { return w_.host(tone); }

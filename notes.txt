@@ -335,6 +335,14 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The part given the disk image's waves v362 (2026-11-25, on claude/v358-plant-reach after v361; HARDWARE_FIRMWARE.md,
+  "The part given the disk image's waves: two wiring faults, tns-count caught"): xt_vc2synth gives both sides the disk
+  image's waves, rom.4's own load (v503) at run time; rom.4's reads past them given zeros, counted on both sides and
+  held equal. Two faults fixed red first: the samples giveWaves didn't give (step 4.5's v455 lines) and boundFloat's
+  word for an address in no tone (Tempo Sync's beat). tns-count caught by the waves alone. 0 different at the six
+  seeds; at 400 cases 4 and 5 differ by reads past in mapped memory (v363) and seed 4's mix (v364). Step 4.5's two
+  [gap]s: the far walk and the stale record pointer.
+
 Time Trip's pad by a controller alone v361 (2026-11-25, on claude/v358-plant-reach after v360; HARDWARE_FIRMWARE.md,
   "Time Trip's pad by a controller alone: check-pad-cc caught"): the tone list's [gap] since v189. No case moved a Time
   Trip Assign alone and then asked the pad. Replays after the last case, a random case with a live edit one in four,
