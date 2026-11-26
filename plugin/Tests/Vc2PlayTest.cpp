@@ -164,10 +164,12 @@ int run(const juce::File& rom, const juce::File& work) {
 
 } // namespace
 
-// The check, or with `time` after the image the timing mode (Vc2PlayTime.cpp)
+// The check, or with `time` after the image the timing mode (Vc2PlayTime.cpp), with `render` the render mode
+// (Vc2PlayRender.cpp)
 int main(int argc, char** argv) {
     const auto chosen = [](const juce::File& rom, const juce::File& work, const juce::StringArray& rest) {
-        return rest[0] == "time" ? vc2PlayTime(rom, work, rest) : run(rom, work);
+        if (rest[0] == "time") return vc2PlayTime(rom, work, rest);
+        return rest[0] == "render" ? vc2PlayRender(rom, work, rest) : run(rom, work);
     };
     return testMain(argc, argv, "vc2play", chosen);
 }

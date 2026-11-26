@@ -190,27 +190,32 @@ add_custom_target(VSynthEmuBuildId
     COMMAND "${CMAKE_COMMAND}" "-DREPO=${CMAKE_CURRENT_SOURCE_DIR}/.." "-DOUT=${XT_BUILD_ID_H}" -P "${CMAKE_CURRENT_SOURCE_DIR}/BuildId.cmake"
     BYPRODUCTS "${XT_BUILD_ID_H}"
     VERBATIM)
-add_dependencies(VSynthEmu VSynthEmuBuildId)
 set_source_files_properties(Source/XtBuildId.cpp PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # ─── JUCE Modules ────────────────────────────────────────────────────────────
-target_link_libraries(VSynthEmu PRIVATE
-    juce::juce_audio_utils
-    juce::juce_audio_processors
-    juce::juce_audio_basics
-    juce::juce_audio_formats
-    juce::juce_dsp
-    juce::juce_gui_basics
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
-    juce::juce_recommended_warning_flags
-)
-
-target_compile_definitions(VSynthEmu PUBLIC
-    JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_VST3_CAN_REPLACE_VST2=0
-)
+# A plugin target's set-up past its sources (v462: the instrument's and the effect build's, FxPlugin.cmake): the build
+# id first, the JUCE modules, the definitions
+function(vse_plugin_setup target)
+    add_dependencies(${target} VSynthEmuBuildId)
+    target_link_libraries(${target} PRIVATE
+        juce::juce_audio_utils
+        juce::juce_audio_processors
+        juce::juce_audio_basics
+        juce::juce_audio_formats
+        juce::juce_dsp
+        juce::juce_gui_basics
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+    )
+    target_compile_definitions(${target} PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+    )
+endfunction()
+vse_plugin_setup(VSynthEmu)
+include(FxPlugin.cmake)   # the effect build (v462), on the sources above
 
 # ─── Tests of the processor (not built by default) ───────────────────────────
 # A test linked to the plugin's shared code, with JUCE's headers and settings as that code sees them
@@ -251,13 +256,13 @@ vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/T
 # The VC-2 mode's audio (v455): the processor against the part driven directly, bit for bit, nothing allocated; the
 # part's view (v456) and the system's parameters (v457)
 vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayRun.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp
-             Tests/Vc2PlaySystem.cpp Tests/Vc2PlayFx.cpp Tests/TestMain.cpp)
+             Tests/Vc2PlaySystem.cpp Tests/Vc2PlayFx.cpp Tests/Vc2PlayRender.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # A project's own files (v600 on): a link to a preset wave followed to the wave it names
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
              Tests/TestMain.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
-add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
+add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuFx_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
                  VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
                  VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest VSynthEmuVc2PlayTest)

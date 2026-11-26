@@ -78,10 +78,12 @@ bash "$D/gitlinks_test.sh" || rc=1
 # Which build: the script on a repository of its own, then the copies this build made against git
 bash "$D/buildid_test.sh" || rc=1
 [ $BUILT = 1 ] && { bash "$D/buildid.sh" || rc=1; }
-# The AU as a host sees it: the run fails unless auval succeeds and says so
+# The AUs as a host sees them, the instrument and (v461) the effect build: the run fails unless auval succeeds and says so
 if [ $BUILT = 1 ]; then
-    o=$(auval -v aumu VsEm Gato 2>&1) || rc=1
-    echo "auval: $(echo "$o" | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
-    echo "$o" | grep -q "AU VALIDATION SUCCEEDED" || rc=1
+    for au in "aumu VsEm Gato" "aumf VsEf Gato"; do
+        o=$(auval -v $au 2>&1) || rc=1
+        echo "auval ${au%% *}: $(echo "$o" | grep -o "AU VALIDATION SUCCEEDED\|FAIL.*" | head -1)"
+        echo "$o" | grep -q "AU VALIDATION SUCCEEDED" || rc=1
+    done
 fi
 exit $rc

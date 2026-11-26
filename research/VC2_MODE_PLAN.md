@@ -1439,6 +1439,13 @@ version against rom.4's routines with what it calls hooked:
      inputs the frame's +4 and +0x14 are wait on step 5's captures (items 2 and 4 below). Those captures change that one
      rule. v458: with the effects on, rom.4's chip is given no input either (the mic reaches the part by this rule,
      not through the chip's slots); the same captures say what the chip does with it.
+   - [x] (v461) The VC-2 heard dry in REAPER (the user, 2026-11-26): REAPER plays an instrument's track audio beside
+     the instrument's output, so the vocoder, about 15 dB under its input, was lost under the dry vocal; the plugin
+     vocodes there as offline (HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"). Fixed by an effect build
+     beside the instrument, "V-Synth Emu FX" (plugin/FxPlugin.cmake, AU aumf, VST3 Fx), which REAPER runs on the
+     track's audio, with no dry vocal (the user's check in REAPER, 2026-11-26); held by verify.sh's auval of both AUs
+     and buildid.sh. Whether the XT's vocoder also comes out that
+     far under its input is step 5's to measure.
    - [x] (v460) 018 FemaleChoirs back in the played-block test after the three-way merge (v362 in): it plays, peak
      0.166, 28% of real time, bit for bit. Its one failing check was the test's: 018's vocoder is modulated by the
      patch's own wave, not the mic (the part mixer takes the modulator from the voices' direct sound when no OSC Type

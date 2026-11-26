@@ -2,6 +2,7 @@
 // VSynthEmuVc2PlayTest's set-up, its check's and its timing mode's (v455): the images and the VC-2's waves in, and a
 // processor in the VC-2 mode with a .p02 loaded and its part made.
 #include "TestChecks.h"
+#include "TestPatches.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/Vc2WavesInUse.h"
 #include "../Source/XtEncoded.h"
@@ -35,6 +36,34 @@ inline std::unique_ptr<VSynthEmuProcessor> vc2Processor(TestChecks& check, const
     return p;
 }
 
+// A processor at `rate` given a session's saved state as a host restores one, the control thread ticked once so its
+// part is made (the system checks' session, the render mode's `state=`)
+inline std::unique_ptr<VSynthEmuProcessor> vc2ProcessorFromState(const juce::MemoryBlock& state, double rate) {
+    auto p = std::make_unique<VSynthEmuProcessor>();
+    p->fxManualTicks();
+    p->prepareToPlay(rate, kVc2PlayBlock);
+    p->setStateInformation(state.getData(), (int)state.getSize());
+    p->vc2Play().tick();
+    return p;
+}
+
+// The disk image's .p02 at `place` (0 the first) written into `work` and loaded by vc2Processor at `rate`, its name in
+// `name` (the timing and render modes'); none, and a failed check, where the image holds none
+inline std::unique_ptr<VSynthEmuProcessor> vc2PlayPatchAt(TestChecks& check, const juce::File& rom,
+                                                          const juce::File& work, int place, double rate,
+                                                          std::string& name) {
+    const std::vector<DiskPatch> patches = diskVc2Patches(rom);
+    if (place < 0 || place >= (int)patches.size()) {
+        check(false, "the disk image holds no .p02 at place " + std::to_string(place));
+        return nullptr;
+    }
+    const DiskPatch& patch = patches[(size_t)place];
+    const juce::File file = work.getChildFile(patch.name);
+    writeTestFile(file, patch.bytes);
+    name = patch.name;
+    return vc2Processor(check, file, rate);
+}
+
 // The input the checks play: a saw at 220 Hz, a little higher on the right, at a quarter of full scale
 inline float vc2PlayInput(int frame, int side) {
     constexpr double kPitch = 220.0, kRight = 1.01, kRate = 44100.0;
@@ -45,6 +74,8 @@ inline float vc2PlayInput(int frame, int side) {
 
 // The timing mode (Vc2PlayTime.cpp): `VSynthEmuVc2PlayTest <rom> time <place> [notes]`
 int vc2PlayTime(const juce::File& rom, const juce::File& work, const juce::StringArray& rest);
+// The render mode (Vc2PlayRender.cpp): `VSynthEmuVc2PlayTest <rom> render <place> <out.wav>`
+int vc2PlayRender(const juce::File& rom, const juce::File& work, const juce::StringArray& rest);
 // v456: the part's view as the editor reads it, on a processor that has played (Vc2PlayView.cpp)
 void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::string& name);
 // v457: on a part just made, the system parameters at their defaults, rom.4's as the part reads them; on a processor that

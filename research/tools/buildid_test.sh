@@ -80,16 +80,27 @@ carry() {
     mkdir -p "$(dirname "$1")"
     printf 'x\0V-Synth Emu build %s\0y' "$2" > "$1"
 }
-au() { echo "$1/V-Synth Emu.component/Contents/MacOS/V-Synth Emu"; }
-vst3() { echo "$1/V-Synth Emu.vst3/Contents/MacOS/V-Synth Emu"; }
+F="$B/VSynthEmuFx_artefacts/Release"   # v462: the effect build's, beside the instrument's
+FX="V-Synth Emu FX"
+NAMES=("V-Synth Emu" "$FX")   # the products, and where this build makes each
+MADE=("$A" "$F")
+# A bundle's binary in a folder, the instrument's unless another product is named
+au() { echo "$1/${2:-V-Synth Emu}.component/Contents/MacOS/${2:-V-Synth Emu}"; }
+vst3() { echo "$1/${2:-V-Synth Emu}.vst3/Contents/MacOS/${2:-V-Synth Emu}"; }
+# This build's copies: the test with the first id, both products' AUs with the second, their VST3s with the third
 own() {
     carry "$B/VSynthEmuTest" "$1"
-    carry "$(au "$A/AU")" "$2"
-    carry "$(vst3 "$A/VST3")" "$3"
+    for i in 0 1; do
+        carry "$(au "${MADE[i]}/AU" "${NAMES[i]}")" "$2"
+        carry "$(vst3 "${MADE[i]}/VST3" "${NAMES[i]}")" "$3"
+    done
 }
+# ~/Library's: both products' AUs with the first id, their VST3s with the second
 installed() {
-    carry "$(au "$P/Components")" "$1"
-    carry "$(vst3 "$P/VST3")" "$2"
+    for name in "${NAMES[@]}"; do
+        carry "$(au "$P/Components" "$name")" "$1"
+        carry "$(vst3 "$P/VST3" "$name")" "$2"
+    done
 }
 # expect <case> <exit status> <text its line must hold>
 expect() {
@@ -120,5 +131,14 @@ expect "a wrong id in this build's test" 1 "$other in $B/VSynthEmuTest"
 own "$id" "$id" "$id"
 rm -rf "${A:?}/AU"
 expect "this build's AU missing" 1 "no id in $A/AU/"
+# v462: the effect build's copies held to the same id
+own "$id" "$id" "$id"
+carry "$(au "$F/AU" "$FX")" "$other"
+expect "a wrong id in the effect build's AU" 1 "$other in $F/AU/"
+own "$id" "$id" "$id"
+rm -rf "${F:?}/VST3"
+expect "the effect build's VST3 missing" 1 "no id in $F/VST3/"
+own "$id" "$id" "$id"
+expect "the effect build's installed copies named" 0 "FX AU this build's, FX VST3 this build's"
 
 [ $fail = 0 ] && echo "build id's script: $n cases as they should be" || { echo "buildid_test: $fail of $n wrong"; exit 1; }

@@ -18,16 +18,10 @@ constexpr juce::uint8 kVelocity = 100;
 int vc2PlayTime(const juce::File& rom, const juce::File& work, const juce::StringArray& rest) {
     TestChecks check { "vc2play time" };
     vc2PlayImages(check, rom);
-    const std::vector<DiskPatch> patches = diskVc2Patches(rom);
     const int place = rest[1].getIntValue(), notes = std::max(1, rest[2].getIntValue());
-    if (place < 0 || place >= (int)patches.size()) {
-        check(false, "the disk image holds no .p02 at place " + std::to_string(place));
-        return check.summary();
-    }
-    const DiskPatch& patch = patches[(size_t)place];
-    const juce::File file = work.getChildFile(patch.name);
-    writeTestFile(file, patch.bytes);
-    auto p = vc2Processor(check, file, kRate);
+    std::string name;
+    auto p = vc2PlayPatchAt(check, rom, work, place, kRate, name);
+    if (p == nullptr) return check.summary();
     juce::AudioBuffer<float> buf(2, kVc2PlayBlock);
     double seconds = 0, peak = 0;
     for (int b = 0; b < 2 * kBlocksASecond; ++b) {
@@ -46,6 +40,6 @@ int vc2PlayTime(const juce::File& rom, const juce::File& work, const juce::Strin
     const Vc2PartPlayer::Counts& c = p->vc2Play().player()->counts();
     std::printf("vc2play time: %s, %d note(s): processBlock %.3f s for %.3f s of audio (%.0f%% of real time), peak "
                 "%.4g; %ld blocks, %ld ahead in waits\n",
-                patch.name.c_str(), notes, seconds, audio, 100.0 * seconds / audio, peak, c.blocks, c.ahead);
+                name.c_str(), notes, seconds, audio, 100.0 * seconds / audio, peak, c.blocks, c.ahead);
     return check.summary();
 }

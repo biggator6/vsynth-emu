@@ -32,8 +32,13 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   its driver is given, `vc2FxGive`, shared with the test's reference; `PluginVc2Fx`, its threads), `vc2FxSystemAreaOf`
   (Vc2SystemStore). v459: `UiVc2Bands` (the VOCODER card's bands, d-14, `Vc2BandsView`), the view's bands
   (`Vc2PartView`, `Vc2PartPlayer::viewedBands`). Checked by `VSynthEmuVc2PlayTest` (`plugin/Tests/Vc2PlayTest.cpp`, its
-  reference `Vc2PlayDirect.h`, its set-up `Vc2PlayRig.h`, its run `Vc2PlayRun.cpp`, its timing mode `Vc2PlayTime.cpp`,
+  reference `Vc2PlayDirect.h`, its set-up `Vc2PlayRig.h` (v461: `vc2PlayPatchAt`, `vc2ProcessorFromState`), its run
+  `Vc2PlayRun.cpp`, its timing mode `Vc2PlayTime.cpp`, its render mode `Vc2PlayRender.cpp` (v461),
   the view's checks `Vc2PlayView.cpp`, the system's `Vc2PlaySystem.cpp`, the effects run `Vc2PlayFx.cpp`).
+- `plugin/FxPlugin.cmake` (v461): the effect build, VSynthEmuFx ("V-Synth Emu FX", AU aumf VsEf Gato, VST3 Fx), on
+  VSynthEmu's own sources read back from its target, with `vse_plugin_setup` (CMakeLists.txt, both targets' set-up);
+  REAPER plays an instrument's track audio beside its output (HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER").
+  Checked by verify.sh's auval and buildid.sh.
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `IOS_companion/`: a companion application for iPhone and iPad, developed separately from the plugin, that works as the XT's Time Trip or X-Y pad over MIDI; tested and working (the user, 2026-11-13). It is not part of the plugin's build, tests or outstanding work; its `IOS_COMPANION_PLAN.md` still reads "Planned" and is out of date.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,

@@ -738,6 +738,18 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VC-2 heard dry in REAPER v461 (2026-11-26; HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"): not the
+  plugin's. VSynthEmuVc2PlayTest's render mode (Vc2PlayRender.cpp: a .p02 or a session's state, a rate, Effects, a
+  saw or a file on the input, a held chord, `seconds=`) vocodes the user's own project state and vocal offline; the
+  user's REAPER render is the vocal unchanged at lag 0 plus the plugin's vocoder: REAPER adds an instrument's track
+  audio to its output. research/tools/rppstate.py reads a REAPER project's routing and the plugin's state. Rig:
+  vc2PlayPatchAt (the timing mode's load, made one) and vc2ProcessorFromState (the system check's session, made one).
+  The fix: an effect build beside the instrument, "V-Synth Emu FX" (plugin/FxPlugin.cmake: AU aumf VsEf Gato, VST3
+  Fx, the same sources, processor and editor), which a host runs on its track's audio; vse_plugin_setup the two
+  targets' shared set-up; in REAPER it vocodes with no dry vocal (the user's check). verify.sh: auval on both AUs
+  (verify_test.sh: a stub auval fails each AU's line); buildid.sh: the effect build's copies (28 cases).
+  VSynthEmuVc2PlayTest 137/137; the 9 vc2play-system plants caught.
+
 018 FemaleChoirs in the played-block test v460 (2026-11-26, on the three-way merge 17e965b; HARDWARE_FIRMWARE.md, "018
   FemaleChoirs in the played-block test"): 018 back (v362 in), bit for bit, 28% of real time. Its failing check was the
   test's: 018's vocoder is modulated by its own wave (no OSC Type EXTIN, and its voices don't play the mic), so a

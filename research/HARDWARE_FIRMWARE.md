@@ -1546,6 +1546,38 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 heard dry in REAPER: REAPER adds an instrument's input to its output; an effect build (2026-11-26, v461) {#vc2-plugin-reaper-dry}
+
+The user's report: in REAPER (AU and VST3 alike), VC-2 mode, 001 LargeChoir 1, a vocal into the plugin and notes
+held, only the dry vocal heard, though the VOCODER page said it vocoded (Input -9.5 dBFS, voiced, 4 notes sounding,
+Output -30.9 dBFS, every check OK). Measured, not the plugin's fault:
+- Offline, the processor (VSynthEmuVc2PlayTest's render mode, v461) vocodes 001 at 44.1, 48 and 96 kHz, Effects off
+  and on, with a saw, a sung vowel, a drum loop, a chord, and the user's own project state (its JUCE state block taken
+  from the .RPP by `rppstate.py`) with the user's own vocal over 20 s: the output 14-15 dB under the input, its
+  likeness to the input 0.05-0.11 (1.0 the input itself), MAIN 0, the sound in MULTI at the held notes.
+- Every way out of processBlock writes the whole buffer (the VC-2 block, the V-Synth's render, playFile's clear);
+  XtRateOut writes silence when nothing is made; JUCE's VST3 wrapper copies processBlock's buffer to the host's
+  outputs as it is and passes the input only through processBlockBypassed (its own Bypass parameter), which the
+  saved state holds false. The project's pin map: inputs from track channels 1/2, outputs to 1/2.
+- REAPER's own render of the vocal through the plugin, notes played (16 s): the vocal at gain 0.9985 L, 0.9996 R and
+  lag 0, likeness 0.975-0.991 every 2 s (the part answers a block or more late, never at lag 0), plus a rest of
+  -33.3 dBFS rms whose level follows the offline render's (-33.9) with correlation 0.889. So REAPER sums the track's
+  audio with the output of a plugin it takes for an instrument (VST3i, AU aumu), and the vocoder, 15 dB under the
+  vocal, is lost under it. Forum reports describe the same for other instruments with audio inputs; no Cockos
+  document of it was found.
+- The way out is a build REAPER takes for an effect. A REAPER-only way round it: the vocal on the plugin's track's
+  channels 3/4, the plugin's inputs from 3/4, the parent send of channels 1/2 only.
+
+**The effect build** (`plugin/FxPlugin.cmake`): VSynthEmuFx, a second plugin target on the instrument's own sources
+(read back from VSynthEmu's SOURCES, so a file added there is in both), "V-Synth Emu FX": an AU music effect (aumf
+VsEf Gato: a type that takes audio and MIDI) and a VST3 in the Fx category, no Standalone. The processor and editor
+are the instrument's, the same parameters and sessions; a host runs it on its track's audio and plays its output in
+that audio's place. Its own codes make it a plugin of its own to every host, so nothing saved with the instrument
+moves. The set-up both targets share (the build id, the JUCE modules, the definitions) is one function,
+`vse_plugin_setup`. verify.sh builds it (VSynthEmuVerify), runs auval on both AUs, and buildid.sh holds its built
+copies to this build's id and names its installed ones (buildid_test.sh: 28 cases). In REAPER, "V-Synth Emu FX" on
+the vocal's track vocodes with no dry vocal (the user, 2026-11-26: "Yes, it works").
+
 ### 018 FemaleChoirs in the played-block test (2026-11-26, v460) {#vc2-plugin-018}
 
 After the three-way merge (claude/vc2-merge-4-5b 17e965b: v455–v459, the known misses' v358–v364 with v362's

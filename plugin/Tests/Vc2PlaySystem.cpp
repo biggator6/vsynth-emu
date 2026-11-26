@@ -89,11 +89,7 @@ void vc2PlaySystemChecks(TestChecks& check, VSynthEmuProcessor& p, const Vc2Play
           name + "the part's settings' tables or the Matrix's settings aren't what the direct part's readers wrote");
     juce::MemoryBlock state;
     p.getStateInformation(state);
-    VSynthEmuProcessor again;
-    again.fxManualTicks();
-    again.prepareToPlay(44100.0, kVc2PlayBlock);
-    again.setStateInformation(state.getData(), (int)state.getSize());
-    again.vc2Play().tick();
-    first = unheld(again, nullptr);
+    const auto again = vc2ProcessorFromState(state, 44100.0);
+    first = unheld(*again, nullptr);
     check(first == 0, name + "a part made from the session doesn't read " + named(first) + " at its parameter's value");
 }
