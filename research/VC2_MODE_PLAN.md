@@ -1445,8 +1445,11 @@ version against rom.4's routines with what it calls hooked:
      is EXTIN, and 018's voices don't play the mic), so silencing the host input leaves it vocoding and the chip
      rightly says HIRESO. The check now expects NO MIC only when rom.4's detector finds the vocoder's input quiet, and
      the MIC IN card shows the mic's own level, not the modulator's (HARDWARE_FIRMWARE.md, "018 FemaleChoirs in the
-     played-block test"). Was:
-     [gap] 018 FemaleChoirs plays at 9x real time, nearly silent; out of the played-block test until v362 (boundFloat),
+     played-block test"). Closed 2026-11-26: the fix is v362's (4409e32, `Vc2SynthOscOutside::boundFloat` in
+     Vc2SynthTone.cpp no longer answering 0 for an address in no tone), 018 put back by v460 (fd8b9b7); held by
+     VSynthEmuVc2PlayTest (`kPatchesPlayed`, place 17; in verify.sh's plugin tests, 137/137 at fd8b9b7). Was, closed:
+     [gap, closed v460] 018 FemaleChoirs plays at 9x real time, nearly silent; out of the played-block test until v362
+     (boundFloat),
      then timed and put back (v455; the coordinator, 2026-11-25). Its time is in its SOLO walk (vc2solo::loadNext through
      Vc2ToneOscLink::boundFloat and Vc2SynthOscOutside::boundFloat), peak 1e-4 against the other patches' 0.07–0.16;
      VSynthEmuVc2PlayTest's patch list says so. v362 (the known-misses session) fixes boundFloat answering 0 for an

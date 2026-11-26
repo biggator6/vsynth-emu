@@ -1825,7 +1825,8 @@ was missed there).
 **The cost**: processBlock 10–27% of one core in real time for the four. 018 FemaleChoirs runs at nine times real time
 and nearly silent (peak 1e-4), its time in its SOLO walk (`vc2solo::loadNext` through the tones' `boundFloat`): likely
 v362's fault (`Vc2SynthOscOutside::boundFloat` answering 0 for an address in no tone, the known-misses session), and out
-of the test until then (VC2_MODE_PLAN.md, step 4.5's [gap] on it).
+of the test until then (VC2_MODE_PLAN.md, step 4.5's [gap] on it). Confirmed 2026-11-26: it was v362's boundFloat;
+with v362 in, 018 plays at 28% of real time, peak 0.166, and is back in the test (v460, {#vc2-plugin-018}).
 
 ### The tone mix's delay index driven far out: rom.4's 32-bit address (2026-11-25, v364) {#vc2-mix-delay-wrap}
 
