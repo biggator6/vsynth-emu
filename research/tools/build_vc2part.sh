@@ -24,9 +24,11 @@
 # rom.1's kernel's event services (v353) against rom.1's own, rom.1 beside rom.4, its switch and timers hooked
 [ -f Vc2KernelCheck.cpp ] && cc -DXT_VC2KERNEL_MAIN Vc2KernelCheck.cpp Vc2KernelRig.cpp Vc2KernelWords.cpp \
    Vc2Kernel.cpp "${SH4[@]}" -o "$O/xt_vc2kernel" &
-# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the .p02 reader (v450) and rom.4's
-# own load of the waves (v503); from v345 rom.4's parameter tables and the patch store, which the part reads, with theirs
-NOT_SYN=" Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp Vc2WavesInUse.cpp Vc2PartPlayer.cpp "
+# Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the waves in use (v504) and the
+# plugin's player (v455); from v345 rom.4's parameter tables and the patch store, which the part reads, with theirs;
+# v362 rom.4's own load of the waves (v503) and the disk image they're read from, which both sides are given; v363 the
+# .p02 reader (v450), for the factory patches
+NOT_SYN=" Vc2WavesInUse.cpp Vc2PartPlayer.cpp "
 SYNX=(XtFxValueText.cpp XtPatchStore.cpp XtSoloVoice.cpp "${FW[@]}")
 VSYN=()
 while read -r f; do
@@ -35,7 +37,7 @@ done < <(sed -n 's|^ *Source/\(Vc2[A-Za-z0-9]*\.cpp\)$|\1|p' ../Vc2Sources.cmake
 # v355: and its whole part on rom.1's kernel, rom.4 and rom.1 in one interpreter
 [ -f Vc2SynthCheck.cpp ] && cc -DXT_VC2SYNTH_MAIN Vc2Synth*Check.cpp Vc2CheckWords.cpp "${VSYN[@]}" XtLfo.cpp \
    Vc2KernelRig.cpp Vc2KernelWords.cpp Vc2MachineRig.cpp \
-   XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp XtTempoTicks.cpp \
+   XtEnvelope.cpp XtCosm.cpp XtOsc.cpp XtExtIn.cpp XtTempoTicks.cpp XtDiskImage.cpp \
    $( [ -f Vc2OscBeat.cpp ] && echo XtMultiBandPlayer.cpp ) \
    $( [ -f Vc2OscHeads.cpp ] && echo XtLitePlayer.cpp ) $( [ -f Vc2OscAnalogRender.cpp ] && echo XtAnalog.cpp ) \
    "${SYNX[@]}" "${SH4[@]}" -o "$O/xt_vc2synth" &

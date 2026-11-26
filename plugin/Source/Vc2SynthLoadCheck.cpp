@@ -225,6 +225,10 @@ std::string vc2SynthStepDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& 
     return d;
 }
 
+std::string vc2SynthMessage(Vc2Fw& fw, Vc2Synth& s, bool part, uint8_t kind, uint8_t second) {
+    return messageBoth(fw, s, part, kind, second);
+}
+
 void vc2SynthPatchDropped(Vc2Fw& fw, Vc2Synth& s) {
     fw.cpu.wr8(kEntryAt, 0);
     s.givePatch(nullptr);

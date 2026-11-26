@@ -1255,6 +1255,18 @@ version against rom.4's routines with what it calls hooked:
        - [x] The merge's gate (v357): the --osc list's heads-count, missed from v334 as the check's wave memory grew, its
          reach back by a draw of LITE's heads on SOLO's waves (HARDWARE_FIRMWARE.md, "LITE's heads past the wave
          memory's first quarter").
+       - [x] The plants the merge's whole lists still missed (v358 on): the --kernel list's kn-rr-freeze, caught by
+         the words compared between a tick and the watchdog's interrupt (v358; HARDWARE_FIRMWARE.md, "The round
+         robin's tie with a put-off dispatch"); the --synth list's plain voice's five and its drain's flag, shown out
+         of reach on rom.4 and taken out (v359; "The plain voice and the drain's flag: out of the part's reach");
+         seven more of the --synth list's caught by draws and compares of their own (v360; "The part's reach: seven of
+         xt_vc2synth's misses caught").
+       - [x] tns-count (--synth): an OSC voice's count moves only where a VariPhrase player asks it, caught once the
+         part has waves (v362; HARDWARE_FIRMWARE.md, "The part given the disk image's waves"). Both sides get the disk
+         image's waves, the port through `giveWaves` and rom.4's machines by rom.4's own load (v503's), read at run time
+         beside rom.4, and rom.4's reads past them are given zeros and counted on both sides. The renders showed two
+         faults, each fixed red first in v362: the samples `giveWaves` didn't give (step 4.5's v455 lines) and
+         `boundFloat`'s word for an address in no tone (Tempo Sync's beat). No steer was needed.
        - [deferred] The VOCODER's balance NaN's sign (v349; the user, 2026-11-24: "Defer it"). A patch that changes a
          sounding VOCODER-OSC note's OSC Type to PCM (a patch change, or an OSC Type edit under the note) has the next
          update pass convert the note's OSC block by the new type (C picks the converter by the record's type at each
@@ -1266,6 +1278,9 @@ version against rom.4's routines with what it calls hooked:
          `xtf::sub`, which rom.2's ports share; XtFloat.h is unchanged and there is no VC-2-only subtract. Meanwhile
          xt_vc2synth's notes part keeps a sounding VOCODER OSC's Type in a new patch (`vocoderTypesKept`,
          Vc2SynthNotesCheck.cpp). What the NaN does to the audio: step 4.5's "A NaN sample to the host" (closed by v454).
+       - [gap] `ftrc` of a NaN (seen in v364, not its cause): XtFloat's `xtf::ftrc` gives 0, the interpreter's FTRC
+         (`ftrcF`, Sh4Interp.cpp) 0x80000000. XtFloat is shared with rom.2's ports, so it is left as it is. What a real
+         SH-4's FTRC gives for a NaN is to be read from its manual; not decided (the coordinator's call, 2026-11-25).
 4. The effects: rom.4's driver on `XtFxChip` (XtFxControl on rom.4's programs), the patch EQ with them. It needs nothing
    of step 4.3: the driver reads parameters by ID and writes the chip's bus, and no tone is in its way.
    The map (2026-11-17), run on rom.4's driver a message flag at a time:
@@ -1466,6 +1481,19 @@ version against rom.4's routines with what it calls hooked:
      waiting meanwhile for the next block asked for; a wait past the room stops the part, and the control thread makes
      another. VSynthEmuVc2PlayTest: 138 to 168 blocks ahead in waits a patch, bit for bit against the part driven
      directly by the same rules.
+   - [gap] A player's interpolated sample loads past its wave (rom.4's 46 sample-load pcs) read rom.4's own memory on
+     an XT: its .text (e.g. 0xa93220b0) or .bss (e.g. 0xa9d5a518), as sample values. Factory patches reach it: 8 reads
+     in the 2024 factory run, 32 in 31337's. The port plays 0. The .text part could match by reading rom.4's image at
+     those addresses; the .bss part would need the part's memory as rom.4 lays it out. Not done: the check gives rom.4
+     zeros there (v363; HARDWARE_FIRMWARE.md, "Sample loads past the waves"). The walk past the wave reaches unmapped
+     memory too (physical 0x07959e08, 0x08704e30, 0x09085420, 0x0ca1e0e8; 31337's factory notes case 69 reads
+     0xaca1e0e8), where an XT reads whatever is there, and the port plays 0 (v362). And a tone mix delay index driven
+     far out (an OSC overflowing to ~−3e18) wraps in 32 bits past the rings into the free LFOs; the port plays 0 there
+     (v364; HARDWARE_FIRMWARE.md, "The tone mix's delay index driven far out").
+   - [gap] A LITE voice reused across kinds reads its loop record through a stale pointer (0x893c859a); on an XT that
+     read lands in area 7's on-chip registers (P4), whose values the port doesn't model; the port reads 0. Reached by
+     seed 3's noise draws (xt_vc2synth's notes case 28, through 0x3ea7ffcb), by no factory patch in the runs at 2024, 7
+     and 31337. xt_vc2synth gives rom.4 a zero record there and counts both sides (v362).
 
 ### 5. Against the machine
 

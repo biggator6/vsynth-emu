@@ -95,10 +95,16 @@ std::string bareTick(Case& c) {
 }
 
 // The watchdog's interrupt on both, when the services before started it; one time in four a tick first, as TMU0's
-// interrupt may be taken before the watchdog's (the round robin then meets a put-off dispatch)
+// interrupt may be taken before the watchdog's (the round robin then meets a put-off dispatch). v358: the words
+// compared between the two, where the running task runs on: which task of a level the put-off dispatch names is read
+// by nothing after (its level alone), and the watchdog's interrupt clears it
 std::string interruptEnd(Case& c) {
     if (!c.rig.watchdog) return "";
-    std::string what = c.rng() % 4 == 0 ? bareTick(c) : "";
+    std::string what;
+    if (c.rng() % 4 == 0) {
+        what = bareTick(c);
+        if (what.empty()) what = difference(c.rig, c.port);
+    }
     return what.empty() ? both(c, Rig::kWatchdogIrq, {}, [&c] { return c.port.interruptEnd(); }) : what;
 }
 

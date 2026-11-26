@@ -1795,6 +1795,362 @@ and nearly silent (peak 1e-4), its time in its SOLO walk (`vc2solo::loadNext` th
 v362's fault (`Vc2SynthOscOutside::boundFloat` answering 0 for an address in no tone, the known-misses session), and out
 of the test until then (VC2_MODE_PLAN.md, step 4.5's [gap] on it).
 
+### The tone mix's delay index driven far out: rom.4's 32-bit address (2026-11-25, v364) {#vc2-mix-delay-wrap}
+
+Step 4.3's ninety-first version, seed 4's last difference at 400 cases after v363 (notes case 315: the mixer's
+`carrier[1].right`, 0x8999f2dc, the port 00 against rom.4's ff). The coordinator's call: the wrap in the port, and
+(A)'s zeros for the reads past the rings.
+
+**What it is.** A tone with OSC 2 overflowing (kind 3, about -2.9e18) through the mix's delay (`delayStereo`,
+0x893e4820; `delayMono`, 0x893e4740, the same). The delay `(b + fullScale)·depth/fullScale` is hugely negative, so
+`ftrc` gives 0x80000000 and the read's index is near -2^31. rom.4 forms the index and the address in 32 bits: `near`
+by `sub` (0x893e48a8), `far` by `add #-1` (0x893e48b0), each brought back by the line's 496 when negative, then
+`ring + 4·index` (`shll2`, `fmov.s @(r0,Rm)`). 4·(-2^31 + k) wraps to 4·k, so its reads land in the next ring, and from
+the last B ring (47) past all 48, in the free LFOs (0x8a0c6d84 on: their list words, 0x8a0c6f14 and 0xffffffff, read
+as floats). The port had three differences there:
+1. `Vc2ToneMixRings::at` formed `ring·kSamples + i` in a `long`, found it past every ring and read 0. Now it forms the
+   address as rom.4 does, in 32 bits, so a read that wraps back into the rings is exact.
+2. `delayedSample`'s `position - whole` overflowed an `int` at a whole of -2^31: undefined in C++, and clang folded the
+   `near < 0` tests differently from rom.4's wrap, depending on what was inlined (a probe's print in `at` moved the
+   port's count from 162 to 190). Now `near` and `far` are formed in 32-bit unsigned arithmetic, as rom.4's.
+3. The reads past all the rings, into rom.4's other memory: (A)'s treatment (the coordinator's call), as for the sample
+   loads (v363). The check skips rom.4's six delay ring loads (0x893e47d4, 0x893e47de, 0x893e48c2, 0x893e48cc,
+   0x893e490e, 0x893e4918, `kRingLoads`, none in a delay slot) with their register 0 when the address is past the
+   rings, and counts them against the port's reads past (`Vc2ToneMixRings::past`, a check's pointer). The counts are
+   printed and held equal. Step 4.5's [gap] has a line for it.
+
+With the wrap and the free LFOs' bytes read past the rings (a probe), case 315 agreed. The next difference was case
+316's vocoder word 0x8999b3b4, 7fffffff against ffffffff: the free LFOs' -1 words as NaNs, then the user's deferred
+NaN sign (xtf::sub against FSUB). Under (A) those reads are zeros on both sides, so it doesn't arise.
+
+**Who reaches it.** The notes part's drawn cases alone: seed 4's 190 such reads and seed 7's 24 all fall there. The
+factory patches' cases reach none at any of the six seeds (400 cases).
+
+**`ftrc` on a NaN**, seen on the way, not this fault's cause: XtFloat's `ftrc` gives 0, the interpreter's FTRC
+0x80000000. XtFloat is shared with rom.2's ports, so it's left as it is: a [gap] beside the [deferred] VOCODER NaN's
+sign in VC2_MODE_PLAN.md.
+
+Red first: with the check's ring hooks and the port's count, but the port's old arithmetic, seed 4 at 400 cases is 1
+different, the reads past the rings rom.4 190 against the port's 2,148 (its `long` index finds far more of them past).
+Then the six seeds are 0 different at 16, 40 and 400 cases, every count equal (seed 4: 190 and 190; seed 7: 24 and 24).
+The counts are printed on a line of their own, which fcheck holds.
+
+Plants (the new port `vc2synthmixrender`, Vc2ToneMixRender.cpp under xt_vc2synth, and the check's `vc2synthwaves`),
+each at seed 4: `mix-ring-wrap` (the address with no wrap for an index that far out), `mix-ring-count` (the port's
+count cut) and `wav-ring-skip` (rom.4's skip removed, the load still counted). The `int` subtract's overflow isn't
+planted: what it gives is the compiler's choice.
+
+Results:
+- fcheck `--update` moved xt_vc2synth's one new line alone; xt_vc2tone, which runs the mix's renders, at its baseline.
+- `mutate_vc2.py --synth`, the whole list, clean first: 332 planted, 332 caught, 0 errors (about an hour).
+- `mutate_vc2.py --tone --changed` (the plants in Vc2ToneMixRender.cpp): 85 of 85 caught. Five (mixr-tap-near,
+  mixr-tap-far and the three mixr-beside plants) planted v337's text of `at` and `delayedSample`; they were re-aimed
+  at the new text, each with its meaning as before, and caught.
+- `verify.sh`: clean (fcheck as baseline, every test holding, auval).
+
+### Sample loads past the waves: zeros wherever they land, the factory patches' cases (2026-11-25, v363) {#vc2-synth-sample-loads}
+
+Step 4.3's ninetieth version, the coordinator's call (A) on v362's far reads in mapped memory.
+
+**What v362 left.** With the disk image's waves on both sides, some of a player's interpolated sample loads past its
+wave land in memory rom.4 maps. Some land in its own .text (0xa93220b0, mid-routine; 0xa942db90, 0xa98caa30,
+0xa9713c88), others in its .bss (0xa9d5a518, 0xa9e6cca8, 0xaa0be768). rom.4 reads its code or state there as samples,
+as an XT would; the port reads 0. Both compute the same addresses. Seeds 4 and 5 have 4 such reads each at 400 cases;
+the factory patches' runs have 8 (2024) and 32 (31337). The renders' other loads past the pool are table reads, which
+both sides model.
+
+**The call (A).** The standing model for rom.2's reads past a wave (`xtFwHookBandReads`) is that the port plays 0
+there, so rom.4 is given zeros there too: a render's sample load past the pool is skipped with its register 0 and
+counted, against the port's reads past its samples. The counts are printed every run and held equal.
+- Only the sample loads. They're found from rom.4's code, not listed: a render's (0x893c6000…0x893c8000) indexed
+  halfword loads (`mov.w @(r0,Rm),Rn`), but those whose address lies within 0x100 past their own pc (`kTableReach`).
+  Those are the renders' own tables: 0x893c6402 reads +0x10, 0x893c6730 +0x10…+0x1c, 0x893c7d70 +0x20 and +0x24.
+  The rule is stated once, in the code beside the renders' span. The kit's lesson check refused a literal table of the
+  46 pcs ("[no-rom-table-literal] … Regenerate it from its formula, with a tolerance test"; refusal 33a11b18, marked
+  wrong: addresses are facts, not ROM bytes; workflow-bugs.md's [gap]). The table reads' count is printed on a line of
+  its own and held by fcheck's baseline, the rule's tolerance test (2,684 at 2024, 16 cases). The
+  46 loads xt_vc2synth's runs saw read the pool are: 0x893c64a4, 64ac, 68e0, 68e4, 68ee, 68fe, 6938, 693c, 694c, 6954,
+  69b0, 69b4, 69c4, 69cc, 6a0c, 6a12, 6a20, 6a26, 6c0e, 6c12, 6c1c, 6c2c, 6c6a, 6c6e, 6c7e, 6c86, 6ce6, 6cea, 6cfa,
+  6d02, 6d46, 6d4c, 6d5a, 6d60, 7a2e, 7a36, 7a44, 7a4c, 7a70, 7a78, 7a86, 7a8e, 7bc8, 7bd0, 7bde and 7be6: each
+  render's two interpolated pairs, none in a delay slot. The formula's far-read counts equal that table's at the six
+  seeds and 16, 40 and 400 cases.
+- Wherever they land. Mapped memory (rom.4's image, its .bss) and unmapped memory alike. v362's zero pages for areas
+  1 to 3 are withdrawn (marked so in place in v362's section): once the skip gave every such load 0 they changed
+  nothing, the runs identical with and without them at the six seeds and 16, 40 and 400 cases. They went, about
+  150 MB less a machine, and any other load past mapped memory faults, as before v362 (the coordinator's yes).
+- Plants: `wav-sample-pc` (0x893c6a0c taken as a table read, so rom.4 reads its own code there as samples,
+  uncounted) fails the check, 53 against the port's 56 at 2024. `wav-mapped-skip` (the skip removed, the load still
+  counted) fails at seed 5, whose notes case 395 plays one. `wav-zero-pages` left the list with the pages.
+
+**The factory patches' cases** (`vc2SynthNotesPart` with the factory patches, `vc2SynthFactoryPatches`). The disk
+image's 128 patches in `Internal.vc2/Patch` are read by rom.4's .p02 reader (`vc2PatchRead`; `Vc2PatchFile.cpp` is
+now linked into xt_vc2synth). Each is the store of a case of the notes part, run a second time: as it is, but for a
+sounding VOCODER OSC's Type kept (v349's deferral). There's at least a case for each patch, so fcheck runs all 128,
+on seeds of their own (the run's 17, 25 and 27 after).
+
+Red first: with the factory cases and without (A), 2024 at fcheck's count is 1 different, the far reads rom.4 4
+against the port's 16 (the factory cases' 12 into mapped memory). With (A): the six seeds 0 different at 16 and 40
+cases, the counts equal; at 400 cases all but seed 4, whose notes case 315 is v364's (2024 56/56, 7 28/28, 31337
+44/44, 3 96/96 with records 1/1, 5 48/48).
+
+**No v365.** 31337's factory notes case 258 (the vocoder object's word 0x8999cef0, 00000000 against 494afe99) was one
+of these reads: a player reading rom.4's code as samples moved the vocoder's analysis. It goes with (A).
+
+The far walk is step 4.5's [gap] (VC2_MODE_PLAN.md, the coordinator's wording): the port plays 0 where an XT reads
+its own memory. The .text part could match by reading rom.4's image there; the .bss part would need the part's
+memory as rom.4 lays it out.
+
+Results:
+- fcheck `--update` moved xt_vc2synth's lines alone: the factory patches' count, the factory cases' summary, the
+  waves' counts, and the table reads' line.
+- `mutate_vc2.py --synth`, the whole list, clean first: 329 planted, 329 caught, 0 errors (54 minutes). After the
+  rule's comment and the table reads' own line, the plants of what changed (`--changed`, the waves check's four): 4 of
+  4 caught.
+- The other lists `--changed`: no plant of theirs changed.
+- `verify.sh`: clean (fcheck as baseline, every test holding, auval).
+
+### The part given the disk image's waves: two wiring faults, tns-count caught (2026-11-25, v362) {#vc2-synth-waves}
+
+Step 4.3's eighty-ninth version. Until now xt_vc2synth gave the part no waves. PCM's start then leaves the OSC kind 0,
+so the whole part never rendered a VariPhrase wave, and `tns-count` (an OSC voice's count moves only where a
+VariPhrase player asks it) was out of reach. Its reach is the part given waves (the coordinator's call).
+
+**Both sides the same waves** (`Vc2SynthWavesCheck.cpp`, `vc2SynthWavesBoth`). The disk image's waves are loaded by
+rom.4's own loaders (`vc2LoadWaves`, v503) from the image beside rom.4, at run time, about 2.5 s a run. The port gets
+them through `giveWaves`. Each of rom.4's machines (main's, and each whole pair's after its start) gets the same bytes at
+their addresses: the store's and the pool's words, the sets' counts, tables, buffers, velocity and key data, and the
+pool's 33.5 MB at 0x8dffffe8. They're given after the tones part, before the load part. Without the disk image the
+check stops, said.
+
+**The reads past the waves.** The project's model reads 0 there, as rom.2's band reads past a wave are given zeros
+(`xtFwHookBandReads`). rom.4 is given zeros narrowly, and each side counts the reads it made so. A run prints the
+counts, and unequal counts are a difference:
+- A player's sample read past the waves. Areas 1 to 3's pages that nothing maps become zeros; area 0, where an XT's
+  boot flash lies, stays unmapped, so a read there still faults. rom.4's halfword loads in the players' renders
+  (`mov.w @(r0,Rm),Rn`, 0x893c6000…0x893c8000) that land in those pages are counted. The port counts its reads outside
+  its samples (`Vc2OscSamples::far`, a check's pointer, none in the plugin). **Withdrawn in v363:** the zero pages
+  went once (A)'s skip gave every sample load past the waves 0, wherever it lands. With the skip the runs are
+  identical with and without them, and any other load past mapped memory now faults ("Sample loads past the waves").
+- LITE's loop record read through a pointer that leaves mapped memory, a stale word on a voice reused across kinds
+  (0x893c859a, through 0x3ea7ffcb). Its loads through r14 (`mov.l @(disp,r14)`, `mov.w @(disp,r14),r0`,
+  0x893c7f00…0x893c8700) are given a zero record there (0x8C1FE000) and counted. The port counts its loop records at an
+  address its waves don't hold (`Vc2WaveMemory::holds`, new: `Vc2LoadedWaves`' sets' data and pool).
+
+**Two faults the waves showed**, each red first at fcheck's count (16 cases), the six seeds:
+1. `giveWaves` gave the store and the sets but not the samples the players read, so every sample read 0. With neither
+   fix, 1 to 3 different at every seed, the port counting 128 to 110,080 reads past its samples and rom.4 none. Fixed by
+   step 4.5's v455 lines, letter for letter (its session's text, the coordinator's call): the pool's memory as rom.4's
+   halfwords from its address. With them alone, 2024, 4 and 3 still differ (an OSC voice's words); 31337, 7 and 5 are 0.
+2. `Vc2SynthOscOutside::boundFloat` gave 0 for an address in no tone. VariPhrase's Tempo Sync beat (`Vc2OscBeat.cpp`)
+   reads its four loop events (+0x4, +0xb8, +0x16c, +0x220 of the block at the voice's +0x1c8) through it, from the
+   wave's cached loop events in the wave memory, so its beat never wrapped. Now it reads the word the waves hold there
+   (0 with none given, as before). Step 4.5's played-block test had factory patch 018 FemaleChoirs at 9× real time and
+   nearly silent (peak 1e-4), all its time under one note-on's SOLO seek: `vc2OscSoloSetUp`'s record seek,
+   `vc2SeekRecords`' last loop calling `loadNext` on records that read 0 through `boundFloat`. 018 played on the part
+   on its OS model with the waves and v455's samples given (C4 at 100 for a second, then a second's release): with
+   `boundFloat` 0 the note-on's seek runs 1,048,854,689 `loadNext` steps (9.6 s), the peak 12,915; with v362's 0
+   steps, the peak 1.19e8 (the part's units), the blocks 0.27 s for each second of audio.
+
+With both: xt_vc2synth 0 different at the six seeds at 16 cases. The far reads, rom.4's and the port's: 2024 0/0,
+7 0/0, 31337 0/0, 3 8/8, 4 4/4, 5 8/8; at 40 cases 2024 16/16, 7 0/0, 31337 4/4, 3 8/8, 4 4/4, 5 8/8. The records past:
+1/1 at seed 3 (the notes case 28), 0 elsewhere. At 400 cases 2024 (36/36), 7 (16/16), 31337 (40/40) and 3 (68/68,
+records 1/1) are 0. Seeds 4 and 5 differ at 400 (their notes cases 315 and 395, a block's buffers), the port counting
+4 reads past its samples more than rom.4 each. Those reads land in rom.4's mapped memory, so rom.4 reads what's there
+and the port reads 0. That's v363's (the coordinator's call (A): rom.4 given zeros there too). Seed 4 has a second
+difference of its own, v364's.
+
+**What reaches them.** With the factory patches in the notes part (a probe: `Internal.vc2/Patch` from the disk image,
+`vc2LoadPatchFiles` and `vc2PatchRead`, at 400 cases), the far walk is reached: 31337's notes case 69, read at
+0xaca1e0e8. The stale pointer was reached only by seed 3's noise draws, with no records past in the factory runs at
+2024, 7 and 31337. Both are step 4.5's [gap]s (VC2_MODE_PLAN.md): on an XT the far read takes whatever is there and
+the stale pointer's read lands in area 7's on-chip registers, and the port reads 0 for both. The factory runs also
+show 2024's far reads 4 against 12 (the reads past in mapped memory above) and 31337's notes case 258, the vocoder
+object's word 0x8999cef0 (00000000 against 494afe99), which goes with them (v363).
+
+**tns-count caught** by the waves alone, no steer: at 2024, 400 cases, the notes case 1, tone 15's OSC 2 voice, byte
+0x899c3e08 04 against 02. Its list line's note ("missed until the check gives the part waves") is gone.
+
+The files: the check's `Vc2SynthWavesCheck.cpp` (new), `Vc2SynthCheck.cpp` and `.h`, `Vc2SynthWholeCheck.cpp`;
+`build_vc2part.sh` and `mutate_vc2files.sh` link rom.4's load of the waves (`Vc2WaveBoot`, `Vc2WaveBootKernel`,
+`Vc2BootFiles`) and `XtDiskImage` into xt_vc2synth. The port: `Vc2Synth.cpp` (v455's lines), `Vc2SynthTone.cpp` and
+`.h` (`boundFloat`; the records' count), `Vc2WaveStore.h` and `Vc2WaveBoot.h` (`holds`), `Vc2OscVoice.h` (`far`).
+
+Plants (vc2synth_muts.txt; two new ports, vc2synthtone for Vc2SynthTone.cpp and vc2synthwaves for the check's own
+hooks), each caught first in a scratch build: syn-waves-samples (v455's count 0), stn-bound-waves (the waves' word 0
+again), stn-records-count (at seed 3, the records' count cut), wav-zero-pages (rom.4 faults at a8704e30, pc
+893c6a0c; withdrawn with the pages in v363), wav-far-count (rom.4's count cut), wav-zero-record (at seed 3: rom.4 faults at notes case 28, read32 at
+3ea7ffcb, pc 893c859a). `Vc2OscVoice.h`'s count isn't planted: a header's plant builds from the unplanted sources.
+
+Results:
+- xt_vc2synth as above; fcheck `--update` moved xt_vc2synth's two new lines alone (the waves given, and the counts).
+- `mutate_vc2.py --synth`, the whole list, clean first: 328 planted, 328 caught, 0 errors (37 minutes; tns-count
+  among them). Its first run failed at the clean build: `XtDiskImage` linked twice, as `harnessParts` already adds it;
+  `mutate_vc2files.sh` names only the check's file.
+- The other lists `--changed` the version before: no plant of theirs changed. fcheck ran every harness at its baseline
+  (xt_vc2osc, xt_vc2tone, xt_vc2sets and xt_vc2waves read the changed headers).
+- `verify.sh`: clean (fcheck as baseline, every test holding, auval).
+
+### Time Trip's pad by a controller alone: check-pad-cc caught (2026-11-25, v361) {#tone-pad-cc-reach}
+
+`tone_muts.txt`'s `check-pad-cc`, the tone list's open [gap] since v189: xt_tone's live edit not giving the
+firmware's pad handler a controller moved alone (`moveLive`), so XtSynth's pad hears it and the firmware's doesn't. It
+shows only where that controller is also a Time Trip Assign and a later Time Trip asks the pad.
+
+**Why the draws missed it.** A controller moves alone at a live edit in two places, and neither reaches it. The
+random cases' live edits move CC 7, 11, 10 or 1, which `drawMatrix`'s Time Trip Assigns leave out. The sweep's CC 91
+and 93 cases run no Time Trip. The pad is compared only at a trip's own messages. Since v189's fixed pick no case
+moved a Time Trip Assign alone and then asked the pad (missed on 32 clean seeds). A steer inside the random cases moves
+their notes' ends and every later draw, so the reach is cases of their own.
+
+**The replays** (`XtToneCases.cpp`, the state in the case loop's Report). After the last case, the random cases with a
+live edit (g % 3 == 2) one in four are run again, each on a generator of its own (the run's seed and the case's number).
+The run's generator is given back after, so no case's draw moves. A replay has:
+- Time Trip Assign X on CC 91 and Y on the chart's 83;
+- the trip's messages sent Y first, where its pad moves by those controllers;
+- its live edit moving CC 91 alone, the panel kept as it was.
+
+Its differences are said as case 100000 + its case, and its counts go in the last section's (stored waves). The
+check's own file grows by no line (2,491); the replays are XtToneCases' (the fork of this session that found the reach;
+its scratch's global state became the Report's, as the kit's rules ask).
+
+Results:
+- xt_tone 0 different at 2024, 7 and 31337 (2,000 cases); every line as before but the stored waves' two (918 notes
+  to 1,140 at 2024), and the same two in the EXT IN section. fcheck `--update` moved those four lines alone.
+- `check-pad-cc` caught at the default seed 2024 (its list line's seed 4242 dropped): case 100311 (the replay of 311),
+  the pad's radius, then the Time Trip's walk and the outputs.
+- `mutate_tone.py`, the whole list (xt_tone's own check changed), clean first: 1,194 planted, 1,194 caught, 0 errors
+  (2 h 58 min under the machine's load). `tone_stack_test.sh`: the same, 2,000 cases at seed 24.
+
+### The part's reach: seven of xt_vc2synth's misses caught (2026-11-25, v360) {#vc2-synth-reach}
+
+Step 4.3's eighty-eighth version. Seven of the plants xt_vc2synth missed, each given the reach to be caught: four by
+draws on generators of their own (the notes part's the run's seed + 13 and + 11, the whole part's + 15), so no other
+draw moves, and two by compares added. Never a compare loosened.
+
+**Why each was missed, and its reach.**
+- `rcv-full-stop` (a full MIDI IN ring's parser count, v355). With the ring full, rom.4's parser (`0x89312576`) leaves
+  its count at the message's length; the plant sets it to 1. The next status byte sets it to 0 on both sides, and the
+  check gives every message its status byte. The flood's full ring comes inside a wait, and the check compared only
+  after the step. *The compare*: where the port's MIDI IN ring has just written a full ring's marker (0xfd, code 2), the
+  machine is given what the model took and both are compared there, inside the wait, as a cut does
+  (`Vc2SynthWhole::fullCompare`). MIDI IN's count then differs, 01 against 03, at 2024's case 13.
+- `ost-cyclic-sensing` and `rcv-sensing-mark` (the sensing check's call and its mark's clear, v355). The check (rom.4's
+  `0x89311330`, every 512 ticks) watches MIDI IN's receive object until the first parameters' message moves it to the
+  second USB port's, which takes no bytes. In the draws that message came long before the first 512 ticks. *The draw*:
+  a fresh pair's lead-in before its first patch, silent blocks with a channel message on MIDI IN one event in 16, until
+  the kernel's time passes 600 ticks. Both plants leave MIDI IN's mark set there.
+- `upd-glue` (the vocoder's glue given the tracked period + 100, v349). The glue (`Vc2Vocoder::glue`) reads the period
+  only with an offset, which Auto Note's Formant Template gives (an EXTIN OSC, Auto Note on, a template whose shifts
+  aren't both 0). It clamps every period past 200.45 frames alike (the ratio 100.227 over it below ½), and the noise's
+  periods were 195 to 630. *The draw*: one case in two on a pitch, its blocks' frames a saw of 40 to 189 frames (where
+  not silent, as loud as the noise's shift), its patch the vocoder's on an EXTIN with Auto Note (OSC 1 Type, Auto Note
+  On Switch, Vocoder Sw and Type, a template with shifts). The plant shows at 2024's case 11.
+- `svo-noteon-back` (the note-on's fix-up not written back, v346). The tone's note-on turns OSC 2's code 10 into 2 under
+  the MOD Type OSC SYNC with OSC 2 ANALOG (`0x893b3870`); noise never made that case (0 in every run). *The draw*: one
+  notes-part patch in 4 on it, in both kinds (MOD Type 4, OSC 2 Type ANALOG, OSC 2 Waveform LA-SAW). The note's input
+  then differs, 0a against 02, at 2024's case 15.
+- `svo-block-cosm` (COSM 2's new block given COSM 1, v346). A COSM's new block takes effect only where its code is the
+  object's (`Vc2CosmNoteOn::newBlock`), and what it changes, the two targets (+0xfc, +0x100), lay in the words the
+  tone's compare left out (the COSM objects weren't compared; xt_vc2tone masks +0x70…+0x104 as rom.4's DSP state).
+  *The compare*: each tone's two COSM objects, masked as xt_vc2tone's but for the targets, which the frame keeps in the
+  object (`cosmDifference`, Vc2SynthCheck.cpp). *The draw*: one notes-part patch in 2 has both COSMs of each kind on
+  one Switch and Type, a sounding kind's as the last patch had its COSM 1, so an update's new block keeps the code and
+  COSM 2's lands on COSM 1. COSM 1's target differs at 2024's case 45.
+- `kt-state-before` (a channel state of channel −1 on row 0, the word before the table, v355). The notes' task's own
+  poly pressure (event 0x100) goes on source 3 at the Auto Note node's channel, the part's receive channel, −1 with
+  Part 1 Receive Switch off. The word before the table is 1, so its state 3 matches no voice; the plant's (row 0's
+  channel 0) matches every voice of sources 1 to 3 on channel 0. The notes part keeps the switch on (with it off, the
+  update's Matrix sources read the boot flash, a [gap]); the load part, which may turn it off, plays no note. And the
+  system's message (kind 4) asks every voice of part 0 a change, which takes the notify's place. *The draw*
+  (`vc2SynthReceiveOff`, Vc2SynthTasksCheck.cpp): after a notes case receiving on channel 0 with a voice there, the
+  switch off by the routing's reset (kind 0 with its flag, which reads the switch into part 0's nodes but stops no
+  voice and leaves G's channel word, so no boot flash is read), two update passes (taking the voices' asked updates),
+  the notes' task's own poly pressure, then the switch on again. The voices differ at 2024's case 192.
+
+**Not reached:** `tns-count` (an OSC voice's count moves only where a VariPhrase player asks it), which needs the part
+to have waves: PCM's start (`pcmWaveFound`) leaves the OSC kind 0 without one, and the check gives the part none.
+
+**The split.** `Vc2SynthWholeCheck.cpp` was at the 300-line limit, so a pair's events moved as they stood into
+`Vc2SynthWholeEventsCheck.cpp`, with what both share in `Vc2SynthWholeCheck.h`.
+
+Results:
+- xt_vc2synth 0 different at 2024, 7 and 31337 (400 cases): 90, 97 and 102 fix-up patches; 204, 194 and 197 with the
+  COSMs' types kept; 90, 74 and 65 receive-switch cases; one compare at a full ring each; 18, 22 and 23 cases on a pitch.
+- xt_vc2synth 0 different at the six seeds v355 ran, 2024, 7, 31337, 3, 4 and 5 (40 cases).
+- The seven plants caught at 400 cases, 2024 (`mutate_vc2.py --synth` by name).
+- `mutate_vc2.py --synth`, the whole list: 322 planted, 321 caught, tns-count missed, clean first (28 minutes).
+- fcheck: only xt_vc2synth's two summary lines moved (the notes part's and the whole part's counts, the new ones with
+  them), `--update` on purpose; verify.sh green.
+
+### The plain voice and the drain's flag: out of the part's reach (2026-11-25, v359) {#vc2-synth-plain-voice}
+
+Step 4.3's eighty-seventh version. Six of the plants xt_vc2synth missed, shown out of reach and taken out of
+`vc2synth_muts.txt`. No code changed.
+
+**The plain voice's routines** (`svo-destroy-end`, `-note`, `-updated`, `svo-prepare-plain`, `svo-keyoff-plain`;
+missed since v346). A voice's virtuals go by its class at +0x10: the note voice's (`0x898cd3dc`) or the plain voice's
+(`0x898cd1a8`: +0x14 `0x89391730`, retune `0x893916c0`, destroy `0x893916d0`, key-off `0x893916f0`, prepare
+`0x89391710`, the change test `0x89391720`). On rom.4 no voice of the plain class is ever on a list's walk or
+destroyed:
+- the plain vtable is written by the voices' init (`0x89391ba0`, once, from the notes' task's start at `0x89392af2`)
+  and as the first store of the two builds' constructor chains (`0x89396a0c`, `0x89396be6`), each followed at once by
+  the note class's (`0x89396a16`, `0x89396bf0`);
+- the destroy-on-leave word (`0x89391740`) is written only by those two builds (`0x89396a20`, `0x89396bfa`), so a
+  plain voice is never destroyed;
+- a voice reaches the sounding and prepared lists, where prepare, key-off, retune and the change test are called,
+  only through the take that the build follows.
+
+Results:
+- Counting hooks on both classes' six routines in every rom.4 xt_vc2synth runs (the load, notes and reads parts and
+  each pair of the whole part), at 400 cases on 2024, 7 and 31337: the plain class's 0 calls, the note class's
+  thousands (prepare 9,644, 11,441 and 8,257; key-off 2,583, 2,550 and 2,311).
+- The control: at the notes part's last case, a sounding voice made plain on both sides (+0x10, its +0x30 set), then
+  rom.4's plain prepare, key-off and destroy each against the port's, every region and tone compared after each.
+  Clean: 0 different. With each of the five plants: different there (destroy-end the tone pool's head, -note +0x4c,
+  -updated and prepare-plain +0x30, keyoff-plain the tone's envelope).
+
+**The drain's flag** (`mp-empty-draining`, missed since v355). The wait for the OS MIDI task's queue to empty
+(`0x89311070`) tests the queue's draining flag, set only inside its task's drain (`0x893110b0`, level 12). The drain
+neither waits nor posts a sender, so a sender (the input task, level 1; the front, 27) can test the flag set only if an
+interrupt is taken inside the drain. That is the XT's own timing: a MIDI byte arriving mid-drain. Neither the check's
+events, taken at the model's waits, nor the plugin's, which come between the model's passes, can give it, so the plant
+changes nothing either can play.
+
+Results:
+- The draws: the flag was set at none of the tests (24,413 at 2024, 32,426 at 7, 20,028 at 31337).
+- The control: the flag set on both sides (rom.4's queue +0x2c in the part's words), then a MIDI IN note-on given. Clean:
+  the same. With the plant: its sender goes on while rom.4's waits, and the keys differ.
+
+Both taken out with their notes; the list holds 322 plants. The plants of the other eight misses (v360 on) are as they
+were.
+
+### The round robin's tie with a put-off dispatch (2026-11-25, v358) {#vc2-kernel-rr-tie}
+
+Step 4.3's eighty-sixth version, the first of the plants the firmware checks still missed after the merge's whole
+lists. `vc2kernel_muts.txt`'s `kn-rr-freeze`, missed since v353: the round robin's (`0x8800fbb0`) test of a put-off
+dispatch, `<=` made `<`, so that one put off for a task of the next's own level is taken over by the next.
+
+**Why the check missed it.** The round robin runs only with the lock 0 (the lock-out's bit is in the holds' half), and
+any release of the lock to 0 runs the put-off dispatch, so freezTask can name a task at the round robin only when the
+same interrupt set it: an event set from an interrupt (or a tick's cyclic handler) wakes a task of level 16, then
+TMU0's interrupt is taken before the watchdog's and its round robin finds the running task at its level's head, its
+count out. For the plant to change anything the woken task must also stand third or later in that queue, ready already
+with its wait left from a set that didn't switch to it. And what freezTask names is read by nothing after but its
+level: the watchdog's interrupt (`0x8800fb60`) dispatches to the first ready from that level on, a wake (`0x8800fd20`)
+and the round robin compare its level. So by the end of the watchdog's interrupt both sides have dispatched alike and
+cleared it, and the check compared the words only then (a tick before the watchdog's interrupt was one service).
+
+**The compare.** Between TMU0's interrupt and the watchdog's the running task runs on, so the words there are a state
+of rom.1's own. xt_vc2kernel now compares every word there as well (`interruptEnd`, Vc2KernelCheck.cpp): a compare
+added, no draw added or moved, the counts at each seed those before. freezTask then differs under the plant: at 2024
+in case 6 (service 95; 113 and 377 too), at 7 in case 278, at 31337 in case 121.
+
+Results:
+- xt_vc2kernel 0 different at 2024, 7 and 31337 (40 and 400 cases), its counts as before (40 cases at 2024: 8,000
+  services, 576 switches, fcheck's line).
+- `kn-rr-freeze` caught at 400 cases at each seed, and at fcheck's 40 at 2024.
+- `mutate_vc2.py --kernel`, the whole list: 42 planted, all caught, clean first.
+
 ### LITE's heads past the wave memory's first quarter (2026-11-25, v357) {#vc2-osc-heads-reach}
 
 Step 4.3's eighty-fifth version. The merge's whole `--osc` list missed v326's `heads-count`, LITE's heads' sample

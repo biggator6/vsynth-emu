@@ -2,9 +2,13 @@
 // them): each of rom.4's three tasks' steps on both sides, then what differs.  An update pass (v349): rom.4's loop body
 // from its top 0x89395310 until it comes back there, against Vc2Synth::updatePass.  A notes' task's pass (v350): its
 // loop body from 0x8938fc66, against Vc2Synth::notesPass.  A block (v351): the part mixer 0x893b1820 on input frames
-// drawn, against Vc2Synth::block.  XT_VC2SYNTH_MAIN only.
+// drawn, against Vc2Synth::block.  v360: the receive switch's case (vc2SynthReceiveOff), the notes' pass on given events.
+// XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
+#include "Vc2KeysTables.h"
+#include "Vc2Params.h"
 #include "Vc2SynthCheck.h"
+#include "Vc2SystemStore.h"
 
 namespace {
 // [FW] v349: the update task's loop top (its wait's call) and the ticks' word; the registers its prologue leaves, r8
@@ -70,11 +74,13 @@ std::string vc2SynthUpdatePass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2Syn
 // them, which the part has none of), the schedule's count 0…3 (a timer's), Auto Note's two keys and its note with its
 // period (its block's) drawn; rom.4's loop body with the registers its prologue leaves and the MIDI queue on its stack,
 // its drain (the OS's mailbox) a bare return as the part's
-std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts) {
-    posts.notesWaited = posts.notes & kNotesMask;   // the wait takes what each side posted the task (equal)
+std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts, uint32_t only) {
+    posts.notesWaited = posts.notes & kNotesMask & only;   // the wait takes what each side posted the task (equal)
     posts.notes &= ~kNotesMask;
     s.notesEvents &= ~kNotesMask;
-    for (uint32_t bit = kNotesFirstBit; bit <= kNotesLastBit; bit <<= 1) posts.notesWaited |= rng() % 2 ? bit : 0;
+    for (uint32_t bit = kNotesFirstBit; bit <= kNotesLastBit; bit <<= 1) {
+        posts.notesWaited |= (rng() % 2 ? bit : 0) & only;   // v360: of `only` alone
+    }
     s.noteGate = rng() % 4 == 0 ? 1 : 0;
     s.schedule.count = rng() % kScheduledMost;
     for (uint32_t& key : s.autoNoteKeys) key = rng() % 128;
@@ -167,5 +173,57 @@ std::string vc2SynthClockEvent(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2Syn
     if (!loopBodyRan(fw, kClockLoopAt)) return "the clock task's pass faults: " + fw.cpu.error();
     s.clockPass(posts.clockWaited);
     return vc2SynthEventDifference(fw, s, posts);
+}
+
+namespace {
+// [FW] v360: Part 1 Receive Switch (system B's one bit); the routing's reset, a parameters' message of kind 0 with its
+// flag (0x89393e30), which reads the switch into part 0's nodes as the system's message (kind 4) does, but stops no
+// voice (kind 4's last call asks every voice of part 0 a change, which takes the notify's place); the notes' task's own
+// poly pressure, its event 0x100 (0x8938fc66's way, on source 3 at the Auto Note node's channel); the update passes
+// between, which take the voices' updates the reset asked, so the pressure's notify finds them unasked
+constexpr int kReceiveSwitchId = 0x47;
+constexpr uint8_t kRoutingKind = 0, kRoutingReset = 0x80;
+constexpr uint32_t kOwnPressure = 0x100, kStateWord = 2;
+constexpr int kUpdatesBetween = 2;
+
+// Whether a voice sounds on row 0's channel 0 (sources 1 to 3's tables of channel 0: a table's channel word is its
+// state + 2)
+bool row0Channel0Sounds(Vc2Synth& s) {
+    const uint32_t state = vc2KeysTables().states[0] + kStateWord;
+    const uint32_t list = s.voices.g.lists[Vc2PartVoices::kSounding];
+    for (uint32_t v = s.voices.at(list).next; v != list; v = s.voices.at(v).next) {
+        if (s.keys.table(s.voices.at(v).channel).channel == state) return true;
+    }
+    return false;
+}
+
+// The system as rom.4's memory held it, its Part 1 Receive Switch set as `on` says, on both sides, then the routing's
+// reset on both
+std::string receiveSet(Vc2Fw& fw, Vc2Synth& s, Vc2System system, bool on) {
+    const XtParamDesc* sw = vc2ParamDesc(kReceiveSwitchId);
+    uint8_t& byte = system.bytes[(size_t)(Vc2System::kRecord + sw->offset)];
+    const auto bit = (uint8_t)(0x80 >> sw->bit);
+    byte = on ? (uint8_t)(byte | bit) : (uint8_t)(byte & ~bit);
+    for (const Vc2System::Area& a : Vc2System::kAreas) fw.cpu.write(a.at, system.bytes.data() + a.from, a.size);
+    s.giveSystem(system);
+    return vc2SynthMessage(fw, s, false, kRoutingKind, kRoutingReset);
+}
+} // namespace
+
+std::string vc2SynthReceiveOff(Vc2Fw& fw, Vc2Synth& s, Vc2SynthPosts& posts, std::mt19937& own, long& cases) {
+    if (s.nodes.of(1, 0).channel != 0 || !row0Channel0Sounds(s)) return "";
+    ++cases;
+    Vc2System system {};
+    for (const Vc2System::Area& a : Vc2System::kAreas) {
+        fw.cpu.read(a.at, reinterpret_cast<char*>(system.bytes.data()) + a.from, a.size);
+    }
+    std::string d = receiveSet(fw, s, system, false);
+    if (d.empty()) d = vc2SynthStepDifference(fw, s, posts);
+    for (int k = 0; k < kUpdatesBetween && d.empty(); ++k) d = vc2SynthUpdatePass(fw, s, own, posts);
+    if (d.empty() && s.nodes.of(1, 0).channel < 0) d = vc2SynthNotesTaskPass(fw, s, own, posts, kOwnPressure);
+    if (!d.empty()) return "the receive switch off: " + d;
+    d = receiveSet(fw, s, system, true);
+    if (d.empty()) d = vc2SynthStepDifference(fw, s, posts);
+    return d.empty() ? "" : "the receive switch on again: " + d;
 }
 #endif

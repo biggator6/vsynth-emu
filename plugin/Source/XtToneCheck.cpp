@@ -395,7 +395,7 @@ int sweepWave(size_t at) {
 
 struct Report {
     std::map<std::string, long> kinds;
-    long checks = 0;
+    long checks = 0;   XtTonePads pads {};   // v361: check-pad-cc's replays' state (XtToneCases.h)
     int caseNo = 0, firstCase = -1;
     bool first = std::getenv("XT_TONE_FIRST") != nullptr;      // only each case's first difference
     bool stop = std::getenv("XT_TONE_STOP") != nullptr;        // the run ends at its first difference
@@ -837,8 +837,8 @@ int XtToneProbe::run(int argc, char** argv, bool extIn) {
     };
     // Each zone's OSC's own copy of its wave's header and loop chunks, as a zone's settings of the wave's own are its own here
     constexpr uint32_t kZoneChunks = kRam + 0x2800000;
-    for (int g = 0; g < storedFrom + nStored + (int)oddTerm.size() * kOddCases; ++g) {
-        rep.caseNo = g;
+    for (int g = 0; xtTonePadMore(rep.pads, g, storedFrom + nStored + (int)oddTerm.size() * kOddCases, nCases, r); ++g) {
+        rep.caseNo = xtTonePadCaseNo(rep.pads, g);   // v361: a replay of check-pad-cc's (XtToneCases.h) said as 100000 + g
         const bool playCase = g >= playFrom, segCase = g >= segFrom && g < storedFrom, storedCase = g >= storedFrom, zoneCase = g >= zoneFrom && !playCase;
         const bool oddCase = g >= storedFrom + nStored;
         const bool patchCase = g >= patchFrom && g < tuneFrom, tuneCase = g >= tuneFrom && g < liteFrom, liteCase = g >= liteFrom && !zoneCase && !playCase, extra = patchCase || tuneCase || liteCase || zoneCase || playCase;
@@ -959,7 +959,7 @@ int XtToneProbe::run(int argc, char** argv, bool extIn) {
             wv = band(wv);
             for (size_t i = 0; wv == wv2 && i < pool.size(); ++i) wv = band(&pool[((size_t)(wv - pool.data()) + 1) % pool.size()]);
         }
-        Ctl ctl = drawControls(r, g, wv != nullptr, wv2 != nullptr, extIn);
+        Ctl ctl = xtTonePadAssigns(rep.pads, drawControls(r, g, wv != nullptr, wv2 != nullptr, extIn));   // v361
         if (patchCase) {   // what a patch has, on what the wave has of its own
             const Ctl d = ctl;
             ctl = patchCtl;
@@ -1809,7 +1809,7 @@ int XtToneProbe::run(int argc, char** argv, bool extIn) {
         if (sweepAssign) { ctl.assign[10] = 82; ctl.assign[11] = 83; fw.par = patchOf(ctl); syn.setControls(ctl); if (!fw.updatePatch()) return 1; }
         const bool tripByCc = tripCase && !farCase && !padSource && (sweepAssign || xyCase || (!sweepOn && r.one(2)));
         const int tripNumX = ctl.assign[xyCase ? 6 : 10], tripNumY = ctl.assign[xyCase ? 7 : 11];
-        const bool tripYFirst = r.one(2);
+        const bool tripYFirst = r.one(2) || xtTonePadLive(rep.pads, ctl, tripByCc);   // v361: a replay's Y first
         int tripSentX = -1, tripSentY = -1;
         const auto padByCc = [&](int x, int y, int blk) {
             const auto send = [&](int number, int value, int& sent) {
@@ -1996,10 +1996,10 @@ int XtToneProbe::run(int argc, char** argv, bool extIn) {
                 for (int k = 0; k < 2; ++k) { n.cosm[k].on = ctl.cosm[k].on; n.cosm[k].type = ctl.cosm[k].type; n.cosm[k].lfoKeySync = ctl.cosm[k].lfoKeySync; n.cosm[k].odType = ctl.cosm[k].odType; n.cosm[k].ampType = ctl.cosm[k].ampType; }
                 const int bentFrom = fw.bender;
                 if (sweep ? sweepAt == kBenderOnly : r.one(2)) fw.bender = r.range(0, 16383);
-                int ccAt = -1, ccTo = 0;
+                int ccAt = -1, ccTo = 0, padLive = xtTonePadKeep(rep.pads, n, ctl, tripByCc);   // v361: CC 91 alone
                 if (sweep && sweepAt >= kCcOnly && sweepAt != kBenderOnly) { ccAt = (int)(sweepAt - kCcOnly); ccTo = 90; }
                 else if (!sweep && r.one(3)) { ccAt = r.range(0, 3); ccTo = r.range(0, 127); }
-                if (!moveLive(n, bentFrom, blk, ccAt, ccTo)) return 1;
+                if (!moveLive(n, bentFrom, blk, padLive ? kPadAt : ccAt, padLive ? 127 - cc[kPadAt] : ccTo)) return 1;
             }
             if (blk == followAt) {
                 const int from = fw.bender;

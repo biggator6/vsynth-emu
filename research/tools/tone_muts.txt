@@ -1059,7 +1059,9 @@ check-play-vpno-count|    le(4, (uint32_t)e.vpnoCount, 4);|    le(4, (uint32_t)e
 check-play-vpno-list|    for (size_t k = 0; k < e.vpno.size(); ++k) le(12 + 2 * k, e.vpno[k], 2);|    for (size_t k = 0; k < e.vpno.size(); ++k) le(10 + 2 * k, e.vpno[k], 2);|tonecheck
 check-play-patch|    p[b + 0x2e] = o.playbackMode;|    p[b + 0x2e] = 0;|tonepatchids
 patch-playback|    o.playbackMode = p(b + 0x2e);|    o.playbackMode = p(b + 0x2f);|tonepatch
-check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck|4242
+# v361: check-pad-cc, the [gap] since v189, caught at the default seed by xt_tone's replays of its own (XtToneCases.h:
+# Time Trip Assign X on CC 91, the live edit moving CC 91 alone), its seed 4242 dropped
+check-pad-cc|            if (ccMoved && !panelMoved && !fw.padCc(kCcNum[ccAt], ccTo)) return false;\n||tonecheck
 seg-forward-off|            segForward();\n||tonesolo
 seg-forward-len|    if (!(endStop16 > (int32_t)((uint32_t)X + (uint32_t)first))) return;|    if (!(endStop16 > X)) return;|tonesolo|31337
 seg-forward-anchor|    loaded();\n    anchor = recStart;\n}\n\n// The walk back|    loaded();\n}\n\n// The walk back|tonesolo

@@ -10,11 +10,15 @@
 Vc2ToneMixRings::Ring& Vc2ToneMixRings::a(uint32_t address) { return rings_[(address - kAAt) / kBytes]; }
 Vc2ToneMixRings::Ring& Vc2ToneMixRings::b(uint32_t address) { return rings_[kTones + (address - kBAt) / kBytes]; }
 
-// v337: by its place among all 48, A's then B's end to end as rom.4 lays them; past them 0
+// v337: by its place among all 48, A's then B's end to end as rom.4 lays them; past them 0.  [FW] v364: its address the
+// ring's and 4 × i in 32 bits, as rom.4's delay renders form it (0x893e47d4, 0x893e48c2, 0x893e490e and their pairs)
 float Vc2ToneMixRings::at(const Ring& ring, int i) const {
-    const long n = (long)(&ring - rings_.data()) * kSamples + i;
-    if (n < 0 || n >= (long)rings_.size() * kSamples) return 0.0f;
-    return rings_[(size_t)(n / kSamples)][(size_t)(n % kSamples)];
+    constexpr uint32_t kFloat = sizeof(float);
+    const uint32_t at = kAAt + (uint32_t)(&ring - rings_.data()) * kBytes + (uint32_t)i * kFloat;
+    const uint32_t k = (at - kAAt) / kFloat;
+    if (k < (uint32_t)rings_.size() * kSamples) return rings_[k / kSamples][k % kSamples];
+    if (past != nullptr) ++*past;
+    return 0.0f;
 }
 
 namespace {
@@ -70,7 +74,9 @@ void ringProduct(MixBlock& m) {
 float delayedSample(const Vc2ToneMixRings& rings, const Vc2ToneMixRings::Ring& ring, int position, float delay) {
     const int whole = ftrc(delay);
     const float part = sub(delay, flt(whole));
-    int near = position - whole, far = near - 1;
+    // [FW] v364: rom.4's sub and add #-1 (0x893e48a8, 0x893e48b0) in 32 bits, which a whole of -2^31 wraps; C++'s int
+    // subtract would overflow there
+    int near = (int)((uint32_t)position - (uint32_t)whole), far = (int)((uint32_t)near - 1u);
     if (near < 0) near += Vc2ToneMixRings::kSamples;
     if (far < 0) far += Vc2ToneMixRings::kSamples;
     return add(mul(rings.at(ring, near), sub(1.0f, part)), mul(rings.at(ring, far), part));

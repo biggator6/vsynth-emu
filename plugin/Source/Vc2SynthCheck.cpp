@@ -6,7 +6,8 @@
 // Then Vc2Synth built and started, and every member compared with rom.4's memory at its address, byte for byte: the
 // whole objects, the tables a field at a time, the tone pool's tones by the words a tone holds (its head and tail),
 // the vocoder by v219's shared compares (its engines and stages) with its engine and hook words.  The start is one,
-// so the run is one case whatever [cases] says.  XT_VC2SYNTH_FIRST=1 says what differs.  XT_VC2SYNTH_MAIN only.
+// so the run is one case whatever [cases] says.  v362: after the tones, the disk image's waves on both sides
+// (Vc2SynthWavesCheck.cpp), the reads past them counted.  XT_VC2SYNTH_FIRST=1 says what differs.  XT_VC2SYNTH_MAIN only.
 #ifdef XT_VC2SYNTH_MAIN
 #include "Vc2CheckRig.h"
 #include "Vc2CheckVocoder.h"   // v345
@@ -14,6 +15,7 @@
 #include "Vc2Synth.h"
 #include "Vc2SynthCheck.h"    // v343
 #include "Vc2SynthMemory.h"   // v342: the part's regions
+#include "Vc2WaveBoot.h"      // v362
 #include "Vc2AutoNoteTables.h"
 #include "Vc2CarrierTables.h"
 #include "Vc2CosmTables.h"
@@ -88,8 +90,27 @@ Words withIndex(const Words& w, int32_t index, size_t indexAt) {
     return out;
 }
 
+// v360: a tone's COSM object (`cosm` 0 or 1) against rom.4's, but for what its sound keeps (rom.4's DSP state, D+4…,
+// which the port keeps in XtCosm's objects; v263) and rom.4's stack bytes, as xt_vc2tone's compare masks them
+// (Vc2ToneCosmCheck.cpp): here the new block's two targets (+0xfc, +0x100), which the frame keeps in the object, are
+// compared too, so a COSM's block given the other COSM shows (svo-block-cosm's reach)
+std::string cosmDifference(Vc2Fw& fw, uint32_t tone, const Vc2CosmObjectWords& port, int cosm) {
+    struct Masked {
+        uint32_t from, to;
+    };
+    constexpr Masked kMasked[] = { { 0x0d, 0x10 }, { 0x5c, 0x60 }, { 0x70, 0xfc }, { 0x114, 0x11c }, { 0x124, 0x140 } };
+    constexpr uint32_t kCosmAt[] = { 0x1728, 0x188c };   // [FW] the tone's COSM 1 and 2
+    const uint32_t at = tone + kCosmAt[cosm];
+    Vc2CosmObjectWords mine = port;
+    for (const Masked& m : kMasked) {
+        fw.cpu.read(at + m.from, reinterpret_cast<char*>(&mine) + m.from, m.to - m.from);
+    }
+    const std::string name = "its COSM " + std::to_string(cosm + 1);
+    return vc2FirstDifference(fw, at, &mine, sizeof mine, name.c_str());
+}
+
 // v340: a made tone's words, each region by its place in the tone: its head, tail and link, its OSC voices, TVA, mix,
-// and its envelopes' and LFOs' words (its COSM objects hold rom.4's own pointers, which xt_vc2tone masks: there)
+// and its envelopes' and LFOs' words; v360: its COSM objects, masked as xt_vc2tone masks them but for the targets
 std::string madeDifference(Vc2Fw& fw, Vc2Synth& s, int tone) {
     constexpr uint32_t kOsc2At = 0xba4, kTvaAt = 0x19f0, kMixAt = 0x1ab8, kLinkAt = 0x2618;     // [FW] the tone's
     constexpr uint32_t kOsc1At = 0x20, kEnvelopesAt = 0x1b38, kLfosAt = 0x2158;                  // [FW]
@@ -120,6 +141,10 @@ std::string madeDifference(Vc2Fw& fw, Vc2Synth& s, int tone) {
     }
     for (const SynthRegion& r : regions) {
         if (std::string d = bytesDifference(fw, r); !d.empty()) return "tone " + std::to_string(tone) + ", " + d;
+    }
+    for (int cosm = 0; cosm < 2; ++cosm) {
+        const std::string d = cosmDifference(fw, at, h.cosms[(size_t)cosm], cosm);
+        if (!d.empty()) return "tone " + std::to_string(tone) + ", " + d;
     }
     return "";
 }
@@ -242,6 +267,11 @@ int main(int argc, char** argv) {
     std::printf("synth: %d tones made through the part's hosts, their words compared, then given back\n", made);
     Vc2SynthPosts posts;   // v346: the OS's hooks, the parts' one rig
     vc2SynthInstallOs(fw, posts);
+    const auto waves = std::make_unique<Vc2LoadedWaves>();   // v362: the disk image's waves on both sides
+    Vc2SynthPast past;
+    if (!vc2SynthWavesBoth(argv[1], fw, *synth, *waves, past)) return 1;
+    Vc2SynthPatches factory;   // v363
+    if (!vc2SynthFactoryPatches(argv[1], factory)) return 1;
     // v355: with XT_VC2SYNTH_STOP, the parts after the first that differs left (a plant's run)
     long tally = (what.empty() ? 0 : 1) + (tones.empty() ? 0 : 1);
     const bool stop = xtSwitch("XT_VC2SYNTH_STOP") != nullptr;
@@ -251,9 +281,12 @@ int main(int argc, char** argv) {
     if (tally == 0) {
         next([&] { return vc2SynthLoadPart(fw, *synth, *run, posts); });    // v345
         next([&] { return vc2SynthNotesPart(fw, *synth, *run, posts); });   // v346
+        next([&] { return vc2SynthNotesPart(fw, *synth, *run, posts, &factory); });   // v363: on the factory patches
         next([&] { return vc2SynthReadsPart(fw, *synth, *run); });          // v343: after the load, its noise last
-        next([&] { return vc2SynthWholePart(argv[1], *run); });             // v355: a fresh pair, on their OSes
+        next([&] { return vc2SynthWholePart(argv[1], *run, *waves, past); });   // v355: a fresh pair, on their OSes
     }
+    vc2SynthPortRecords(*synth, past);   // v362: the reads past the waves, each side's
+    tally += vc2SynthPastDifference(past);
     std::printf("xt_vc2synth: %ld different\n", tally);
     return 0;
 }

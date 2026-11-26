@@ -335,6 +335,68 @@ Whole-tone check v93–v100 (2026-11-02): XtSynth against a whole firmware tone 
   free-running LFOs, following a sounding tone; v95 a PCM OSC's gain target at note-on; v96 the TVA and the block in the XT's units, a voice's end;
   v97 a voice no longer stops at the wave's end; v98 the band players' start by position; v99 a tone update's order, on any change, the bender, legato.
 
+The tone mix's delay index driven far out v364 (2026-11-25, on claude/v358-plant-reach after v363; HARDWARE_FIRMWARE.md,
+  "The tone mix's delay index driven far out: rom.4's 32-bit address"): seed 4's last difference. An OSC overflowing
+  drives the delay's index to about -2^31; rom.4 forms the index and the address in 32 bits, so its reads wrap back
+  into the rings and past them into the free LFOs. The port now forms both in 32 bits (its int subtract overflowed,
+  undefined in C++), and rom.4's reads past the rings get (A)'s zeros, counted on both sides. Red first at seed 4
+  (reads past the rings 190 against 2,148); the six seeds 0 different at 16, 40 and 400 cases. No factory patch
+  reaches it. ftrc on a NaN left as a [gap].
+
+Sample loads past the waves v363 (2026-11-25, on claude/v358-plant-reach after v362; HARDWARE_FIRMWARE.md, "Sample
+  loads past the waves: zeros wherever they land, the factory patches' cases"): the coordinator's call (A). A render's
+  sample load past the waves, wherever it lands (rom.4's .text and .bss, unmapped memory), skipped with its register 0
+  and counted on both sides; the sample loads found from rom.4's code (all but the renders' own tables just past
+  them; the lesson check refused a literal table); v362's zero pages gone with it. The 128 factory patches as the notes
+  part's own cases on seeds of their own (Vc2PatchFile linked in). Red first: 2024 with the factory cases, far reads 4
+  against 16. 31337 factory's vocoder word goes with it: no v365.
+
+The part given the disk image's waves v362 (2026-11-25, on claude/v358-plant-reach after v361; HARDWARE_FIRMWARE.md,
+  "The part given the disk image's waves: two wiring faults, tns-count caught"): xt_vc2synth gives both sides the disk
+  image's waves, rom.4's own load (v503) at run time; rom.4's reads past them given zeros, counted on both sides and
+  held equal. Two faults fixed red first: the samples giveWaves didn't give (step 4.5's v455 lines) and boundFloat's
+  word for an address in no tone (Tempo Sync's beat). tns-count caught by the waves alone. 0 different at the six
+  seeds; at 400 cases 4 and 5 differ by reads past in mapped memory (v363) and seed 4's mix (v364). Step 4.5's two
+  [gap]s: the far walk and the stale record pointer.
+
+Time Trip's pad by a controller alone v361 (2026-11-25, on claude/v358-plant-reach after v360; HARDWARE_FIRMWARE.md,
+  "Time Trip's pad by a controller alone: check-pad-cc caught"): the tone list's [gap] since v189. No case moved a Time
+  Trip Assign alone and then asked the pad. Replays after the last case, a random case with a live edit one in four,
+  each on a generator of its own with the run's given back: Time Trip Assign X on CC 91, Y on 83, the pad's messages Y
+  first, the live edit moving CC 91 alone. xt_tone 0 different at 2024/7/31337, only the stored waves' two lines moved
+  (and EXT IN's); check-pad-cc caught at 2024 (case 100311), its seed 4242 dropped. The whole tone list 1,194 of
+  1,194 caught; tone_stack_test the same.
+
+The part's reach v360 (2026-11-25, on claude/v358-plant-reach after v359; HARDWARE_FIRMWARE.md, "The part's reach:
+  seven of xt_vc2synth's misses caught"): rcv-full-stop by a compare inside a wait at MIDI IN's full ring; the sensing
+  pair (ost-cyclic-sensing, rcv-sensing-mark) by a fresh pair's lead-in past the sensing check's first 512 ticks;
+  upd-glue by a pitch over half the whole part's cases, their patches the vocoder's on an EXTIN with Auto Note;
+  svo-noteon-back by a notes-part patch in 4 on the fix-up's case; svo-block-cosm by each tone's COSM objects compared
+  (masked as xt_vc2tone's but for the targets) and a patch in 2 with both COSMs of a kind on one type; kt-state-before
+  by a case turning Part 1 Receive Switch off by the routing's reset under voices on channel 0, then the notes' task's
+  own poly pressure. Each draw on a generator of its own. tns-count still needs the part to have waves. The whole part's
+  events split into Vc2SynthWholeEventsCheck.cpp (its file was at the limit). xt_vc2synth 0 different at 2024/7/31337
+  (400) and 3/4/5 (40). The whole --synth 322, 321 caught (tns-count), clean first; fcheck --update moved only
+  xt_vc2synth's two summary lines; verify.sh green (it covers v359's tree too, which its own run couldn't).
+
+The plain voice and the drain's flag out of the part's reach v359 (2026-11-25, on claude/v358-plant-reach after v358;
+  HARDWARE_FIRMWARE.md, "The plain voice and the drain's flag: out of the part's reach"): six xt_vc2synth misses taken
+  out of vc2synth_muts.txt, no code changed. The plain voice's five (svo-destroy-end, -note, -updated,
+  svo-prepare-plain, svo-keyoff-plain): rom.4 gives every voice on a list the note class (the plain vtable written only
+  by the voices' init and as the builds' first store; the destroy-on-leave word only by the builds); hooked on rom.4 at
+  400 cases on 2024/7/31337, its plain routines ran 0 times; forced on a voice made plain on both sides, clean 0
+  different and each plant caught. mp-empty-draining: the flag is set only inside the OS MIDI drain, which yields to no
+  sender, so only an interrupt mid-drain tests it, which neither the check's nor the plugin's events give; the draws
+  never saw it set, and forced on both sides the plant differs. 322 plants; fcheck as baseline; verify.sh green.
+
+The round robin's tie with a put-off dispatch v358 (2026-11-25, on claude/v358-plant-reach from vc2-mode 30cab59;
+  HARDWARE_FIRMWARE.md, "The round robin's tie with a put-off dispatch"): the first of the plants the firmware checks
+  still missed after the merge's whole lists. kn-rr-freeze (missed since v353) changes which task of a level the put-off
+  dispatch names, only between TMU0's interrupt and the watchdog's, whose dispatch reads its level alone and clears it;
+  the check compared only after both. xt_vc2kernel now compares the words between them too, no draw moved: 0 different
+  at 2024/7/31337 (40 and 400), counts as before; kn-rr-freeze caught at each seed. The whole --kernel 42, all caught,
+  clean first; fcheck as baseline; verify.sh green.
+
 LITE's heads past the wave memory's first quarter v357 (2026-11-25, on claude/vc2-part-4-3-rest-773f3e after v356's
   c956952; HARDWARE_FIRMWARE.md, "LITE's heads past the wave memory's first quarter"): the merge's whole --osc list
   missed heads-count (the heads' sample count cut to a quarter). Bisected: caught to c6ea59a, missed from v334

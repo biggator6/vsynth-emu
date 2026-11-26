@@ -24,7 +24,8 @@ static_assert(sizeof(Vc2MixWords) == 0x40, "rom.4's layout, the mix's words befo
 // The delay lines, one pair a tone by its index: rom.4's at 0x8a0af984 and 0x8a0bb384, end to end, A's 24 then B's 24.
 // A read a ring's delay puts past either end of it (OSC 2 past full scale, as an analog OSC's Impact takes it: from
 // v337, its renders the voice's own) reads on into the rings beside it, as on the XT (rom.2's FM lines the same,
-// XtModShared), and past them all memory the port has as 0.
+// XtModShared), and past them all memory the port has as 0.  v364: the read's index and address formed in 32 bits, as
+// rom.4's delay renders form them, so an index driven far out (OSC 2 overflowing) wraps where rom.4's does.
 class Vc2ToneMixRings {
 public:
     static constexpr int kSamples = 0x1f0, kTones = 24;
@@ -36,6 +37,7 @@ public:
     Ring& a(uint32_t address);
     Ring& b(uint32_t address);
     float at(const Ring& ring, int i) const;
+    long* past = nullptr;   // v364: a check's count of the reads past all the rings (none: not counted)
 
 private:
     std::array<Ring, 2 * kTones> rings_ {};

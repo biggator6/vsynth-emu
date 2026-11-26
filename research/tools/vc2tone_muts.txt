@@ -369,8 +369,8 @@ mixr-ring-level|mul(mul(add(mul(m.b[c], g[0]), g[1]), g[2]), m.a[c])|mul(add(mul
 mixr-ring-order|mul(mul(add(mul(m.b[c], g[0]), g[1]), g[2]), m.a[c])|mul(add(mul(m.b[c], g[0]), g[1]), mul(g[2], m.a[c]))|vc2tonemixrender
 mixr-ring-left|for (int c = s; c < s + 2; ++c) m.out[c]|for (int c = s; c < s + 1; ++c) m.out[c]|vc2tonemixrender
 mixr-tap-part|const float part = sub(delay, flt(whole));|const float part = sub(delay, flt(whole + 1));|vc2tonemixrender
-mixr-tap-near|int near = position - whole, far = near - 1;|int near = position - whole + 1, far = near - 1;|vc2tonemixrender
-mixr-tap-far|int near = position - whole, far = near - 1;|int near = position - whole, far = near;|vc2tonemixrender
+mixr-tap-near|int near = (int)((uint32_t)position - (uint32_t)whole), far|int near = (int)((uint32_t)position - (uint32_t)whole + 1u), far|vc2tonemixrender
+mixr-tap-far|far = (int)((uint32_t)near - 1u);|far = (int)((uint32_t)near);|vc2tonemixrender
 mixr-tap-near-wrap|    if (near < 0) near += Vc2ToneMixRings::kSamples;\n||vc2tonemixrender
 mixr-tap-far-wrap|    if (far < 0) far += Vc2ToneMixRings::kSamples;\n||vc2tonemixrender
 mixr-tap-weights|add(mul(rings.at(ring, near), sub(1.0f, part)), mul(rings.at(ring, far), part))|add(mul(rings.at(ring, near), part), mul(rings.at(ring, far), sub(1.0f, part)))|vc2tonemixrender
@@ -827,9 +827,10 @@ link-voice-pool|pool.holds(at) && osc < kOscsAt.size()|false && osc < kOscsAt.si
 # v331: link-event-position went with the link's event lookup, VariPhrase's note-on reading the voice's own
 # v337: the delay lines' reads beside a ring (vc2tonemixrender: the rings end to end, A's then B's, OSC 2 past full
 # scale as an analog OSC's Impact takes it now its renders are the voice's own), and the five plants above on
-# delayedSample's new text
-mixr-beside-none|    if (n < 0 \|\| n >= (long)rings_.size() * kSamples) return 0.0f;|    if (n < 0 \|\| n >= (long)rings_.size() * kSamples \|\| i < 0 \|\| i >= kSamples) return 0.0f;|vc2tonemixrender
-mixr-beside-ring|(long)(&ring - rings_.data()) * kSamples + i|(long)(&ring - rings_.data()) * kSamples + i % kSamples|vc2tonemixrender
-mixr-beside-first|(long)(&ring - rings_.data()) * kSamples + i|(long)i|vc2tonemixrender
+# delayedSample's new text; v364: mixr-tap-near, mixr-tap-far and the three beside plants re-aimed at the new text of
+# at() and delayedSample (the index and the address in 32 bits, as rom.4's), each with its meaning as before
+mixr-beside-none|    if (k < (uint32_t)rings_.size() * kSamples) return|    if (k < (uint32_t)rings_.size() * kSamples && i >= 0 && i < kSamples) return|vc2tonemixrender
+mixr-beside-ring|+ (uint32_t)i * kFloat;|+ (uint32_t)(i % kSamples) * kFloat;|vc2tonemixrender
+mixr-beside-first|kAAt + (uint32_t)(&ring - rings_.data()) * kBytes + (uint32_t)i * kFloat|kAAt + (uint32_t)i * kFloat|vc2tonemixrender
 mixr-b-after-a|return rings_[kTones + (address - kBAt) / kBytes];|return rings_[(address - kBAt) / kBytes];|vc2tonemixrender
 mixr-a-from|return rings_[(address - kAAt) / kBytes];|return rings_[(address - kAAt) / kBytes + 1];|vc2tonemixrender

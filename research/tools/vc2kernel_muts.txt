@@ -6,6 +6,7 @@
 # (its makeReady sets each count again), the event set's test by the task's events or by the bits set (a waiting task
 # never holds one of its waited events), the round robin's test of the holds' half or of the whole lock (the lock-out
 # bit is in that half), and the tick's test of a record's on bit (a record off is due at 0, never a tick's time).
+# kn-rr-freeze, missed from v353, caught from v358 by the words compared between a tick and the watchdog's interrupt.
 kn-start-order|for (int t = (int)tasks.size() - 1; t >= 0; --t) makeReady(t);|for (int t = 0; t < (int)tasks.size(); ++t) makeReady(t);|vc2kernel
 kn-ready-head|    k.readyNext = heads[k.level];\n    heads[k.level] = t;|    k.readyNext = kNone;\n    heads[k.level] = t;|vc2kernel
 kn-ready-count|k.count = k.quantum != 0 ? 1 : 0;|k.count = k.quantum;|vc2kernel

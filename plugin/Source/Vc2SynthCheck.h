@@ -13,9 +13,32 @@
 // v355: rom.4's start as main runs it, on a fresh image: its initializers (how many in `rows`; the OS's rows main's, or
 // `osRows` in the table's order), then the system's start; what faulted, or none
 std::string vc2SynthRomStart(Vc2Fw& fw, int& rows, std::span<const uint32_t> osRows = {});
+// v362: the disk image's waves on both sides (Vc2SynthWavesCheck.cpp), and the reads past them each side counted: a
+// player's sample reads, LITE's loop records
+struct Vc2LoadedWaves;
+struct Vc2SynthPast {
+    long romFar = 0, portFar = 0, romRecords = 0, portRecords = 0;
+    long romTables = 0;   // v363: the renders' loads of their own tables, which aren't samples
+    long romRings = 0, portRings = 0;   // v364: the tone mix's delay reads past its rings
+};
+// The waves loaded by rom.4's own loaders from the disk image beside `rom4`, written into `fw` and given `s`; false,
+// said, when they can't be
+bool vc2SynthWavesBoth(const char* rom4, Vc2Fw& fw, Vc2Synth& s, Vc2LoadedWaves& w, Vc2SynthPast& past);
+// v363: the factory patches (the disk image's Internal.vc2/Patch, by rom.4's .p02 reader) as stores; false, said, when
+// they can't be read
+bool vc2SynthFactoryPatches(const char* rom4, std::vector<std::vector<uint8_t>>& out);
+// The waves' bytes into a machine's memory at their addresses, the zero pages past them, rom.4's reads there counted
+void vc2SynthWavesWritten(Sh4& c, const Vc2LoadedWaves& w, Vc2SynthPast& past);
+// The waves given the part (giveWaves), its reads past the samples counted
+void vc2SynthWavesGiven(Vc2Synth& s, const Vc2LoadedWaves& w, Vc2SynthPast& past);
+// The part's records past the waves, added before it goes
+void vc2SynthPortRecords(const Vc2Synth& s, Vc2SynthPast& past);
+// The counts printed; 1 when a side's differ from the other's
+long vc2SynthPastDifference(const Vc2SynthPast& past);
 // v355: the whole part (Vc2SynthWholeCheck.cpp): a fresh pair on their OSes, the port's model and rom.1's kernel with
-// rom.4 (Vc2MachineRig, rom.1 beside `rom4`); how many differ
-long vc2SynthWholePart(const char* rom4, const Vc2Run& run);
+// rom.4 (Vc2MachineRig, rom.1 beside `rom4`); how many differ. v362: each pair given `waves`, its reads past them
+// counted in `past`
+long vc2SynthWholePart(const char* rom4, const Vc2Run& run, const Vc2LoadedWaves& waves, Vc2SynthPast& past);
 // The first byte of the region that differs from rom.4's at its address, said; none
 std::string vc2SynthBytesDifference(Vc2Fw& fw, const Vc2SynthRegion& r);
 // The first region of the part that differs, said; none
@@ -76,7 +99,10 @@ long vc2SynthCases(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, uint32_t offset, c
 long vc2SynthLoadPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, const Vc2SynthPosts& posts);
 // The notes part (v346, Vc2SynthNotesCheck.cpp): cases of a patch loaded, then MIDI messages through the OS MIDI's
 // handler and the dispatcher on both sides; how many differ
-long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts);
+// v363: with `factory`, its cases each on the next of the factory patches (at least one each), on seeds of their own
+using Vc2SynthPatches = std::vector<std::vector<uint8_t>>;
+long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts& posts,
+                       const Vc2SynthPatches* factory = nullptr);
 
 // The tasks' steps (Vc2SynthTasksCheck.cpp, v351), each on both sides, then what differs: after a step every region,
 // the vocoder, the events and each tone's words; an update pass (v349); a notes' task's pass (v350); a block on input
@@ -84,7 +110,15 @@ long vc2SynthNotesPart(Vc2Fw& fw, Vc2Synth& s, const Vc2Run& run, Vc2SynthPosts&
 using Vc2SynthInput = std::array<int32_t, 32 * 8>;
 std::string vc2SynthEventDifference(Vc2Fw& fw, Vc2Synth& s, const Vc2SynthPosts& posts);
 std::string vc2SynthUpdatePass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
-std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts);
+// v360: its events drawn of `only` alone
+std::string vc2SynthNotesTaskPass(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthPosts& posts,
+                                  uint32_t only = 0xffffffffu);
+// v360: with the part receiving on channel 0 and a voice sounding there, Part 1 Receive Switch off by the routing's
+// reset, two update passes, then the notes' task's own poly pressure (on channel −1, where its channel state is the
+// word before the table's), the switch on again after; `own` its draws, `cases` counted (kt-state-before's reach)
+std::string vc2SynthReceiveOff(Vc2Fw& fw, Vc2Synth& s, Vc2SynthPosts& posts, std::mt19937& own, long& cases);
+// v360: a parameters' message (the part's, or any kind's) on both sides, as the load part gives it
+std::string vc2SynthMessage(Vc2Fw& fw, Vc2Synth& s, bool part, uint8_t kind, uint8_t second);
 std::string vc2SynthMixerBlock(Vc2Fw& fw, Vc2Synth& s, std::mt19937& rng, Vc2SynthInput& input,
                                const Vc2SynthPosts& posts);
 // v354: one to three of the clock's ms (0x89312f50), then the clock task's pass (its loop body from 0x89313c36)
