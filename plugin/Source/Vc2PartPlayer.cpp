@@ -154,8 +154,8 @@ void Vc2PartPlayer::viewed(const float* lr) {
     Vc2Synth& s = *part_;
     constexpr auto relaxed = std::memory_order_relaxed;
     const float out = peakOf(lr, 2 * kBlock);
-    const float in = s.vocoder.stage.peak();
-    view->inputPeak.store(in, relaxed);
+    const float in = s.vocoder.stage.peak();   // the vocoder's input, its modulator's (v460)
+    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);   // v460: the mic's own
     view->voiced.store(s.vocoder.stage.voiced(), relaxed);
     view->period.store(s.tracker.period(), relaxed);
     view->lock.store(s.tracker.s.lock, relaxed);

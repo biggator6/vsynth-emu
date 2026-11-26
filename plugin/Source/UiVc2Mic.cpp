@@ -40,6 +40,7 @@ std::vector<Check> checks(VSynthEmuProcessor& p) {
     const bool level = patchValue(p, kSound) != 0 && patchValue(p, kMfxSend) != 0;
     const juce::String low = patchValue(p, kSound) == 0 ? "Vocoder Sound Level is 0" : "Zone 1's MFX Send is 0";
     const bool playing = v.playing.load(std::memory_order_relaxed);
+    // the vocoder's input, its modulator (v460: the mic, or the patch's own sound when no voice plays the mic)
     const bool mic = v.quietFrames.load(std::memory_order_relaxed) < Vc2PartView::kQuietFrames;
     const bool note = v.sounding.load(std::memory_order_relaxed) > 0;
     return {
@@ -59,7 +60,7 @@ std::vector<juce::String> stateLines(VSynthEmuProcessor& p) {
     const int tracked = period > 0.0f ? (int)std::lround(69.0 + 12.0 * std::log2(kPartRate / period / 440.0)) : -1;
     const int autoNote = v.autoNote.load(relaxed);
     return {
-        dbText(v.inputPeak.load(relaxed)),
+        dbText(v.micPeak.load(relaxed)),   // v460: the mic's own level, not the modulator's
         v.voiced.load(relaxed) ? "VOICED" : "UNVOICED",
         tracked >= 0 ? noteText(tracked) + ", lock " + juce::String(v.lock.load(relaxed)) : juce::String("none"),
         autoNote >= 0 ? noteText(autoNote) : juce::String("none"),

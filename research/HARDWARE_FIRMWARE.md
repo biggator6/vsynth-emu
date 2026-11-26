@@ -1546,6 +1546,38 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### 018 FemaleChoirs in the played-block test (2026-11-26, v460) {#vc2-plugin-018}
+
+After the three-way merge (claude/vc2-merge-4-5b 17e965b: v455–v459, the known misses' v358–v364 with v362's
+boundFloat, v505), 018 FemaleChoirs (place 17) is back in VSynthEmuVc2PlayTest. It plays bit for bit, peak 0.166, 28%
+of real time, 158 blocks ahead in waits.
+
+One check failed, v456's: after a second of host silence the mic's check should fail and the chip say NO MIC, but it
+said HIRESO. The test's expectation was wrong, and the view's label with it:
+- 018's vocoder is on (HIRESO) and its input is silent: the part mixer's mic and tracker buffers read 0 in the silence.
+- The vocoder's input stage (rom.4's 0x899d9a5c peak) still read 0.69. Its modulator isn't the mic: the part mixer
+  (`0x893b1820`, Vc2MixerBlock.cpp) fills the vocoder's detector ring from the mic itself only with an OSC Type EXTIN
+  (the mixer's EXTIN word, from OSC 1 and 2's Type 0x2e5 in `0x893b1480`). Otherwise it fills it from the direct
+  buffer's right channel, the sound of the zone's voices that aren't carriers.
+- None of the five patches has an EXTIN OSC (the mixer's word is 0 on all of them). In four, the voices play the mic
+  (voice kind 6 reads the mic ring), so the modulator falls silent with it. In 018 they play a wave of the patch's own,
+  which goes on sounding, so rom.4 goes on vocoding.
+
+So v456's mic check, which reads the input stage on whatever modulates the vocoder, was right, and the chip's HIRESO
+(the Type in rom.4's own text) was right. The fixes:
+- The test expects NO MIC after the silence only when rom.4's detector finds the vocoder's input quiet (the port's input
+  stage); else the mic's check ticks and the chip says the Type as `vc2ValueText` gives it. Both ways now run: 018's
+  modulator sounds on, the others' go quiet.
+- The MIC IN card's level line showed the input stage's peak as "the input's level", the modulator's. For 018 that read
+  about −3 dBFS with the mic silent. It now shows the mic's own level, its block's peak in the mixer's mic buffer
+  (`Vc2PartView::micPeak`), −inf on every patch after the silence, as the test now holds.
+
+Not changed: the mic check's name and its reason ("The input is quiet on the channels External In Type takes") still
+speak of the mic, though on a patch like 018 the quiet input would be its own wave's. A wording for that is the user's
+to choose (UI_DESIGN_VC2.md's d-12); none is made here. 137 checks; editor 5225. 25 plants on the two files changed (Vc2PartPlayer.cpp, UiVc2Mic.cpp), all caught, among
+them the new `vc2play-view-mic-is-modulator` (the MIC IN line on the modulator's peak again) and `vc2play-view-input`,
+now on the mic's own level.
+
 ### The VOCODER card's bands (2026-11-25, v459) {#vc2-plugin-bands}
 
 Step 4.5's second half, its fifth version: d-14 as the user decided it (2026-11-22; research/UI_DESIGN_VC2.md). The

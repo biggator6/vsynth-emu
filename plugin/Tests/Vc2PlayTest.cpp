@@ -27,12 +27,10 @@ constexpr int kBlock = kVc2PlayBlock, kBlocks = kVc2PlayBlocks, kEditAt = 100;  
 // and Knob 1 Assign, the system's
 constexpr int kSystemAt = 150;
 constexpr int kSystemMoved[] = { 0x43, 0x7a, 0x95 };
-// The disk image's .p02s played, by place, the first at 48 kHz as well.  Left out until v362: 018 FemaleChoirs, which
-// plays at nine times real time and nearly silent (peak 1e-4): one note-on's SOLO seek walks records that all read 0
-// (vc2SeekRecords through the tones' boundFloat, 1e9 steps), likely v362's fault (Vc2SynthOscOutside::boundFloat
-// answering 0 for an address in no tone), and it would take this test past a minute; timed again (this program's
-// `time` mode, Vc2PlayTime.cpp) and put back once v362 is in (VC2_MODE_PLAN.md, step 4.5's [gap] on it)
-constexpr size_t kPatchesPlayed[] = { 0, 40, 101, 120 };
+// The disk image's .p02s played, by place, the first at 48 kHz as well.  v460: 018 FemaleChoirs back, left out before
+// v362: one note-on's SOLO seek walked records that all read 0 (vc2SeekRecords through the tones' boundFloat answering 0
+// for an address in no tone, 1e9 steps), nine times real time and nearly silent; with v362's boundFloat it plays
+constexpr size_t kPatchesPlayed[] = { 0, 17, 40, 101, 120 };
 constexpr size_t kFxPatch = 40;                              // v458: the one played through the effects
 constexpr int kReceiveSwitch = 0x47, kUsbThru = 0x7d;        // [FW] Part 1 Receive Switch, USB-MIDI Thru: system B's
 constexpr double kLevelNear = 6.0;                           // dB the 48 kHz run's level may stand from 44.1 kHz's

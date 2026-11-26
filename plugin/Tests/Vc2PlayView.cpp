@@ -8,11 +8,13 @@
 #include "../Source/UiControls.h"
 #include "../Source/UiVc2Bands.h"
 #include "../Source/UiVc2Mic.h"
+#include "../Source/Vc2Params.h"
 #include <cstdio>
 
 namespace {
 constexpr int kSecond = 87, kReleaseOut = 3 * kSecond;   // host blocks of kVc2PlayBlock frames
 constexpr int kNote = 60;
+constexpr int kVocoderType = 0x194;   // [FW] Vocoder Type
 constexpr juce::uint8 kVelocity = 100;
 
 // `n` host blocks, the saw on the input or silence, `first` (if any) at the first block's start
@@ -65,9 +67,21 @@ void vc2PlayViewChecks(TestChecks& check, VSynthEmuProcessor& p, const std::stri
     blocks(p, kSecond + 2, nullptr, false);
     c = Vc2Mic::checks(p);
     const bool vocoding = c[0].state == State::ok && c[1].state == State::ok;   // the chip's words before NO MIC
-    check(c[Vc2Mic::kMicCheck].state == State::silent && (!vocoding || Vc2Mic::chipWord(p) == "NO MIC"),
-          name + "a second of silence should fail the mic's check, the chip saying NO MIC with the vocoder on, not " +
-              Vc2Mic::chipWord(p).toStdString());
+    // v460: the vocoder's input is its modulator, the mic as the patch's voices play it or the patch's own wave (018's),
+    // so a silent mic silences it only when rom.4's detector finds it quiet (the input stage, 0x899d9a5c); else it
+    // vocodes on, the chip saying the Type in rom.4's own text.  The MIC IN card's level the mic's, -inf either way
+    const bool quiet = p.vc2Play().player()->part().vocoder.stage.peak() < Vc2PartView::kQuiet;
+    const int type = Controls::paramValue(p.apvts, vc2HostParamId(kVocoderType, 0, 0));
+    const juce::String chip = Vc2Mic::chipWord(p).trim();
+    const juce::String typeText = juce::String(vc2ValueText(kVocoderType, type)).trim();
+    const State mic = c[Vc2Mic::kMicCheck].state;
+    const bool asRom4 = quiet ? mic == State::silent && (!vocoding || chip == "NO MIC")
+                              : mic == State::ok && (!vocoding || chip == typeText);
+    check(asRom4 && Vc2Mic::stateLines(p)[0] == "-inf dBFS",
+          name + "a second of silence should " + (quiet ? "fail the mic's check, NO MIC" : "leave it vocoding") +
+              " with the vocoder on, the MIC IN card's level -inf, not " + chip.toStdString() + ", " +
+              Vc2Mic::stateLines(p)[0].toStdString());
+    std::printf("vc2play view: %sthe modulator %s in the silence\n", name.c_str(), quiet ? "quiet" : "sounding");
     const int held = state[4].getIntValue();
     blocks(p, 1, &off, false);
     blocks(p, kReleaseOut, nullptr, false);

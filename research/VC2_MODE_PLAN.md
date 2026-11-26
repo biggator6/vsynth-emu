@@ -1439,7 +1439,14 @@ version against rom.4's routines with what it calls hooked:
      inputs the frame's +4 and +0x14 are wait on step 5's captures (items 2 and 4 below). Those captures change that one
      rule. v458: with the effects on, rom.4's chip is given no input either (the mic reaches the part by this rule,
      not through the chip's slots); the same captures say what the chip does with it.
-   - [gap] 018 FemaleChoirs plays at 9x real time, nearly silent; out of the played-block test until v362 (boundFloat),
+   - [x] (v460) 018 FemaleChoirs back in the played-block test after the three-way merge (v362 in): it plays, peak
+     0.166, 28% of real time, bit for bit. Its one failing check was the test's: 018's vocoder is modulated by the
+     patch's own wave, not the mic (the part mixer takes the modulator from the voices' direct sound when no OSC Type
+     is EXTIN, and 018's voices don't play the mic), so silencing the host input leaves it vocoding and the chip
+     rightly says HIRESO. The check now expects NO MIC only when rom.4's detector finds the vocoder's input quiet, and
+     the MIC IN card shows the mic's own level, not the modulator's (HARDWARE_FIRMWARE.md, "018 FemaleChoirs in the
+     played-block test"). Was:
+     [gap] 018 FemaleChoirs plays at 9x real time, nearly silent; out of the played-block test until v362 (boundFloat),
      then timed and put back (v455; the coordinator, 2026-11-25). Its time is in its SOLO walk (vc2solo::loadNext through
      Vc2ToneOscLink::boundFloat and Vc2SynthOscOutside::boundFloat), peak 1e-4 against the other patches' 0.07–0.16;
      VSynthEmuVc2PlayTest's patch list says so. v362 (the known-misses session) fixes boundFloat answering 0 for an

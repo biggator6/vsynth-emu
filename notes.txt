@@ -738,6 +738,14 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+018 FemaleChoirs in the played-block test v460 (2026-11-26, on the three-way merge 17e965b; HARDWARE_FIRMWARE.md, "018
+  FemaleChoirs in the played-block test"): 018 back (v362 in), bit for bit, 28% of real time. Its failing check was the
+  test's: 018's vocoder is modulated by its own wave (no OSC Type EXTIN, and its voices don't play the mic), so a
+  silent mic leaves it vocoding; NO MIC is now expected only when rom.4's detector finds the vocoder's input quiet. The
+  MIC IN card's level line shows the mic's own level (micPeak), not the modulator's. 137/137, the editor 5225/5225.
+  Plants: the 25 on Vc2PartPlayer.cpp and UiVc2Mic.cpp,
+  all caught, one new (the MIC IN line on the modulator's peak).
+
 The VOCODER card's bands v459 (2026-11-25, after v458; HARDWARE_FIRMWARE.md, "The VOCODER card's bands"): d-14, the
   engine's bands as they play (LEGACY 10, HIRESO 32), the mic's envelope and the band's output in each, as bars in dB
   each under its own loudest band (Vc2BandsView, UiVc2Bands.cpp), from the part's view (Vc2PartPlayer::viewedBands);

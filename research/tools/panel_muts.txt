@@ -348,7 +348,7 @@ vc2play-mode-unread|void PluginVc2Play::readMode() { vc2_.store(pluginMode(apvts
 vc2play-view-unset|    next->view = &view_;|    ;|plugin/Source/PluginVc2Play.cpp|vc2play
 vc2play-view-sounding|    view->sounding.store(s.voices.sounding(*s.voiceParts).count, relaxed);|    view->sounding.store(0, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
 vc2play-view-quiet|    view->quietFrames.store(in >= Vc2PartView::kQuiet ? 0 : quiet + kBlock, relaxed);|    view->quietFrames.store(0, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
-vc2play-view-input|    view->inputPeak.store(in, relaxed);|    view->inputPeak.store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-view-input|    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);|    view->micPeak.store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
 vc2play-mic-always|    const bool mic = v.quietFrames.load(std::memory_order_relaxed) < Vc2PartView::kQuietFrames;|    const bool mic = true;|plugin/Source/UiVc2Mic.cpp|vc2play
 vc2play-carrier-always|    const bool note = v.sounding.load(std::memory_order_relaxed) > 0;|    const bool note = true;|plugin/Source/UiVc2Mic.cpp|vc2play
 vc2play-chip-no-mic|    if (c[kMicCheck].state == State::silent) return "NO MIC";|    ;|plugin/Source/UiVc2Mic.cpp|vc2play
@@ -387,3 +387,5 @@ vc2play-bands-hireso-out|            view->outBands[(size_t)b].store(carrier * h
 vc2play-bands-hireso-count|        bands = Vc2HiresoWords::kBands;|        bands = Vc2LegacyTables::kCarrierBands;|plugin/Source/Vc2PartPlayer.cpp|vc2play
 vc2play-bands-out-on-mic|    topOut_ = std::max(loudOut, topOut_ * fall);|    topOut_ = std::max(loudMic, topOut_ * fall);|plugin/Source/UiVc2Bands.cpp|vc2play
 editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : "";|    said_ = bands == 0 ? kOff : "";|plugin/Source/UiVc2Bands.cpp|layout
+# v460: the MIC IN card's level the mic's own, not the vocoder's modulator's (018 FemaleChoirs' is its own wave)
+vc2play-view-mic-is-modulator|    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);|    view->micPeak.store(in, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
