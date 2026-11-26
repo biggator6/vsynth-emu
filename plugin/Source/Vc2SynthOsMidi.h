@@ -21,7 +21,7 @@
 #include "Vc2OsQueue.h"
 #include <array>
 #include <cstdint>
-#include <functional>
+#include "XtFn.h"
 
 struct Vc2Synth;
 class Vc2SynthOs;
@@ -84,7 +84,7 @@ public:
     uint16_t osMidiPass(uint32_t events);
     uint16_t frontPass(uint32_t events);
     // The notes' task's drain (0x893110b0 on its queue): each message to `dispatch`, then its waiters woken
-    void notesDrain(const std::function<void(const Vc2MidiMessage&, uint32_t)>& dispatch);
+    void notesDrain(const XtFn<void(const Vc2MidiMessage&, uint32_t)>& dispatch);   // v455: XtFn, no allocation
     // Outside: a byte of a channel message on source 1 or 2, as the receive interrupt gives it; a message given the
     // front (false, dropped, with its queue full)
     void receiveByte(int source, uint8_t byte);
@@ -149,5 +149,5 @@ private:
     // waiting
     bool takeInput(Vc2MidiReceive& r, bool thruDiverts);
     void settings();                      // the input task's 8: 0x89311ca0, 0x89311d10
-    void drain(int queue, const std::function<void(const Vc2MidiMessage&, uint32_t)>& handler);
+    void drain(int queue, const XtFn<void(const Vc2MidiMessage&, uint32_t)>& handler);
 };

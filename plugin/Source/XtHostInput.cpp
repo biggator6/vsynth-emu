@@ -28,6 +28,7 @@ void XtHostInput::prepare(double hostRate) {
     held_ = kHalf;   // the silence before the host's first frame, as render's history starts
     next_ = 0;
     out_.clear();
+    takenFrom_ = out_.taken();
     const std::array<int32_t, 2 * kBlockFrames> silence {};
     for (int left = latency_; left > 0; left -= kBlockFrames) out_.push(silence.data(), std::min(left, kBlockFrames));
     short_ = over_ = 0;
@@ -98,4 +99,14 @@ void XtHostInput::produce() {
 const int32_t* XtHostInput::block() {
     if (out_.held() < (uint32_t)kBlockFrames) ++short_;
     return out_.block();
+}
+
+int XtHostInput::drop(int frames) {
+    int dropped = 0;
+    while (dropped < frames && out_.held() > 0) {
+        const int n = std::min({ frames - dropped, kBlockFrames, (int)out_.held() });
+        out_.take(n);
+        dropped += n;
+    }
+    return dropped;
 }

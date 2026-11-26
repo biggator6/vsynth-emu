@@ -12,6 +12,7 @@
 #include "../Source/PluginProcessor.h"
 #include "../Source/PluginVc2Params.h"
 #include "../Source/Vc2Params.h"
+#include "../Source/Vc2SystemStore.h"
 #include <map>
 #include <tuple>
 
@@ -96,7 +97,10 @@ Rom4Range rom4Range(int id) {
     if (startOffset(id)) return { 0, (1 << 24) - 1, 0 };
     if (const XtTypedDesc* t = vc2TypedDesc(id)) return { t->min, t->max, std::clamp(t->def, t->min, t->max) };
     const XtParamDesc* d = vc2ParamDesc(id);
-    return { d->min - d->centre, d->max - d->centre, std::clamp(d->def, d->min, d->max) - d->centre };
+    Rom4Range r { d->min - d->centre, d->max - d->centre, std::clamp(d->def, d->min, d->max) - d->centre };
+    // v457: a system ID the part reads starts at rom.4's system default (VSynthEmuVc2PlayTest reads it as the part does)
+    if (int system = 0; vc2SystemDefault(id, system)) r.def = std::clamp(system, r.lo, r.hi);
+    return r;
 }
 
 // Its name: "VC-2 ", "Z2 " in zone 2, "COSM n " for a COSM's (0x462, 0x463 and the typed from 0x926), then rom.4's

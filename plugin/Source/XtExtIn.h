@@ -44,6 +44,7 @@ public:
     const int32_t* take(int frames);   // the next `frames` of them, at most 32, the same way (XtFxUnit's, a frame at a time)
     void clear();
     uint32_t held() const { return write_ - read_; }   // the frames pushed and not yet taken
+    uint32_t taken() const { return read_; }           // v455: the frames taken, or passed over by an overrun, counted on
     // Where the frames come from, if anywhere: XtSynth::busOut asks it each block (v207).  Set before the audio runs.
     void setFeed(XtExtInFeed* f) { feed_ = f; }
     XtExtInFeed* feed() const { return feed_; }

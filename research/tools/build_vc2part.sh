@@ -26,7 +26,7 @@
    Vc2Kernel.cpp "${SH4[@]}" -o "$O/xt_vc2kernel" &
 # Vc2Synth's start (v314) against rom.4's own static initializers: every VC-2 port but the .p02 reader (v450) and rom.4's
 # own load of the waves (v503); from v345 rom.4's parameter tables and the patch store, which the part reads, with theirs
-NOT_SYN=" Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp Vc2WavesInUse.cpp "
+NOT_SYN=" Vc2PatchFile.cpp Vc2BootFiles.cpp Vc2WaveBoot.cpp Vc2WaveBootKernel.cpp Vc2WavesInUse.cpp Vc2PartPlayer.cpp "
 SYNX=(XtFxValueText.cpp XtPatchStore.cpp XtSoloVoice.cpp "${FW[@]}")
 VSYN=()
 while read -r f; do

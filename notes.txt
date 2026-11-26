@@ -676,6 +676,49 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VOCODER card's bands v459 (2026-11-25, after v458; HARDWARE_FIRMWARE.md, "The VOCODER card's bands"): d-14, the
+  engine's bands as they play (LEGACY 10, HIRESO 32), the mic's envelope and the band's output in each, as bars in dB
+  each under its own loudest band (Vc2BandsView, UiVc2Bands.cpp), from the part's view (Vc2PartPlayer::viewedBands);
+  OFF with the vocoder off, waiting before any part plays. VSynthEmuVc2PlayTest 116/116, the editor 5225/5225.
+  Plants: 8 new, all caught; all 60 vc2play- and editor-vc2- again.
+
+The VC-2 mode's effects v458 (2026-11-25, after v457; HARDWARE_FIRMWARE.md, "The VC-2 mode's effects"): with the
+  Effects switch on, the part's blocks through rom.4's XtFxUnit (PluginVc2Fx: made on the control thread, given every
+  ID its driver reads as rom.4 answers it, from the store and the kept system on the traced areas, CC 91 and 93 through
+  a ring); off, the copy without the chip as before. Master Level and Output Gain on system B's area. The V-Synth's
+  effects no longer ticked in the VC-2 mode. VSynthEmuVc2PlayTest's effects run (Vc2PlayFx.cpp, the loop made one in
+  Vc2PlayRun.cpp): 041 Flashback330 bit for bit, edited in play, the switch off and on; 33% of real time, 15% without.
+  112/112. Plants: 7 vc2play-fx-, all caught, and all 35 vc2play- again (two more equivalent, left out).
+
+The system's parameters to the VC-2 part v457 (2026-11-25, after v456; HARDWARE_FIRMWARE.md, "The system's parameters
+  to the VC-2 part"): Clock Source and External In Type (system B's area) and the controller assigns (the system's)
+  kept over rom.4's system defaults and given at a block's edge with the front's system (kind 4) and assignments (5)
+  messages; a part made again starts on them. Their defaults are now rom.4's system's (the 14 assigns' were their
+  descriptors' 0). Master Level and Output Gain stay the effects'. VSynthEmuVc2PlayTest 94/94, the system moved in the
+  burst bit for bit, the dispatchers' tables the direct part's (rom.4's stop after the messages stops no voice there,
+  so the sound alone doesn't show them), the 16 read as the part's readers read them (Vc2PlaySystem.cpp). Plants: 9
+  vc2play-system-, all caught (a tenth, the centre left out, equivalent: every centre is 0).
+
+The VC-2 part's view in the editor v456 (2026-11-25, after v455; HARDWARE_FIRMWARE.md, "The VC-2 part's view in the
+  editor"): Vc2PartView, written by the player after each block (the input stage's peak and voiced flag, the tracker's
+  period and lock, Auto Note's note, the voices sounding, the output's peak, the frames since the input was last above
+  -60 dBFS), read lock-free by the mic's checks (NO MIC after a second of quiet, NO NOTE with no voice) and the MIC IN
+  card's six state lines; each waits while no part has played. VSynthEmuVc2PlayTest's view checks (Vc2PlayView.cpp),
+  62/62; the editor 5224/5224. The VOCODER card's bands still wait.
+
+The VC-2 in the plugin v455 (2026-11-25, on claude/vc2-plugin-4-5b from vc2-mode's 30cab59; HARDWARE_FIRMWARE.md, "The
+  VC-2 in the plugin"): step 4.5's second half, its first version. With the mode on the VC-2, processBlock plays the part
+  (Vc2PartPlayer: Vc2Synth on its OS model, the front's stand-in's start messages, the host's MIDI on MIDI IN before the
+  block it precedes, the input at each block's own place into words 1 and 5, MAIN + MULTI at 2^-30 out; a wait's blocks
+  ahead in XtRateOut's room of a second), and the VC-2's parameters reach it (PluginVc2Play: written over the .p02's store
+  on the control thread, given at a block's edge as Vc2Synth::patchGiven, the store kept as the session's). XtRateOut is
+  XtSynth's render moved out (ab 4/4 identical). Fixed on the way: rom.4's system defaults now load with its tables (Part
+  1 received nothing); Vc2Synth::giveWaves gives the players the samples (PCM read none); std::function allocations on
+  the audio thread (XtFn); XtHostInput::taken from its prepare. VSynthEmuVc2PlayTest (in verify.sh, about 7 s): four
+  factory .p02s bit for bit against the part driven directly, 138-168 blocks ahead in waits each, no allocation in
+  processBlock. Open: the system's parameters and the effects in the VC-2 mode, the pages' live views; 018 FemaleChoirs'
+  SOLO walk at nine times real time.
+
 The plugin's output always numbers v454 (2026-11-24, on vc2-mode ab50a1c; HARDWARE_FIRMWARE.md, "The plugin's output
   always numbers"; the user's "ok, fix the NaN at the output"). OutputFinite (PluginOutputFinite.h), made at the top of
   processBlock, sets a sample that isn't a finite number to 0 on every way out, so no NaN or infinity reaches the host

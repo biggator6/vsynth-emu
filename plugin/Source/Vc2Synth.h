@@ -86,6 +86,13 @@ private:
     Vc2Synth& s_;
 };
 
+// v455: who hears each block the part mixes, its 32 frames of 8 words as `frames` holds them (the plugin's player,
+// Vc2PartPlayer); none in the checks
+struct Vc2BlockSink {
+    virtual ~Vc2BlockSink() = default;
+    virtual void mixed(const float* frames) = 0;
+};
+
 struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     Vc2Synth();
     ~Vc2Synth();
@@ -98,6 +105,10 @@ struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     void giveWaves(const Vc2LoadedWaves& w);
     // v345: the patch store the part's parameters read (Vc2PatchStore's bytes), none for every ID's default
     void givePatch(const std::vector<uint8_t>* store) { patch = store; }
+    // v455: a patch given as xt_vc2synth's whole part gives one from the idle (vc2SynthPatchGiven), the plugin's stand-in
+    // for the front's load: the store, then the part's read, the system's, assignments' and calibration's dispatchers,
+    // and part 0's message (its node the held class)
+    void patchGiven(const std::vector<uint8_t>* store);
     // v347: the system's three areas (vc2SystemDefaults(), or a system's own), copied in, as rom.4's store object aims
     // its system read objects at them; until then, every system ID its default
     void giveSystem(const Vc2System& given);
@@ -244,4 +255,5 @@ struct Vc2Synth final : Vc2SynthToneWorld, Vc2ClockParts {
     // which run each task's pass themselves
     std::unique_ptr<Vc2SynthOsTasks> osTasks;
     void runOnOs(std::function<bool(Vc2PartEvent&)> source);
+    Vc2BlockSink* sink = nullptr;   // v455: told each block's frames as block() leaves them
 };

@@ -29,6 +29,22 @@ inline std::vector<ImagePatch> imagePatches(const juce::File& rom) {
     return out;
 }
 
+// A VC-2 patch of the image's: its file's name and bytes (v452; here from Vc2PatchPluginTest.cpp, v455)
+struct DiskPatch {
+    std::string name;
+    std::vector<uint8_t> bytes;
+};
+
+// The disk image's Internal.vc2/Patch, beside the ROM, in its order; none without the image
+inline std::vector<DiskPatch> diskVc2Patches(const juce::File& rom) {
+    XtDiskImage disk;
+    std::vector<DiskPatch> out;
+    if (!disk.open(rom.getSiblingFile("V-SynthXTDiskImage.bin.0.bin").getFullPathName().toStdString())) return out;
+    for (const XtDiskImage::Entry& e : disk.list("Internal.vc2/Patch"))
+        if (!e.isDir) out.push_back({ e.name, disk.read(e) });
+    return out;
+}
+
 // The first-bank IDs two stores read otherwise, zone 1 and both COSMs, as "ID was→is", the first few (v602, from
 // ProjectSaveTest.cpp when the project's save, v603, needed it too)
 inline std::string idsMoved(const std::vector<uint8_t>& was, const std::vector<uint8_t>& is) {

@@ -19,6 +19,7 @@
 #include "../Source/Vc2SetEnvelopeTables.h"
 #include "../Source/Vc2PartSettingsTables.h"
 #include "../Source/Vc2OsMidiTables.h"
+#include "../Source/Vc2SystemStore.h"
 #include "../Source/Vc2HiresoTables.h"
 #include "../Source/Vc2LegacyTables.h"
 #include "../Source/Vc2Params.h"
@@ -87,7 +88,7 @@ bool vc2TablesIn() {
            && vc2MixerLoaded() && vc2OscLoaded() && vc2TvaLoaded() && vc2CosmLoaded() && vc2MatrixLoaded()
            && vc2RampLoaded() && vc2OscConvertLoaded() && vc2LibMathLoaded() && vc2ToneMixLoaded()
            && vc2PartVoicesLoaded() && vc2KeysLoaded() && vc2SetEnvelopesLoaded() && vc2PartSettingsLoaded()
-           && vc2OsMidiLoaded() && vc2PatchFilesLoaded();
+           && vc2OsMidiLoaded() && vc2PatchFilesLoaded() && vc2SystemDefaults() != nullptr;
 }
 
 // An instance given `file` by `choose` should refuse it, its status saying `says`

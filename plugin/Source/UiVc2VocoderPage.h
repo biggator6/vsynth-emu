@@ -9,6 +9,7 @@
 #include "PluginProcessor.h"
 #include "UiCard.h"
 #include "UiControlGrid.h"
+#include "UiVc2Bands.h"
 #include "UiWatch.h"
 #include <memory>
 #include <vector>
@@ -34,6 +35,7 @@ public:
     void refresh();   // the editor's timer, while the page shows: the mic's checks, which follow the host's input too
     juce::String status() const;                 // the status line as it says now
     std::vector<juce::String> checkLines() const;   // each check's line as it says now
+    const Vc2BandsView* bands() const;              // v459: the VOCODER card's bands (d-14), for the checks
     void resized() override;
 
 private:

@@ -13,6 +13,13 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const OutputFinite finite(buffer);       // every way out: no NaN or infinity reaches the host (v454)
     const int numIn = inputBlock(buffer);   // the outside input, left in the first channels for the render (v207)
 
+    // ── The VC-2 mode: its part plays the block, the editor's messages first (PluginVc2Play.h, v455) ───────
+    if (auto vc2 = vc2Play_.block()) {
+        takeFromEditor([&vc2](const juce::MidiMessage& m) { vc2.message(m); });
+        vc2.process(buffer, midi, numIn);
+        return;
+    }
+
     const int numOut     = std::min(buffer.getNumChannels(), getTotalNumOutputChannels());
     const int numSamples = buffer.getNumSamples();
 

@@ -10,7 +10,8 @@
 #include "XtFxControl.h"
 #include "PluginArp.h"
 #include "PluginLoadedWave.h"
-#include "PluginVc2Patch.h"
+#include "PluginVc2Play.h"
+#include "PluginWaveView.h"
 #include <climits>
 #include <mutex>
 
@@ -105,13 +106,8 @@ public:
 
     juce::String getLoadedFileName(int osc = 0) const  { return wave_[osc].name; }
     bool         hasFileLoaded(int osc = 0)    const   { return wave_[osc].loaded.load(); }
-    // A loaded wave as the editor draws it (PluginWaveView.cpp, v200): kViewColumns columns, each its lowest and highest
-    // sample, the channels mixed; made as the wave goes to its encode.  None before one has.  Message thread, as is gen.
-    struct WaveView {
-        static constexpr int kViewColumns = 512;
-        struct Column { float low, high; };
-        std::vector<Column> columns;
-    };
+    // A loaded wave as the editor draws it (PluginWaveView.h, v200).  None before one has.  Message thread, as is gen.
+    using WaveView = PluginWaveView;
     std::shared_ptr<const WaveView> waveView(int osc) const;
     int waveViewGen(int osc) const { return waveViewGen_[osc].load(); }   // moves with each view made
 
@@ -139,6 +135,7 @@ public:
     // Returns false, the status saying why, if the file isn't the VC-2's image.  No port reads it yet (the VC-2 mode).
     bool setVc2RomFile(const juce::File& file);
     bool hasVc2Rom() const { return xtSynthVc2RomReady(); }
+    PluginVc2Play& vc2Play() { return vc2Play_; }   // the VC-2 mode's audio (v455), its tick a test's to run by hand
 
     // ── The effects ────────────────────────────────────
     // What the control thread does each time round, also callable from a test: with the Effects switch on and rom.2 here, the chip and its driver come up (the first time) and take
@@ -294,6 +291,7 @@ private:
     void unloadWave(int osc);
     juce::String patchName_, patchNote_;
     PluginVc2Patch vc2Patch_;   // the VC-2 patch loaded last, or a session's (v452)
+    PluginVc2Play vc2Play_ { apvts, vc2Patch_ };   // the VC-2 mode's part and the patch it plays (v455)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VSynthEmuProcessor)
 };

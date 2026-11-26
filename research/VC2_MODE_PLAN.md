@@ -1347,20 +1347,44 @@ version against rom.4's routines with what it calls hooked:
       "A .p02 onto the VC-2's parameters"). With it the first half is done.
    4. The second half: the mode switch's audio, the wiring to Vc2Synth, the VC-2 pages and cards, the plugin test of a
       played block.
+      - done (v455): the mode switch's audio and the wiring: processBlock plays the part on its OS model
+        (`Vc2PartPlayer`), the VC-2's parameters written over the .p02's store and given at a block's edge
+        (`PluginVc2Play`), the played-block test bit for bit against the part driven directly, in verify.sh
+        (`VSynthEmuVc2PlayTest`; HARDWARE_FIRMWARE.md, "The VC-2 in the plugin"). Not yet: the system's parameters to
+        the part (v457), the effects (rom.4's unit) with the Effects switch on, the pages' live views of the part (v456).
+      - done (v456): the pages' view of the part: `Vc2PartView`, written after each block, the mic's checks (NO MIC, NO
+        NOTE) and the MIC IN card's state lines from it (HARDWARE_FIRMWARE.md, "The VC-2 part's view in the editor").
+        Not yet: the VOCODER card's bands (d-14).
+      - done (v457): the system's parameters to the part: Clock Source, External In Type and the controller assigns
+        kept over rom.4's system defaults on the areas their readers read, given at a block's edge with the front's
+        system and assignments messages, a part made again on them; their defaults rom.4's system's (the assigns' were
+        their descriptors' 0). Master Level and Output Gain are the effects' (HARDWARE_FIRMWARE.md, "The system's
+        parameters to the VC-2 part").
+      - done (v458): the effects, the coordinator's call (2026-11-25): rom.4's XtFxUnit behind the one Effects switch,
+        its driver given the store's and the kept system's IDs as rom.4's getters answer them (the system's areas
+        traced), CC 91 and 93, the copy without the chip with the switch off; the played-block test's effects run bit
+        for bit against the part through a Vc2Fx of its own, edited in play; 33% of real time with them, 15% without
+        (HARDWARE_FIRMWARE.md, "The VC-2 mode's effects"). Not yet: a .p02 loaded with the effects playing isn't in the
+        test (the driver's patch load again, `wantPatch`).
+      - done (v459): the VOCODER card's bands (d-14): the engine's 10 or 32 as they play, the mic's envelope and the
+        band's output in each, from the part's view (HARDWARE_FIRMWARE.md, "The VOCODER card's bands"). With it the
+        VC-2 pages' state reads the playing part throughout.
       - Before it, done (v550): the VC-2's firmware checks under AddressSanitizer, UBSan and libc++'s bounds
         (`XT_SANITIZE=1 build.sh`), the 21 step 4.3 isn't changing at 40 and 400 cases, three seeds: the voices' noise
         drawn as an XT's keys; the check rig's compare passed to step 4.3 (HARDWARE_FIRMWARE.md, "The VC-2 checks under
         the sanitizers"). Step 4.3's own three (osc, tone, synth) are its to run so.
 
    Open for the second half, found in step 4.3 (v349):
-   - [gap] Part 1 Receive Switch off, among the system settings. rom.4's system defaults (`0x89328d60`, run by
+   - [x] Part 1 Receive Switch off, among the system settings. rom.4's system defaults (`0x89328d60`, run by
      `0x89319e10`) set it on (ID 0x47 = 1); a user's own system setting turns it off. With it off, G's channel word is
      rom.4's `0x8999738c`, which nothing writes (0), so M's init on the static M (`0x893a2ee0`, on the update task's
      pass) gives M a channel state of 0, and the Matrix sources (`0x893a1df0`) read [0 + 0x84 + a byte]: low addresses,
      on an XT the boot flash. rom.0 isn't the bytes there (it starts with 0xff). The interpreter faults on them and the
      part reads zeros (its step fails on a read no region holds); xt_vc2synth's notes part draws Part 1 receiving always.
      Step 4.5 decides between starting the plugin with Receive on and finding the boot flash's bytes; the read isn't
-     ported.
+     ported. Closed by v455: the plugin's part plays rom.4's system defaults (now loaded with rom.4's tables), Part 1
+     Receive Switch on, and no host parameter holds the switch, so the boot flash is never read; VSynthEmuVc2PlayTest
+     checks both and plays through part 1. A user's system with it off isn't a thing the plugin has.
    - [x] A NaN sample to the host. In step 4.3's [deferred] state (the VOCODER's balance NaN), the carrier's noise
      gain is NaN on both sides, and `vc2Clamp01` passes a NaN through (both compares false). So the carrier's render
      (Vc2Carrier.cpp) gives a NaN noise scale, its noise low-pass state goes NaN and stays so until the carrier's next
@@ -1374,20 +1398,60 @@ version against rom.4's routines with what it calls hooked:
      before the guard, 5/5 checks after (HARDWARE_FIRMWARE.md, "The plugin's output always numbers"). When the
      VC-2's audio reaches processBlock (this step's second half), it passes the same guard; the plugin test of a
      played block then also holds it on the VC-2's own path.
-   - [gap] The MIDI input's real-time bytes (v354; v355). v354 took `0x89313cb0` for their handler; it is the clock
+   - [deferred] The MIDI input's real-time bytes (v354; v355). [deferred] the coordinator, 2026-11-25: needs rom.4's
+     receive parser's real-time branch and the clock object's F8, start and stop ported and checked in a harness
+     first; after step 4.5's second half, in step 4.3's numbers; until then Clock Source INT, the patch's tempo. The
+     host-transport stand-in decided earlier (below) waits on that port too. Found at v457: the part takes no
+     real-time byte (`Vc2MidiReceive.cpp`'s parser drops them, "not ported"), and the clock object's F8 path is ported
+     in the ms but fed nothing, so the plugin has nothing to hand them to. Was: v354 took `0x89313cb0` for their handler; it is the clock
      task's listener on the OS MIDI's hub, of the parameters' messages, and v355 ports it with the clock task's 0x40
      pass (`0x89313d50`, `0x89313e10`: Clock Source, Clock Out, the patch's tempo). With Clock Source MIDI the clock
      object goes on the MIDI IN ring (`0x899598a0`), whose listeners the input task tells each message it takes (its
      F8's the object's +0x40 path, ported in the ms but fed nothing; start, continue and stop the class's own, not
      traced); the port's parser drops the real-time bytes, SysEx and system common (v355), and the part's MIDI takes
      none. Step 4.5 decides whether the plugin's host transport stands in for them, as XtSynth's does for the V-Synth.
-   - [gap] The MIDI out side (v355): USB-MIDI Thru (MIDI IN's messages to USB out instead of the part, USB's to MIDI
+     The coordinator's call (2026-11-25; the user can overturn it): yes, the host's transport stands in for MIDI clock
+     with Clock Source MIDI, through the V-Synth's own host-transport path (the one XtSynth's HOST reads), so the VC-2
+     reads the one clock the V-Synth does: no second clock, and no play head read in a VC-2 file. v455's state: the
+     plugin takes no system or real-time bytes (PluginVc2Play's Block::message), and the part plays rom.4's system
+     defaults, Clock Source INT, since the system's parameters don't reach it yet; this stays open until they do.
+     v457: they do, so Clock Source MIDI is the host's to set; with it the part's clock is fed nothing until the port
+     above and the host's transport standing in.
+   - [gap] The part's input frames (v455). The plugin fills each block's input frames from the host's input by one rule
+     in one place (Vc2PartPlayer.h: `vc2InputWord`, `kMicWord`, `kTrackerWord`): the mean of L and R into word 1 (+4,
+     the mic, kind 6's ring) and word 5 (+0x14, the tracker), the rest 0; silence gives exactly 0 there. A stand-in, the
+     coordinator's call (2026-11-25; the user can overturn it): unsourced, as which slot the mic comes back on and which
+     inputs the frame's +4 and +0x14 are wait on step 5's captures (items 2 and 4 below). Those captures change that one
+     rule. v458: with the effects on, rom.4's chip is given no input either (the mic reaches the part by this rule,
+     not through the chip's slots); the same captures say what the chip does with it.
+   - [gap] 018 FemaleChoirs plays at 9x real time, nearly silent; out of the played-block test until v362 (boundFloat),
+     then timed and put back (v455; the coordinator, 2026-11-25). Its time is in its SOLO walk (vc2solo::loadNext through
+     Vc2ToneOscLink::boundFloat and Vc2SynthOscOutside::boundFloat), peak 1e-4 against the other patches' 0.07–0.16;
+     VSynthEmuVc2PlayTest's patch list says so. v362 (the known-misses session) fixes boundFloat answering 0 for an
+     address in no tone; if that isn't this, it's a fault of its own. Measured through processBlock
+     (`VSynthEmuVc2PlayTest <rom> time 17 1`, v455's timing mode): 7.3 s for 2.0 s, the same with 1, 3 or 24 notes; every
+     sample under one note-on's SOLO seek (vc2OscSoloSetUp, vc2SeekRecords' `while (!(recEnd > to)) loadNext`), the seek
+     to 0 over records all read 0, 1.05e9 steps before it ended: the 9x is that seek's (boundFloat reading 0), not the
+     play path's (XtRateOut, Vc2PartPlayer, PluginVc2Play hold none of the time). With v362's boundFloat change on a
+     scratch copy of v455 (the coordinator's diff, not on this branch): 0.534 s for 2.0 s (27% of real time), peak 0.11,
+     and 28% with 3 notes. So 018 goes back into the test at the joint merge, once v362 is in.
+   - [gap] vc2SeekRecords' last loop has no bound. Over zero-length records, as before v362 or from a damaged wave, it
+     walks ~1e9 steps on the audio thread. rom.4 would loop the same. Whether the plugin bounds it is open (v455; the
+     coordinator, 2026-11-25: not to decide now; if the plugin should guard the audio thread, the user's decision).
+   - [x] The MIDI out side (v355): USB-MIDI Thru (MIDI IN's messages to USB out instead of the part, USB's to MIDI
      out as well), the MIDI out task and its flush (cyclic record 8). Nothing drains USB out or MIDI out on the rig,
      so the whole part keeps Thru off; step 4.5 decides what the plugin does with Thru (most likely nothing: a host
-     has no MIDI out of the part's).
-   - [gap] The front (v355): the whole part's front is a stand-in on entry 12's TCB sending each message the check
+     has no MIDI out of the part's). Closed by v455: nothing. The plugin's part plays rom.4's system defaults, USB-MIDI
+     Thru off, no host parameter holds it, and the plugin sends no MIDI (producesMidi false); VSynthEmuVc2PlayTest
+     checks the default and that no parameter holds it.
+   - [x] The front (v355): the whole part's front is a stand-in on entry 12's TCB sending each message the check
      gives it as the front's are (`0x89314d60`); the front's own task (its panel, its patch loads) is step 4.5's.
-   - [gap] A wait inside a pass, in the plugin (v355). On its OS model the notes' task's wait for a fade (0x1000, the
+     Closed by v455 with the plugin's own stand-in (Vc2PartPlayer, PluginVc2Play): at the part's start the parameters'
+     messages of kinds 3, 4, 5 and 0 with the routing's reset, each the front's to send through the OS MIDI task; a
+     patch, and each move of a VC-2 parameter, given as xt_vc2synth's patch given (Vc2Synth::patchGiven) at a block's
+     edge. rom.4's own front task (its panel, its edits' own messages, its start's order) isn't ported or traced: what
+     an edit on an XT sends the part may be less than a whole patch given. VSynthEmuVc2PlayTest holds the stand-in.
+   - [x] A wait inside a pass, in the plugin (v355). On its OS model the notes' task's wait for a fade (0x1000, the
      TVA's render posting it in a later block) takes the part's next outside events until the fade ends: the update
      task's passes, the ticks and the blocks run meanwhile, as on an XT. The plugin hands the part a host block's
      events and input at once, so a wait reaching past them needs the next host block before the part can go on.
@@ -1395,7 +1459,13 @@ version against rom.4's routines with what it calls hooked:
      the blocks the host block still holds and end the fade at the host block's end. The host's MIDI never makes the
      host wait (v355): each message goes, as its bytes, into MIDI IN's or USB's receive ring (2048 words,
      preallocated, as rom.4's row 15 builds it), and a full ring drops its backlog for the full marker, as rom.4's does
-     (`0x89311e90`); the input task's wait for room is the task's own state, not the audio thread's.
+     (`0x89311e90`); the input task's wait for room is the task's own state, not the audio thread's. Closed by v455
+     (the coordinator's brief: the fade wait's blocks to an output FIFO ahead of the host): a wait takes blocks past the
+     one the read asked for, on the input the host has given at their places (mostly none, the rest passed over when
+     it comes), their frames held in XtRateOut's room of a second ahead of the host and heard first, the host's messages
+     waiting meanwhile for the next block asked for; a wait past the room stops the part, and the control thread makes
+     another. VSynthEmuVc2PlayTest: 138 to 168 blocks ahead in waits a patch, bit for bit against the part driven
+     directly by the same rules.
 
 ### 5. Against the machine
 

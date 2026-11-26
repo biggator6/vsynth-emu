@@ -16,7 +16,7 @@ int32_t times(int32_t v, int32_t by) {
     return static_cast<int32_t>(static_cast<uint32_t>(v) * static_cast<uint32_t>(by));
 }
 
-bool everyRow(int rows, const std::function<bool(int, int)>& row) {
+bool everyRow(int rows, const XtFn<bool(int, int)>& row) {
     for (int kind = 0; kind < kKinds; ++kind)
         for (int i = 0; i < rows; ++i)
             if (!row(kind, i)) return false;

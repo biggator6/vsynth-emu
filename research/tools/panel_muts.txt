@@ -139,7 +139,7 @@ rom4-not-sought|    findVc2Rom(file);\n||plugin/Source/PluginRom.cpp|rom-image
 rom4-not-alone|void vc2FindRomEarly() { seekVc2(romPlaces()); }|void vc2FindRomEarly() {}|plugin/Source/PluginRom.cpp|rom-image
 rom-any-image|    out.known = known == std::end(kKnown) ? nullptr : *known;|    out.known = &kVSynth;|plugin/Source/XtSynthRom.cpp|rom-image
 rom-not-the-image|    if (file->known != &image_) {|    if (false) {|plugin/Source/XtSynthRom.cpp|rom-image
-rom4-no-tables|return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)\n           && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)\n           && vc2LoadCosm(path) && vc2LoadMatrix(path) && vc2LoadRamp(path) && vc2LoadOscConvert(path)\n           && vc2LoadLibMath(path) && vc2LoadToneMix(path) && vc2LoadPartVoices(path) && vc2LoadKeys(path)\n           && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);|Sh4 m; return m.loadRom(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-tables|return vc2LoadParams(path) && vc2LoadUnvoiced(path) && vc2LoadLegacy(path) && vc2LoadHireso(path)\n           && vc2LoadVocoder(path) && vc2LoadCarrier(path) && vc2LoadTracker(path) && vc2LoadKind6(path)\n           && vc2LoadAutoNote(path) && vc2LoadMixer(path) && vc2LoadOsc(path) && vc2LoadTva(path)\n           && vc2LoadCosm(path) && vc2LoadMatrix(path) && vc2LoadRamp(path) && vc2LoadOscConvert(path)\n           && vc2LoadLibMath(path) && vc2LoadToneMix(path) && vc2LoadPartVoices(path) && vc2LoadKeys(path)\n           && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path)\n           && vc2LoadSystem(path);|Sh4 m; return m.loadRom(path);|plugin/Source/XtSynthRom.cpp|rom-image
 # v208: the unvoiced detector's coefficients, loaded with rom.4's parameters at the start; v210: LEGACY's; v213: HIRESO's;
 # v220: the vocoder object's
 rom4-no-unvoiced|&& vc2LoadUnvoiced(path) && vc2LoadLegacy(path)|&& vc2LoadLegacy(path)|plugin/Source/XtSynthRom.cpp|rom-image
@@ -174,9 +174,11 @@ rom4-no-voices|&& vc2LoadToneMix(path) && vc2LoadPartVoices(path) &&|&& vc2LoadT
 rom4-no-keys|&& vc2LoadPartVoices(path) && vc2LoadKeys(path)\n|&& vc2LoadPartVoices(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
 rom4-no-setenvelopes|vc2LoadKeys(path)\n           && vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n|vc2LoadKeys(path)\n           && vc2LoadPartSettings(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
 rom4-no-partsettings|vc2LoadSetEnvelopes(path) && vc2LoadPartSettings(path)\n|vc2LoadSetEnvelopes(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
-rom4-no-osmidi|vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);|vc2LoadPartSettings(path)\n           && vc2LoadPatchFiles(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-osmidi|vc2LoadPartSettings(path)\n           && vc2LoadOsMidi(path) && vc2LoadPatchFiles(path)\n|vc2LoadPartSettings(path)\n           && vc2LoadPatchFiles(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
 # v450: the image a .p02's read runs on, kept by rom.4's loader at the start
-rom4-no-patchfiles|&& vc2LoadOsMidi(path) && vc2LoadPatchFiles(path);|&& vc2LoadOsMidi(path);|plugin/Source/XtSynthRom.cpp|rom-image
+rom4-no-patchfiles|&& vc2LoadOsMidi(path) && vc2LoadPatchFiles(path)\n|&& vc2LoadOsMidi(path)\n|plugin/Source/XtSynthRom.cpp|rom-image
+# v455: rom.4's system defaults, which the VC-2 mode's part starts from (VSynthEmuRomTest)
+rom4-no-system|&& vc2LoadPatchFiles(path)\n           && vc2LoadSystem(path);|&& vc2LoadPatchFiles(path);|plugin/Source/XtSynthRom.cpp|rom-image
 # v504: the VC-2's waves at the plugin's start, rom.4's own load on the disk image beside rom.4 (VSynthEmuRomTest)
 waves-not-sought|        firstTaken(cand, takeVc2);\n    }\n    seekWaves();|        firstTaken(cand, takeVc2);\n    }|plugin/Source/PluginRom.cpp|rom-image
 waves-not-beside|    juce::StringArray cand(juce::File(juce::String::fromUTF8(rom4.c_str())).getSiblingFile(kDiskImageName)\n                               .getFullPathName());|    juce::StringArray cand;|plugin/Source/PluginRom.cpp|rom-image
@@ -323,3 +325,65 @@ projsave-import|if (!isVSynthWave(wave)) report.toImport.add(to.getFileName());|
 projsave-alone|"001 " + name + ".p00"|"002 " + name + ".p00"|plugin/Source/PluginProjectSave.cpp|project
 save-loop-kept|            ids.erase(kLoopSwitch + kOscStride * osc);|            ;|plugin/Source/PluginPatchSave.cpp|project
 save-slot-any-file|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false);|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false, "*." + extension);|plugin/Source/PluginProject.cpp|project
+# v455: the VC-2 mode's audio (VSynthEmuVc2PlayTest): the part's blocks heard, at its level, MAIN and MULTI; the input
+# at each block's own place and in buffers that outlive a wait; messages before their block; the front's start; the
+# patch's store given at a block's edge, a parameter written into it, kept as the session's; the mode read; no
+# allocation in processBlock; the room ahead of the host
+vc2play-no-sink|    if (sink != nullptr) sink->mixed(frames.data());   // v455|    ;   // v455|plugin/Source/Vc2Synth.cpp|vc2play
+vc2play-level|    static constexpr float kLevel = 0x1p-30f;|    static constexpr float kLevel = 0x1p-31f;|plugin/Source/Vc2PartPlayer.h|vc2play
+vc2play-no-multi|        at[2 * i] = (f[kMainL] + f[kMultiL]) * kLevel;|        at[2 * i] = f[kMainL] * kLevel;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-input-place|    if (behind > 0) counts_.inputDropped += in_.drop(behind);|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+# (no plant for the input buffers' stack by depth: a ring of 16 was missed, as no wait the test makes takes 16 blocks
+# inside a block's own ticks, before its input interrupt; the stack stands for the waits that would)
+vc2play-messages-after|    if (head_ != tail_) {|    if (head_ != tail_ && !wanted_) {|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-no-front|    for (const uint32_t word : kVc2FrontStart) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, word);|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-allocates|    out_.render(left, right, n, [this] { produce(); });|    float* volatile heap = new float[(size_t)n + 1];\n    delete[] heap;\n    out_.render(left, right, n, [this] { produce(); });|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-no-room|    out_.prepare(hostRate, kMostAhead + kRoomSlack);|    out_.prepare(hostRate, 4 * kBlock);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-patch-not-given|        p_->patchGiven(s->none ? nullptr : s->bytes.data());|        ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-edit-not-put|        vc2PatchPut(k.work, *p.h, v);|        ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-store-not-kept|    if (patch_.gen == k.gen) patch_.store = k.work;|    ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-mode-unread|void PluginVc2Play::readMode() { vc2_.store(pluginMode(apvts_.state) == PluginMode::vc2); }|void PluginVc2Play::readMode() { vc2_.store(false); }|plugin/Source/PluginVc2Play.cpp|vc2play
+# v456: the part's view (Vc2PartView.h), written after each block and read by the mic's checks and the MIC IN card
+# (VSynthEmuVc2PlayTest's view checks; the editor's with no part played)
+vc2play-view-unset|    next->view = &view_;|    ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-view-sounding|    view->sounding.store(s.voices.sounding(*s.voiceParts).count, relaxed);|    view->sounding.store(0, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-view-quiet|    view->quietFrames.store(in >= Vc2PartView::kQuiet ? 0 : quiet + kBlock, relaxed);|    view->quietFrames.store(0, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-view-input|    view->inputPeak.store(in, relaxed);|    view->inputPeak.store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-mic-always|    const bool mic = v.quietFrames.load(std::memory_order_relaxed) < Vc2PartView::kQuietFrames;|    const bool mic = true;|plugin/Source/UiVc2Mic.cpp|vc2play
+vc2play-carrier-always|    const bool note = v.sounding.load(std::memory_order_relaxed) > 0;|    const bool note = true;|plugin/Source/UiVc2Mic.cpp|vc2play
+vc2play-chip-no-mic|    if (c[kMicCheck].state == State::silent) return "NO MIC";|    ;|plugin/Source/UiVc2Mic.cpp|vc2play
+editor-vc2-checks-never-wait|    if (!v.playing.load(std::memory_order_relaxed)) return State::waits;|    ;|plugin/Source/UiVc2Mic.cpp|layout
+editor-vc2-lines-never-wait|    if (!v.playing.load(relaxed)) return std::vector<juce::String>(kStateLines, kLineWaits);|    ;|plugin/Source/UiVc2Mic.cpp|layout
+# v457: the system's parameters to the part (VSynthEmuVc2PlayTest's Vc2PlaySystem.cpp and its system move): the system
+# given, its front's messages, kept from the parameters, the areas, the defaults, a part made again on it
+vc2play-system-old|        p_->systemGiven(s->system, s->areaSeq[(size_t)Vc2SystemArea::kB] > had,|        p_->systemGiven(*vc2SystemDefaults(), s->areaSeq[(size_t)Vc2SystemArea::kB] > had,|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-system-no-read|    if (systemB) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, kVc2SystemRead);|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-system-no-assigns|    if (assigns) queue({ kVc2ParametersMessage, 0, 0, kMidiIn }, kVc2AssignsRead);|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-system-unkept|        vc2SystemPut(k.system, p.area, p.h->id, v);|        ;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-system-ext-in-unmapped|    if (id == kClockSource \|\| id == kExternalInType) area = Vc2SystemArea::kB;|    if (id == kClockSource) area = Vc2SystemArea::kB;|plugin/Source/Vc2SystemStore.cpp|vc2play
+vc2play-system-assigns-on-b|    else if (id >= kAssignsFirst && id <= kAssignsLast) area = Vc2SystemArea::kSystem;|    else if (id >= kAssignsFirst && id <= kAssignsLast) area = Vc2SystemArea::kB;|plugin/Source/Vc2SystemStore.cpp|vc2play
+vc2play-system-default-descriptor|std::clamp(vc2SystemDefault(id, system) ? system : d->def - d->centre, lo, hi)|std::clamp(d->def - d->centre, lo, hi)|plugin/Source/PluginVc2Params.cpp|vc2play
+vc2play-system-made-defaults|std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_, keeper_.hasSystem ? &keeper_.system : nullptr)|std::make_unique<Vc2PartPlayer>(vc2Waves(), rate_, nullptr)|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-system-start-defaults|    if (const Vc2System* given = system != nullptr ? system : vc2SystemDefaults()) s.giveSystem(*given);|    if (const Vc2System* given = vc2SystemDefaults()) s.giveSystem(*given);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+# (vc2play-system-put-raw, the centre left out of vc2SystemPut, is equivalent: every one of the 16 has a centre of 0)
+# v458: the VC-2 mode's effects (VSynthEmuVc2PlayTest's Vc2PlayFx.cpp): the unit heard by the switch, the edits and the
+# control changes reaching the driver, the system's areas and the patch's readers as rom.4's getters read them
+vc2play-fx-never|    p_->fx = owner_.fxOn_->load() >= 0.5f ? owner_.fx_.sink() : nullptr;|    p_->fx = nullptr;|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-fx-switch-ignored|    p_->fx = owner_.fxOn_->load() >= 0.5f ? owner_.fx_.sink() : nullptr;|    p_->fx = owner_.fx_.sink();|plugin/Source/PluginVc2Play.cpp|vc2play
+vc2play-fx-edits-lost|    if (moved) vc2FxGive(c, storeOf(store), system);|    ;|plugin/Source/PluginVc2Fx.cpp|vc2play
+vc2play-fx-controls-lost|        taken_.push_back(ring_[at % ring_.size()]);|        ;|plugin/Source/PluginVc2Fx.cpp|vc2play
+vc2play-fx-controls-all|    if (number != kVc2FxReverbSend && number != kVc2FxChorusSend) return;|    if (number == kVc2FxReverbSend) return;|plugin/Source/PluginVc2Fx.cpp|vc2play
+vc2play-fx-typed-unread|        else if (id >= kVc2FirstTyped && id < kCosmTypedFirst) c.set(id, vc2StoreTyped(store, id));|        else if (id < 0) c.set(id, vc2StoreTyped(store, id));|plugin/Source/PluginVc2Fx.cpp|vc2play
+vc2play-fx-first-bank-unread|        else if (id >= kVc2FirstStored && id < kVc2FirstTyped) c.set(id, xtStoreValue(vc2Store(), store, id));|        else if (id < 0) c.set(id, xtStoreValue(vc2Store(), store, id));|plugin/Source/PluginVc2Fx.cpp|vc2play
+# (vc2play-fx-attenuation-on-b and -usb-unread, Attenuation read on system B's area and USB External In Type left at the
+# driver's default, are equivalent: neither is a parameter, so each holds rom.4's default, 2 and 0, on any area and as
+# its descriptor's)
+# v459: the VOCODER card's bands (d-14): the view's per engine (Vc2PartPlayer::viewedBands), drawn (UiVc2Bands.cpp)
+vc2play-bands-unwritten|    viewedBands();|    ;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-legacy-mic|            view->micBands[(size_t)b].store(v.legacy.analysis.s.bands[b][kLegacyHeld], relaxed);|            view->micBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-legacy-out|            view->outBands[(size_t)b].store(last * std::fabs(vc2LegacyTables().gains[b]), relaxed);|            view->outBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-hireso-mic|            view->micBands[(size_t)b].store(h.analysis.envelope(b), relaxed);|            view->micBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-hireso-out|            view->outBands[(size_t)b].store(carrier * h.s.left.follower[b] * gain, relaxed);|            view->outBands[(size_t)b].store(0.0f, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-hireso-count|        bands = Vc2HiresoWords::kBands;|        bands = Vc2LegacyTables::kCarrierBands;|plugin/Source/Vc2PartPlayer.cpp|vc2play
+vc2play-bands-out-on-mic|    topOut_ = std::max(loudOut, topOut_ * fall);|    topOut_ = std::max(loudMic, topOut_ * fall);|plugin/Source/UiVc2Bands.cpp|vc2play
+editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : "";|    said_ = bands == 0 ? kOff : "";|plugin/Source/UiVc2Bands.cpp|layout

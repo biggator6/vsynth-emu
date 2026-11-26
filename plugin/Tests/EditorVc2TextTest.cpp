@@ -81,8 +81,17 @@ void vc2TextChecks(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
     if (auto* page = dynamic_cast<Vc2VocoderPage*>(ed.pageView(Blocks::kVc2VocoderPage))) {
         page->refresh();
         check(page->status() == Vc2Mic::checks(p)[1].why, "the MIC IN card's status doesn't say the input is off");
+        const Vc2BandsView* bands = page->bands();   // v459: with no part played, no bands, a line saying it waits
+        check(bands != nullptr && bands->bands() == 0 && bands->said().contains("VC-2 part"),
+              "with no part played, the VOCODER card's bands should say they wait for it");
     }
     p.setBusesLayout(layout);
     for (const Vc2Mic::Check& c : Vc2Mic::checks(p))
-        if (c.state == Vc2Mic::State::waits) check(c.why.contains("step 4.3"), "a waiting check should say what for");
+        if (c.state == Vc2Mic::State::waits) check(c.why.contains("VC-2 part"), "a waiting check should say what for");
+    // v456: with no part played, the MIC IN card's state lines each wait, and the checks that read the part neither
+    // tick nor fail
+    const auto state = Vc2Mic::stateLines(p);
+    check(state.size() == Vc2Mic::kStateLines && std::ranges::all_of(state, [](const juce::String& s) {
+              return s.contains("VC-2 part");
+          }), "with no part played, the MIC IN card's state lines should say they wait for it");
 }

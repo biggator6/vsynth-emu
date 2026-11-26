@@ -4,7 +4,7 @@
 // take; each timer due by then fires through its class, which may set it again. On the part the list holds the notes'
 // task's schedule alone, a timer each MIDI clock (HARDWARE_FIRMWARE.md, "The part's clock and tempo timers").
 #include <cstdint>
-#include <functional>
+#include "XtFn.h"
 
 // A timer, 0x1c bytes as rom.4 lays it out (its constructor 0x8930f000)
 struct Vc2TempoTimer {
@@ -41,8 +41,8 @@ static_assert(sizeof(Vc2TempoList) == 12);
 // The list's routines on its words, the timers found by their addresses (the remove, 0x8930f0d0, isn't the part's:
 // nothing takes the schedule off)
 struct Vc2TempoTimers {
-    using TimerAt = std::function<Vc2TempoTimer&(uint32_t)>;
-    using Fire = std::function<void(uint32_t)>;   // a due timer's class's method, by the timer's address
+    using TimerAt = XtFn<Vc2TempoTimer&(uint32_t)>;   // v455: XtFn, no allocation
+    using Fire = XtFn<void(uint32_t)>;   // a due timer's class's method, by the timer's address
     Vc2TempoList& list;
     TimerAt timerAt;
     void set(uint32_t timer, uint32_t time);       // 0x8930f050: only sooner; on the list at its end if it was off

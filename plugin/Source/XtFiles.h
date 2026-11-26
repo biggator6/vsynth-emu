@@ -115,6 +115,9 @@ int xtStoreSection(const XtStoreLayout& l, int id, int zone = 0, int cosm = 0);
 int xtStoreRaw(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone = 0, int cosm = 0);
 int xtStoreValue(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone = 0, int cosm = 0);
 int xtStoreTyped(const XtStoreLayout& l, const std::vector<uint8_t>& store, int base, int id, int zone = 0, int cosm = 0);
+// v455: xtStoreRaw's other way, the ID's bits set to `raw`'s low ones (a Start Offset's 32 too); nothing for an ID outside
+// the store
+void xtStoreRawPut(const XtStoreLayout& l, std::vector<uint8_t>& store, int id, int zone, int cosm, uint32_t raw);
 // A type's IDs, first and last, from rom.2 (block 0 MFX, 1 Chorus, 2 Reverb, 3 COSM; the tables at 0x897a8218, 0x897a82e4, 0x897a8310, 0x897cebd8).  False past its types.
 bool xtEffectTypeIds(int block, int type, int& first, int& last);
 int xtEffectTypes(int block);

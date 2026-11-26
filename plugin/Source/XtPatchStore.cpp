@@ -187,6 +187,20 @@ int xtStoreRaw(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id
     return (int)(width >= 32 ? v : v & ((1u << width) - 1));   // 0x2c6 and 0x2fa are 32 bits wide
 }
 
+void xtStoreRawPut(const XtStoreLayout& l, std::vector<uint8_t>& store, int id, int zone, int cosm, uint32_t raw) {
+    const XtParamDesc* d = l.desc(id);
+    const int section = xtStoreSection(l, id, zone, cosm);
+    if (!d || section < 0) return;
+    const int width = std::abs(d->width), total = width + d->bit, bytes = (total + 7) / 8, at = section + d->offset;
+    if (at < 0 || at + bytes > (int)store.size() || width > 32) return;
+    const int shift = bytes * 8 - total;
+    const uint64_t mask = ((uint64_t { 1 } << width) - 1) << shift;
+    uint64_t v = 0;
+    for (int k = 0; k < bytes; ++k) v = v << 8 | store[(size_t)(at + k)];
+    v = (v & ~mask) | ((uint64_t)raw << shift & mask);
+    for (int k = bytes - 1; k >= 0; --k, v >>= 8) store[(size_t)(at + k)] = (uint8_t)v;
+}
+
 int xtStoreValue(const XtStoreLayout& l, const std::vector<uint8_t>& store, int id, int zone, int cosm) {
     const XtParamDesc* d = l.desc(id);
     if (!d) return 0;

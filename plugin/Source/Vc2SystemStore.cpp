@@ -4,12 +4,19 @@
 #include "Vc2RomTables.h"
 #include "XtFiles.h"
 #include "XtFwMachine.h"
+#include <algorithm>
 #include <iterator>
 #include <memory>
 
 namespace {
 constexpr int kSystemBlock = 24;   // [FW] 0x89320790: the system's block, system B's base + 24
 constexpr int kLastId = 0x7fff;
+// [FW] v457: Clock Source, External In Type (system B's); the controller assigns, Beam 1 L to Knob 2 (the system's)
+constexpr int kClockSource = 0x43, kExternalInType = 0x7a, kAssignsFirst = 0x89, kAssignsLast = 0x96;
+// [FW] v458: the effect driver's, as traced: its system reader's (0x8935feb0) on system B's, Attenuation on C's
+constexpr int kMasterLevel = 0x40, kOutputGain = 0x78, kAttenuation = 0x52b;
+constexpr int kFxSystemB[] = { kMasterLevel, kClockSource, 0x67, 0x68, 0x6f, 0x70, 0x71, 0x72, kOutputGain,
+                               kExternalInType, 0x7f };
 
 // [FW] each area's one section, every ID at its base: system B's, the system's, C's and D's
 constexpr XtPatchSectionDef kAreas[][1] = { { { 0, kLastId, Vc2System::kRecord, 0 } },
@@ -49,6 +56,33 @@ constinit Vc2RomTables<Read> tables;
 
 int vc2SystemValue(const Vc2System& s, Vc2SystemArea area, int id) {
     return xtStoreValue(kLayouts[(size_t)area], s.bytes, id);
+}
+
+void vc2SystemPut(Vc2System& s, Vc2SystemArea area, int id, int value) {   // v457
+    if (const XtParamDesc* d = vc2ParamDesc(id))
+        xtStoreRawPut(kLayouts[(size_t)area], s.bytes, id, 0, 0, (uint32_t)(value + d->centre));
+}
+
+bool vc2SystemAreaOf(int id, Vc2SystemArea& area) {   // v457
+    if (id == kClockSource || id == kExternalInType) area = Vc2SystemArea::kB;
+    else if (id >= kAssignsFirst && id <= kAssignsLast) area = Vc2SystemArea::kSystem;
+    else return (id == kMasterLevel || id == kOutputGain) && vc2FxSystemAreaOf(id, area);   // v458
+    return true;
+}
+
+bool vc2FxSystemAreaOf(int id, Vc2SystemArea& area) {   // v458
+    if (id == kAttenuation) area = Vc2SystemArea::kC;
+    else if (std::ranges::find(kFxSystemB, id) != std::end(kFxSystemB)) area = Vc2SystemArea::kB;
+    else return false;
+    return true;
+}
+
+bool vc2SystemDefault(int id, int& value) {   // v457
+    Vc2SystemArea area {};
+    const Vc2System* system = vc2SystemDefaults();
+    if (system == nullptr || !vc2SystemAreaOf(id, area)) return false;
+    value = vc2SystemValue(*system, area, id);
+    return true;
 }
 
 bool vc2LoadSystem(const char* path) { return tables.load(path); }
