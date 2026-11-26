@@ -1,7 +1,9 @@
 // fxplay: plays a run from fxcapture.py to a MIDI output through CoreMIDI, so the capture needs no DAW to send SysEx (any recorder takes the audio).
 //   fxplay                     lists the MIDI outputs
 //   fxplay <file.mid> <name>   counts down 5 s, then plays it to the output whose name contains <name>; prints each second's progress
-//   fxplay --from <seconds> <file.mid> <name>     starts part-way, sending the SysEx it skips first
+//   fxplay --from <seconds> <file.mid> <name>     starts part-way, sending the settings it skips first (SysEx, a
+//                              patch's Bank Select and Program Change, each followed by its load); a run's "hand:"
+//                              cue (vc2writer.py) is shown at its time, for the user to set at the panel in its pause
 //   fxplay --test <file.mid>   sends the file as fast as possible to a virtual output made here, and checks every byte arrives (no hardware)
 //   fxplay [--from <seconds>] --listen <file.mid>    a virtual output named "fxplay listen" for another fxplay to play to, checking the bytes and the timing (no hardware)
 // For a capture that feeds the XT a signal too (the VC-2's, vc2capture.py; fxaudio.h):
@@ -31,42 +33,12 @@
 
 #include "fxaudio.h"
 #include "fxmidiin.h"
+#include "fxrun.h"
 
 namespace {
-struct Event { uint32_t ms; std::vector<uint8_t> bytes; };
-using Cues = std::vector<std::pair<uint32_t, std::string>>;
-
-// A run's SysEx and notes; its markers (FF 06, the input's cues) into `cues` when asked for.  A run's file holds no
-// real-time bytes (0xF8 on), so a status is a channel message's by its high nibble, and anything else is refused.
-bool readRun(const char* path, std::vector<Event>& out, Cues* cues = nullptr) {
-    std::vector<uint8_t> b;
-    if (!fxaudio::bytesOf(path, b))
-        return false;
-    if (b.size() < 22 || std::memcmp(b.data(), "MThd", 4) || std::memcmp(b.data() + 14, "MTrk", 4) || b[12] != 0x01 || b[13] != 0xf4) { std::fprintf(stderr, "%s is not a run from fxcapture.py\n", path); return false; }
-    size_t i = 22; uint32_t t = 0;
-    const auto var = [&] { uint32_t v = 0; while (i < b.size()) { const uint8_t c = b[i++]; v = v << 7 | (c & 127); if (!(c & 128)) break; } return v; };
-    while (i < b.size()) {
-        t += var();
-        const uint8_t c = b[i++];
-        if (c == 0xff) {
-            const uint8_t kind = b[i++];
-            const uint32_t ln = var();
-            if (kind == 0x06 && cues)
-                cues->push_back({ t, std::string(b.begin() + i, b.begin() + i + ln) });
-            i += ln;
-            if (kind == 0x2f)
-                break;
-        }
-        else if (c == 0xf0) { const uint32_t ln = var(); Event e{ t, { 0xf0 } }; e.bytes.insert(e.bytes.end(), b.begin() + i, b.begin() + i + ln); i += ln; out.push_back(std::move(e)); }
-        else if (c >= 0xf8) {
-            std::fprintf(stderr, "a real-time byte %02x at %u ms: not a run from fxcapture.py\n", c, t);
-            return false;
-        }
-        else if ((c & 0xf0) == 0x80 || (c & 0xf0) == 0x90) { out.push_back({ t, { c, b[i], b[i + 1] } }); i += 2; }
-        else { std::fprintf(stderr, "unexpected event %02x at %u ms\n", c, t); return false; }
-    }
-    return true;
-}
+using fxrun::Cues;
+using fxrun::Event;
+using fxrun::readRun;
 using fxmidi::nameOf;
 void send(MIDIPortRef port, MIDIEndpointRef dest, const std::vector<uint8_t>& m) {
     Byte buffer[1024]; MIDIPacketList* list = reinterpret_cast<MIDIPacketList*>(buffer);
@@ -163,7 +135,10 @@ int testRun(MIDIClientRef client, MIDIPortRef port, char** argv, int a) {
 int listenRun(MIDIClientRef client, char** argv, int a, double from) {
         std::vector<Event> ev, want; if (!readRun(argv[a + 1], ev)) return 1;
         const uint64_t startMs = static_cast<uint64_t>(from * 1000); size_t first = 0;      // what a player with the same --from sends: the skipped SysEx first, then the rest on time
-        for (const auto& e : ev) { if (e.ms >= startMs) want.push_back(e); else if (e.bytes[0] == 0xf0) { want.push_back(e); first++; } }
+        for (const auto& e : ev) {                     // the skipped settings (SysEx, a patch's choice), then the rest
+            if (e.ms >= startMs || fxrun::isSetting(e)) want.push_back(e);
+            if (e.ms < startMs && fxrun::isSetting(e)) first++;
+        }
         std::vector<uint8_t> bytes; for (const auto& e : want) bytes.insert(bytes.end(), e.bytes.begin(), e.bytes.end());
         MIDIEndpointRef virt = 0;
         const OSStatus st = MIDIDestinationCreate(client, CFSTR("fxplay listen"), received, nullptr, &virt);
@@ -208,7 +183,8 @@ std::pair<AudioQueueRef, bool> inputQueue(fxaudio::Player& input, const char* pa
 // The run at argv[a] to the MIDI output whose name holds argv[a + 1], and its input when --audio gives one.
 int play(MIDIPortRef port, char** argv, int a, const Options& opt) {
     std::vector<Event> ev;
-    if (!readRun(argv[a], ev))
+    Cues cues;
+    if (!readRun(argv[a], ev, &cues))
         return 1;
     MIDIEndpointRef dest = 0;
     const std::string want = argv[a + 1];
@@ -233,10 +209,12 @@ int play(MIDIPortRef port, char** argv, int a, const Options& opt) {
     const uint64_t startMs = static_cast<uint64_t>(opt.from * 1000);
     size_t k = 0;
     for (; k < ev.size() && ev[k].ms < startMs; k++)    // skipped: its settings still count, its notes don't
-        if (ev[k].bytes[0] == 0xf0) {
+        if (fxrun::isSetting(ev[k])) {
             send(port, dest, ev[k].bytes);
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(fxrun::pauseAfter(ev[k])));
         }
+    size_t hand = 0;                                   // the next cue: a "hand:" one is shown at its time
+    while (hand < cues.size() && cues[hand].first < startMs) ++hand;
     uint64_t t0;                                       // only now: the time spent on what was skipped mustn't bunch up
     now(t0, gTb);
     if (queue)
@@ -244,6 +222,10 @@ int play(MIDIPortRef port, char** argv, int a, const Options& opt) {
     uint32_t shown = 0;
     for (; k < ev.size(); k++) {
         const Event& e = ev[k];
+        for (; hand < cues.size() && cues[hand].first <= e.ms; ++hand) {
+            waitUntil(t0 + (cues[hand].first - startMs) * 1000000ull);
+            fxrun::showHand(cues[hand].second);
+        }
         waitUntil(t0 + (e.ms - startMs) * 1000000ull);
         send(port, dest, e.bytes);
         if (e.ms / 10000 != shown) { shown = e.ms / 10000; std::printf("%4u s of %u\n", e.ms / 1000, ev.back().ms / 1000); std::fflush(stdout); }

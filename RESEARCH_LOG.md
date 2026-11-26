@@ -4298,3 +4298,54 @@ Round-2 recordings.  First build-out after that: real-time granular port
   in 32 bits, so an index near -2^31 wraps back into the rings and past them into the free LFOs. The port computed it
   in a long and an int subtract that overflowed. That overflow is undefined in C++: a print added to `at` changed what
   the compiler made of it, which is how it showed (v364).
+
+### Session 25 (2026-11-25) — rom.4's SysEx map, read and run (no version)
+
+- The coordinator asked for rom.4's SysEx paths, to prove or correct step 5's map, inferred from the V-Synth's. The
+  inference didn't survive its first byte past the header: rom.4's DT1 method takes models 0x20d, 0x124 and 0x14d, and
+  the V-Synth's 0x153 is parsed and dropped. The VC-2's model is 00 00 0D, the one rom.4's own senders put out.
+- The map is rom.4's own: an address table per block in .data, an entry per address byte, the value named by its last
+  byte's entry, some entries gated by Patch Category. It reaches the VC-2's edit set, not its store, so 23 of the
+  settings step 5's runs change have no address at all (the vocoder's type, depth and level, the OSC types, External
+  In Type, Output Gain). How the runs set them is now the coordinator's or the user's decision (the plan, step 5).
+- Two sources, as the house asks: vc2map.py reads the tables and decodes the Category test from the image; `vc2run
+  sysex` runs rom.4's own parser on DT1s at every address with the setters hooked. They agree on all 347 values. The run
+  needed the SysEx task's start (0x89316a40) for the tables' counts, and a stand-in class for the out ports, whose base
+  class has pure methods; with them the RQ1 answer and the edit-data senders ran, and every DT1 they sent lands where
+  the receive map takes it.
+- Not traced: model 00 24's handlers (files or waves) and two senders of other models. rom.2's own tables aren't read:
+  the V-Synth map there still stands on the manual and fxcapture's checks alone.
+
+### Session 25, continued (2026-11-25) — v505: the VC-2's patches on the card
+
+- The user chose patch files for the 23 settings. Of them, 21 are a patch's; Output Gain and External In Type are the
+  system's, which no patch holds and SysEx can't reach.
+- The save was found by name, as v602's was: the .p02's header strings are written in one routine, which turned out to be
+  rom.2's writer at one distance. Its store-to-file layout is the read's conversion mirrored, and the setters are rom.2's
+  at the setters' own distance. All 128 factory patches come back byte for byte. A drawn store can't: its bits that no
+  ID holds don't reach a file. Its check is that its file reads back to a store that writes the same file again.
+- The first setter run found 112 settings "wrong", every one a one-value range. rom.4's setter doesn't hold those, as
+  rom.2's doesn't; the check had assumed it did.
+- One plant was missed: the writer entered 2 bytes in runs the same, as the interpreter's call returns at its sentinel
+  whatever the stack holds. It was an equivalent plant, and was replaced.
+- The card's layout took rom.4's boot on cards made in memory. It needed three kernel answers the boot's table lacks:
+  a line read, a handle's name, and the seek's place. With those the project's ini is read line by line, each line
+  whole, and the Patch folder fills the bank by the files' numbers.
+- I first proposed giving the two system settings runs of their own. That would have taken each take away from the
+  `main` its checks read against in the same recording. Instead run 1 pauses 20 s before such a take, at a `hand:` cue
+  fxplay prints, so the run's timing and checks stay as they were.
+- vc2cut_test's from-part-way case then failed for something real: a recording resumed just before `master_100` took
+  that take as its own reference. The direct sound's levels are now read only against a take at 127.
+- Then the coordinator gave the shape it wanted for the merge. The save takes rom.4's path from v450's reader by one
+  accessor, as v602's takes none. Its checks are two parts of xt_vc2patch rather than a harness of their own, and its
+  plants are lines of v450's list. build.sh changes only on xt_vc2patch's lines, so the writer tool got a build
+  script of its own. The git guard refuses a reset while untracked files stand in the worktree, so this went on top as
+  a second v505 commit, as v334 did. The recount showed 19 plants, not the 20 the first commit said.
+- The coordinator kept the pauses and asked for the panel path at each cue. rom.4's screens, read by their titles and
+  labels, put Output Gain on SYSTEM > Common > IO, as rom.2's do. They draw External In Type nowhere: the IO screen's
+  first label became "USB Input Type", and the VC-2 keeps its own system file. So the four extin takes may have
+  nothing to set in VC-2 mode, which was put to the coordinator. A wait for a key at the cue was left out, because
+  the cut and fxplay's input both run on the run's fixed timeline.
+- The coordinator kept the four, with their verdicts made to depend on whether the user found the setting. A seventh
+  argument to `analyse` broke the shape law, so the cutter got a function that makes an analysis by class. The shared CLI
+  now picks one by a flag, which fxcut doesn't use.

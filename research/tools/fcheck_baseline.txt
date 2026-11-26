@@ -918,6 +918,10 @@ sections: 8972 IDs placed, at every block, against rom.4's pointing routines, 0 
 reads: 1439592 values in every block, bits and value, over 128 patches and 40 random, 0 different
 typed reads: 880992 typed values in every zone, over 128 patches and 40 random, 0 different
 files: 149 read, 128 of them the disk image's, the rest made otherwise, 0 different
+saved, the image's patches: 128 back as their files and their stores, 0 different
+saved, drawn stores: 40 whose files read back write them again, 0 different
+set, first bank: 1517 values by rom.4's setter, read back, no other byte moved, 0 different
+set, typed: 1224 typed values by rom.4's setter, read back, no other byte moved, 0 different
 xt_vc2patch: 0 different
 == xt_vc2waves
 the disk image's index: 58 waves, 43 maps, 192 samples

@@ -2151,6 +2151,287 @@ Results:
 - `kn-rr-freeze` caught at 400 cases at each seed, and at fcheck's 40 at 2024.
 - `mutate_vc2.py --kernel`, the whole list: 42 planted, all caught, clean first.
 
+### The VC-2's system settings at its panel (2026-11-25, no version) {#vc2-system-panel}
+
+For step 5's run 1, whose six "hand:" cues ask for Output Gain and External In Type at the panel. Both are system
+settings that no patch holds and rom.4 has no SysEx address for (see "rom.4's SysEx: the VC-2's own address map").
+Where VC-2 mode's panel has them was read from rom.4's screens, by their titles and labels (names first).
+
+**The screens.** rom.4 has rom.2's system screens by title: `SYSTEM Com Master`, `SYSTEM Com IO`, `SYSTEM Com EQ`,
+`SYSTEM Com MIDI/USB`, `SYSTEM Com Audio I/F`, `SYSTEM Com USB Setting`. It also has some of its own, such as
+`SYSTEM MIC Setting`. The XT's manual (pp. 122, 123, 156) shows how V-Synth mode reaches them: SYSTEM, a group by the
+buttons at the screen's foot (Common), a tab on its left (Master, IO, EQ…).
+
+**Output Gain** (ID 0x78, −12…+12 dB, default +0 dB) is on `SYSTEM Com IO` in VC-2 mode too, by two sources:
+- rom.4's screen routine (`0x894a0c10`, its title from `0x894a0d40`) draws three labels: "USB Input Type",
+  "Output Gain" (`0x894a0c84`) and "Digital Output Freq";
+- rom.2's same screen (`0x8944ebb8`) draws Output Gain there, and the manual lists it under Common, IO.
+
+So its panel path is SYSTEM > Common > IO > Output Gain.
+
+**External In Type** (ID 0x7a, STEREO, MONO-L+R, MONO-L, MONO-R; default MONO-L+R) is drawn on no rom.4 screen:
+- rom.2's IO screen draws "External Input Type", "(Mic -> R)", "External Input Source", "Mix/Parallel", "Output Gain"
+  and "Digital Output Freq". rom.4's draws "USB Input Type" and none of rom.2's first four.
+- `SYSTEM Com Audio I/F` (`0x8949e6e8`) draws the jacks' switches and gain and the USB audio's routing: "MIC Jack
+  Switch", "INPUT Jack Switch", "INPUT Jack Gain", "USB Audio Input Source", "Monitor Sw", "USB Audio Output Dest".
+- No other rom.4 string names it but its own name in the parameter table (`0x898bbaf0`). The "Input Mode" labels are
+  effect types' pages (Lo-Fi, Distortion…).
+- rom.4 keeps a system file of its own, "VC-2 System.s00" (rom.2's is "V-Synth System.s00"), so V-Synth mode's
+  setting very likely doesn't carry over.
+
+So in VC-2 mode External In Type very likely stays at MONO-L+R: no page, no SysEx, no patch. Not yet seen on an XT. The
+guide (step 3) has the user look for it and write down whether they found it. If not, `vc2cut.py --extin-not-found`
+reads run 1's four extin takes as repeats of one setting, held to each other's sides and level. The plugin's side is
+step 4.5's [gap]. Not traced: the screens' field tables, which would show each field's ID (the
+IO screen's table at `0x895a4574` didn't read plainly as IDs), and whether rom.4 loads 0x7a from "VC-2 System.s00".
+
+**For the cut.** fxplay can't wait for a key at a "hand:" cue without breaking the run's timing:
+- the cutter places each take's mark near its place on the run's timeline (`capbase.align`, `note_on + MARK + offset`),
+  and fits one line through the clean marks for the takes with none, such as run 2's vocoder takes;
+- `fxplay --audio` schedules the whole input on one timeline at the start.
+
+A wait of unknown length would shift every take after it. So the pause stays a fixed 20 s.
+
+### A VC-2 patch saved (2026-11-25, v505) {#vc2-patch-save}
+
+For step 5's patch files (the user's "Patch files", 2026-11-25; VC2_MODE_PLAN.md, step 5). rom.4's own .p02 save runs
+in the interpreter, as v602 runs rom.2's: `Vc2PatchSave.cpp`, held by two parts of `xt_vc2patch` after v450's
+(`Vc2PatchSaveCheck.cpp`).
+
+**Names first.** One routine reads the .p02's header strings ("VC20", "Rev008", "PATa", "VC_2"):
+`0x893411b0(path, layout)`. It opens the file for writing (`0x89336c90`). It writes the first header (00 1e, "VC20",
+"Rev008"), then the second ("PATa", "VC_2", the data's place 0x20 and its length 0x13a4, big-endian), then the
+layout's bytes, each by `0x89336d70`, and closes the file (`0x893391c0`). On a short write it removes the file
+(`0x89341360` → `0x89336ea0`) and returns 0, else 1. It is rom.2's `0x8948fc30`, 0x14ea80 away (codepairs.py).
+
+The store's layout comes from `0x89324f20(layout, store)`, the mirror of the read's conversion `0x89324b20`.
+
+rom.4's save of patch n, `0x893270a0`, is the two:
+- `0x89324f20(0x8996f595, store)`;
+- then `0x89341380(n, layout)`, which builds "<project>Patch\" + "%03d %s.p02" (the project's path from `0x893436b0`)
+  and calls the writer.
+
+**The setters.** rom.2's two, 0x159230 away:
+- `0x89328680(place, descriptor, value)` for the first bank (rom.2's `0x894818b0`): the centre added, held to min and
+  max unless they are equal (compared unsigned), the width's bits kept;
+- `0x89328bf0(place, slot's descriptor, typed descriptor, value)` for a typed ID (rom.2's `0x89481e20`): held to its
+  type's range, then as its slot's.
+
+Their descriptors:
+- `0x8950f0b0`, 12 bytes an ID;
+- `0x895131a8`, 8 bytes a typed one, from 0x56a.
+
+A value's place is its ID's section in v450's layout (`vc2Store()`). A typed ID's is its block's slot
+(`vc2StoreSlotBase` plus the slot).
+
+**The run.** It runs on the rom.4 image v450's reader keeps (`vc2PatchFilesRom`), as v602's save runs on rom.2's.
+The store sits in XtFwMachine's samples' room (`kSamp`), the layout 0x2000 past it. Hooks answer the writer's four OS
+calls and keep the bytes written (`Written`). Not for the audio thread.
+
+**Checks.** `xt_vc2patch <rom.4> 40 2024`, its two parts after v450's; also 300 cases at seeds 7 and 31337, 0
+different:
+
+| Part | Cases | Different |
+| --- | --- | --- |
+| The image's patches (Internal.vc2/Patch), read by vc2PatchRead and written again: each is its file byte for byte, and its file reads back as its store | 128 | 0 |
+| Drawn stores: each one's file, read back, writes the same file again (bits no ID holds don't reach a file, so a drawn store can't come back byte for byte) | 40 | 0 |
+| The first bank: every ID of the store's sections, in zone 1, again in zone 8 where its section repeats and in COSM 2 for a COSM's. Read back by xtStoreValue: in range as set, past it at an end, a one-value range in its bits; no other byte moved | 1517 | 0 |
+| Every typed ID, the same, read back by vc2StoreTyped | 1224 | 0 |
+
+`mutate_vc2.py --patch` caught all 58: the 19 `save-` plants (`vc2patch_muts.txt`, `PORT=vc2save`) and v450's 39, as
+before.
+The plants cover:
+- the routines and their arguments;
+- the writer's calls;
+- the descriptor banks and their strides;
+- a typed ID's block and slot;
+- the zone, the COSM and the value;
+- the store kept.
+
+The first `writer` plant started the writer 2 bytes in, and was missed: the call runs the same with its first
+instruction skipped, since the interpreter returns at its sentinel whatever the stack holds. The bank file's writer
+(`0x89342680`) in its place replaced it.
+
+**A finding.** rom.4's setter doesn't hold a one-value range (min equal to max), as rom.2's doesn't (v602). On a first
+run, 112 of the first bank's settings past such a range read back as set, in the field's bits: −1 in a 4-bit field
+reads 15. The check now expects that.
+
+**The tool.** `vc2patchwrite <rom.4> <out.p02> [ID=value[@zone] ...]` (research/tools/, built by
+`build_vc2patchwrite.sh`). It starts
+from rom.4's default patch (what its reader lays under a header with no data), sets the values by the setters, and
+writes the file by the writer. It reads the file back before keeping it, and refuses a value that doesn't read back as
+set.
+
+### A card's patches in VC-2 mode (2026-11-25, no version) {#vc2-card-patches}
+
+For step 5's patch files: where a card's patches sit, and the Bank Select and Program Change that reach one in VC-2
+mode. The research tool is `vc2card <rom.4>` (`vc2card.cpp`, `vc2cardfiles.h`, `vc2cardkernel.cpp`): rom.4's boot
+of the bank and the project, run on cards made in memory. Each fact has two sources: the code, read, and the run.
+
+**The project.** `0x89342cb0(0x8997ab20)` reads "C:\VC-2 Project.ini" (C: is the card) a line at a time, by the
+kernel's line read `0x88008cb0`. It compares each line whole:
+1. "[current project]\r\n";
+2. `drive="PC Card"\r\n` (C:\), or `drive="Internal"\r\n` (A:\Internal.vc2\, its path then ignored);
+3. `path="…"`, whose value is appended to the drive. It must end in '\' and open as a folder.
+
+Anything else, or a folder that isn't there, falls back to "A:\Internal.vc2\". `0x893436b0(0x8997ab20)` gives the
+path to the rest of rom.4.
+
+**The bank.** `0x899613e8`: +0 its base, +4 its count (a halfword). The static initializer `0x8931a940` makes 512
+patches at `0x89addbf8`, each the init patch (`0x893291c0`), state byte 2. `0x89341e90` loads the project's Patch
+folder:
+- it lists Patch\;
+- it parses each name by `0x89340eb0`: "NNN name", NNN 1…512, then ' ' or '_', the rest the patch's name;
+- it loads a slot whose state (`0x893272e0`) is 2 or 3: the file read by `0x89341de0` (its reader `0x893419a0`) and
+  copied in by `0x89327070`.
+
+**Program Change.** `0x89318a20(record, out)` takes the record's +0 as the Program Change, +1 as Bank Select's MSB and
++2 as its LSB:
+- the MSB must be 87;
+- LSB 0 gives patch PC + 1, for PC under 64 (patches 1…64);
+- LSB n of 1 or more gives (n − 1)·128 + 64 + PC + 1, held to the bank's count (`0x893273c0(1)`, 512). LSB 4 reaches
+  449…512, with PC 0…63.
+
+rom.4's map has the setup's Part 1 Bank Select MSB (ID 0, default 87), its LSB and its Program Number (01 00 00 00…02).
+It also has the system's Receive Program Change and Receive Bank Select (02 00 00 08 and 09, both on by default).
+
+**The run.** Card 1 holds the ini (drive="PC Card", path="RUNS.vc2\") and 12 files in RUNS.vc2\Patch\. It gives:
+- the project C:\RUNS.vc2\;
+- slots 1, 2, 64, 65, 66, 128, 129, 300, 448, 449, 511 and 512 named by their files (CARD00…CARD11), the rest the init
+  patch;
+- the parse's grid as above.
+
+The other cards:
+- without the path's trailing '\', the path is broken and nothing loads;
+- a missing folder, or drive="Internal", gives A:\Internal.vc2\;
+- "513 PAST.p02" and "ABC NAME.p02" are skipped.
+
+**What the run answers for rom.1's kernel** (calls the boot's table doesn't answer):
+- the line read `0x88008cb0`: a line of the file, CR LF kept;
+- a handle's name `0x88008cd0`: the opened folder's path;
+- the seek's place: the wrapper returns at `0x89336e0a` with r12 the place. The reader needs it; the boot's kernel
+  answered 0;
+- the folder calls `0x88008d90` and `0x88008de0`, the removal `0x88009000`, and `0x88008db0` on a missing folder.
+
+**For the captures.** vc2cardrun.py writes the card's folder: "VC-2 Project.ini" at its root, and
+RUNS.vc2\Patch\NNN RUN NNN.p02 (with an empty Wave\). A take selects its patch by CC 0 = 87, CC 32 = its LSB, then
+the Program Change. It then waits 1.5 s for the load: a pause chosen, not measured. RECORDING_GUIDE.md has one patch
+checked by ear.
+
+### rom.4's SysEx: the VC-2's own address map (2026-11-25, no version) {#vc2-sysex-map}
+
+For VC2_MODE_PLAN.md, step 5, whose SysEx map was inferred from the V-Synth's: rom.4's receive and send paths, read,
+then run. Research tools only, no harness: `vc2run <rom.4> sysex` (`vc2sysex.cpp`, `vc2sysexmap.cpp`,
+`vc2sysexsend.cpp`) and `vc2map.py`. **The inferred map was wrong from its model on, and is withdrawn** (the plan,
+step 5).
+
+**The way in.** The OS MIDI handler's message 0x01 calls `0x89310640(0x8995dd0c, message)` while SysEx's flag
+`0x8992e3d1` is set. `0x893154a0` (the handler's kind 4) sets four bytes from the system: that flag from Receive
+Exclusive (ID 0x75, default on), `0x8992e3d2` from Exclusive Protect (0x76), `0x8992e3d3` from Transmit Edit Data
+(0x74), and the device byte `0x8992e3d0` from Device ID (0x77, 16…31, the panel's 17…32; .data and default 0x10). The
+message is a word of length, then F0 … F7, at most 0x200 bytes. The parser is the OS's Roland class (base
+`0x898c7e80`, the object's `0x898c8360`, a slot 12 bytes, its method at +8):
+- 41 goes on; 7F and 7E go to `0x8930f840` and `0x8930fcc0`; anything else to the class's +0x18.
+- The device byte, then the model: each 00 adds 0x100, the next byte is or'd in, looked up in the model table
+  `0x8950cfd0` (model, address bytes): 0x110 4, 0x42 3, 0x46 4, 0x6a 4, 0x153 4, 0x16d 4, 0x20d 4, 0x124 5, 0x14d 4.
+  rom.2's (`0x897a0668`) has the same less 0x16d, 0x20d and 0x14d.
+- 11 is RQ1 (`0x8930f3d0`, then the class's +0x54), 12 DT1: the address bytes 7 bits each, the data, a checksum over
+  both; good goes to +0x48, bad to +0x60.
+
+**The models.** The DT1 method (`0x89315780`) takes a message at the device byte or 7F, for three models alone:
+- **0x20d, 00 00 0D**: the parameters, `0x8931c1b0` (below);
+- 0x124, 00 24 with five address bytes: `0x89319250`, by the address's top nibble to six cases (1 and 4…6 handled,
+  2 and 3 a return), on lists at `0x89973084` and `0x89974024`: files or waves, not parameters, not traced;
+- 0x14d, 00 4D: a bare return.
+
+**The V-Synth's 00 53 is parsed and dropped.** No DT1 of the inferred map would have set anything on an XT in VC-2
+mode. RQ1 (`0x89315830`) answers 0x20d (`0x8931f8b0`) and 0x124 (`0x89319920`). A bad checksum (`0x893158a0`) on
+0x20d or 0x124 puts the screen's message 3 up (`0x89315480(3)`), then takes the DT1 all the same.
+
+**The address decode** (`0x8931c1b0`), the address as 28 bits, b0 << 21 | b1 << 14 | b2 << 7 | b3:
+- Each address byte has an entry of 40 bytes in a table in .data: +0 its value's width in bytes, +1 this byte's place
+  in it, +3 a Category condition, +4 how many (group, ID) pairs follow from +8.
+- A DT1 writes at a value's first byte alone (place 0). The value is `width` bytes from there (one byte as it is,
+  more as nibbles, high first, `0x8931b0c0`), named by the pairs of the value's last byte's entry (`0x8931b158`).
+  The other bytes' entries name the IDs rom.4's descriptors give as 4-bit views of the same field (MFX Parameter
+  1's three dummies, 0x1bb…0x1bd, before it).
+- The counts are words in .data from `0x899343d0`, made into the .bss counts the handler tests by the SysEx task's
+  start (`0x89316a40` on `0x8995e644`, from `0x89314ce0`).
+
+| Address | What | Table | Entries |
+|---|---|---|---|
+| 01 00 00 00 | the setup: Part 1's bank and program, Transpose, Octave Shift, Beep, Sampling Template, Patch Palette, Chord Memory's switches | `0x8992e408` | 12 |
+| 02 00 00 00 | the system: Master Tune (4 bytes), Key Shift, Level, Clock Source and Out, Receive Program Change, Bank Select and Channel, the controllers' assigns, the system EQ, Arpeggio Grid, Chord Memory (2 bytes a note) | `0x8992e5e8` | 145 |
+| 03 00 0i 00, i 0…7 | MIC setting i + 1: Sampling Template Name 1…8 and the pre-effect chain (0x4f7…0x51f) | `0x8992fc90` | 29 each |
+| 10 00 00 00 | the patch common: Patch Category, Name, Tempo (4), Beam Type, Pad Mode and Hold, Coarse and Fine Tune, Scale Tune (2 a note), the three effect switches, then MFX from 10 00 00 32, Chorus from 10 00 01 36, Reverb from 10 00 01 69 (a type's parameters 4 bytes each) | `0x89930118` | 331, to 10 00 02 4A |
+| 10 00 03 00 | an edit set: portamento, Mono/Poly, Legato, Bend Up, Env 1 and 5 Decay, zone 1's OSC 1 and 2 (levels, waves, tunes, vibrato, harm formant, sub-oscillator), its COSM's switch and first two parameters, Matrix Controls 1…3, the patch EQ, the TVA's level and pan, Env 13 | `0x899334d0` | 67 |
+| 10 00 04 00 | Modulator Key Mode, zone 2's OSC 1 (wave, pitch, time, formant, tempo sync, level), Matrix Controls 5…8 | `0x89933f48` | 15 |
+| 10 00 05 00 | Direct Sound Level, zone 1's Reverb and MFX sends, Matrix Control 4, Env Attack and Release, Auto Note On Switch, Hold Dump Time, Unvoice Detect and Level, Formant Template and Shift | `0x899341a0` | 14 |
+| 20 00 00 00 + k b1's, k 0…447 | stored patch k + 65: the 10 00 blocks as they are | the same | |
+
+**Groups.** A pair's group picks the setter (`0x8931b110`): 1 the setup, 2 and 3 the system, 4 a MIC setting (b2 its
+number), 5 and 6 the common, 7 MFX, 8 Chorus, 9 Reverb, 10…12 zone 1's envelopes, OSC block and COSM, 13…15 zone 2's.
+The system's writer (`0x89321340`) takes the data bytes from the first ID, so a 4-byte value goes in whole. A stored
+patch's setters (`0x8931ba70`) take groups 5…15 and test Exclusive Protect first: on, the screen's message 2 and no
+write.
+
+**Patch Category** (0x12c, 0…11, of the patch written to) gates an entry with a condition (`0x8931c5d0`). Condition 0
+writes always, a Category past 11 nothing; else, by condition, the Categories: 1, 0…9; 2, 0…5 and 7…9; 3, 2, 5 and 9;
+4, 6; 5, 7…9; 6, 0…2 and 7…10; 7, 0…6; 8, 0…5 and 7…11; 9, 0…2 and 6…10; 10, 3…5 and 11. So Formant Shift writes
+under Categories 3…5 and 11 alone, Auto Note On Switch under 0…6, OSC 1 Pulse Width under 2, 5 and 9, the 10 00 04
+block under 7…9; Patch Category itself, the names, the effects, the setup, system and MIC settings always.
+
+**What has no address.** No entry names, of the vocoder block (0x193…0x1a5): Vocoder Sw, Vocoder Type, Vocoder Sound
+Level, Vocoder Depth, Auto Note Retrigger, Split Point, robot human depth, Stereo Process Sw, Unvoice Spread switch.
+Of the tone: no OSC Switch, Type, Wave Gain, Vari or Time Trip switch, no TVA Switch, Output Assign, Chorus Send Level
+or MOD Switch, and none of the VOCODER OSC's own IDs (0x354…0x383 but the vibrato's, wave start and harm formant's).
+Of the system: no Output Gain, External In Type, Receive Exclusive, Device ID or Transmit Edit Data. The map is the
+VC-2's edit set, not its store.
+
+**Two sources, held to each other.**
+- The code, read: the decode above, the tables read by `vc2map.py` from the image (their places from the handler,
+  their contents at run time, the Category law decoded from `0x8931c5d0`'s own jump tables).
+- The code, run: `vc2run <rom.4> sysex` builds the object by its static initializer (`0x89315bc0`) and the counts by
+  the task's start, and hands the parser DT1s of 384 bytes (byte k is k & 15): every b0 at b1 00 and every b2, then
+  every b1 and b2 of the eight b0 that write (01, 02, 03, 10, 20…23), then b2 0…8 at every b1 at each Category 0…12.
+  Every setter the path ends in is hooked (16 leaves and the 4 effect objects; the Category's reads answer as drawn).
+  Each set's ID is the setter's own (its info's +0x10), its address the data byte it came from.
+
+`vc2map.py --check-run` compares them: 347 values, 0 different in address, group, zone, ID and Categories. The 8 MIC
+settings are alike, and the 448 stored patches are the temporary one's, numbered k + 65. Three errors planted in a
+copy of `vc2map.py` (the Category test one case off, a value named by its first byte, one table swapped) each fail
+it: 104 and 260 different, and a fault.
+
+**What the run's parser takes:**
+- model 00 00 0D writes; 00 53 and 00 4D write nothing, and 00 24 with a fifth address byte reaches its own handler;
+- device 10 and 7F write, 11 and 1F don't; with the device byte at 1F, 1F writes and 10 doesn't;
+- a checksum one off writes, and shows message 3.
+
+**What rom.4 sends.** `0x89310a80` builds every head: F0 41, the device byte, the model's zeros and byte, 12, the
+address. Its callers pass 0x20d, but for `0x893237f0` (0x153, the V-Synth's) and `0x8932baa8` (0x16d, device 10),
+neither traced.
+- **An RQ1's answer** (`0x8931f8b0`) is a DT1 of the address asked, run: `F0 41 10 00 00 0D 12 10 00 00 01`, the four
+  values, `6B F7`. It goes on MIDI out A (`0x89958870`) and USB out (`0x8995bb10`), each after a header word.
+- **Transmit Edit Data** (`0x8992e3d3`) is tested by the parameters' writers (`0x89321640` and fifteen more) before
+  they call the sender for their kind: `0x89315f90` the setup, `0x89315fb0` and `0x89315fd0` the system, `0x89315ff0`
+  a MIC setting by its number, `0x89316020` the common, `0x89316040` MFX, `0x89316060` Chorus, `0x89316080` Reverb,
+  `0x893160d0` the envelopes, `0x893160a0` the OSC block, `0x89316110` the COSM, each with a word on the stack. All go
+  through `0x89315cb0` to `0x8931f8b0`.
+
+Run on every ID, each sender's DT1s land as the receive map takes them: at the ID's own address; or as a run from an
+earlier address covering it (Chord Memory's and Scale Tune's notes, sent from the pair's first); or, for a value's
+other IDs, the value whole from its first byte. None goes anywhere else. Not sent:
+- an address's second ID: Env 5 Decay at Env 1's, OSC 2 Vibrato Type and Rate at OSC 1's;
+- with the stack word 1, Env 13's Attack, Release and Attack Velocity Sens, which `0x89315cb0` skips.
+
+Group 6 (Beam Type, Pad Mode and Hold) has no sender among these. An edit at the panel of a parameter with no address
+sends nothing: Vocoder Type moved with Transmit Edit Data on gives no message.
+
+**Not settled:** model 00 24's handlers, the 0x153 and 0x16d senders, what the senders' stack word is, and whether the
+XT itself agrees (RECORDING_GUIDE.md, "VC-2 captures", step 4, now asks it on rom.4's map). rom.2's receive path is
+the same class, and its own tables are not read here: the V-Synth map's rule there, address offset = ID − the block's
+first, is still the manual's and fxcapture's checks, not rom.2's code.
+
 ### LITE's heads past the wave memory's first quarter (2026-11-25, v357) {#vc2-osc-heads-reach}
 
 Step 4.3's eighty-fifth version. The merge's whole `--osc` list missed v326's `heads-count`, LITE's heads' sample

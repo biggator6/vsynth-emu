@@ -4,7 +4,8 @@
 // names to the next one's.  The reads: every ID a section holds in every block, its bits (0x89328580) and value
 // (0x8932b050), and every typed ID through its block's slots (0x8932b460), the blocks by rom.4's type tables, on the
 // disk image's 128 patches as vc2PatchRead stores them and `cases` stores of random bits (40, seed 2024).  The files:
-// Vc2PatchFileCheck.cpp.  A line a part, its first differences under it.  XT_VC2PATCH_MAIN only.
+// Vc2PatchFileCheck.cpp; rom.4's patch save (v505): Vc2PatchSaveCheck.cpp.  A line a part, its first differences under
+// it.  XT_VC2PATCH_MAIN only.
 #ifdef XT_VC2PATCH_MAIN
 #include "Vc2PatchCheck.h"
 #include "Vc2Params.h"
@@ -235,6 +236,8 @@ int main(int argc, char** argv) {
     different += values.say("values in every block, bits and value, over " + over);
     different += slots.say("typed values in every zone, over " + over);
     different += vc2PatchFiles(fw, files);
+    different += vc2PatchSaves(files, run->cases, run->seed);
+    different += vc2PatchSetters(files, run->seed);
     std::printf("xt_vc2patch: %ld different\n", different);
     return different ? 1 : 0;
 }

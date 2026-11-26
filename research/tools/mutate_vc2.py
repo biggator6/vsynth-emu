@@ -53,8 +53,9 @@
 # (40).  --sets: vc2sets_muts.txt, in Vc2Sets.cpp, Vc2NoteMatrix.cpp and Vc2SetCommon.cpp (PORT=vc2sets, vc2notematrix,
 # vc2setcommon: the part's conversion sets, the notes' Matrix objects, v280, and C's common, v281), through
 # xt_vc2sets, [cases] its cases (40).  --patch: vc2patch_muts.txt, in Vc2PatchStore.cpp, Vc2PatchFile.cpp and
-# XtPatchStore.cpp's reads (PORT=vc2patch, vc2patchfile, vc2patchxt: rom.4's patch store and its .p02 reader, v450),
-# through xt_vc2patch, [cases] its random stores beside the disk image's 128 patches (4).  --waves: vc2waves_muts.txt,
+# XtPatchStore.cpp's reads (PORT=vc2patch, vc2patchfile, vc2patchxt: rom.4's patch store and its .p02 reader, v450)
+# and Vc2PatchSave.cpp (vc2save: rom.4's patch save, v505), through xt_vc2patch, [cases] its random and drawn stores
+# beside the disk image's 128 patches (4).  --waves: vc2waves_muts.txt,
 # in Vc2WaveIndex.cpp, Vc2WaveSets.cpp's reads by address, Vc2WavePool.cpp and Vc2WaveRecords.cpp (PORT=vc2waveindex,
 # vc2wavesetsdata, vc2wavepool, vc2waverecords: the wave loaders, v500 on) and rom.4's own load, Vc2WaveBoot.cpp,
 # Vc2WaveBootKernel.cpp and Vc2BootFiles.cpp (vc2waveboot, vc2wavekernel, vc2bootfiles, v503), through xt_vc2waves,

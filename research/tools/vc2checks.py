@@ -17,6 +17,8 @@ SIDE_WORDS = {'MONO-L': 'the input\'s left alone', 'MONO-R': 'the input\'s right
               'swapped': 'the sides crossed', 'none': 'neither side'}
 VS_WANT = {'main': 'STEREO', 'vs_monolr': 'MONO-L+R', 'vs_monol': 'MONO-L', 'vs_monor': 'MONO-R'}
 DIRECT_TAKES = ('main', 'main_again', 'direct_64', 'direct_16', 'master_100')
+EXTIN_TAKES = ('extin_stereo', 'extin_monolr', 'extin_monol', 'extin_monor')
+REPEAT_DB = 0.5     # repeats of one setting: their levels this close
 SETTINGS_2 = [('legacy', 'main'), ('hireso_vocosc', 'main'), ('legacy_vocosc', 'legacy'),
               ('hireso_fshift_0', 'main'), ('hireso_fshift_127', 'main'), ('legacy_fshift_0', 'legacy'),
               ('legacy_fshift_127', 'legacy'), ('hireso_tmpl_5', 'main'), ('hireso_tmpl_15', 'main'),
@@ -71,7 +73,7 @@ class Vc2Checks:
         """Run 1: the input's level and side, the direct sound's law and flag, the EXT IN tone, Auto Note."""
         held = [n for n in DIRECT_TAKES if n in self.by]           # a recording made --from may hold none of them
         direct = [n for n in DIRECT_TAKES if self.sounding(n)]
-        extin = [n for n in ('extin_stereo', 'extin_monolr', 'extin_monol', 'extin_monor') if self.sounding(n)]
+        extin = [n for n in EXTIN_TAKES if self.sounding(n)]
         if not direct and not extin:
             self.add('FAIL', 'Nothing of the input came back: no direct sound and no EXT IN tone. Check the cable into '
                      'the XT, its INPUT (or MIC) Jack Switch, and that fxplay was given --audio.')
@@ -92,13 +94,43 @@ class Vc2Checks:
                 'sounds, so OSC 2\'s Type sets the flag too' if self.sounding('direct_osc2')
                 else 'is silent, so the flag reads OSC 1\'s Type'))
         self.tail_of('direct_rev', 'the direct sound\'s Reverb send')
-        for name in ('extin_stereo', 'extin_monolr', 'extin_monol', 'extin_monor'):
-            self.sides_of(name)
+        if self.extin_found:
+            for name in EXTIN_TAKES:
+                self.sides_of(name)
+        else:
+            self.extin_repeats()
         self.pitches()
 
+    def extin_repeats(self):
+        """External In Type not found at the XT's panel (vc2cut.py --extin-not-found; HARDWARE_FIRMWARE.md, "The VC-2's
+        system settings at its panel"): the four extin takes are one setting, MONO-L+R, four times, so they're held to
+        each other, one pattern of sides and one level, not to the four types' differences."""
+        sides = {n: self.sides_of(n) for n in EXTIN_TAKES if n in self.by}
+        heard = {n: p for n, p in sides.items() if p is not None}
+        if len(set(heard.values())) > 1:
+            self.add('LOOK', 'External In Type wasn\'t found at the panel, yet the extin takes carry different sides '
+                     '(%s): the XT took a setting after all. Tell Claude.'
+                     % ', '.join('`%s` %s' % (n, p or 'none of the four') for n, p in heard.items()))
+        elif len(heard) > 1:
+            self.add('OK', 'The extin takes, one setting as External In Type wasn\'t found, carry the same sides: %s.'
+                     % SIDE_WORDS.get(next(iter(heard.values())), 'no pattern of the four'))
+        for name in EXTIN_TAKES:
+            d = self.delta(name, 'extin_monolr') if name != 'extin_monolr' else None
+            if d is not None and abs(d) > REPEAT_DB:
+                self.add('LOOK', 'External In Type wasn\'t found at the panel, yet `%s` is %+.2f dB against '
+                         '`extin_monolr`: not a repeat. Tell Claude.' % (name, d))
+            elif d is not None:
+                self.add('OK', '`%s` repeats `extin_monolr`\'s level (%+.2f dB), one setting.' % (name, d))
+
     def direct_law(self):
-        ref = self.by[next(n for n in DIRECT_TAKES if self.sounding(n))]
-        self.sides_of(ref.name)
+        """The direct sound's sides by its first take, and its levels against a take at Direct Sound Level 127: a
+        recording made --from past `main` and `main_again` has none, and each other direct take moves its own level."""
+        self.sides_of(next(n for n in DIRECT_TAKES if self.sounding(n)))
+        ref = next((self.by[n] for n in ('main', 'main_again') if self.sounding(n)), None)
+        if ref is None:
+            self.add('INFO', 'No `main` or `main_again` here (a recording made --from?): the direct sound\'s levels '
+                     'have no take at 127 to be read against.')
+            return
         if ref.lvl() is not None:
             self.add('INFO', 'The direct sound at 127 is %+.2f dB against the input, on its 1 kHz steps at %d and %d '
                      'dBFS.' % (ref.lvl(), LOW_STEPS[0], LOW_STEPS[1]))

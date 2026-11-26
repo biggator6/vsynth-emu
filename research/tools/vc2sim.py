@@ -21,7 +21,8 @@ class Vc2Sim(Sim):
     def __init__(self, **k):
         mine = dict(run='vc2_run_1', mic='L', input_db=-6.0, clip=1.0, no_input=False, lost_patch=False,
                     lost_level=False, osc2_flag=False, vs_types=None, tracks='L', vocoder_dead=False,
-                    carrier_dead=False, dead_setting=None, feed_dead=False, lost_type=False, extin_delay=64)
+                    carrier_dead=False, dead_setting=None, feed_dead=False, lost_type=False, extin_delay=64,
+                    extin_fixed=False, extin_found=True)   # an XT with no External In Type page; what the user said
         super().__init__(**{**mine, **k})
 
 
@@ -38,6 +39,8 @@ def settings_of(sim, run, name):
         s['Master Level'], s['Output Gain'] = 127, 16
     if sim.lost_type:
         s['MFX Type'] = 0
+    if sim.extin_fixed and run != 'vc2_vsynth':
+        s['External In Type'] = vc2takes.BASE['External In Type']
     if name == sim.dead_setting:
         s = {**vc2takes.BASE, **next(x for x in takes if x['name'] == 'main')['set']}
     return t, s

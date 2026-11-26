@@ -35,9 +35,10 @@
 # the notes' Matrix objects M (vc2notematrix) under xt_vc2sets; C's common (vc2setcommon, v281) under its second part;
 # C's envelopes (vc2setenvelope, v282) and their tables (vc2setenvtables) under its third; the patch store (vc2patch,
 # v450), the .p02's reader (vc2patchfile) and the store's reads both images share (vc2patchxt, XtPatchStore.cpp) under
-# xt_vc2patch; the wave index's parse (vc2waveindex, v500) and the sets' data read by address (vc2wavesetsdata,
-# Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its records and chunks (vc2waverecords, v502) under
-# xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's answers (vc2wavekernel) and its files
+# xt_vc2patch, and rom.4's patch save (vc2save, v505) under it too; the wave index's parse (vc2waveindex, v500)
+# and the sets' data read by address (vc2wavesetsdata, Vc2WaveSets.cpp), the store's pool (vc2wavepool, v501) and its
+# records and chunks (vc2waverecords, v502) under xt_vc2waves; and rom.4's own load (vc2waveboot, v503), its kernel's
+# answers (vc2wavekernel) and its files
 # (vc2bootfiles) under its fourth part; rom.1's kernel's event services (vc2kernel, v353) under xt_vc2kernel, on rom.1
 # beside rom.4; the part's clock (vc2synthclock, v354) and the tempo timers (vc2tempotimers) under xt_vc2synth; the
 # part's tasks on the kernel (vc2synthos, v355), their parts on the part (vc2synthostasks) and the part mixer's walk of
@@ -262,6 +263,7 @@ VC2PORTS=(
     "vc2patch|Vc2PatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
     "vc2patchfile|Vc2PatchFile.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
     "vc2patchxt|XtPatchStore.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
+    "vc2save|Vc2PatchSave.cpp|XT_VC2PATCH_MAIN|vc2patch_obj|VC2PATCH"
     "vc2waveindex|Vc2WaveIndex.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
     "vc2wavesetsdata|Vc2WaveSets.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"
     "vc2wavepool|Vc2WavePool.cpp|XT_VC2WAVES_MAIN|vc2waves_obj|VC2WAVES"

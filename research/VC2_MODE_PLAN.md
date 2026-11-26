@@ -1494,6 +1494,11 @@ version against rom.4's routines with what it calls hooked:
      read lands in area 7's on-chip registers (P4), whose values the port doesn't model; the port reads 0. Reached by
      seed 3's noise draws (xt_vc2synth's notes case 28, through 0x3ea7ffcb), by no factory patch in the runs at 2024, 7
      and 31337. xt_vc2synth gives rom.4 a zero record there and counts both sides (v362).
+   - [gap] External In Type (0x7a): rom.4 draws it on no screen (its SYSTEM Com IO has USB Input Type, Output Gain
+     and Digital Output Freq only), it has no SysEx address, and no patch holds it, so in VC-2 mode it likely stays
+     MONO-L+R. Whether the plugin's VC-2 mode should offer a control for it waits on step 5 run 1's hand cue at the
+     user's XT. (Logged 2026-11-25 by the step 5 session, on the coordinator's word; HARDWARE_FIRMWARE.md, "The VC-2's
+     system settings at its panel". The plugin side's: no code changed.)
 
 ### 5. Against the machine
 
@@ -1548,11 +1553,72 @@ plays a run's input at its cues beside its MIDI (`--audio`, `fxaudio.h`) and pri
 `capclick.py`, `caplayout.py`, `capmeasure.py`, `cappath.py`, `capreport.py`); `vc2cut_test.py` holds it to a simulated XT
 (`vc2sim.py`, on `capsim.py`) with faults planted; `fxplay_test.sh` holds fxplay's input to the take list's own.
 
-**The address map is inferred** (`vc2map.py`): the V-Synth's map on rom.4's own IDs. Nothing in rom.4 that receives or sends
+~~**The address map is inferred** (`vc2map.py`): the V-Synth's map on rom.4's own IDs. Nothing in rom.4 that receives or sends
 SysEx has been read. Block by block, rom.4's IDs from each block's first are rom.2's name for name: the system's 72 but the two
 rom.4 gave to MIDI MODE for VariOS and USB External In Type, the common's 114 with the vocoder block appended at +0x73, the MFX,
 Chorus and Reverb heads, zone 1's 128. The guide's step "Learn the map" asks the XT itself (Transmit Edit Data, `fxplay --in`,
-`vc2capture.py --learn`) before any long run. The VOCODER OSC's own IDs, past a zone's 128, aren't written.
+`vc2capture.py --learn`) before any long run. The VOCODER OSC's own IDs, past a zone's 128, aren't written.~~
+**Withdrawn 2026-11-25:** rom.4's SysEx paths, read and run (HARDWARE_FIRMWARE.md, "rom.4's SysEx: the VC-2's own address
+map"). In VC-2 mode the XT takes DT1 and RQ1 of model **00 00 0D**, at its Device ID or 7F, and drops the V-Synth's 00 53, so
+no message of the inferred map would have set anything. rom.4's map is its own: address tables in .data, an entry per address
+byte, some gated by Patch Category. The setup is at 01 00 00 00, the system at 02 00 00 00, eight MIC settings at 03 00 0i 00,
+the patch common with MFX, Chorus and Reverb in it at 10 00 00 00, three edit blocks at 10 00 03 00, 04 00 and 05 00, and 448
+stored patches from 20 00 00 00. It is the VC-2's edit set, not its store: Vocoder Sw, Type, Sound Level and Depth, Stereo
+Process, Unvoice Spread, Split Point, every OSC Type and Switch, the TVA Switch, Output Assign, Output Gain and External In
+Type have no address, and nor have the VOCODER OSC's own IDs but its vibrato, wave start and harm formant. `vc2map.py` now reads
+rom.4's tables and Category test from the image, checked against `vc2run <rom.4> sysex` (0 different). `vc2capture.py` names
+what the VC-2 runs set that has no address under PATCH Init's Category (23 parameters), writes the input and the
+V-Synth-mode run, and exits 2. `fxplay_test.sh` and `vc2cut_test.py`, which need the VC-2 runs, wait on the decision below.
+
+**[decision, the coordinator's or the user's] How do runs 1…4 set what rom.4 takes no SysEx for?** Their base and takes set 23
+such parameters: Vocoder Sw, Type, Depth and Sound Level, Stereo Process Sw, Unvoice Spread switch, Auto Note Retrigger, Formant
+Shift (only under Categories 3…5 and 11), OSC 1 and 2's Switch, Type, Vari Sw and Time Trip Sw, OSC 1 Wave Gain, MOD Switch,
+TVA Switch, Output Assign, Chorus Send Level, Output Gain and External In Type. The ways, as far as rom.4 shows them:
+- (a) The user sets them at the panel, in a by-hand list per take, and the runs send the rest. Slow, and runs 2 and 1's
+  `extin_*` takes vary exactly these.
+- (b) Patches made for the runs, written as VC-2 patch files (`.p02`) to the card (HARDWARE_FIRMWARE.md, "rom.4's patch
+  store and a .p02"; VC2_VOCAL_DESIGNER.md, "The factory patches, read by rom.4"), one per take or per group of takes. The runs then
+  select each by Bank Select and Program Change, which rom.4's OS turns into a patch change (a stored patch is 65…512 on the
+  SysEx side, its own numbering on the MIDI side not read here), and send the rest by SysEx.
+- (c) Takes that need them dropped, keeping what the map reaches (the direct sound's levels, the effects, the EQ, Formant
+  Template, Unvoice Detect and Level, Env Attack and Release, Auto Note On Switch under Category 1).
+Recommended: (b), as it keeps every take; it needs the patch writer (step 4.5's patch files, or a tool beside `vc2patches.cpp`)
+and Program Change's path to a stored patch read first.
+
+**Decided 2026-11-25, the user's choice of the three: "Patch files (Recommended)".** Each take that needs them selects a
+patch from the card by Program Change. The work, as the coordinator set it out (v505…v519, the loaders' unused block):
+rom.4's own patch save run in the interpreter, held by a round trip of every factory patch (v505 on); where Program Change
+and Bank Select reach a card patch in VC-2 mode and how the card's folder is laid out, from rom.4's code by two sources;
+then `vc2capture.py` writing the patch files a run needs and sending the bank and Program Change at each take's cue,
+`fxplay_test.sh` and `vc2cut_test.py` green again on the new runs, and the guide's copy-to-card step.
+- [x] rom.4's patch save in the interpreter, its writer and setters, held by xt_vc2patch (v505; HARDWARE_FIRMWARE.md,
+  "A VC-2 patch saved").
+- [x] Where a card's patches sit and the Bank Select and Program Change that reach one (no version: vc2card's run;
+  HARDWARE_FIRMWARE.md, "A card's patches in VC-2 mode").
+- [x] vc2capture.py's runs selecting each take's patch (vc2writer.py, vc2cardrun.py), the card's folder, the tests green
+  (fxplay_test.sh, vc2cut_test.py), the guide's step (RECORDING_GUIDE.md, "VC-2 captures": copy to the card, check one
+  patch by ear). Output Gain and External In Type, the system's, which no patch holds: set by hand in run 1's 20 s
+  pauses at fxplay's `hand:` cues, so the takes keep their places and their checks (no version).
+
+**Decided 2026-11-25, the coordinator's call (the user can overturn it), beside the user's "Patch files": the five system
+takes stay in run 1 with hand cues.** gain_plus6, extin_stereo, extin_monolr, extin_monol and extin_monor keep their places
+in run 1. Each is set by hand in a 20 s pause at a `hand:` cue that fxplay prints with the panel path, and the defaults
+are set back after the last. This replaces the coordinator's earlier "short runs", because the same recording's `main`
+is the stronger reference. A missed setting shows as the take's FAIL or LOOK. A wait for a key at the cue isn't offered:
+the cut places takes by the run's timing, and fxplay schedules the input on one timeline (HARDWARE_FIRMWARE.md, "The
+VC-2's system settings at its panel").
+
+**Found on the way, for the coordinator:** rom.4 draws External In Type on no VC-2 page. Output Gain is on SYSTEM >
+Common > IO, as in V-Synth mode (same section). So in VC-2 mode External In Type very likely can't be set at all and
+stays at MONO-L+R. The four extin takes would then all play at it, unless the user's XT shows the setting. The guide
+(step 3) has the user look.
+
+**Decided 2026-11-25, the coordinator's call: the four extin takes and their pauses stay** (80 s of run 1). They still
+show which side reaches the EXT IN tone at MONO-L+R, and they catch an XT that does draw the setting. The guide's step 3
+has the user write down whether they found External In Type. `vc2cut.py --extin-not-found` then reads the four as
+repeats of one setting, held to each other's sides and level (`Vc2Checks.extin_repeats`), with a LOOK if they differ.
+Without the flag they're read as before. vc2cut_test's r1_extin_none and r1_extin_taken hold both. Step 4.5's [gap]
+above is the plugin's side of it.
 
 Not done: the recordings (the user's); the comparison against Vc2Synth's renders (needs step 4.3's Vc2Synth and step 4.5's
 second half); the comparison against `XtFxChip` on rom.4's programs (needs a recording made at 44.1 kHz on an exact path).
