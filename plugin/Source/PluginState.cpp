@@ -5,6 +5,7 @@
 #include "PluginParamIds.h"
 
 void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    midi_.edits.flush();   // v462: a MIDI edit not yet on its parameter goes with it
     auto state = apvts.copyState();
     juce::String edits;
     for (int id = 0; id < kFxIds; ++id) {
@@ -24,6 +25,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
 
     const juce::ValueTree saved = juce::ValueTree::fromXml(*xml);
     const bool hadSplits = saved.getChildWithProperty("id", Params::zoneUpperId(0)).isValid();   // v195 on
+    midi_.edits.drop();   // v462: the session's values, not a MIDI edit made before it came
     apvts.replaceState(saved);
     restoreArpPattern();   // v190: a session before it has none
     for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);

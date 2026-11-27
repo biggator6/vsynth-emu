@@ -26,7 +26,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // ── The XT's own players: one voice per note, sample-accurate MIDI (PluginRender.cpp) ───────
     if ((xtActive_.load() || playsWaveless()) && numOut > 0) {
         synth_.setControls(xtControls());
-        synth_.useBusSink(apvts.getRawParameterValue(Params::kFxOn)->load() >= 0.5f);
+        synth_.useBusSink(raw(Params::kFxOn) >= 0.5f);
         // The host's transport, for Clock Source HOST (the Standalone has none: the Patch Tempo stands)
         double hostBpm = 0.0, hostPpq = 0.0;
         bool hostMoving = false;
@@ -36,7 +36,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 if (const auto ppq = info->getPpqPosition()) { hostPpq = *ppq; hostMoving = info->getIsPlaying(); }
             }
         synth_.hostClock(hostBpm, hostMoving, hostPpq);
-        const int trip = (int)apvts.getRawParameterValue(Params::kTripPad)->load();
+        const int trip = (int)raw(Params::kTripPad);
         if (trip != tripKnob_) { tripKnob_ = trip; synth_.timeTripKnob(trip); }
         float* L = buffer.getWritePointer(0);
         float* R = numOut > 1 ? buffer.getWritePointer(1) : nullptr;
@@ -115,14 +115,18 @@ void VSynthEmuProcessor::playFile(juce::AudioBuffer<float>& buffer, const juce::
 }
 
 // One message to the synth, as the host's MIDI and the editor's reach it (the block's own chain, v201): the mode
-// messages are controllers too
+// messages are controllers too.  A controller's edits of the patch first, as the XT's OS takes a message before its
+// tone generator does (v462: onto the parameters, for the next block's controls)
 void VSynthEmuProcessor::toSynth(const juce::MidiMessage& msg) {
     if (msg.isNoteOn()) synth_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
     else if (msg.isNoteOff()) synth_.noteOff(msg.getNoteNumber(), msg.getFloatVelocity());
     else if (msg.isPitchWheel()) synth_.pitchBend(msg.getPitchWheelValue());
     else if (msg.isChannelPressure()) synth_.channelPressure(msg.getChannelPressureValue());
     else if (msg.isAftertouch()) synth_.polyPressure(msg.getNoteNumber(), msg.getAfterTouchValue());
-    else if (msg.isController()) synth_.controller(msg.getControllerNumber(), msg.getControllerValue());
+    else if (msg.isController()) {
+        midi_.controller(msg.getControllerNumber(), msg.getControllerValue());
+        synth_.controller(msg.getControllerNumber(), msg.getControllerValue());
+    }
 }
 
 // One message to the file played without the firmware: a note-on starts it from the top, the last note-off stops it
@@ -137,16 +141,4 @@ void VSynthEmuProcessor::toFile(const juce::MidiMessage& msg) {
         activeVoices_ = 0;
         playbackPos_ = -1;
     }
-}
-
-// The editor's message for the next block (any thread but the audio thread's): three bytes at most, the keys' notes and
-// the pad's controllers.  False when the queue is full or the message is longer.
-bool VSynthEmuProcessor::sendFromEditor(const juce::MidiMessage& m) {
-    if (m.getRawDataSize() > (int)sizeof(EditorEvent::bytes)) return false;
-    EditorEvent e {};
-    std::copy_n(m.getRawData(), m.getRawDataSize(), e.bytes);
-    const auto scope = editorFifo_.write(1);
-    if (scope.blockSize1 + scope.blockSize2 == 0) return false;
-    scope.forEach([&](int i) { editorEvents_[(size_t)i] = e; });
-    return true;
 }

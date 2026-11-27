@@ -61,6 +61,7 @@ for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
       Vc2WaveLookupCheck.cpp ) "${SH4[@]}" -o "$O/xt_vc2waves" &
 # The part's voices, notes, keys, OS MIDI and the part whole, and rom.1's kernel: build_vc2part.sh (its own file, v353)
 source "$REPO/research/tools/build_vc2part.sh"
+source "$REPO/research/tools/build_midi.sh"   # xt_midi, rom.2's edits of the patch from MIDI (v462)
 # The part's conversion sets C and the notes' Matrix objects M (v280) against rom.4's own, C's children hooked
 [ -f Vc2SetsCheck.cpp ] && cc -DXT_VC2SETS_MAIN Vc2SetsCheck.cpp Vc2SetsDraws.cpp Vc2SetsEvents.cpp Vc2Sets.cpp \
    Vc2NoteMatrix.cpp Vc2MatrixSetup.cpp Vc2MatrixTables.cpp Vc2Matrix.cpp Vc2MatrixSources.cpp Vc2SetMemoryReads.cpp \

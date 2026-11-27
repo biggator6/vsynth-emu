@@ -182,6 +182,7 @@ target_sources(VSynthEmu PRIVATE
 )
 include(Vc2Sources.cmake)   # the VC-2 mode's ports, rom.4's (v251: moved out of this list as they stood)
 include(Vc2UiSources.cmake)   # the VC-2 mode's pages in the editor (v453)
+include(MidiSources.cmake)    # the plugin's MIDI ahead of the firmware's (v462)
 
 # ─── Which build this is ─────────────────────────────────────────────────────
 # Worked out at every build, not at configure, so it can't go stale.  It rewrites the file only when the id changes.
@@ -260,9 +261,11 @@ vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayRun.cpp Tes
 # A project's own files (v600 on): a link to a preset wave followed to the wave it names
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
              Tests/TestMain.cpp Tests/TestWave.cpp)
+# The plugin's MIDI ahead of the firmware's (v462): rom.2's edits of the patch from MIDI onto the parameters
+vse_add_test(VSynthEmuMidiTest Tests/MidiTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuFx_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
                  VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
-                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest VSynthEmuVc2PlayTest)
+                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest VSynthEmuVc2PlayTest VSynthEmuMidiTest)

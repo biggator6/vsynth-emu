@@ -39,6 +39,15 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   VSynthEmu's own sources read back from its target, with `vse_plugin_setup` (CMakeLists.txt, both targets' set-up);
   REAPER plays an instrument's track audio beside its output (HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER").
   Checked by verify.sh's auval and buildid.sh.
+- The plugin's own MIDI ahead of the firmware's (v462; HARDWARE_FIRMWARE.md "rom.2's MIDI paths"; research/NEXT_ISSUES.md
+  items 1 and 2), in `plugin/MidiSources.cmake`: `XtMidiEdits` (`XtMidiPort`, rom.2's OS MIDI port's numbers and its
+  part object's control change and RPN slots: the six edits of the patch, CC 5, 65, 126, 127 and RPN 0…2; no JUCE;
+  checked by `xt_midi`, `XtMidiEditsCheck.cpp`, XT_MIDI_MAIN only, built by `research/tools/build_midi.sh`),
+  `PluginMidiIn` (the editor's queue, moved from PluginProcessor.h; each controller's edits onto their parameters before
+  XtSynth has it), `PluginMidiEdits` (an edit kept lock-free on the audio thread, read ahead of its parameter by
+  `VSynthEmuProcessor::raw`, which the controls' reads go through, and handed to the parameter as a gesture by the
+  message thread, the later setter winning), `PluginGesture.h` (`setAsGesture`, Controls::setValue's and the edits').
+  Checked by `VSynthEmuMidiTest` (`plugin/Tests/MidiTest.cpp`) and `mutate_panel.py`'s `midi-` plants.
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `IOS_companion/`: a companion application for iPhone and iPad, developed separately from the plugin, that works as the XT's Time Trip or X-Y pad over MIDI; tested and working (the user, 2026-11-13). It is not part of the plugin's build, tests or outstanding work; its `IOS_COMPANION_PLAN.md` still reads "Planned" and is out of date.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,

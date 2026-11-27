@@ -93,6 +93,8 @@ for spec in "3 drum.bin 2 1.0 1.0 30000" "3 drum.bin 2 1.3 -1.0 30000" "5 chord.
 [ -x "$X/xt_arp" ] && part xt_arp 'echo "== xt_arp"; "$X/xt_arp" "$ROM" 1000 2024'
 # The Multi Step Modulator against the firmware's own object: the disk image's patches that use it, and random cases
 [ -x "$X/xt_msm" ] && part xt_msm 'echo "== xt_msm"; "$X/xt_msm" "$ROM" 300 2024'
+# rom.2's edits of the patch from MIDI against the firmware's own port handler and OS part object (v462)
+[ -x "$X/xt_midi" ] && part xt_midi 'echo "== xt_midi"; "$X/xt_midi" "$ROM" 200 2024'
 # rom.4's parameter tables against rom.4's own routines (v199): on rom.4, whose bytes the section's key reads
 if [ -x "$X/xt_vc2params" ] && [ -f "$ROM4" ]; then
   FILES=("$ROM4")

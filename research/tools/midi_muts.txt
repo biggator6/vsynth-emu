@@ -1,0 +1,27 @@
+# xt_midi's planted errors (v462), each in XtMidiEdits.cpp: name|old|new[|port[|seed]], \n and \| escaped
+midi-bend-limit|if (msb > 24) return;|if (msb > 25) return;
+midi-bend-down-none|            e.add(xtedit::BendDown, msb);\n|
+midi-bend-down-up|e.add(xtedit::BendDown, msb);|e.add(xtedit::BendUp, msb);
+midi-fine-divide|((int)data * 100 >> 13) - 100|((int)data * 100 / 8191) - 100
+midi-fine-low|cents >= -50|cents > -50
+midi-fine-high|cents <= 50|cents < 50
+midi-coarse-low|msb - 64 >= -48|msb - 64 >= -49
+midi-coarse-high|msb - 64 <= 48|msb - 64 <= 47
+midi-coarse-centre|e.add(xtedit::CoarseTune, msb - 64)|e.add(xtedit::CoarseTune, msb - 63)
+midi-porta-switch|value >= 64 ? 1 : 0|value > 64 ? 1 : 0
+midi-porta-time|case 5: e.add(xtedit::PortaTime, value); return;|case 5: return;
+midi-mono|case 126: e.add(xtedit::MonoPoly, 0); return;|case 126: e.add(xtedit::MonoPoly, 1); return;
+midi-poly|case 127: e.add(xtedit::MonoPoly, 1); return;|case 127: return;
+midi-msb-keeps-lsb|data = (uint16_t)(v << 7);|data = (uint16_t)((data & 0x7f) \| v << 7);
+midi-lsb-mask|(data & 0x3f80) \| v|(data & 0x3fff) \| v
+midi-msb-no-edit|data = (uint16_t)(v << 7);\n            rpnEdits(rpn, data, e);|data = (uint16_t)(v << 7);
+midi-lsb-no-edit|data = (uint16_t)((data & 0x3f80) \| v);\n            rpnEdits(rpn, data, e);|data = (uint16_t)((data & 0x3f80) \| v);
+midi-nrpn-lsb-select|nrpn = (uint16_t)((nrpn & 0x7f80) \| v); rpn \|= kUnselected;|nrpn = (uint16_t)((nrpn & 0x7f80) \| v);
+midi-nrpn-msb-shift|(nrpn & 0x00ff) \| v << 8|(nrpn & 0x00ff) \| v << 7
+midi-rpn-lsb-keeps|rpn = (uint16_t)((rpn & 0x7f80) \| v)|rpn = (uint16_t)((rpn & 0xff80) \| v)
+midi-rpn-msb-mask|rpn = (uint16_t)((rpn & 0x00ff) \| v << 8)|rpn = (uint16_t)((rpn & 0x007f) \| v << 8)
+midi-rpn-select-nrpn|rpn = (uint16_t)((rpn & 0x00ff) \| v << 8); nrpn \|= kUnselected;|rpn = (uint16_t)((rpn & 0x00ff) \| v << 8);
+midi-reset-any|if (value == 0) rpn = nrpn = kNone;|rpn = nrpn = kNone;
+midi-reset-rpn-only|if (value == 0) rpn = nrpn = kNone;|if (value == 0) rpn = kNone;
+midi-rpn-unselected|switch (rpn) {|switch (rpn & 0x7fff) {
+midi-fine-as-coarse|e.add(xtedit::FineTune, cents)|e.add(xtedit::CoarseTune, cents)

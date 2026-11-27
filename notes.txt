@@ -738,6 +738,17 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The six edits of the patch from MIDI v462 (2026-11-27, claude/midi-learn from vc2-mode f1c0797; HARDWARE_FIRMWARE.md,
+  "rom.2's MIDI paths"): research/NEXT_ISSUES.md items 1 and 2's research, the user's d-3, d-4, d-5 (all as
+  recommended) and "Not now" for a program change, the tuning message and SysEx. rom.2's OS part objects (class
+  0x8982ffa4) make CC 5, 65, 126, 127 and RPN 0, 1, 2 edits of the patch; all else only modulates. XtMidiPort
+  (XtMidiEdits.cpp) is the port's numbers and the part object's two slots; xt_midi (XtMidiEditsCheck.cpp,
+  research/tools/build_midi.sh, in fcheck at 200 cases) 0 different at 2024, 7, 31337; mutate_midi.py 26 plants, 0
+  missed (mutlist.main, mutate_msm.py's arguments too). PluginMidiIn (the editor's queue moved out of
+  PluginProcessor.h, the edits onto the parameters) and PluginMidiEdits (lock-free on the audio thread, read ahead
+  of the parameter by VSynthEmuProcessor::raw, handed on as a gesture by a 30 Hz timer; the later setter wins);
+  PluginGesture.h's setAsGesture (Controls::setValue's, made one). VSynthEmuMidiTest (new, in verify.sh).
+
 The VC-2 heard dry in REAPER v461 (2026-11-26; HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"): not the
   plugin's. VSynthEmuVc2PlayTest's render mode (Vc2PlayRender.cpp: a .p02 or a session's state, a rate, Effects, a
   saw or a file on the input, a held chord, `seconds=`) vocodes the user's own project state and vocal offline; the

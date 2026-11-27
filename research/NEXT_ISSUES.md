@@ -25,6 +25,8 @@ ahead of the firmware's MIDI, and shown as a list (the map).
 - **d-3. A learned CC and the firmware.** Recommended: a learned CC is the plugin's alone and doesn't also reach the
   firmware, so one CC never does two things; an unlearned CC reaches the firmware as now.
 - **d-4. Where the map lives.** Recommended: in the session first; a default map for new sessions later if wanted.
+- **Decided (2026-11-27):** the user took both recommendations: a learned CC is the plugin's alone, an unlearned one
+  reaches the firmware as now (d-3); the map is the session's (d-4).
 
 ### 2. Controls that follow the values live
 "controls should real-time reflect values. Move as control information or modulators are sent." Today: a parameter's
@@ -36,6 +38,13 @@ Step Modulator), which move a value at run time without changing what's stored.
 - **d-5. What a control shows.** Recommended: a stored value changed by MIDI moves the control itself (and the host's
   parameter with it); a modulator shows as a ring or bar beside the control, so the control always says what's stored.
   UI_DESIGN.md takes the ring's design.
+- **Found (2026-11-27; HARDWARE_FIRMWARE.md, "rom.2's MIDI paths"):** the OS's part objects make six edits of the patch:
+  CC 5 Portamento Time, CC 65 Portamento Switch, CC 126 and 127 Mono/Poly, RPN 0 both Bend Ranges, RPN 1 Patch Fine
+  Tune, RPN 2 Patch Coarse Tune; a program change, the MIDI Tuning scale message and SysEx DT1 write stored values too.
+  Everything else only modulates.
+- **Decided (2026-11-27):** the user took d-5's recommendation: the six edits (and a learned CC) move the control and
+  the host's parameter, a modulator shows as the knob's ring. And of the other three paths, none in this group ("Not
+  now"): a program change, the tuning message and SysEx DT1 are follow-ups.
 
 ### 3. The arpeggiator's pattern
 "arpeggiator only reads from patches - no ability to program patterns. with no pattern, it should still handle live input

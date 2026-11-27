@@ -1546,6 +1546,99 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### rom.2's MIDI paths: which edit a stored value, which only modulate; the six edits in the plugin (2026-11-27, v462) {#midi-stored-or-modulated}
+
+For research/NEXT_ISSUES.md items 1 and 2 (MIDI learn; controls that follow their values). The question: which MIDI
+messages change what the XT stores, its temporary patch (the values its display shows and a Write saves), and which
+only move a value at run time. Names first: the XT manual's MIDI Implementation Chart (p. 201) recognises Bank Select
+(CC 0, 32), CC 1–31 and 33–95, RPN (CC 100, 101), Program Change 1–128, System Exclusive and the mode messages 123–127;
+its Controller pages name CC 5 Portamento Time. Read in rom.2 by `sh4dis.py`, the address and offsets below.
+
+**Two listeners per message.** rom.2 has the OS library rom.4 has (v313, "rom.4's MIDI channel states"), at
+`0x89474a10` (rom.4's `0x893172e0`): a control change is stored on the channel below 96 (`0x89475370`) and then told
+to the port's listeners, vtable slot +0x18; Data Entry (CC 6, 38) tells slot +0x24 with the RPN's number and +0x30
+with the NRPN's; CC 98…101 select them, each marking the other unselected (bit 15); CC 121 at 0 resets them; a
+program change tells slot +0x0c. Beside that, the tone generator's own dispatcher (`0x894d43e0` → `0x894d6f10`, v117,
+v132) reads the channel's values. The listeners are the OS's 16 part objects (eight bytes: +0 the part, +1…+3 its own
+bytes, +4 the class), built by `0x89475dc0` on the base `0x894756c0`, class `0x8982ffa4` (rom.4's `0x898c872c`):
+
+| Slot | Routine | What it writes |
+|---|---|---|
+| +0x18 control change | `0x89475ee0` | first the base (`0x894754e0`: CC 0 to +2, CC 32 to +3, the bank kept for a program change); then CC 5 → Portamento Time (ID 0x118) = value; CC 65 → Portamento Switch (0x115) = value ≥ 64; CC 126 → Mono/Poly (0x113) = 0, MONO; CC 127 → Mono/Poly = 1, POLY |
+| +0x24 RPN data | `0x89475f80`, by a table at `0x89475fdc` | RPN 0 → Pitch Bend Range Up and Down (0x11e, 0x11f) = Data Entry's MSB, when ≤ 24; RPN 1 → Patch Fine Tune (0x111) = data × 100 / 8192 − 100, when −50…+50; RPN 2 → Patch Coarse Tune (0x110) = MSB − 64, when −48…+48; any other number, or none selected, nothing. Each Data Entry, MSB or LSB, tells it again |
+| +0x30 NRPN data | the base's `rts` | nothing |
+| +0x0c program change | `0x89475e30` | with +1 set: the part's bank (+2, +3) and program into the system's patch selection (`0x8947a090`, `0x8947a170`, `0x8947a0b0`): a patch change, every stored value |
+| +0x3c | `0x894760a0`, from the universal SysEx handler `0x89473b60` (device 127 or the XT's, a channel mask) | the MIDI Tuning Standard's scale/octave tuning: twelve bytes, each ≤ 127 less 64, into Patch Scale Tune C…B (0x136, step 2) |
+
+Each writes through one edit object: `0x8947a550(edit, part)` takes the part's store (table `0x897a0fc8`), the IDs
+changed start empty; `0x89479e50(edit, value, id)`, the setter the panel's pages and the SysEx receive use too, writes
+the value and widens the span; `0x8947a590(edit, 0)` then, if anything changed, posts message 7 for the part to
+`0x89c1d518`, which brings the tone generator the new values. So these are edits of the patch, as a knob's on the
+panel is. The tone generator's handlers for the same numbers do nothing else of their own: CC 5, 65 and 71…74 are its
+plain update (v117), CC 126 and 127 let the keys go.
+
+**What only modulates.** Everything else a channel message does. A controller below 96 is kept on the channel
+(C + 0x84 + number) and read where it is used: the Matrix's Control Sources 1–8 (CC01…CC95, the bender, the
+aftertouch), the patch TVA's CC 7, 11 and 10 (v114), Hold and Sostenuto (v117), the pad's Time Trip and X-Y assigns
+(v132, v134). The bender and both pressures are channel values too. LFOs, envelopes and the Multi Step Modulator run
+in the voices. None of these writes the store, so the XT's display doesn't show them; nor does a CC 71…74 (Resonance,
+Release, Attack, Cutoff), which only a Matrix route makes do anything.
+
+**System Exclusive.** A DT1 to the temporary patch writes stored values by address (with Rx Sys-Ex on). Its receive
+in rom.2 reaches the same setter through `0x89472c70`, not traced further here. The plugin takes no SysEx.
+
+**In the plugin today.** `VSynthEmuProcessor::toSynth` hands XtSynth notes, bends, pressures and controllers, and
+XtSynth::controller does the tone generator's part. None of the OS part's edits is made: CC 5, 65, 126 and 127 and
+RPN 0…2 leave the parameters as they are, and a program change, SysEx and the tuning message are dropped.
+
+`0x8947a590`'s other two calls (`0x89473f90` when its flag is set and `0x8987a507` is on, which sends the edit out as
+the XT's own transmit does; `0x89480010`) were not followed.
+
+**The decisions** (the user, 2026-11-27, research/NEXT_ISSUES.md): a stored value changed by MIDI moves the control and
+the host's parameter, a modulator shows as the knob's ring (d-5); a learned controller is the plugin's alone (d-3), the
+map the session's (d-4); a program change, the tuning message and SysEx not in this group ("Not now").
+
+**The port** (`XtMidiPort`, XtMidiEdits.cpp): the port object's words +4, +6 and +8 as the handler moves them (CC 6
+Data Entry's MSB, `data = value << 7`, its LSB 38 `(data & 0x3f80) | value`; CC 98 and 99 the NRPN's LSB, `& 0x7f80`,
+and MSB, `& 0x00ff`, each marking the RPN unselected, bit 15; CC 100 and 101 the RPN's the same way; CC 121 at 0 both
+back to 0x7f7f), then for Data Entry the RPN slot, then for every number the control change slot. It gives the IDs
+and values in the order the setter is called, two at most. The Rx Bank flag only drops CC 0 and 32, which edit
+nothing here, so the port doesn't keep it, nor the bank bytes.
+
+**In the plugin** (`PluginMidiIn`, `PluginMidiEdits`). `toSynth` hands each controller to `PluginMidiIn::controller`
+before XtSynth's, as the OS's task takes a message before the part does. Each edit goes onto its parameter
+(Patch Coarse and Fine Tune, Mono/Poly, Portamento, Portamento Time, Bend Range Up and Down, each the patch's value as
+it is: MONO 0, POLY 1 as the choice's order). The audio thread never calls JUCE's parameters: `PluginMidiEdits::edit`
+keeps the value for the parameter, lock-free, and every read the synth's controls make (`VSynthEmuProcessor::raw`,
+which `knob`, `kf` and the reads of PluginControlsRead.cpp, PluginOsc2Controls.cpp and PluginCosmControls.cpp now
+go through) takes it ahead of the parameter, so the next block plays it. The message thread, on a 30 Hz timer, hands
+it to the parameter as a gesture, which moves the control and tells the host. If the parameter moved meanwhile (a host,
+a control, a patch), the later setter wins and the edit is dropped. A patch's controls and a session coming back drop
+a pending edit, and a saved session takes it first. The XT's tone generator gets its edit by a message after the OS
+has made it, so taking it from the next block on is the plugin's choice of when, as host automation is.
+
+The editor's queue (v201) moved as it stood from PluginProcessor.h into `PluginMidiIn`, so the header has room.
+
+**The check.** `xt_midi <rom> [cases] [seed]` (XtMidiEditsCheck.cpp, XT_MIDI_MAIN) runs rom.2's handler `0x89474a10`
+on a port object whose one listener is an OS part object built by the firmware's own constructor `0x89475dc0`. The
+edit object's three routines are hooked to log the part, each (ID, value) and each commit. The channel's store
+`0x89475370` and reset `0x89475200` belong to the tone generator, not these edits, and answer at once. Each case draws
+the part (0…15), the Rx Bank flag and the port's words (none, an RPN 0…2, one unselected, or noise), then 400 control
+changes aimed at the handler's ways: the four numbers mostly at 0…3, Data Entry's MSB at the limits (24/25, 32/96,
+16/112), CC 65 about 64, CC 121 at 0 and 1. One message in 50 is preceded by noise in the port's words on both sides.
+After each message the three words, the edits and the commits are compared.
+- 0 different at 2024 (200 cases, 80,000 messages, 17,132 edits), 7 and 31337 (400 cases each, 160,000 messages).
+- `mutate_midi.py`: 26 plants (`midi_muts.txt`, `PORT=midi`), none missed.
+
+`VSynthEmuMidiTest` (Tests/MidiTest.cpp) runs them through the processor: CC 5's edit the synth's at once and the
+parameter's only when handed on, its listeners told once within a gesture; CC 1, 74 and 7 edit nothing; each of the
+six onto its parameter, RPN 0 past 24 and an NRPN chosen last editing nothing; a parameter moved before the hand-on
+keeping its own value; a saved session carrying a pending edit and a session coming back dropping one.
+
+**Not covered.** A real XT, as before. The VC-2's own (rom.4's part objects, class `0x898c872c`, the same slots at
+`0x893187a0` and `0x89318840`), which VC-2 mode doesn't make yet: a follow-up. The program change, the tuning message
+and SysEx DT1, by the user's choice.
+
 ### The VC-2 heard dry in REAPER: REAPER adds an instrument's input to its output; an effect build (2026-11-26, v461) {#vc2-plugin-reaper-dry}
 
 The user's report: in REAPER (AU and VST3 alike), VC-2 mode, 001 LargeChoir 1, a vocal into the plugin and notes

@@ -21,6 +21,7 @@
 # v189), under xt_arp; [cases] its random cases, after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
+# PORT=midi: XtMidiEdits.cpp (rom.2's edits of the patch from MIDI, v462) under xt_midi, [cases] its cases, SEED its seed.
 # PORT=vc2…: rom.4's ports under their checks, on rom.4 ($ROM4): mutate_vc2ports.sh's list (v220).
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
@@ -111,6 +112,9 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     esac
     ARGS=("${SEED:-2024}")
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
+elif [ "$PORT" = midi ]; then      # rom.2's edits of the patch from MIDI against xt_midi (v462); XT_MIDI_STOP stops it
+    F=XtMidiEdits.cpp; ARGS=("${SEED:-2024}")
+    harnessParts XT_MIDI_MAIN midi_obj XtMidiEdits XtMidiEditsCheck
 elif [[ "$PORT" =~ ^vc2 ]]; then   # rom.4's ports, on rom.4 (mutate_vc2ports.sh, v220)
     vc2Port "$PORT"
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used

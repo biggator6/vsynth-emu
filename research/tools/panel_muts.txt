@@ -214,7 +214,7 @@ extin-clear-inputs|    for (int ch = inputs; ch < buffer.getNumChannels(); ++ch)
 extin-inputs-ignore-layout|std::min({ getTotalNumInputChannels(), kMostInputs, buffer.getNumChannels() })|std::min(kMostInputs, buffer.getNumChannels())|plugin/Source/PluginExtIn.cpp|extin
 extin-layout-no-mono|in.isDisabled() \|\| in == juce::AudioChannelSet::mono() \|\||in.isDisabled() \|\||plugin/Source/PluginExtIn.cpp|extin
 extin-has-input-always|bool VSynthEmuProcessor::hasInput() const { return getTotalNumInputChannels() > 0; }|bool VSynthEmuProcessor::hasInput() const { return true; }|plugin/Source/PluginExtIn.cpp|extin
-extin-gate-analog-only|    return std::lround(reads_.oscType->load()) != Params::kOscTypePcm|    return std::lround(reads_.oscType->load()) == 0|plugin/Source/PluginRender.cpp|extin
+extin-gate-analog-only|    return std::lround(edits.read(reads_.oscType)) != Params::kOscTypePcm|    return std::lround(edits.read(reads_.oscType)) == 0|plugin/Source/PluginRender.cpp|extin
 extin-prepare-rate|    hostIn_.prepare(sampleRate, synth_.input);|    hostIn_.prepare(44100.0, synth_.input);|plugin/Source/PluginProcessor.cpp|extin
 editor-d-extin-no-word|    return processor_.hasInput() ? juce::String() : "No input: the host gives none, or the input is off";|    return juce::String();|plugin/Source/UiOscPanel.cpp|layout
 # The OSC displays (v200), by VSynthEmuEditorTest's EditorWaveTest.cpp: a loaded wave's view made and replaced, its
@@ -389,3 +389,14 @@ vc2play-bands-out-on-mic|    topOut_ = std::max(loudOut, topOut_ * fall);|    to
 editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : "";|    said_ = bands == 0 ? kOff : "";|plugin/Source/UiVc2Bands.cpp|layout
 # v460: the MIC IN card's level the mic's own, not the vocoder's modulator's (018 FemaleChoirs' is its own wave)
 vc2play-view-mic-is-modulator|    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);|    view->micPeak.store(in, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+# v462: the plugin's MIDI ahead of the firmware's, by VSynthEmuMidiTest: the six edits onto the parameters, read at once, handed on, dropped
+midi-no-edits|        midi_.controller(msg.getControllerNumber(), msg.getControllerValue());\n||plugin/Source/PluginProcess.cpp|midi
+midi-not-read|    return midi_.edits.read(apvts.getRawParameterValue(id));|    return apvts.getRawParameterValue(id)->load();|plugin/Source/PluginControlsRead.cpp|midi
+midi-wrong-param|{ xtedit::PortaTime, &Params::kPortaTime }|{ xtedit::PortaTime, &Params::kPortaVeloSens }|plugin/Source/PluginMidiIn.cpp|midi
+midi-no-gesture|            setAsGesture(*params_[i], value);|            params_[i]->setValueNotifyingHost(params_[i]->convertTo0to1(value));|plugin/Source/PluginMidiEdits.cpp|midi
+midi-ours-always|    const bool ours = now == p.before.load(std::memory_order_relaxed) \|\| now == lastSet_[i];|    const bool ours = true;|plugin/Source/PluginMidiEdits.cpp|midi
+midi-no-before|    if (p.gen.load(std::memory_order_relaxed) == p.flushed.load(std::memory_order_acquire))\n        p.before|    if (false)\n        p.before|plugin/Source/PluginMidiEdits.cpp|midi
+midi-flushed-twice|        p.flushed.store(gen, std::memory_order_release);|        ;|plugin/Source/PluginMidiEdits.cpp|midi
+midi-state-no-flush|    midi_.edits.flush();   // v462|    ;   // v462|plugin/Source/PluginState.cpp|midi
+midi-state-no-drop|    midi_.edits.drop();   // v462|    ;   // v462|plugin/Source/PluginState.cpp|midi
+midi-patch-no-drop|    midi_.edits.drop();   // a MIDI edit|    ;   // a MIDI edit|plugin/Source/PluginMsm.cpp|midi
