@@ -1696,8 +1696,9 @@ CLAUDE.md's "as its own mode beside the V-Synth, as the XT's [V-CARD] switches a
 - [ ] The effect's new name (d-7): PRODUCT_NAME in plugin/FxPlugin.cmake, buildid.sh's and buildid_test.sh's FX names, the
   old "V-Synth Emu FX" bundles taken out of ~/Library at the install (two AUs with one type, subtype and maker confuse a
   host). To check: a REAPER session saved with "V-Synth Emu FX" finds the renamed plugin.
-- [ ] VST3 and AU only (d-8): no Standalone in either target; what reads the Standalone's build id (buildid.sh, verify.sh)
-  without it.
+- [ ] VST3 and AU only (d-8): the instrument's Standalone taken out of its FORMATS, none in the effect's; buildid.sh's
+  Standalone copy with it (the one script that names it, read 2026-11-26; no code of plugin/Source asks for the
+  Standalone, only PluginExtIn.cpp's comment on its input device).
 
 **The user's decisions** (2026-11-26, the user's answers to the recommendations; d-9 open):
 - **d-6. The other mode's parameters. Decided: each plugin keeps only its own** ("each plugin should keep only its own
@@ -1708,8 +1709,8 @@ CLAUDE.md's "as its own mode beside the V-Synth, as the XT's [V-CARD] switches a
 - **d-7. The effect's name. Decided: "V-Synth Emu VC-2"** (the recommendation). Only the name the host shows; the codes
   (VsEf Gato, the bundle ID) stay, so sessions saved with it still open.
 - **d-8. A Standalone. Decided: none** ("standalone app isn't needed at this time at all, only VST/AU"; not the
-  recommendation): both plugins VST3 and AU only. Read as the instrument's Standalone going too, which the user confirms
-  when the step starts; the VC-2 is then heard only in a host.
+  recommendation): both plugins VST3 and AU only. The instrument's Standalone goes too (the user's "Yes, drop it",
+  2026-11-26); the V-Synth and the VC-2 are then heard only in a host.
 - **d-9. The instrument's audio input** (open). The recommendation was to keep it, as the V-Synth's EXT IN OSC needs it
   (v207). The user's question: can EXT IN simply be an oscillator, treated like a PCM type? It is one already: OSC Type
   is ANALOG, PCM or EXT IN, the XT's three (`oscTypeNames`), and the firmware makes EXT IN a voice on the PCM converter's
