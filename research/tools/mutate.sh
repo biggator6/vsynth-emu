@@ -55,6 +55,7 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds XtPatchIds
            XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn XtSynthOut XtSinc
            $( [ -f "$S/XtRateOut.cpp" ] && echo XtRateOut ) $( [ -f "$S/XtSynthImport.cpp" ] && echo XtSynthImport ) \
+           $( [ -f "$S/XtFwEncode.cpp" ] && echo XtFwEncode XtFwEvents ) \
            $(vc2Tables "$S"))   # XtRateOut: render's read (v455)   # rom.4's tables, which XtSynthRom.cpp loads: vc2_tables.sh's list (v231)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
@@ -100,7 +101,7 @@ elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks|arpring)$ ]]; then   # XtArpeggi
                  XtTempoTicks XtTempoTicksCheck XtArpeggioPatch
     PARTS=(XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases XtTempoTicks XtTempoTicksCheck
            XtArpeggioPatch XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer
-           XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup)
+           XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup $( [ -f "$S/XtFwEncode.cpp" ] && echo XtFwEncode XtFwEvents ))
     TONE=(-DXT_ARP_MAIN -DXT_HARNESS_SWITCHES)   # the header's plant's flags, as the tone's own
 elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     # The Multi Step Modulator against xt_msm: XtMsm.cpp, with PORT=msmtrack XtMsmTrack.cpp, with PORT=msmpatch
@@ -163,6 +164,8 @@ fi
 if [ -z "$TF" ] && { [ "$F" = XtFirmware.cpp ] || [[ " ${L[*]} " == *"/XtFirmware.cpp "* ]]; }; then
     L+=("$S/XtFwMachine.cpp")
     [[ " ${L[*]} " == *"/Sh4Setup.cpp "* ]] || L+=("$S/Sh4Setup.cpp")
+    # the encodes, out of XtFirmware.cpp (v481), and the event edits they call
+    [ -f "$S/XtFwEncode.cpp" ] && L+=("$S/XtFwEncode.cpp" "$S/XtFwEvents.cpp")
 fi
 # A header's plant (PORT=tonefwh, wirefwmsm; v193) goes into a copy of the sources
 OUT="$M/$N.cpp"

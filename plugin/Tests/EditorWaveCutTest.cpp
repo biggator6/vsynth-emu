@@ -12,7 +12,6 @@
 #include "WavePageTest.h"
 #include "../Source/PluginParamIds.h"
 #include "../Source/PluginWaveEdit.h"
-#include <cstring>
 
 namespace {
 
@@ -45,51 +44,6 @@ std::vector<float> monoOf(VSynthEmuProcessor& p, int osc) {
 bool keeps(const std::vector<float>& before, const std::vector<float>& after, long from) {
     if (after.empty() || (long)before.size() < from + (long)after.size()) return false;
     return std::equal(after.begin(), after.end(), before.begin() + from);
-}
-
-void put32(uint8_t* at, uint32_t v) {
-    std::memcpy(at, &v, 4);
-}
-
-// A V-Synth SOLO wave as a project keeps one: a RIFF with its sample chunk (type SOLO, mono, its frames, key 60), its
-// loop record (both loops the whole wave, One Way, the Loop switch deciding) and plain samples, 44.1 kHz 16-bit
-juce::File writeSoloWave(const juce::File& folder, long frames) {
-    juce::MemoryBlock fmt(16, true), vpsc(32, true), vplp(28, true), data((size_t)frames * 2, true);
-    auto* f = (uint8_t*)fmt.getData();
-    f[0] = 1;                                    // PCM
-    f[2] = 1;                                    // mono
-    put32(f + 4, 44100);
-    put32(f + 8, 88200);
-    f[12] = 2;
-    f[14] = 16;
-    auto* s = (uint8_t*)vpsc.getData();
-    s[1] = 1;                                    // SOLO
-    put32(s + 4, (uint32_t)frames);
-    s[0xa] = 60;
-    auto* l = (uint8_t*)vplp.getData();
-    put32(l + 8, (uint32_t)(frames - 1));
-    put32(l + 0xc, (uint32_t)(frames - 1));
-    l[0x18] = 1;
-    l[0x19] = 1;
-    l[0x1a] = 1;
-    auto* d = (int16_t*)data.getData();
-    for (long i = 0; i < frames; ++i) d[i] = (int16_t)(12000.0 * std::sin(0.03 * (double)i));
-    juce::MemoryOutputStream body;
-    body.write("WAVE", 4);
-    const std::pair<const char*, const juce::MemoryBlock*> chunks[] = {
-        { "fmt ", &fmt }, { "vpsc", &vpsc }, { "vplp", &vplp }, { "data", &data } };
-    for (const auto& [id, b] : chunks) {
-        body.write(id, 4);
-        body.writeInt((int)b->getSize());
-        body.write(b->getData(), b->getSize());
-    }
-    const juce::File file = folder.getChildFile("solo_cut.wav");
-    file.deleteFile();
-    juce::FileOutputStream out(file);
-    out.write("RIFF", 4);
-    out.writeInt((int)body.getDataSize());
-    out.write(body.getData(), body.getDataSize());
-    return file;
 }
 
 void cutsTheWave(WavePage& page, VSynthEmuProcessor& p, TestChecks& check) {
@@ -170,7 +124,7 @@ void cutsOnTheImport(WavePage& page, VSynthEmuProcessor& p, const juce::File& fo
     for (int16_t s : xtSynthImport(loaded, 48000.0, 16)) imported.push_back((float)s / 32768.0f);
     check(keeps(imported, monoOf(p, 1), 1000), "the 48 kHz wave isn't cut on the XT's import to 44.1 kHz");
     // A V-Synth SOLO wave, cut, is LITE (vpsc's type 0 after Truncate, 0x894a2270)
-    p.loadFile(writeSoloWave(folder, kFrames), 1);
+    p.loadFile(writeSoloWave(folder, "solo_cut.wav", kFrames), 1);
     check(waitFor([&] { return p.getStatusText().contains("Encoded as SOLO"); }), "the SOLO wave isn't its own SOLO");
     check(PluginWaveEdits::truncate(p, 1, 0, 44099, 1), "Truncate on the SOLO wave refused");
     check(waitFor([&] { return p.getStatusText().contains("Encoded as LITE"); }),

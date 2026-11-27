@@ -154,7 +154,11 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   Loop End and Playback Mode. The rack's OSC display draws the Start Offset line too, while that parameter's gesture
   runs (its DETAILS knob held, or a drag here). Built in v479 (`UiWavePage`, `UiWaveEdit`). v480: the Edit region's two
   ends in the ruler, its span pale over the wave, Truncate and Revert on the wave card's title line (d-8a); the line of
-  what the wave is says what the session keeps besides the file. The events (d-9) come next.
+  what the wave is says what the session keeps besides the file. v481, the events (d-9), as the XT's Encode screen has
+  them: each a ▼ at the wave's top in `text`, Current a thin `label` line the wave's height (a click on the wave puts it
+  there); Delete, Add, Next Event and Prev Event on the title line beside Revert and Truncate, Add and Delete at
+  Current, Next and Prev moving it; the points' card gains Encode (the type) and Depth, the events' own. A refusal is
+  said on the status line in the XT's words ("Event Interval Too Narrow!").
 
 The footer's keyboard and its zones' ranges are step 1's.
 

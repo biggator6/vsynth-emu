@@ -15,6 +15,7 @@ cc() { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 ${XT_STACK_INIT:+-ftrivial-
        "${SAN[@]}" "${HARNESS_SWITCHES[@]}" "$@" 2>&1 | grep -E " error"; return 0; }
 cd "$S" || exit 1
 FW=(XtFirmware.cpp $( [ -f XtFwMachine.cpp ] && echo XtFwMachine.cpp ))   # the routines and their machine (v175 on)
+FW+=($( [ -f XtFwEncode.cpp ] && echo XtFwEncode.cpp XtFwEvents.cpp ))   # the encodes, out of XtFirmware.cpp (v481)
 SH4=(Sh4Interp.cpp $( [ -f Sh4Setup.cpp ] && echo Sh4Setup.cpp ))   # the interpreter and its setup (v197 on)
 # V-Synth's files: patches, a wave's chunks, and the firmware's disk image (its own file from v177 on); the patch store's
 # layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on); the preset waves a

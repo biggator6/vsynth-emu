@@ -3,6 +3,7 @@
 #include "XtFirmware.h"
 #include "Sh4Interp.h"
 #include "XtFloat.h"
+#include "XtFwAddrs.h"
 #include "XtFwMachine.h"
 
 #include <algorithm>
@@ -13,21 +14,9 @@
 #include <string>
 
 using namespace xtfw;   // the machine the routines run on, and its memory (XtFwMachine.h)
+using namespace xtfwaddr;   // rom.2's entry points the wave routines call (XtFwAddrs.h, v481)
 
 namespace {
-
-// rom.2 entry points (see research/HARDWARE_FIRMWARE.md)
-constexpr uint32_t kSoloNew = 0x8951dc40, kSoloEncode = 0x8951e120;
-constexpr uint32_t kLoadInit = 0x89529e90, kLoad = 0x894a9940;
-constexpr uint32_t kEncMulti = 0x89516000;                       // BACKING/ENSEMBLE encode driver
-constexpr uint32_t kEncSolo = 0x89515e28;                        // SOLO encode driver
-constexpr uint32_t kOsAlloc = 0x895113a0, kOsFree = 0x895113e0;  // sample-memory chunks (OS pointers 0x8987c8f0/8f8)
-constexpr uint32_t kAfterVpdt = 0x89515b40;                       // the note chunk, after the vpdt is written
-constexpr uint32_t kEncInit = 0x89516400, kDetect = 0x895164c0;   // encode module init; attack detection (depth)
-constexpr uint32_t kSmp = 0x8987c940;    // sample block: +0 type, +2 channels, +8 frames, +0x20 start, +0x24 end, +0x7c samples
-constexpr uint32_t kChunks = 0x8987c97c; // (ptr, size) per chunk kind 0..8, set by 0x89517320
-constexpr uint32_t kMarkCount = 0x89ff0cfc, kMarkHead = 0x89ff0d04;
-constexpr uint32_t kSrcSetup = 0x8952dec0, kSrcFeed16 = 0x8952e4d0;  // WAV import converter (16-bit input)
 
 std::string g_rom;
 
@@ -178,142 +167,7 @@ bool xtFwSoloEncode(const int16_t* x, int n, std::vector<XtRecord>& out, int cha
     return true;
 }
 
-namespace {
-// The markers as the attack detection leaves them (0x895164c0, read back after it): a list head and one marker an event, each
-// {position, a later position, a level} in samples with +0xd set, doubly linked (next at +0xbc, previous at +0xc0).  The driver's
-// 0x895126d0 takes the events' positions from the first word alone; the later position here is the event's own, as at the end.
-void putMarkers(Sh4& c, uint32_t& heap, const std::vector<uint32_t>& at) {
-    const uint32_t head = heap; heap += 0x100;
-    for (uint32_t a = head; a < heap; a += 4) c.wr32(a, 0);
-    uint32_t prev = head;
-    for (uint32_t pos : at) {
-        const uint32_t m = heap; heap += 0x100;
-        for (uint32_t a = m; a < heap; a += 4) c.wr32(a, 0);
-        c.wr32(m, pos); c.wr32(m + 4, pos); c.wr8(m + 0xd, 1);
-        c.wr32(prev + 0xbc, m); c.wr32(m + 0xc0, prev);
-        prev = m;
-    }
-    c.wr32(kMarkHead, head);
-    c.wr32(kMarkCount, (uint32_t)at.size());
-}
-}
-
-bool xtFwEncodeMulti(int type, const int16_t* pcm, long frames, int channels, std::vector<uint8_t>& vpdt,
-                     int depth, int* events, const std::vector<uint32_t>* markers) {
-    vpdt.clear();
-    auto M = waveMachine(g_rom, pcm, frames, channels, 0x800000);
-    if (!M || (type != 3 && type != 5)) return false;
-    Sh4& c = M->cpu;
-    if (markers && (markers->size() < 2 || markers->front() != 0 || markers->back() != (uint32_t)frames)) return false;
-    if ((depth >= 0 || markers) && !c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
-    // the sample being encoded
-    c.wr8(kSmp, (uint8_t)(depth >= 0 && !markers ? 0 : type));
-    c.wr8(kSmp + 2, (uint8_t)channels);
-    c.wr32(kSmp + 8, (uint32_t)frames);
-    c.wr32(kSmp + 0x20, 0);
-    c.wr32(kSmp + 0x24, (uint32_t)frames);
-    c.wr32(kSmp + 0x7c, kSamp);
-    // OS sample-memory chunks: hand out heap blocks
-    c.hook(kOsAlloc, [&M](Sh4& cpu) {
-        const uint32_t sz = 0x400000, p = M->heap;
-        if (p + sz > kRam + kRamSize) { cpu.ret(0); return; }
-        if (uint8_t* m = cpu.ptr(p, sz)) std::memset(m, 0, sz);
-        M->heap += sz;
-        cpu.ret(p);
-    });
-    c.hook(kOsFree, [](Sh4& cpu) { cpu.ret(0); });
-    if (markers) putMarkers(c, M->heap, *markers);   // the events given, in place of the detection
-    else if (depth >= 0) {   // the XT's attack detection at this Encode Depth builds the markers
-        uint32_t rc = 0;
-        if (!c.call(kDetect, { (uint32_t)std::min(depth, 127) }, kStack, &rc)) { std::fprintf(stderr, "sh4 detect: %s\n", c.error().c_str()); return false; }
-        c.wr8(kSmp, (uint8_t)type);
-    } else {
-    // markers: a list head and {start (type 1), end (type 2)}, doubly linked
-    auto marker = [&](uint32_t at, uint32_t pos, uint8_t kind) {
-        c.wr32(at, pos); c.wr32(at + 4, pos);
-        c.wr8(at + 0xc, kind); c.wr8(at + 0xd, 1); c.wr8(at + 0xe, 1);
-    };
-    const uint32_t head = M->heap; M->heap += 0x100;
-    const uint32_t m0 = M->heap; M->heap += 0x100;
-    const uint32_t m1 = M->heap; M->heap += 0x100;
-    for (uint32_t a = head; a < M->heap; a += 4) c.wr32(a, 0);
-    marker(m0, 0, 1);
-    marker(m1, (uint32_t)frames, 2);
-    c.wr32(head + 0xbc, m0); c.wr32(m0 + 0xc0, head);    // next at +0xbc, previous at +0xc0
-    c.wr32(m0 + 0xbc, m1);   c.wr32(m1 + 0xc0, m0);
-    c.wr32(kMarkHead, head);
-    c.wr32(kMarkCount, 2);
-    }
-    // The vpdt is complete when the driver moves on to the note chunk
-    // (0x89515b40, after 0x89515a70 succeeded): take it there and stop.
-    bool done = false;
-    c.hook(kAfterVpdt, [&](Sh4& cpu) {
-        const uint32_t p = cpu.rd32(kChunks + 8 * 5), n = cpu.rd32(kChunks + 8 * 5 + 4);
-        if ((int32_t)cpu.rd32(0x89ff0dd0) == 0 && p && n && n <= 0x400000) {
-            vpdt.resize(n);
-            cpu.read(p, vpdt.data(), n);
-            if (events) *events = (int)(cpu.rd32(p + 8) >> 16);
-            done = true;
-        }
-        cpu.ret(0);
-    });
-    uint32_t rc = 0;
-    if (!c.call(kEncMulti, { 0 }, kStack, &rc)) { std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false; }
-    return done;
-}
-
-bool xtFwEncodeSolo(const int16_t* pcm, long frames, int channels, int depth, std::vector<uint8_t>& vpdt, std::vector<uint32_t>* events, bool onlyWithAttacks,
-                    const std::vector<uint32_t>* markers) {
-    vpdt.clear();
-    if (events) events->clear();
-    auto M = waveMachine(g_rom, pcm, frames, channels, 0x800000);
-    if (!M) return false;
-    Sh4& c = M->cpu;
-    if (!c.call(kEncInit, {}, kStack)) { std::fprintf(stderr, "sh4 init: %s\n", c.error().c_str()); return false; }
-    c.wr8(kSmp, 0);
-    c.wr8(kSmp + 2, (uint8_t)channels);
-    c.wr32(kSmp + 8, (uint32_t)frames);
-    c.wr32(kSmp + 0x20, 0);
-    c.wr32(kSmp + 0x24, (uint32_t)frames);
-    c.wr32(kSmp + 0x7c, kSamp);
-    c.hook(kOsAlloc, [&M](Sh4& cpu) {
-        const uint32_t sz = 0x400000, p = M->heap;
-        if (p + sz > kRam + kRamSize) { cpu.ret(0); return; }
-        if (uint8_t* m = cpu.ptr(p, sz)) std::memset(m, 0, sz);
-        M->heap += sz;
-        cpu.ret(p);
-    });
-    c.hook(kOsFree, [](Sh4& cpu) { cpu.ret(0); });
-    uint32_t rc = 0;
-    if (markers) {                      // the events given, in place of the detection
-        if (markers->size() < 2 || markers->front() != 0 || markers->back() != (uint32_t)frames) return false;
-        putMarkers(c, M->heap, *markers);
-    } else if (!c.call(kDetect, { (uint32_t)std::clamp(depth, 0, 127) }, kStack, &rc)) { std::fprintf(stderr, "sh4 detect: %s\n", c.error().c_str()); return false; }
-    c.wr8(kSmp, 1);
-    // The event list the encoder gets: the start, the attacks, the end.  With none between, the port's encoder gives the same
-    // records ({n·16}: the driver's {0, n·16} changes none), so the caller may stop here
-    bool attacks = true;
-    c.hook(kSoloNew, [&](Sh4& cpu) {
-        if (events) for (uint32_t k = 0; k < cpu.r[6] && k < 4096; ++k) events->push_back(cpu.rd32(cpu.r[7] + 4 * k));
-        if (cpu.r[6] <= 2) attacks = false;
-        if (!attacks && onlyWithAttacks) cpu.pc = 0x10;   // stop the whole run there (an unmapped address: the call ends as a fault)
-    });
-    bool done = false;
-    c.hook(kAfterVpdt, [&](Sh4& cpu) {
-        const uint32_t p = cpu.rd32(kChunks + 8 * 5), n = cpu.rd32(kChunks + 8 * 5 + 4);
-        if ((int32_t)cpu.rd32(0x89ff0dd0) == 0 && p && n && n <= 0x400000) {
-            vpdt.resize(n);
-            cpu.read(p, vpdt.data(), n);
-            done = true;
-        }
-        cpu.ret(0);
-    });
-    if (!c.call(kEncSolo, {}, kStack, &rc)) {
-        if (!attacks && onlyWithAttacks) return false;
-        std::fprintf(stderr, "sh4: %s\n", c.error().c_str()); return false;
-    }
-    return done;
-}
+// The encodes (xtFwEncodeMulti, xtFwEncodeSolo) and their markers are XtFwEncode.cpp's (v481, moved as they stood)
 
 bool xtFwImport(const int16_t* pcm, long frames, int channels, int rate, std::vector<int16_t>& out) {
     out.clear();

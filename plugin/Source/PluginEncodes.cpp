@@ -10,6 +10,7 @@
 #include "PluginProcessor.h"
 #include "Sh4Interp.h"
 #include "XtPatch.h"
+#include <optional>
 
 namespace {
 
@@ -96,9 +97,14 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
         std::string err;
         // A V-Synth SOLO wave as its own type keeps its own events (as encoded, or edited in V-Producer), which its vpno
         // names; otherwise the detection at the Encode Depth finds them (xtSynthEncode)
-        const bool ownEvents = isOwn && type == own;
+        // v481: the Encode screen's adds and deletes, at this depth, on the detection's markers, so not the wave's own
+        std::vector<int> results;
+        std::optional<XtFwEventScope> screen;
+        if (waveEventsStand(edit, depth)) screen.emplace(edit.events, results);
+        const bool ownEvents = isOwn && type == own && !screen;
         auto e = xtSynthEncode(chans, rate, type, depth, &err, bits, ownEvents ? &ownWave.events : nullptr,
                                ownEvents ? &ownWave.vpdt : nullptr);
+        screen.reset();
         if (gen != wave_[osc].gen.load()) return;
         if (!e) {
             setStatus(who + "Encode failed: " + juce::String(err));
@@ -114,6 +120,8 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
         synth_.setSample(e, osc);
         xtActive_.store(true);
         static const char* names[] = { "LITE", "SOLO", "", "BACKING", "", "ENSEMBLE" };
+        const juce::String refused = PluginWaveEdits::eventsDone(*this, osc, edit, depth, results);   // the XT's word
+        if (refused.isNotEmpty()) return setStatus(who + refused);
         setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own >= 0 ? " (the wave's own)" : " (auto)"));
     });
 }

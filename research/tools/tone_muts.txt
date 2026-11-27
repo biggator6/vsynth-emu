@@ -1095,10 +1095,10 @@ own-band|        else if (!xtFwEncodeMulti(type, pcm.data(), frames, ch, E->vpdt
 own-detect-too|&& xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, own ? &marks : nullptr)|&& xtFwEncodeSolo(pcm.data(), frames, ch, depth, vp, nullptr, true, nullptr)
 own-end-check|events->front() == 0 && (long)events->back() == frames * 16|events->front() == 0
 own-marks-floor|(uint32_t)(e / 16) > marks.back() ? (uint32_t)(e / 16) : marks.back()|(uint32_t)((e + 15) / 16) > marks.back() ? (uint32_t)((e + 15) / 16) : marks.back()
-fw-marker-pos|        c.wr32(m, pos); c.wr32(m + 4, pos); c.wr8(m + 0xd, 1);|        c.wr32(m, pos + 1); c.wr32(m + 4, pos); c.wr8(m + 0xd, 1);|tonefw
-fw-marker-count|    c.wr32(kMarkCount, (uint32_t)at.size());|    c.wr32(kMarkCount, (uint32_t)at.size() - 1);|tonefw
-fw-marker-solo|    if (markers) {                      // the events given, in place of the detection|    if (false) {                      // the events given, in place of the detection|tonefw
-fw-marker-ends|        if (markers->size() < 2 \|\| markers->front() != 0 \|\| markers->back() != (uint32_t)frames) return false;\n        putMarkers|        putMarkers|tonefw
+fw-marker-pos|        c.wr32(m, pos);|        c.wr32(m, pos + 1);|tonefwenc
+fw-marker-count|    c.wr32(kMarkCount, (uint32_t)at.size());|    c.wr32(kMarkCount, (uint32_t)at.size() - 1);|tonefwenc
+fw-marker-solo|    if (markers) {                      // the events given, in place of the detection|    if (false) {                      // the events given, in place of the detection|tonefwenc
+fw-marker-ends|        if (!marksFit(*markers, frames)) return false;\n        putMarkers|        putMarkers|tonefwenc
 check-own-edit|if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16;|if (ev[1] + 37 * 16 < ev[2]) ev[1] += 37 * 16 + 1;|tonecheck
 check-own-band|encodedEvents(*E2) != (w.type == 1 ? ev : ev0)|encodedEvents(*E2) != ev|tonecheck
 check-own-stride|    const uint32_t stride = E.channels == 2 ? 0x58 : 0x2e;\n    for (uint32_t e = 0; e < (w2 >> 16)|    const uint32_t stride = E.channels == 2 ? 0x2e : 0x58;\n    for (uint32_t e = 0; e < (w2 >> 16)|tonecheck

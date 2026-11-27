@@ -84,20 +84,30 @@ void readEvents(const Chunks& c, XtWaveFile& out) {
     }
     const uint8_t* vpdt = c.at[Dt];
     const uint32_t nDt = c.bytes[Dt];
-    const VpdtLayout* layout = (size_t)out.encodeType < kLayouts.size() ? kLayouts[(size_t)out.encodeType] : nullptr;
-    if (!vpdt || nDt < 12 || !layout) return;
+    const bool laid = (size_t)out.encodeType < kLayouts.size() && kLayouts[(size_t)out.encodeType];
+    if (!vpdt || nDt < 12 || !laid) return;
     out.vpdt.assign(vpdt, vpdt + nDt);
-    const uint32_t nev = le32(vpdt + 8) >> 16;
-    const uint32_t stride = out.channels == 2 ? layout->stereo : layout->mono, first = layout->first;
+    out.events = xtVpdtEvents(out.vpdt, out.encodeType, out.channels);
+}
+
+} // namespace
+
+std::vector<int32_t> xtVpdtEvents(const std::vector<uint8_t>& vpdt, int type, int channels) {
+    std::vector<int32_t> events;
+    const VpdtLayout* layout = type >= 0 && (size_t)type < kLayouts.size() ? kLayouts[(size_t)type] : nullptr;
+    const uint32_t nDt = (uint32_t)vpdt.size();
+    if (nDt < 12 || !layout) return events;
+    const uint32_t nev = le32(vpdt.data() + 8) >> 16;
+    const uint32_t stride = channels == 2 ? layout->stereo : layout->mono, first = layout->first;
     for (uint32_t e = 0; e < nev && e < 4096; ++e) {
         const uint32_t at = (stride * e + first) * 2 + 4;
-        if (at + 4 > nDt) {
-            out.events.clear();
-            break;
-        }
-        out.events.push_back((int32_t)le32(vpdt + at));
+        if (at + 4 > nDt) return {};
+        events.push_back((int32_t)le32(vpdt.data() + at));
     }
+    return events;
 }
+
+namespace {
 
 // The samples: as they are, or RDAC through the firmware's block routine.  What the header says is held to what the data
 // holds, two bytes a sample as they are and one after RDAC's 8-byte header: every real wave has at least that (v169: 745

@@ -25,10 +25,10 @@ long within(long f, long lo, long hi) {
 
 } // namespace
 
-// In Point's order (none, start, the forward loop's ends, the backward's, the Edit region's); none for the backward
-// loop's (the session's edit) and the Edit region's (the page's own, as the XT's are its RAM's)
+// In Point's order (none, start, the forward loop's ends, the backward's, the Edit region's, Current); none for the
+// backward loop's (the session's edit), the Edit region's and Current (the page's own, as the XT's are its RAM's)
 size_t WaveEditView::watchedOf(Point p) {
-    static constexpr std::array<size_t, 8> kWatchedOf { kNone, kStart, kLoopStart, kLoopEnd,
+    static constexpr std::array<size_t, 9> kWatchedOf { kNone, kStart, kLoopStart, kLoopEnd, kNone,
                                                         kNone, kNone,  kNone,      kNone };
     return kWatchedOf[(size_t)p];
 }
@@ -52,6 +52,7 @@ void WaveEditView::refresh() {
             editFrom_ = at(Point::fwdStart);
             editTo_ = at(Point::fwdEnd);
         }
+        events_ = PluginWaveEdits::events(processor_, osc_);   // v481: as the wave last encoded plays them
         madeSpan_ = -1;
         repaint();
     }
@@ -72,6 +73,7 @@ long WaveEditView::at(Point p) const {
         case Point::bwdEnd: return bwd_.backward ? bwd_.bwdEnd : at(Point::fwdEnd);
         case Point::editStart: return editFrom_;
         case Point::editEnd: return editTo_;
+        case Point::current: return std::min(current_, last);
         case Point::none: break;
     }
     return 0;
@@ -186,10 +188,11 @@ void WaveEditView::mouseDrag(const juce::MouseEvent& e) {
     repaint();
 }
 
-void WaveEditView::mouseUp(const juce::MouseEvent&) {
+void WaveEditView::mouseUp(const juce::MouseEvent& e) {
     const bool bwd = dragging_ == Point::bwdStart || dragging_ == Point::bwdEnd;
     if (const size_t i = watchedOf(dragging_); i != kNone) watch_.end(i);
     else if (bwd) PluginWaveEdits::setBackward(processor_, osc_, bwd_);
+    else if (scrolling_ && !e.mouseWasDraggedSinceMouseDown()) setCurrent(frameAt(e.position.x));   // a click: Current
     dragging_ = Point::none;
     scrolling_ = false;
 }

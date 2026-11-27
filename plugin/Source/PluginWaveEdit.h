@@ -7,6 +7,7 @@
 // in a wave's vplp, the shortest 16 samples.
 #include "XtEncoded.h"
 #include "XtFiles.h"
+#include "XtFwEvents.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 struct PluginWaveEdit {
@@ -15,6 +16,10 @@ struct PluginWaveEdit {
     // v480, Truncate's (d-8a): the frames kept of the file's wave as the XT holds it (44.1 kHz), both ends kept
     bool cut = false;
     long keepFrom = 0, keepTo = 0;
+    // v481, the Encode screen's (d-9): its adds and deletes in order, at the Encode Depth they were made at; a change of
+    // the depth drops them, as the XT's does ("the events that were modified manually will be discarded")
+    std::vector<XtFwEventEdit> events;
+    int eventsDepth = -1;
     bool operator==(const PluginWaveEdit&) const = default;
 };
 
@@ -40,6 +45,8 @@ void waveCutOnto(const PluginWaveEdit& edit, XtWaveFile& own, int& ownType, long
 // Truncate's forward loop, its ends in frames of the wave before the cut, after it (0x893810f0, 0x89381336): moved with
 // the kept frames from..to where it lies strictly inside them, else the whole wave; held to the wave
 std::pair<long, long> waveLoopAfterCut(long start, long end, long from, long to);
+// Whether an encode at `depth` puts an edit's event edits on the detection's markers: some, made at that depth
+bool waveEventsStand(const PluginWaveEdit& edit, int depth);
 // The backward loop of an edit set: its Loop Mode and region in frames; and its cut, the frames kept
 void waveEditBackward(PluginWaveEdit& edit, int mode, int start, int end);
 void waveEditCut(PluginWaveEdit& edit, long keepFrom, long keepTo);
@@ -62,6 +69,15 @@ struct PluginWaveEdits {
     static bool truncate(VSynthEmuProcessor& p, int osc, long from, long to, int bwdMode);
     // Back to the wave as its file has it, as it loaded: no edit kept, a V-Synth wave's own settings on the parameters
     static void revert(VSynthEmuProcessor& p, int osc);
+    // v481: an event added or deleted at a frame, at the OSC's Encode Depth, kept and the wave encoded again with it
+    // (the XT's own routine runs it, and may refuse it: the encode then drops it and says why); and the wave's events
+    // as it plays them, in frames, the start and the end among them
+    static void editEvent(VSynthEmuProcessor& p, int osc, const XtFwEventEdit& edit);
+    static std::vector<long> events(const VSynthEmuProcessor& p, int osc);
+    // After an encode given `given` at `depth`: the session's edits as the XT took them (each one refused dropped), or
+    // none where the depth moved off theirs; the XT's message for the first refused, empty for none
+    static juce::String eventsDone(VSynthEmuProcessor& p, int osc, const PluginWaveEdit& given, int depth,
+                                   const std::vector<int>& results);
     // None kept, as a new wave comes (a file loaded, a patch's waves); and the session's words for them, both ways, by
     // the state's properties "waveEdit" and "waveEdit2" (a restore puts them back before it loads the waves)
     static void forget(VSynthEmuProcessor& p, int osc);

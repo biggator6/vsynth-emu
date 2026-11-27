@@ -50,7 +50,7 @@ vpno-list-from|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (
 vpno-list-end|        for (uint32_t k = 12; k + 2 <= nNo; k += 2)|        for (uint32_t k = 12; k + 4 <= nNo; k += 2)|wavefile
 vpdt-solo-stride|kSolo { 10, 16, 8 }|kSolo { 16, 10, 8 }|wavefile
 vpdt-band-first|kBand { 0x2e, 0x58, 14 }|kBand { 0x2e, 0x58, 16 }|wavefile
-vpdt-count|const uint32_t nev = le32(vpdt + 8) >> 16;|const uint32_t nev = (le32(vpdt + 8) >> 16) - 1;|wavefile
+vpdt-count|const uint32_t nev = le32(vpdt.data() + 8) >> 16;|const uint32_t nev = (le32(vpdt.data() + 8) >> 16) - 1;|wavefile
 vpdt-lite|{ nullptr, &kSolo, nullptr, &kBand, nullptr, &kBand }|{ nullptr, nullptr, nullptr, &kBand, nullptr, &kBand }|wavefile
 preset-order|const size_t at = onSector[sample - 1];|const size_t at = onSector[sample % onSector.size()];|presetwaves
 preset-version|kVSynthVersion = "VSYN2W"|kVSynthVersion = "VC2W"|presetwaves

@@ -13,7 +13,7 @@ harnessParts() {   # harnessParts <define> <objdir> <the port's own files, witho
     local f H
     H=$(ls -t "$S"/*.h | head -1)
     for f in "$@" XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer XtSoloVoice \
-             XtSoloEncoder Sh4Interp Sh4Setup; do
+             XtSoloEncoder Sh4Interp Sh4Setup XtFwEncode XtFwEvents; do
         [ "$f.cpp" = "$F" ] && continue
         L+=("$OBJ/$f.o")
         [ "$OBJ/$f.o" -nt "$S/$f.cpp" ] && [ "$OBJ/$f.o" -nt "$H" ] && continue

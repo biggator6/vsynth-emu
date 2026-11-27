@@ -9,6 +9,7 @@ tonefile() {
         toneband) echo XtMultiBandPlayer.cpp ;;
         tonecheck) echo XtToneCheck.cpp ;;
         tonefw) echo XtFirmware.cpp ;;
+        tonefwenc) echo XtFwEncode.cpp ;;   # the encodes and their markers, out of XtFirmware.cpp (v481)
         toneosc) echo XtOsc.cpp ;;
         tonelfo) echo XtLfo.cpp ;;
         toneenv) echo XtEnvelope.cpp ;;

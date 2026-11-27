@@ -33,6 +33,7 @@ void WaveEditView::paint(juce::Graphics& g) {
     shown.columns = columns_;
     const WaveDisplay::Loop loop { watch_.value(kLoop) >= 0.5f, share(at(Point::fwdStart)), share(at(Point::fwdEnd)) };
     WaveDisplay::paintWave(g, w, shown, loop);
+    paintEvents(g);   // v481: the events' marks and Current (UiWaveEditEvents.cpp)
     paintPoints(g);
     paintRuler(g);
 }

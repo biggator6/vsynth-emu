@@ -1546,6 +1546,61 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The WAVE page's events, the XT's own add and delete (2026-11-27, v481) {#wave-events}
+
+The user's d-9: the points first (v479, v480), then the events, by the XT's own add and delete and its encode. The
+routines and their law are rom.2's, read in {#wave-edit-read}.
+
+**Run by rom.2.** The session keeps the edits in order, each an add or a delete at a frame, with the Encode Depth they
+were made at (`PluginWaveEdit::events`, `eventsDepth`; "ev=depth:+frame,-frame,…" in `waveEdit`). The wave's encode
+gives them to the interpreter in a scope (`XtFwEventScope`, `XtFwEvents.cpp`), and both of rom.2's encodes, a band
+wave's and SOLO's (`XtFwEncode.cpp`), run them after the attack detection and before the encode itself, as the screen's
+Execute encodes the list as it stands: each through the screen's routine, add `0x89516b20` and delete `0x89516c80`,
+the delete's frame held as the screen holds it (`0x894a9250`: a frame whose next reaches the length goes as the length,
+which the routine refuses). After each one taken the list is counted again at the depth, as the screen's refresh does
+(a taken edit sets the encode object's +0xc, and `0x894a9020` then runs `0x894ab1b0` → `0x895164c0`, which with the
+analysis made, `0x8987cab0` set, only counts the markers again at `0x89516666` and rebuilds the position words Next
+and Prev read, `0x89512160` → `0x8987c93c`). Then, before the driver, the list is committed as Execute's encode start
+does it (`0x894ab270` → `0x89516720(type)`: the length checked, SOLO's from 220 frames and a band wave's from 2205,
+then `0x89512d00`, then the type's driver from the table at `0x8987c9c4`): markers of kind 0 whose level is at the
+depth's threshold or past it marked deleted, the deleted unlinked (`0x895139a0`), the count the driver takes set
+(`0x89513170` → `0x89ff0cfc`), and a list of more events than the length holds refused (−1). Without it the driver
+took the detection's count from the head of the list: a deleted event (state 2, still linked) played, and with two
+added the end fell off the count and the band encoder read 1.5 MB below the wave (`0x89519cd8`, its four-point read),
+found by dumping the list after each edit. The plugin's encodes with no edits go to the driver as before, as v156
+checked them against the XT's own waves; the commit runs only on an edited list. Each raw result is mapped as the
+screen maps it: an add's −13 "Event Interval Too
+Narrow!", −11 "event memory full", a delete's −17 "Event Doesn't Exist Here!", any other below 0 "Cannot Delete This
+Event!" (the start, the end, out of range). The edits stand only at their own depth: an edit at another depth starts
+the list again, and an encode at another depth drops them, as the manual says the XT does. A refused edit is dropped
+from the session, and the first refusal is said on the status line in the XT's words. An edit stands on the
+detection's markers, so a V-Synth SOLO wave's own events (its vpdt's, which it plays while unedited) give way to the
+detection's at the depth once its events are edited, as the XT's screen takes its list from the detection
+(`0x894a9020`). Truncate drops the edits with the encode. The events the page draws are the encoded wave's vpdt's
+(`xtVpdtEvents`, out of `XtWaveFile.cpp`'s reader), so they are what the synth plays.
+
+**The split.** `XtFirmware.cpp` was past the line limit, so its encodes moved as they stood into `XtFwEncode.cpp` and
+rom.2's wave routines' addresses into `XtFwAddrs.h` (namespace `xtfwaddr`); fcheck's 157 sections as the baseline after
+it. The tone list's four marker plants (`fw-marker-*`) moved with the code (kind `tonefwenc`), and the files list's
+`vpdt-count` onto `xtVpdtEvents`.
+
+**On the page.** Each event a ▼ at the wave's top, Current a thin line (a click on the wave puts it there); Delete, Add,
+Next Event and Prev Event on the title line (Next and Prev as `0x89516a00` and `0x89516a90`: the first above Current,
+else the last; the last below, else the first); Encode and Depth on the points' card; the line of what the wave is says
+how many event edits the session keeps.
+
+**The check.** `VSynthEmuEditorTest`'s `waveEventChecks` (`EditorWaveEventTest.cpp`, new), on a wave of its own (4 s
+of 220 Hz notes half a second apart, each from near silence; TestWave.h's line of notes never falls below 0.6 of its
+peak, and the detection finds nothing in it at depth 100), encoded BACKING at depth 100: its nine events (0, 21749 …
+154049, 176400); Next from the start the first attack and Prev back; the second attack deleted and gone, the others
+there; one added half way between two and there; from a fresh list, an add 1323 before the first attack refused as
+too narrow and 1324 taken, then 1323 before that one refused, 220 after the start refused and 221 taken, the start's
+and the end's deletes "Cannot Delete This Event!", one where there is none "Event Doesn't Exist Here!", the session
+keeping the two taken; a detected event's delete kept with them, the page saying "3 event edits"; a session restored
+playing the same events, and restored at depth 99 dropping them, an edit at 99 starting the list again; a V-Synth SOLO
+wave with its own vpdt (`writeSoloWave`, moved into `TestWave.cpp` with a vpdt of given events) playing its own event
+at 22050, an event added at 30000 then playing on SOLO's own encode, and Truncate dropping it. Editor 5298/5298.
+
 ### Truncate on the WAVE page, the XT's own (2026-11-27, v480) {#wave-truncate}
 
 The user's d-8a: end is the XT's Edit Start and End with Truncate. The law is rom.2's, read in {#wave-truncate-read}.
@@ -1759,7 +1814,7 @@ or isn't deleted and its level is at or below the depth's threshold (`0x89512cc0
 - Delete (`0x89516c80` → `0x89513a60(pos)`): the position held to the length less one (`0x894a9250`), then 1 to the
   length less one, else −16, "Cannot Delete This Event!": so the start and the end can't go. The marker at exactly that
   position, else −17, "Event Doesn't Exist Here!"; an added one is unlinked (`0x895139a0`), a detected one marked 2.
-- Execute encodes on the list as it stands. An added marker carries the second word the band encode reads (its own
+- Execute encodes on the list as it stands, committed first by its encode start (v481, {#wave-events}). An added marker carries the second word the band encode reads (its own
   position), which a file's events don't (v156): so a band wave's events edited on the XT encode as the XT does, where
   the plugin today gives a band wave the detection.
 

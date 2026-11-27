@@ -10,5 +10,5 @@ rm -f "$OUT"
 cd "$REPO/plugin/Source"
 "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -I. "$REPO/research/tools/vc2patchwrite.cpp" Vc2PatchSave.cpp \
     Vc2PatchFile.cpp Vc2PatchStore.cpp XtPatchStore.cpp Vc2Params.cpp XtFxValueText.cpp XtFirmware.cpp XtFwMachine.cpp \
-    XtMultiBandPlayer.cpp XtSoloVoice.cpp Sh4Interp.cpp Sh4Setup.cpp -o "$OUT"
+    XtMultiBandPlayer.cpp XtSoloVoice.cpp Sh4Interp.cpp Sh4Setup.cpp XtFwEncode.cpp XtFwEvents.cpp -o "$OUT"
 echo "vc2patchwrite: built, $OUT"

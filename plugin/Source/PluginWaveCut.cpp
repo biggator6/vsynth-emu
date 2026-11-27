@@ -67,6 +67,8 @@ bool PluginWaveEdits::truncate(VSynthEmuProcessor& p, int osc, long from, long t
         const long base = e.cut ? e.keepFrom : 0;   // a cut of a cut: frames of the file's wave
         waveEditCut(e, base + from, base + to);
         waveEditBackward(e, bwdMode, 0, (int)(to - from));
+        e.events.clear();   // the encode dropped, its events with it (0x894a9db0, v481)
+        e.eventsDepth = -1;
     }
     p.reencode(osc);
     return true;

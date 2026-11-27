@@ -434,5 +434,40 @@ editor-cut-revert-keeps|    forget(p, osc);|    ;|plugin/Source/PluginWaveCut.cp
 editor-cut-unapplied|        waveCutOnto(edit, chans, rate, bits);|        ;|plugin/Source/PluginEncodes.cpp|layout
 editor-cut-unsaved|    if (edit.cut) words.add(|    if (false) words.add(|plugin/Source/PluginWaveEdit.cpp|layout
 editor-cut-bwd-wipes|        if (edit.backward) waveEditBackward(kept, edit.bwdMode, edit.bwdStart, edit.bwdEnd);|        if (edit.backward) kept = edit;|plugin/Source/PluginWaveEdit.cpp|layout
-editor-cut-button|    truncate_->onClick = [this] { views_[(size_t)osc_]->truncate(); };|    truncate_->onClick = [] {};|plugin/Source/UiWavePage.cpp|layout
+editor-cut-button|    [](WaveEditView& v) { v.truncate(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
 editor-cut-region-free|        case Point::editEnd: editTo_ = within(frame, editFrom_, last); break;|        case Point::editEnd: editTo_ = within(frame, 0, last); break;|plugin/Source/UiWaveEdit.cpp|layout
+editor-cut-revert-button|    [](WaveEditView& v) { v.revert(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
+# v481: the events (XtFwEvents, the encodes' calls, PluginWaveEvents, the session's text, the page's Current and buttons),
+# by VSynthEmuEditorTest's waveEventChecks. Not planted: which refusal is said when two are (each edit is encoded on its
+# own, so one at most is refused); the results' count against the edits' (an encode that never reached the detection,
+# which none of the page's edits makes); Current's clamp (every edit's frame is in the wave); the events' drawing.
+editor-event-swapped|e.add ? kEventAdd : kEventDelete|e.add ? kEventDelete : kEventAdd|plugin/Source/XtFwEvents.cpp|layout
+editor-event-narrow|{ -13, kEventTooNarrow }|{ -12, kEventTooNarrow }|plugin/Source/XtFwEvents.cpp|layout
+editor-event-not-here|{ -17, kEventNotHere }|{ -16, kEventNotHere }|plugin/Source/XtFwEvents.cpp|layout
+editor-event-done-positive|    if (raw >= 0) return kEventDone;|    if (raw > 0) return kEventDone;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-messages|"Event Interval Too Narrow!", "Event Doesn't Exist Here!" };|"Event Doesn't Exist Here!", "Event Interval Too Narrow!" };|plugin/Source/XtFwEvents.cpp|layout
+editor-event-unrun|    s->results.clear();|    return;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-end-unheld|!e.add && (long)e.at + 1 >= frames ? (uint32_t)frames : e.at;|e.at;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-band-unedited|        if (!xtFwEditEvents(c, frames, depth)) return failed|        if (false) return failed|plugin/Source/XtFwEncode.cpp|layout
+editor-event-solo-unedited|} else if (!xtFwEditEvents(c, frames, depth)) {|} else if (false) {|plugin/Source/XtFwEncode.cpp|layout
+editor-event-uncommitted|    return !taken || (c.call(kEventsCommit, {}, kStack, &events) && (int32_t)events >= 0);|    return true;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-uncounted|        if (result == kEventDone && !c.call(kDetect, { counted }, kStack, &rc)) return false;|        ;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-scope-none|        if (waveEventsStand(edit, depth)) screen.emplace(edit.events, results);|        ;|plugin/Source/PluginEncodes.cpp|layout
+editor-event-own-kept|isOwn && type == own && !screen;|isOwn && type == own;|plugin/Source/PluginEncodes.cpp|layout
+editor-event-refusal-unsaid|        if (refused.isNotEmpty()) return setStatus(who + refused);|        ;|plugin/Source/PluginEncodes.cpp|layout
+editor-event-depth-kept|        if (e.eventsDepth != depth) e.events.clear();|        ;|plugin/Source/PluginWaveEvents.cpp|layout
+editor-event-any-depth|    return !edit.events.empty() && edit.eventsDepth == depth;|    return !edit.events.empty();|plugin/Source/PluginWaveEvents.cpp|layout
+editor-event-refused-kept|        if (results[i] == kEventDone) taken.push_back|        if (true) taken.push_back|plugin/Source/PluginWaveEvents.cpp|layout
+editor-event-sixteenths|frames.push_back(at / kSixteenths);|frames.push_back(at);|plugin/Source/PluginWaveEvents.cpp|layout
+editor-event-unsaved|    if (!edit.events.empty()) {   // "ev=|    if (false) {   // "ev=|plugin/Source/PluginWaveEdit.cpp|layout
+editor-event-depth-unrestored|edit.eventsDepth = said.upToFirstOccurrenceOf(":", false, false).getIntValue();|edit.eventsDepth = -1;|plugin/Source/PluginWaveEdit.cpp|layout
+editor-event-delete-restored-add|edit.events.push_back({ e.startsWithChar('+'),|edit.events.push_back({ true,|plugin/Source/PluginWaveEdit.cpp|layout
+editor-event-cut-kept|        e.events.clear();   // the encode dropped|        ;   // the encode dropped|plugin/Source/PluginWaveCut.cpp|layout
+editor-event-delete-button|    [](WaveEditView& v) { v.deleteEvent(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
+editor-event-add-button|    [](WaveEditView& v) { v.addEvent(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
+editor-event-next-is-prev|    [](WaveEditView& v) { v.toEvent(true); },|    [](WaveEditView& v) { v.toEvent(false); },|plugin/Source/UiWavePage.cpp|layout
+editor-event-next-at|std::upper_bound(events_.begin(), events_.end(), current_)|std::lower_bound(events_.begin(), events_.end(), current_)|plugin/Source/UiWaveEditEvents.cpp|layout
+editor-event-prev-at|if (at != events_.begin()) to = *(at - 1);|if (at != events_.begin()) to = *at;|plugin/Source/UiWaveEditEvents.cpp|layout
+editor-event-add-deletes|PluginWaveEdits::editEvent(processor_, osc_, { true, (uint32_t)current_ });|PluginWaveEdits::editEvent(processor_, osc_, { false, (uint32_t)current_ });|plugin/Source/UiWaveEditEvents.cpp|layout
+editor-event-kept-unsaid|    if (!edit.events.empty()) kept.add(|    if (false) kept.add(|plugin/Source/UiWavePage.cpp|layout
+editor-event-unread|        events_ = PluginWaveEdits::events(processor_, osc_);|        ;|plugin/Source/UiWaveEdit.cpp|layout

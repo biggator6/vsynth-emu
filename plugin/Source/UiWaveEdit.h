@@ -16,7 +16,7 @@
 class WaveEditView : public juce::Component {
 public:
     WaveEditView(VSynthEmuProcessor& p, int osc);
-    enum class Point { none, start, fwdStart, fwdEnd, bwdStart, bwdEnd, editStart, editEnd };
+    enum class Point { none, start, fwdStart, fwdEnd, bwdStart, bwdEnd, editStart, editEnd, current };
 
     void refresh();                          // the editor's timer: drawn again when the wave, a point or the window moved
     long frames() const { return frames_; }  // the wave's, as the XT holds it; 0 for none
@@ -30,6 +30,14 @@ public:
     // the OSC's parameters, as a drag sets them), false where the XT refuses; Revert, the wave as its file has it
     bool truncate();
     void revert();
+    // v481 (UiWaveEditEvents.cpp; the XT's Encode screen, d-9): Current, set by a click on the wave; the wave's events as
+    // it plays them; Current to the event before or after it (the screen's 0x89516a90, 0x89516a00); an event added or
+    // deleted there (PluginWaveEdits::editEvent, the XT's own routines then judging it)
+    void setCurrent(long frame);
+    const std::vector<long>& events() const { return events_; }
+    void toEvent(bool after);
+    void addEvent();
+    void deleteEvent();
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -50,6 +58,8 @@ private:
     long frames_ = 0, first_ = 0, span_ = 0;
     PluginWaveEdit bwd_;                          // the backward loop as drawn: the synth's, or the one being dragged
     long editFrom_ = 0, editTo_ = 0;              // the Edit region, both ends kept (the XT's Edit Start and End)
+    long current_ = 0;                            // the XT's Current (v481)
+    std::vector<long> events_;                    // the wave's events as it plays them, in frames
     Point dragging_ = Point::none;
     bool scrolling_ = false;
     long grabbedFirst_ = 0;
@@ -65,4 +75,5 @@ private:
     void makeColumns();
     void paintPoints(juce::Graphics&) const;
     void paintRuler(juce::Graphics&) const;
+    void paintEvents(juce::Graphics&) const;
 };

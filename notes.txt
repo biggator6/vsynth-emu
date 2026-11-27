@@ -738,6 +738,16 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The events v481 (2026-11-27, on claude/wave-editor after v480; HARDWARE_FIRMWARE.md, "The WAVE page's events"; the
+  user's d-9): Add, Delete, Next and Prev at Current on the WAVE page, run by rom.2 in the wave's encode after its
+  detection: the screen's add and delete (0x89516b20, 0x89516c80), the list counted again after each taken one as the
+  screen's refresh does, and committed as Execute's encode start does before its driver (0x89512d00, which unlinks
+  the deleted and sets the count the driver takes; without it a delete played on and two adds lost the end). Refusals
+  said in the XT's words and dropped; the session keeps the rest at their depth (ev=), another depth drops them, as does
+  Truncate. A V-Synth wave's own events give way to the detection's once edited. XtFirmware.cpp's encodes split to
+  XtFwEncode.cpp, its addresses to XtFwAddrs.h; XtFwEvents, PluginWaveEvents, UiWaveEditEvents, EditorWaveEventTest
+  (new); writeSoloWave to TestWave.cpp. Editor 5298/5298; fcheck as baseline.
+
 Truncate v480 (2026-11-27, on claude/wave-editor after v479; HARDWARE_FIRMWARE.md, "Truncate on the WAVE page"; the
   user's d-8a): the Edit region's ends in the ruler, Truncate and Revert on the WAVE card. The XT's law: Edit Start …
   End kept; the forward loop moved with them only strictly inside, else the whole wave; the backward loop the whole

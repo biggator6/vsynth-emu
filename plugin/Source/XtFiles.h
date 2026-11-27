@@ -59,6 +59,9 @@ struct XtWaveFile {
 // A .vpw's chunks, or a preset wave's in the disk image, with its RDAC audio unpacked; or a project's .wav, the same chunks in a RIFF
 // with the audio as plain samples.  False (and why) for anything else, a WAV with no vpsc among them.
 bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* why = nullptr);
+// A vpdt's events' positions, 1/16 sample, by the layout of its type (1 SOLO, 3 BACKING, 5 ENSEMBLE) and channels; none
+// for a type with no events or a vpdt too short for them (v481, out of xtWaveRead's: the WAVE page shows a wave's events)
+std::vector<int32_t> xtVpdtEvents(const std::vector<uint8_t>& vpdt, int type, int channels);
 // Its encode type alone, vpsc's byte 1, by the same chunks and without its audio (v600: a preset wave against its sample's
 // kind byte, XtPresetWaves); none when there's no vpsc
 std::optional<int> xtWaveEncodeType(const uint8_t* file, size_t size);

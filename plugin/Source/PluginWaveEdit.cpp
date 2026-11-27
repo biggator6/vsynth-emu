@@ -9,7 +9,7 @@
 namespace {
 constexpr float kPercent = 100.0f;
 constexpr int kNearest = 256;   // floats tried each way from the plain share: enough for any wave of 2^24 frames
-const juce::String kBackward = "bwd", kCut = "cut";
+const juce::String kBackward = "bwd", kCut = "cut", kEvents = "ev";
 const std::array<juce::Identifier, 2> kStateKeys { "waveEdit", "waveEdit2" };   // OSC 1's, OSC 2's
 
 // A value as the host's parameter holds it once set, and as the state's raw value reads it back (JUCE keeps the
@@ -53,6 +53,11 @@ juce::String waveEditText(const PluginWaveEdit& edit) {
         words.add(kBackward + "=" + juce::String(edit.bwdMode) + "," + juce::String(edit.bwdStart) + "," +
                   juce::String(edit.bwdEnd));
     if (edit.cut) words.add(kCut + "=" + juce::String(edit.keepFrom) + "," + juce::String(edit.keepTo));
+    if (!edit.events.empty()) {   // "ev=depth:+frame,-frame,…", an add or a delete each, in order
+        juce::StringArray each;
+        for (const XtFwEventEdit& e : edit.events) each.add((e.add ? "+" : "-") + juce::String(e.at));
+        words.add(kEvents + "=" + juce::String(edit.eventsDepth) + ":" + each.joinIntoString(","));
+    }
     return words.joinIntoString(";");
 }
 
@@ -102,6 +107,11 @@ PluginWaveEdit waveEditFromText(const juce::String& text) {
             waveEditBackward(edit, v[0].getIntValue(), v[1].getIntValue(), v[2].getIntValue());
         } else if (key == kCut && v.size() == 2) {
             waveEditCut(edit, (long)v[0].getLargeIntValue(), (long)v[1].getLargeIntValue());
+        } else if (key == kEvents) {
+            const juce::String said = word.fromFirstOccurrenceOf("=", false, false);
+            edit.eventsDepth = said.upToFirstOccurrenceOf(":", false, false).getIntValue();
+            for (const auto& e : juce::StringArray::fromTokens(said.fromFirstOccurrenceOf(":", false, false), ",", ""))
+                edit.events.push_back({ e.startsWithChar('+'), (uint32_t)e.substring(1).getLargeIntValue() });
         }
     }
     return edit;
