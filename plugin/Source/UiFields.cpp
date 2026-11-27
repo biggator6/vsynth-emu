@@ -8,6 +8,7 @@ constexpr int kNameH = 13, kBarH = 18, kBoxH = 22;
 
 Bar::Bar(Controls::State& state, const juce::String& id, const juce::String& name, juce::Colour fill)
     : attachment_(state, id, bar_) {
+    MidiLearn::attach(bar_, id);   // v463
     Controls::showEditorText(bar_, state, id);   // a VC-2 value on its string's scale (v453)
     bar_.setTitle(name);
     bar_.setColour(juce::Slider::trackColourId, fill);

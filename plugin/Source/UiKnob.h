@@ -2,6 +2,7 @@
 // A knob made from a parameter's ID: the dial on the parameter, its name under it and the parameter's own text of its
 // value under that (research/UI_DESIGN.md, "The look"; UI step 1).  Its width is its owner's; its height is heightFor.
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "UiMidiLearn.h"
 
 class Knob : public juce::Component {
 public:
@@ -15,7 +16,7 @@ public:
 
 private:
     static constexpr int kTextH = 13;
-    juce::Slider dial_ { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };
+    LearnSlider dial_ { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };   // v463: right-click, MIDI learn
     juce::Label name_, value_;
     juce::AudioProcessorValueTreeState::SliderAttachment attachment_;
     int size_;

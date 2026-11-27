@@ -91,7 +91,7 @@ PathBar::PathBar(State& state, const Mode& mode)
     for (int v = juce::roundToInt(range.start); v <= juce::roundToInt(range.end); ++v)
         types.add("TYPE " + Controls::editorValueText(state, mode.structureId, v).getLastCharacters(1));
     structure_.addItemList(types, 1);
-    structureAtt_ = std::make_unique<State::ComboBoxAttachment>(state, mode.structureId, structure_);
+    structureAtt_ = Controls::attached<State::ComboBoxAttachment>(structure_, state, mode.structureId);
     structure_.setTitle("Structure");
     addAndMakeVisible(structure_);
 }

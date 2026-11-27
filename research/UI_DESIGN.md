@@ -176,6 +176,32 @@ round ends; its value arc is `accent` from the bottom of the sweep, or from the 
 has a `mod` ring 3.2 outside the track over the modulation's reach; a big knob has a cap (`2A2D33`); a pointer in `text`
 runs from the centre to 6 inside the track. Its name is under it, its value under that.
 
+### MIDI learn {#midi-learn}
+
+v463 (research/NEXT_ISSUES.md item 1; the user's d-3 and d-4, 2026-11-27). Every control made from a parameter's ID can
+learn a MIDI controller, from the shared makers, not one by one: the knob's dial and a bar are `LearnSlider`s, and the
+knob, the bars, `Controls::box` and `Controls::toggle`, the path's Structure, the header's Effects and the FX page's
+controls mark theirs (`MidiLearn::attach`). A right-click on any of them (or a control-click) opens its menu, in D's
+look as every popup is:
+
+- **Learn MIDI CC**: the next controller the plugin is sent is the parameter's. While it waits the item reads **Cancel
+  learning**, and the page bar's line, on every page, reads "MIDI learn: move a controller for <name>" in the accent.
+- **Forget CC n**, when the parameter has one.
+- **MIDI map...**: the map (`MidiMapView`) in a call-out at the control, 340 wide: MIDI MAP, then a row for each
+  controller learnt by number (its CC in the accent's mono, its parameter's name, Forget), past twelve rows a scrolling
+  list; under them the learning line or how to learn, and Forget all.
+
+A right-click doesn't move the control: a slider takes no drag from it and a switch doesn't toggle. A learnt
+controller moves its parameter over its whole range (0…127 across), the control and the host following as for any
+MIDI edit (`PluginMidiEdits`), and it no longer reaches the firmware (d-3). One controller a parameter: learning a
+second lets the first go. The map is the session's (d-4), by parameter ID. `VSynthEmuEditorTest` holds every control
+it moves to its own parameter's learning, and a right-click to moving nothing.
+
+Every control follows its parameter as it moves, whoever moves it: a host's automation, a learnt controller, or the
+XT's own MIDI edits of the patch (CC 5, 65, 126, 127, RPN 0…2; HARDWARE_FIRMWARE.md, "rom.2's MIDI paths"), through
+its attachment (research/NEXT_ISSUES.md item 2, d-5: what's stored moves the control). `VSynthEmuEditorTest` holds every
+control to it on every page and block (v463).
+
 ### Where the tabbed editor's controls went
 
 | The tabbed editor (v144–v195) | In D |

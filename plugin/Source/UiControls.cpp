@@ -86,13 +86,13 @@ bool box(juce::ComboBox& b, State& state, const juce::String& id, Attached& into
     b.clear(juce::dontSendNotification);
     b.addItemList(items, 1);
     b.setTitle(state.getParameter(id)->getName(64));
-    into.boxes.push_back(std::make_unique<State::ComboBoxAttachment>(state, id, b));
+    into.boxes.push_back(attached<State::ComboBoxAttachment>(b, state, id));
     return true;
 }
 
 bool toggle(juce::Button& b, State& state, const juce::String& id, Attached& into) {
     if (state.getParameter(id) == nullptr) return false;
-    into.switches.push_back(std::make_unique<State::ButtonAttachment>(state, id, b));
+    into.switches.push_back(attached<State::ButtonAttachment>(b, state, id));
     return true;
 }
 

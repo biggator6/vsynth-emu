@@ -69,5 +69,10 @@ void vc2Checks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
 void vc2TextChecks(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 // The patch box's project (EditorPatchBoxTest.cpp, v601): its arrows grey with no patch browsed and at a project's ends,
 // ▶ and ◀ loading the next and the one before, the project's line saying where; a project's patches by slot
+// MIDI learn (EditorLearnTest.cpp, v463): a knob's menu, Learn arming it, a controller through processBlock learnt and
+// the knob following, Forget, the map's rows
+void learnChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// Live values (EditorLiveTest.cpp, v464): the firmware's MIDI edits of the patch moving their controls on the PLAY page
+void liveChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 void patchBoxChecks(LayoutCheck& l, VSynthEmuProcessor& p, const juce::File& rom, const juce::File& work,
                     TestChecks& check);

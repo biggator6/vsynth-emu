@@ -13,6 +13,7 @@ void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
         if (v != kFxNoEdit) edits << id << "=" << v << ",";
     }
     state.setProperty("fxEdits", edits, nullptr);
+    state.setProperty("midiMap", midi_.learn.toText(), nullptr);   // v463: MIDI learn's, by parameter ID (d-4)
     vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
@@ -33,6 +34,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
         if (pair.contains("=")) setFxParam(pair.upToFirstOccurrenceOf("=", false, false).getIntValue(),
                                            pair.fromFirstOccurrenceOf("=", false, false).getIntValue());
     fxPatchPending_ = true;
+    midi_.learn.fromText(apvts.state.getProperty("midiMap").toString());   // v463: none from a session before it
 
     // The firmware image and the file, if their paths were persisted
     const juce::String rom = apvts.state.getProperty("romPath").toString();

@@ -248,7 +248,8 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
              Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/TestMain.cpp
-             Tests/TestWave.cpp)
+             Tests/TestWave.cpp Tests/EditorLearnTest.cpp Tests/LayoutControls.cpp   # MIDI learn (v463)
+             Tests/EditorLiveTest.cpp)   # the controls following MIDI's edits (v464)
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
 # against XtSynth given the input by the law, the Effects off and on
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)

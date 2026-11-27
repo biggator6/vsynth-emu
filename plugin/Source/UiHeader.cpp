@@ -20,6 +20,7 @@ constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserC
 
 Header::Header(VSynthEmuProcessor& p)
     : processor_(p), patch_(p), effectsAtt_(p.apvts, Params::kFxOn, effects_) {
+    MidiLearn::attach(effects_, Params::kFxOn);   // v463
     Look::setTextLook(build_, Look::mono(10.0f), Look::muted, juce::Justification::centredLeft);
     build_.setText(juce::String(xtBuildId()) + "  " + xtBuildTime(), juce::dontSendNotification);
     Look::setTextLook(tempo_, Look::mono(11.0f), Look::text);

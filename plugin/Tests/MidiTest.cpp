@@ -7,10 +7,14 @@
 // - an edit whose parameter something else moved before it was handed on is dropped, and a patch's controls or a
 //   session coming back drop one (the image's first patch, through applyPatch); a saved session carries one not yet
 //   handed on.
+// And MIDI learn (v463, item 1, the user's d-3 and d-4): a controller learnt moving its parameter over its range at once
+// and reaching the firmware no more; the map kept by a saved session; one controller a parameter; Forget; the editor's
+// own controllers never learnt.
 // Run: VSynthEmuMidiTest <rom.2.bin>.  Exit 0 if every check holds.
 #include "TestChecks.h"
 #include "TestControls.h"
 #include "TestMain.h"
+#include "TestMidi.h"
 #include "TestPatches.h"
 #include "../Source/PluginParamIds.h"
 #include "../Source/PluginProcessor.h"
@@ -19,17 +23,6 @@
 namespace {
 constexpr double kRate = 48000.0;
 constexpr int kBlock = 480;
-
-juce::MidiMessage cc(int number, int value) { return juce::MidiMessage::controllerEvent(1, number, value); }
-
-// One block with the messages at its first frame
-void play(VSynthEmuProcessor& p, std::initializer_list<juce::MidiMessage> messages) {
-    juce::AudioBuffer<float> buffer(2, kBlock);
-    buffer.clear();
-    juce::MidiBuffer midi;
-    for (const auto& m : messages) midi.addEvent(m, 0);
-    p.processBlock(buffer, midi);
-}
 
 float stored(VSynthEmuProcessor& p, const juce::String& id) { return p.apvts.getRawParameterValue(id)->load(); }
 
@@ -54,7 +47,7 @@ struct Playing {
 void portamentoTime(TestChecks& check, const juce::File& rom) {
     Playing s(rom);
     VSynthEmuProcessor& p = s.p;
-    play(p, { cc(5, 100) });
+    playMessages(p, { controller(5, 100) });
     check(p.currentControls().portaTime == 100, "CC 5 should be the synth's Portamento Time at once");
     check(stored(p, Params::kPortaTime) == 20, "and its parameter's only once the message thread hands it on");
     Told told;
@@ -65,7 +58,7 @@ void portamentoTime(TestChecks& check, const juce::File& rom) {
     check(told.values == 1 && told.gestures == 2, "and its listeners told once, within a gesture");
     check(p.midiIn().edits.flush() == 0, "an edit handed on should be handed on once");
     param->removeListener(&told);
-    play(p, { cc(1, 90), cc(74, 10), cc(7, 40) });
+    playMessages(p, { controller(1, 90), controller(74, 10), controller(7, 40) });
     check(p.midiIn().edits.flush() == 0, "CC 1, 74 and 7 should edit no parameter");
 }
 
@@ -75,10 +68,11 @@ void theSix(TestChecks& check, const juce::File& rom) {
     VSynthEmuProcessor& p = s.p;
     const auto after = [&](std::initializer_list<juce::MidiMessage> m, const juce::String& id, float want,
                            const char* what) {
-        play(p, m);
+        playMessages(p, m);
         p.midiIn().edits.flush();
         check(stored(p, id) == want, what);
     };
+    const auto cc = controller;
     after({ cc(65, 64) }, Params::kPorta, 1, "CC 65 at 64 should turn Portamento on");
     after({ cc(65, 63) }, Params::kPorta, 0, "and at 63 off");
     after({ cc(126, 0) }, Params::kMonoPoly, 0, "CC 126 should make it MONO");
@@ -95,18 +89,18 @@ void theSix(TestChecks& check, const juce::File& rom) {
 void laterWins(TestChecks& check, const juce::File& rom) {
     Playing s(rom);
     VSynthEmuProcessor& p = s.p;
-    play(p, { cc(5, 90) });
+    playMessages(p, { controller(5, 90) });
     setParam(p, Params::kPortaTime, 33);   // a host or a control, before the edit is handed on
     p.midiIn().edits.flush();
     check(stored(p, Params::kPortaTime) == 33, "a parameter moved after the edit should keep its own value");
     check(p.currentControls().portaTime == 33, "and the synth take it");
-    play(p, { cc(5, 91) });
+    playMessages(p, { controller(5, 91) });
     juce::MemoryBlock saved;
     p.getStateInformation(saved);
     Playing back(rom);
     back.p.setStateInformation(saved.getData(), (int)saved.getSize());
     check(stored(back.p, Params::kPortaTime) == 91, "a saved session should carry an edit not yet handed on");
-    play(back.p, { cc(5, 10) });
+    playMessages(back.p, { controller(5, 10) });
     back.p.setStateInformation(saved.getData(), (int)saved.getSize());
     check(back.p.currentControls().portaTime == 91, "a session coming back should drop a pending edit");
     back.p.midiIn().edits.flush();
@@ -120,7 +114,7 @@ void patchDrops(TestChecks& check, const juce::File& rom) {
     if (patches.empty()) return;
     Playing s(rom);
     VSynthEmuProcessor& p = s.p;
-    play(p, { cc(5, 77) });
+    playMessages(p, { controller(5, 77) });
     p.applyPatch(patches[0].name, patches[0].store, 0, juce::File());
     const float patchTime = stored(p, Params::kPortaTime);
     check(patchTime != 77, "the patch's own Portamento Time should differ from the edit's");
@@ -129,12 +123,59 @@ void patchDrops(TestChecks& check, const juce::File& rom) {
     check(stored(p, Params::kPortaTime) == patchTime, "and the message thread not hand it on after");
 }
 
+// A session's map: by ID into another processor, which then plays it; one with none leaves none
+void mapInSession(TestChecks& check, const juce::File& rom, VSynthEmuProcessor& p, int top) {
+    juce::MemoryBlock saved;
+    p.getStateInformation(saved);
+    Playing back(rom);
+    back.p.setStateInformation(saved.getData(), (int)saved.getSize());
+    const int rate = back.p.midiIn().edits.indexOf(Params::kLfoRate);
+    check(back.p.midiIn().learn.parameterOf(5) == rate, "a saved session should keep the map (d-4)");
+    playMessages(back.p, { controller(5, 127) });
+    check(back.p.currentControls().lfoRate == top, "and the processor it comes back to play it");
+    juce::MemoryBlock none;
+    Playing(rom).p.getStateInformation(none);
+    back.p.setStateInformation(none.getData(), (int)none.getSize());
+    check(back.p.midiIn().learn.entries().empty(), "a session with no map should leave none");
+}
+
+// MIDI learn on LFO 1's Rate, by CC 5, which the firmware takes as Portamento Time
+void learnt(TestChecks& check, const juce::File& rom) {
+    Playing s(rom);
+    VSynthEmuProcessor& p = s.p;
+    PluginMidiLearn& learn = p.midiIn().learn;
+    const int rate = p.midiIn().edits.indexOf(Params::kLfoRate);
+    const auto& range = p.midiIn().edits.param(rate)->getNormalisableRange();
+    const int top = (int)range.end, bottom = (int)range.start;
+    learn.arm(rate);
+    p.sendFromEditor(controller(82, 64));   // the pad's, the editor's own
+    playMessages(p, {});
+    check(learn.armed() == rate && learn.parameterOf(82) < 0, "the editor's own controllers shouldn't be learnt");
+    playMessages(p, { controller(5, 127) });
+    check(learn.parameterOf(5) == rate && learn.armed() < 0, "the next controller should be learnt for the parameter");
+    check(p.currentControls().lfoRate == top, "its value moving the parameter at once, 127 to the top");
+    check(p.currentControls().portaTime == 20, "and no longer reaching the firmware, whose CC 5 it is (d-3)");
+    playMessages(p, { controller(5, 0) });
+    p.midiIn().edits.flush();
+    check((int)stored(p, Params::kLfoRate) == bottom, "0 to the bottom, onto the parameter when handed on");
+    mapInSession(check, rom, p, top);
+    learn.arm(rate);
+    playMessages(p, { controller(21, 0) });
+    check(learn.parameterOf(21) == rate && learn.parameterOf(5) < 0, "a second controller should let the first go");
+    learn.forget(rate);
+    playMessages(p, { controller(21, 127), controller(5, 100) });
+    p.midiIn().edits.flush();
+    check((int)stored(p, Params::kLfoRate) == bottom, "a forgotten controller should move nothing of its own");
+    check(stored(p, Params::kPortaTime) == 100, "CC 5 reaching the firmware again");
+}
+
 int midiTest(const juce::File& rom, const juce::File&) {
     TestChecks check { "midi" };
     portamentoTime(check, rom);
     theSix(check, rom);
     laterWins(check, rom);
     patchDrops(check, rom);
+    learnt(check, rom);
     return check.summary();
 }
 }  // namespace

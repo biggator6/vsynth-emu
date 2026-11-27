@@ -47,7 +47,14 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   XtSynth has it), `PluginMidiEdits` (an edit kept lock-free on the audio thread, read ahead of its parameter by
   `VSynthEmuProcessor::raw`, which the controls' reads go through, and handed to the parameter as a gesture by the
   message thread, the later setter winning), `PluginGesture.h` (`setAsGesture`, Controls::setValue's and the edits').
-  Checked by `VSynthEmuMidiTest` (`plugin/Tests/MidiTest.cpp`) and `mutate_panel.py`'s `midi-` plants.
+  Checked by `VSynthEmuMidiTest` (`plugin/Tests/MidiTest.cpp`) and `mutate_panel.py`'s `midi-` plants. v463, MIDI
+  learn: `PluginMidiLearn` (the map, a controller to a parameter, armed from a control, learnt and taken on the audio
+  thread, the session's by parameter ID; `PluginMidiIn::ahead`, the host's block without the controllers it takes, and every other one's edits of the patch),
+  `UiMidiLearn` (`LearnSlider`, a slider a right-click doesn't move; `MidiLearn::attach`, which `Controls::attached`
+  and the makers call; `MidiLearn::Menus`, the editor's listener and the menu), `UiMidiMap` (`MidiMapView`, the map in
+  a call-out). Checked by `VSynthEmuMidiTest`'s learn part, `VSynthEmuEditorTest` (`LayoutCheck::asItsParameter` on every
+  control, `LayoutControls.cpp`, `EditorLearnTest.cpp`, `EditorLiveTest.cpp`) and the `midi-learn-` and `editor-d-learn-` plants. `plugin/Tests/TestMidi.h`: a
+  controller and a block of messages into a processor, MidiTest's and the editor's.
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `IOS_companion/`: a companion application for iPhone and iPad, developed separately from the plugin, that works as the XT's Time Trip or X-Y pad over MIDI; tested and working (the user, 2026-11-13). It is not part of the plugin's build, tests or outstanding work; its `IOS_COMPANION_PLAN.md` still reads "Planned" and is out of date.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,

@@ -738,6 +738,20 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+MIDI learn v463 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "MIDI learn"; research/UI_DESIGN.md, "MIDI
+  learn"): research/NEXT_ISSUES.md item 1, d-3 and d-4. PluginMidiLearn (a controller to a parameter, armed from a
+  control, learnt on the audio thread, the session's midiMap by ID); PluginMidiIn::ahead (the host's block without
+  the controllers the map takes, before every way it is played; the editor's own messages pass by it). UiMidiLearn:
+  LearnSlider (no drag from a right-click), MidiLearn::attach from every maker (Controls::attached makes an attachment
+  and marks its control), MidiLearn::Menus (the editor's listener: Learn or Cancel, Forget CC n, MIDI map...), the page
+  bar's learning line; UiMidiMap's MidiMapView in a call-out. PluginMidiEdits' flush and drop under a lock (a host's
+  session thread). Tests/TestMidi.h (MidiTest's helpers, made one with the editor's). And item 2's first half: the six
+  edits moved from toSynth into ahead's pass (they were made only while the players played; the live check found it),
+  every control held to follow a host's automation. VSynthEmuMidiTest 37/37; VSynthEmuEditorTest: every control on
+  every page following its parameter set back, learning for it, a right-click moving nothing
+  (LayoutCheck::asItsParameter, LayoutControls.cpp), EditorLearnTest.cpp, EditorLiveTest.cpp (the six edits moving the
+  PLAY page's controls). Plants: 10 midi-learn- (midi-edits-only-playing among them), 10 editor-d-learn-.
+
 The six edits of the patch from MIDI v462 (2026-11-27, claude/midi-learn from vc2-mode f1c0797; HARDWARE_FIRMWARE.md,
   "rom.2's MIDI paths"): research/NEXT_ISSUES.md items 1 and 2's research, the user's d-3, d-4, d-5 (all as
   recommended) and "Not now" for a program change, the tuning message and SysEx. rom.2's OS part objects (class

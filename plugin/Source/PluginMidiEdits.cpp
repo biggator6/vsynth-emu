@@ -72,6 +72,7 @@ bool PluginMidiEdits::settle(bool set, int& count) {
 }
 
 int PluginMidiEdits::flush() {
+    const std::lock_guard<std::mutex> one(settling_);
     const uint32_t seen = edits_.load(std::memory_order_acquire);
     int count = 0;
     if (seen != settled_.load(std::memory_order_relaxed) && settle(true, count))
@@ -80,6 +81,7 @@ int PluginMidiEdits::flush() {
 }
 
 void PluginMidiEdits::drop() {
+    const std::lock_guard<std::mutex> one(settling_);
     const uint32_t seen = edits_.load(std::memory_order_acquire);
     int none = 0;
     if (settle(false, none)) settled_.store(seen, std::memory_order_release);

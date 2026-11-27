@@ -8,6 +8,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -22,9 +23,9 @@ public:
     void edit(int index, float value);
     // Any thread: the parameter's value as the synth reads it, its pending edit's if it has one
     float read(const std::atomic<float>* raw) const;
-    // Message thread: each pending edit to its parameter; how many were set
+    // Message thread, or a host's saving or loading a session: each pending edit to its parameter; how many were set
     int flush();
-    // Message thread: every pending edit dropped, for a session or a patch that came
+    // The same: every pending edit dropped, for a session or a patch that came
     void drop();
 
 private:
@@ -40,7 +41,8 @@ private:
     std::vector<std::atomic<float>*> raws_;
     std::vector<std::pair<const std::atomic<float>*, int>> byRaw_;   // sorted by address, for read
     std::unique_ptr<Pending[]> pending_;
-    std::vector<float> lastSet_;              // the message thread's: what flush left each parameter at
+    std::vector<float> lastSet_;              // what flush left each parameter at, under settling_
+    std::mutex settling_;                     // one flush or drop at a time: the timer's and a session's (v463)
     std::atomic<uint32_t> edits_ { 0 };       // edits made
     std::atomic<uint32_t> settled_ { 0 };     // edits_ as a flush or drop that left none pending saw it
 };

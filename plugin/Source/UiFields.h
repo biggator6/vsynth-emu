@@ -16,7 +16,7 @@ public:
     void resized() override;
 
 private:
-    juce::Slider bar_ { juce::Slider::LinearBar, juce::Slider::NoTextBox };
+    LearnSlider bar_ { juce::Slider::LinearBar, juce::Slider::NoTextBox };   // v463: a right-click is MIDI learn's
     juce::Label name_;
     Controls::State::SliderAttachment attachment_;
     int nameW_ = 0;

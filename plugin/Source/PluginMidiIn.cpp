@@ -14,6 +14,22 @@ PluginMidiIn::PluginMidiIn(juce::AudioProcessorValueTreeState& state) : edits(st
         { xtedit::BendDown, &Params::kBendDown },
     };
     for (const auto& [id, param] : kStored) stored_[(size_t)(id - xtedit::CoarseTune)] = edits.indexOf(*param);
+    rest_.ensureSize(kRestBytes);
+}
+
+const juce::MidiBuffer& PluginMidiIn::ahead(const juce::MidiBuffer& host, bool patchEdits) {
+    const auto isCc = [](const juce::MidiMessageMetadata& m) { return m.numBytes == 3 && (m.data[0] & 0xf0) == 0xb0; };
+    const bool learning = std::any_of(host.begin(), host.end(), [&](const juce::MidiMessageMetadata& m) {
+        return isCc(m) && learn.takes(m.data[1]);
+    });
+    if (learning) rest_.clear();
+    for (const auto meta : host) {   // in the block's order: one being learnt decides the next ones'
+        const bool cc = isCc(meta), taken = cc && learning && learn.take(meta.data[1], meta.data[2]);
+        if (cc && !taken && patchEdits) controller(meta.data[1], meta.data[2]);
+        if (learning && !taken)
+            rest_.addEvent(meta.data, meta.numBytes, meta.samplePosition);   // rt-ok: within the room made at the start
+    }
+    return learning ? rest_ : host;
 }
 
 // The editor's message for the next block (any thread but the audio thread's): three bytes at most, the keys' notes and

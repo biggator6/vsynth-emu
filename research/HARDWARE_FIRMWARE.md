@@ -1546,6 +1546,60 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### MIDI learn; controls that follow a host and MIDI's edits (2026-11-27, v463) {#midi-learn}
+
+research/NEXT_ISSUES.md item 1, the user's d-3 (a learnt controller is the plugin's alone) and d-4 (the map is the
+session's). The XT has no MIDI learn: this is the plugin's own layer, ahead of the firmware's MIDI.
+
+**The map** (`PluginMidiLearn`): a controller number to a parameter (PluginMidiEdits' index), one controller a
+parameter, learning a second letting the first go. A control arms it; the audio thread takes the next controller the
+host sends as that parameter's. A learnt controller's value moves its parameter over its whole range (value / 127,
+through the parameter's own range, so a choice or a switch steps) through `PluginMidiEdits::edit`, as the six edits
+do: the synth plays it from the next block, the message thread hands it to the parameter, the control and the host.
+All of it is atomics: the audio thread neither locks nor allocates.
+
+**Ahead of the firmware.** `PluginMidiIn::ahead` takes the host's block first in processBlock, before every way it is
+played (the V-Synth's players, the VC-2 mode's part, the file with no image). A controller the map takes (the one being
+learnt, or one learnt) is taken out: the block the firmware gets is a copy without it, in a buffer given its room at
+the start. A block with none goes on as it came. The editor's own messages (the footer's keys, the pad's controllers)
+don't pass the map: they are the editor's. In VC-2 mode the part reads its parameters through the patch store the
+keeper writes, so a learnt VC-2 parameter sounds once the message thread has handed it on (30 Hz), not at the next block.
+
+**v462's six edits moved here, a fault the live check found.** v462 made them in `toSynth`, which runs only while the
+XT's players play (a wave loaded, or an OSC that needs none): with OSC 1 on PCM and no wave, a CC 5 edited nothing. The
+XT's OS makes them apart from its tone generator, whatever it plays. In the same pass now, in the block's order, every
+controller the map doesn't take makes its edits in the V-Synth mode (rom.2's; the VC-2 mode's own are a follow-up),
+before the block is played any way. `VSynthEmuEditorTest`'s live check (below) failed on all six with v462's place.
+
+**The session** keeps the map as `midiMap` ("cc=parameter ID" by commas); a session from before has none, and one
+coming back replaces the map. `PluginMidiEdits::flush` and `drop` take a lock now (v463), as a host may save or load a
+session on its own thread while the timer flushes; the audio thread takes none.
+
+**The editor** (research/UI_DESIGN.md, "MIDI learn"). Every control made from a parameter's ID is marked by its maker
+(`MidiLearn::attach`; `Controls::attached`, which makes an attachment and marks its control, for `Controls::box`,
+`Controls::toggle`, the bars, the path's Structure and the FX page; `Knob`, `Bar` and the header's Effects by hand).
+`MidiLearn::Menus`, the editor's, listens to every press under it; a right-click on a marked control opens its menu:
+Learn MIDI CC or Cancel learning, Forget CC n, MIDI map... (`MidiMapView` in a call-out). A `LearnSlider` (the knob's
+dial, the bars) takes no drag from a right-click, and a switch's own press is put back up so it doesn't toggle. The
+page bar says on every page which parameter is learning.
+
+**The checks.**
+- `VSynthEmuMidiTest`: the editor's own controller (the pad's) not learnt; the next one learnt for LFO 1's Rate, its
+  127 the top at once and its 0 the bottom on the parameter; CC 5 learnt no longer Portamento Time (d-3); the map
+  back in another processor from a saved session by ID, and played there; a session with none leaving none; a second
+  controller letting the first go; Forget, after which CC 5 is the firmware's again. 37 checks.
+- `VSynthEmuEditorTest`: on every page, block, face and VC-2 page, each control that moves a parameter learns for that
+  parameter, and a right-click on it (its own press, the editor's listener, a drag of 30 up, the release) moves no
+  parameter (`LayoutCheck::asItsParameter`, LayoutControls.cpp); and (`EditorLearnTest.cpp`) the editor listening, OSC 1 Level's menu, Learn
+  arming it and the line saying so, its menu then offering Cancel, a controller through processBlock learnt and the
+  knob following, Forget, the map's rows by controller, a row's Forget and Forget all.
+- `VSynthEmuEditorTest`, item 2's first half (v463): every control moved, its parameter set back as a host sets one
+  (`changedBy`'s restore) brings the control back to what it showed (`LayoutCheck::asItsParameter`): host automation
+  moves every kind of control, on every page and block, through JUCE's attachments; and (`EditorLiveTest.cpp`) the
+  six edits by CC 5, 65, 126, 127, RPN 0 and 2 through processBlock, the PLAY page's controls unmoved until the
+  message thread hands them on, then each at its value, and back with CC 127.
+- `mutate_panel.py`: the 10 `midi-learn-` (one the place of the six edits) and 10 `editor-d-learn-` plants.
+
 ### rom.2's MIDI paths: which edit a stored value, which only modulate; the six edits in the plugin (2026-11-27, v462) {#midi-stored-or-modulated}
 
 For research/NEXT_ISSUES.md items 1 and 2 (MIDI learn; controls that follow their values). The question: which MIDI

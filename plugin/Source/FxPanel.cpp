@@ -37,7 +37,7 @@ void FxPanel::addChoice(std::vector<std::unique_ptr<Choice>>& to, const char* te
         choice->box.addItemList(p->choices, 1);
     addAndMakeVisible(choice->label);
     addAndMakeVisible(choice->box);
-    choice->att = std::make_unique<ComboAtt>(processor_.apvts, parameter, choice->box);
+    choice->att = Controls::attached<ComboAtt>(choice->box, processor_.apvts, parameter);
     to.push_back(std::move(choice));
 }
 
@@ -48,7 +48,7 @@ FxPanel::Level& FxPanel::addLevel(std::vector<std::unique_ptr<Level>>& to, const
     styleSlider(level->slider, 34, *colours);
     addAndMakeVisible(level->label);
     addAndMakeVisible(level->slider);
-    level->att = std::make_unique<SliderAtt>(processor_.apvts, parameter, level->slider);
+    level->att = Controls::attached<SliderAtt>(level->slider, processor_.apvts, parameter);
     to.push_back(std::move(level));
     return *to.back();
 }
@@ -60,10 +60,10 @@ void FxPanel::addBlock(Block& b, const char* onParam, const char* typeParam, int
     styleLabel(b.typeLabel, *colours);
     addAndMakeVisible(b.typeLabel);
     addAndMakeVisible(b.on);
-    b.onAtt = std::make_unique<ButtonAtt>(processor_.apvts, onParam, b.on);
+    b.onAtt = Controls::attached<ButtonAtt>(b.on, processor_.apvts, onParam);
     for (int t = 0; t < types; ++t) b.type.addItem("Type " + juce::String(t), t + 1);   // their names once the ROM's here
     addAndMakeVisible(b.type);
-    b.typeAtt = std::make_unique<ComboAtt>(processor_.apvts, typeParam, b.type);
+    b.typeAtt = Controls::attached<ComboAtt>(b.type, processor_.apvts, typeParam);
 }
 
 FxPanel::FxPanel(VSynthEmuProcessor& p, const Ui::Palette& palette)

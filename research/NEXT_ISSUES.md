@@ -27,6 +27,7 @@ ahead of the firmware's MIDI, and shown as a list (the map).
 - **d-4. Where the map lives.** Recommended: in the session first; a default map for new sessions later if wanted.
 - **Decided (2026-11-27):** the user took both recommendations: a learned CC is the plugin's alone, an unlearned one
   reaches the firmware as now (d-3); the map is the session's (d-4).
+- **Done in v463** (claude/midi-learn): HARDWARE_FIRMWARE.md "MIDI learn"; research/UI_DESIGN.md "MIDI learn".
 
 ### 2. Controls that follow the values live
 "controls should real-time reflect values. Move as control information or modulators are sent." Today: a parameter's
@@ -45,6 +46,8 @@ Step Modulator), which move a value at run time without changing what's stored.
 - **Decided (2026-11-27):** the user took d-5's recommendation: the six edits (and a learned CC) move the control and
   the host's parameter, a modulator shows as the knob's ring. And of the other three paths, none in this group ("Not
   now"): a program change, the tuning message and SysEx DT1 are follow-ups.
+- **Done:** the six edits onto the parameters, v462; made in processBlock's first pass whatever plays, and every control
+  held to follow a host's automation and the six edits, v463.
 
 ### 3. The arpeggiator's pattern
 "arpeggiator only reads from patches - no ability to program patterns. with no pattern, it should still handle live input

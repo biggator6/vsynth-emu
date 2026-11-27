@@ -6,4 +6,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtMidiEdits.cpp
     Source/PluginMidiEdits.cpp
     Source/PluginMidiIn.cpp
+    Source/PluginMidiLearn.cpp
+    Source/UiMidiLearn.cpp
+    Source/UiMidiMap.cpp
 )

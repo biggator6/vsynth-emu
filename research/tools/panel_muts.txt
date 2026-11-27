@@ -390,7 +390,7 @@ editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : 
 # v460: the MIC IN card's level the mic's own, not the vocoder's modulator's (018 FemaleChoirs' is its own wave)
 vc2play-view-mic-is-modulator|    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);|    view->micPeak.store(in, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
 # v462: the plugin's MIDI ahead of the firmware's, by VSynthEmuMidiTest: the six edits onto the parameters, read at once, handed on, dropped
-midi-no-edits|        midi_.controller(msg.getControllerNumber(), msg.getControllerValue());\n||plugin/Source/PluginProcess.cpp|midi
+midi-no-edits|        if (cc && !taken && patchEdits) controller(meta.data[1], meta.data[2]);|        ;|plugin/Source/PluginMidiIn.cpp|midi
 midi-not-read|    return midi_.edits.read(apvts.getRawParameterValue(id));|    return apvts.getRawParameterValue(id)->load();|plugin/Source/PluginControlsRead.cpp|midi
 midi-wrong-param|{ xtedit::PortaTime, &Params::kPortaTime }|{ xtedit::PortaTime, &Params::kPortaVeloSens }|plugin/Source/PluginMidiIn.cpp|midi
 midi-no-gesture|            setAsGesture(*params_[i], value);|            params_[i]->setValueNotifyingHost(params_[i]->convertTo0to1(value));|plugin/Source/PluginMidiEdits.cpp|midi
@@ -400,3 +400,25 @@ midi-flushed-twice|        p.flushed.store(gen, std::memory_order_release);|    
 midi-state-no-flush|    midi_.edits.flush();   // v462|    ;   // v462|plugin/Source/PluginState.cpp|midi
 midi-state-no-drop|    midi_.edits.drop();   // v462|    ;   // v462|plugin/Source/PluginState.cpp|midi
 midi-patch-no-drop|    midi_.edits.drop();   // a MIDI edit|    ;   // a MIDI edit|plugin/Source/PluginMsm.cpp|midi
+# v463: MIDI learn, by VSynthEmuMidiTest: the map learnt, taken from the firmware, kept by a session, one controller a parameter
+midi-learn-host-whole|    const juce::MidiBuffer& host = midi_.ahead(midi, !vc2);|    const juce::MidiBuffer& host = (midi_.ahead(midi, !vc2), midi);|plugin/Source/PluginProcess.cpp|midi
+midi-learn-reaches-firmware|        if (learning && !taken)\n|        if (learning)\n|plugin/Source/PluginMidiIn.cpp|midi
+midi-edits-only-playing|    const juce::MidiBuffer& host = midi_.ahead(midi, !vc2);|    const juce::MidiBuffer& host = midi_.ahead(midi, !vc2 && (xtActive_.load() \|\| playsWaveless()));|plugin/Source/PluginProcess.cpp|layout
+midi-learn-never|    if (armed >= 0 && armed_.compare_exchange_strong(armed, -1, std::memory_order_acq_rel)) set(cc, armed);|    ;|plugin/Source/PluginMidiLearn.cpp|midi
+midi-learn-keeps-first|        if (index >= 0 && m.load(std::memory_order_relaxed) == index) m.store(-1, std::memory_order_relaxed);|        ;|plugin/Source/PluginMidiLearn.cpp|midi
+midi-learn-range|param->convertFrom0to1((float)value / 127.0f)|param->convertFrom0to1((float)value / 128.0f)|plugin/Source/PluginMidiLearn.cpp|midi
+midi-learn-forget-none|    if (const int cc = controllerOf(index); cc >= 0) set(cc, -1);|    ;|plugin/Source/PluginMidiLearn.cpp|midi
+midi-learn-text-keeps|    forgetAll();\n    arm(-1);|    arm(-1);|plugin/Source/PluginMidiLearn.cpp|midi
+midi-learn-not-saved|    state.setProperty("midiMap", midi_.learn.toText(), nullptr);|    ;|plugin/Source/PluginState.cpp|midi
+midi-learn-not-loaded|    midi_.learn.fromText(apvts.state.getProperty("midiMap").toString());|    ;|plugin/Source/PluginState.cpp|midi
+# v463: MIDI learn in the editor, by VSynthEmuEditorTest: every control marked by its maker, a right-click moving nothing, the menu, the map
+editor-d-learn-knob-unmarked|    MidiLearn::attach(dial_, id);   // v463|    ;   // v463|plugin/Source/UiKnob.cpp|layout
+editor-d-learn-attached-unmarked|    MidiLearn::attach(control, id);\n    return std::make_unique|    return std::make_unique|plugin/Source/UiControls.h|layout
+editor-d-learn-bar-drags|    LearnSlider bar_ { juce::Slider::LinearBar|    juce::Slider bar_ { juce::Slider::LinearBar|plugin/Source/UiFields.h|layout
+editor-d-learn-knob-drags|    LearnSlider dial_ { juce::Slider::RotaryVerticalDrag|    juce::Slider dial_ { juce::Slider::RotaryVerticalDrag|plugin/Source/UiKnob.h|layout
+editor-d-learn-switch-toggles|    if (auto* b = dynamic_cast<juce::Button*>(&control)) b->setState(juce::Button::buttonNormal);|    ;|plugin/Source/UiMidiLearn.cpp|layout
+editor-d-learn-not-listening|    learnMenus_.listenTo(*this);|    ;|plugin/Source/UiEditor.cpp|layout
+editor-d-learn-no-forget|    if (const int cc = learnt.controllerOf(index); cc >= 0) m.addItem(forget, "Forget CC " + juce::String(cc));|    ;|plugin/Source/UiMidiLearn.cpp|layout
+editor-d-learn-silent|    return param ? "MIDI learn: move a controller for "|    return false ? "MIDI learn: move a controller for "|plugin/Source/UiMidiLearn.cpp|layout
+editor-d-learn-map-empty|        rows_.push_back(std::move(row));|        ;|plugin/Source/UiMidiMap.cpp|layout
+editor-d-learn-map-forget|void MidiMapView::forgetAll() { processor_.midiIn().learn.forgetAll(); }|void MidiMapView::forgetAll() {}|plugin/Source/UiMidiMap.cpp|layout

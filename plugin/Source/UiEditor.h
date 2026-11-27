@@ -11,6 +11,7 @@
 #include "UiHeader.h"
 #include "UiLook.h"
 #include "UiLowerPanel.h"
+#include "UiMidiLearn.h"
 #include "UiPageBar.h"
 #include "UiPath.h"
 #include "UiRack.h"
@@ -42,12 +43,14 @@ public:
     PluginMode mode() const { return mode_; }
     bool vc2() const { return mode_ == PluginMode::vc2; }
     Vc2SynthPage& vc2Synth() { return *vc2Synth_; }   // only once the VC-2 mode has been shown
+    MidiLearn::Menus& learnMenus() { return learnMenus_; }   // v463: MIDI learn's, on every control under the editor
 
     void paint(juce::Graphics&) override;
     void resized() override;
 
 private:
     VSynthEmuProcessor& processor_;
+    MidiLearn::Menus learnMenus_ { processor_ };
     Look::Feel feel_;
     juce::Component drawing_;
     Header header_;

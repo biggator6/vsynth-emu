@@ -4,7 +4,9 @@
 // TEST_UI_LAYOUT's sweeps of the tabbed editor went with it (v196).
 #include "../Source/FxPanel.h"
 #include "../Source/PluginProcessor.h"
+#include "../Source/UiEditor.h"
 #include "../Source/UiLook.h"
+#include "../Source/UiMidiLearn.h"
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -50,6 +52,7 @@ struct LayoutCheck {
 
     // What check() and moveAll() walk: the editor, or, for D, the drawing its window scales (UI step 1)
     juce::Component* root = nullptr;
+    MidiLearn::Menus* menus = nullptr;   // D's, its menus shown nowhere (v463)
 
     explicit LayoutCheck(VSynthEmuProcessor& proc)
         : LayoutCheck(proc, std::unique_ptr<juce::AudioProcessorEditor>(proc.createEditor())) {}
@@ -59,6 +62,10 @@ struct LayoutCheck {
         if (panel) for (juce::Component* ch : panel->getChildren()) if (auto* v = dynamic_cast<juce::Viewport*>(ch)) view = v;
         for (auto* prm : p.getParameters()) if (auto* r = dynamic_cast<juce::RangedAudioParameter*>(prm)) params.push_back(r);
         cosmTypes = p.apvts.getParameter("cosmType")->getNumSteps();
+        if (auto* d = dynamic_cast<SynthEditor*>(ed.get())) {
+            menus = &d->learnMenus();
+            menus->showWith([](const juce::PopupMenu&, juce::Component&, std::function<void(int)>) {});
+        }
     }
 
     void fail(const juce::String& m) {
@@ -211,17 +218,30 @@ struct LayoutCheck {
         walk(root ? *root : *ed, [&](juce::Component& c) { for (juce::Component* ch : c.getChildren()) if (ch->isVisible() && isControl(ch) && !dynamic_cast<juce::Label*>(ch)) controls.push_back(ch); });
         for (juce::Component* k : controls) {
             const std::function<void()> move = moverOf(k);
-            if (move && !changedBy(move)) fail(where + ": " + controlName(k) + " moves no parameter");
+            if (!move) continue;
+            const double shown = shownOf(*k);
+            if (juce::RangedAudioParameter* moved = changedBy(move)) asItsParameter(*k, *moved, shown, where);
+            else fail(where + ": " + controlName(k) + " moves no parameter");
         }
     }
+    // The control as its parameter (LayoutControls.cpp): v464, back where it was shown once the parameter is set back
+    // as a host sets one (changedBy's); v463, learning for that parameter (MIDI learn, from its maker), a right-click,
+    // the menu's, moving nothing
+    void asItsParameter(juce::Component& k, const juce::RangedAudioParameter& moved, double shown,
+                        const juce::String& where);
+    static double shownOf(juce::Component& k);   // a slider's value, a box's chosen ID, a switch's state
+    // A right-click on c as the editor gets one: c's own press, then the editor's listener, a drag up, the release
+    static void rightClick(juce::Component& c, MidiLearn::Menus& menus);
 
     // The mouse at a point of c, having gone down at `from`; pressed there, as a click sends it (D's page bar, path and
     // blocks, UI step 1)
-    static juce::MouseEvent mouseAt(juce::Component& c, juce::Point<float> at, juce::Point<float> from) {
+    static inline const juce::ModifierKeys rightButton { juce::ModifierKeys::rightButtonModifier };
+    static juce::MouseEvent mouseAt(juce::Component& c, juce::Point<float> at, juce::Point<float> from,
+                                    juce::ModifierKeys mods = {}) {
         using Src = juce::MouseInputSource;
         const juce::Time now = juce::Time::getCurrentTime();
         const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
-        return juce::MouseEvent(mouse, at, {}, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
+        return juce::MouseEvent(mouse, at, mods, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
                                 Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, from, now, 1, false);
     }
     static void pressAt(juce::Component& c, juce::Point<float> at) { c.mouseDown(mouseAt(c, at, at)); }
