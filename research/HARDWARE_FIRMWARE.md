@@ -1546,6 +1546,74 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Start Offset's unit and the XT's own wave edit, read (2026-11-27, for v478 on) {#wave-edit-read}
+
+The user's request (2026-11-27, research/NEXT_ISSUES.md items 5 and 6): "start offset - change to ms/sec rather than
+samples - display a vertical line when editing" and "need a wav display with editing of start/end/loop/events
+(eliminate the need for v-producer companion software)". Read before any code: the manuals' names, then rom.2.
+
+**Start Offset's unit.** Samples of the wave as the XT holds it, which is always 44.1 kHz: "Data in the V-Synth XT is
+handled as 44.1 kHz data, meaning that one second contains 44,100 data samples" [MAN XT pp. 116, 117: Zero Insert, Trim,
+the loops]. [FW] The converter's RETRIGGER/LEGATO tail (`0x894e4400`) puts it at +0xb8 against the length in frames
+(+0xbc), and the voice's note-on takes it × 16 into the player's +0x18, in 1/16 samples (v152). The plugin brings a WAV
+of another rate to 44.1 kHz by the XT's own converter before it encodes (`xtFwImport`, `xtSynthEncode`), and the XT's
+writer stamps every wave 44100 (below). So a note plays from value / 44100 s on every wave, whatever its file's rate.
+(v152's "44300 is a second" is 44100.) The manuals give its range as "0–**" and its meaning as "the starting address of
+the wave" [MAN XT p. 87].
+
+**The XT's wave edit, by its names** [MAN XT pp. 113–120, SAMPLE mode]. Seven locations: Sample Start and End, Loop
+Start and End, Edit Start and End, Current. Loop FWD and Loop BWD are two screens, each its own Loop Start and End; the
+shortest loop is 16 samples; Loop Start can't pass Loop End; the loops are ignored in STEP and EVENT. A wave has no
+start or end point of its own: a note starts at the OSC's Start Offset (the patch's), and the Edit functions work on the
+region between Edit Start and End: Cut, Truncate (keep the region, delete the rest), Copy, Clear, Paste, Insert, Zero
+Insert, LR-Mix, Trim, Normalize, Reverse, Region. "With some exceptions, editing a sample that has been encoded" discards
+the encode, and the Encode screen then shows LITE. The Encode screen: the type, Depth 0–127 (the attack detection,
+whose marks are the events), events deleted and added at Current, and Execute; a sample of 0.1 s or less can't be
+encoded; "if you change the encode depth after deleting or adding events, the events that were modified manually will
+be discarded". Its messages: "Cannot Delete This Event!", "Event Interval Too Narrow!", "Event Doesn't Exist Here!",
+"event memory full", "over event number". So the events' edit is the XT's own, not only V-Producer's.
+
+**rom.2's screens.** "SAMPLE Loop FWD" `0x8943cd20` and "SAMPLE Loop BWD" `0x8943cf60` (their names' only readers).
+The Encode screen's buttons `0x8943da90(button)`, on the encode object at `0x89cecf54`, with the screen's own values
+read by `0x8937ce90(screen, id, −1)` (0x139c Current; 0x13ac the type, 1/2/3 for SOLO, BACKING, ENSEMBLE, 1/3/5 to the
+encoder): 1 and 2 move Current to the event before or after (`0x894a91a0`, `0x894a9180`), 3 deletes and 4 adds at
+Current (`0x894a9250`, `0x894a91c0`), then the list is taken again at the screen's 0x13ad (`0x894a9020`: the detection
+`0x894ab1b0` run again only when the depth moved), and 0xf executes (`0x894a90b0` → `0x894ab270`). A result other than 1
+goes to `0x893820c0`, the messages: −1 can't delete, −2 memory full, −3 too narrow, −4 doesn't exist, −5 over event
+number.
+
+**The events' law** [FW], all in the encoder's code beside the detection (`0x895164c0`) the plugin already runs in the
+interpreter (`xtFwEncodeSolo`, v156): the list is the detection's markers (each 0xc4 bytes: +0 the position in samples,
++4 a later position, +8 a level, +0xc a kind byte, +0xf a byte that keeps it whatever the depth, +0x10 its state, 0 as
+detected, 1 added, 2 deleted; linked at +0xbc and +0xc0). A marker counts when its kind is 0 and it is kept (+0xf 1),
+or isn't deleted and its level is at or below the depth's threshold (`0x89512cc0`: a table of 128 by the depth).
+- Next and previous (`0x89516a00`, `0x89516a90`): the first position above, or below, Current among the list's
+  `0x8987c93c` words; the last or first when there is none.
+- Add (`0x89516b20` → `0x89513650(pos, 0)`): a position from 1 to the length less one (`0x89516ff0`), else −16. A deleted
+  marker at exactly that position comes back (state 0). Otherwise, with the last counted marker below it `prev` and the
+  first counted above `next` (the length past the last), it is refused as too narrow (−13) unless next − pos ≥ 1324 and
+  pos − prev > 1323, or > 220 when `prev` is the start (position 0): 30 ms each side, 5 ms after the start. A new marker
+  (`0x89513420`) has both positions the one given, level 0, state 1; −11 when there's no memory.
+- Delete (`0x89516c80` → `0x89513a60(pos)`): the position held to the length less one (`0x894a9250`), then 1 to the
+  length less one, else −16, "Cannot Delete This Event!": so the start and the end can't go. The marker at exactly that
+  position, else −17, "Event Doesn't Exist Here!"; an added one is unlinked (`0x895139a0`), a detected one marked 2.
+- Execute encodes on the list as it stands. An added marker carries the second word the band encode reads (its own
+  position), which a file's events don't (v156): so a band wave's events edited on the XT encode as the XT does, where
+  the plugin today gives a band wave the detection.
+
+**The writer** [FW] `0x89496590(path, wave)`, under three callers (`0x89497750`, `0x89497940`, `0x89497b10`): a RIFF,
+its size 0x1c and each block's 8 and bytes, `WAVE`, `fmt ` of 16 (PCM, mono or stereo by `0x8949e740(wave, 4)`, 44100,
+88200 a channel, 2 bytes), then the wave store's nine blocks in order, each that has bytes (`0x894a43b0`): `vpfl`,
+`vmdl`, `vpsc`, `vpno`, `vplp`, `vpdt`, `LIST`, `rdmd`, `data` (the tag table at `0x897a7dd8`), each its size rounded up
+to even, its bytes in pieces of 256 (`0x894a4260`), a zero after an odd one. So a wave's file is its store as it stands:
+the loops are `vplp`'s (as `xtWaveRead` reads them), the events `vpdt`'s and the list STEP and EVENT play `vpno`'s, and
+an edit is a change to the store's blocks before this writes them.
+
+**The user's decisions** (2026-11-27, research/NEXT_ISSUES.md): d-7 the time, ms below a second and s above, the stored
+value as now; d-8a start is the OSC's Start Offset on the display and end the XT's Edit Start/End with Truncate, both
+loops drawn and dragged; d-8 the edit kept in the session's copy first, then written by the XT's own writer (above); d-9
+the points first, then the events by the XT's own add and delete and its encode.
+
 ### The VC-2 heard dry in REAPER: REAPER adds an instrument's input to its output; an effect build (2026-11-26, v461) {#vc2-plugin-reaper-dry}
 
 The user's report: in REAPER (AU and VST3 alike), VC-2 mode, 001 LargeChoir 1, a vocal into the plugin and notes

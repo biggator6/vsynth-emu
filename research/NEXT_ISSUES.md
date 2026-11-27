@@ -64,7 +64,8 @@ step 6, each plugin its own init.
 - Research first: the offset's unit in the firmware's seek (frames of the wave at its own rate, or of the encoded wave),
   so the time it shows is the time it plays from.
 - **d-7. The text.** Recommended: the time (ms below a second, then s), from the wave's own rate, the stored value as
-  now; the panel check takes Start Offset's text as the plugin's own, by name, with its law tested.
+  now; the panel check takes Start Offset's text as the plugin's own, by name, with its law tested. **Decided (the
+  user, 2026-11-27): ms, then s.** The rate is 44.1 kHz on every wave, the XT's (HARDWARE_FIRMWARE.md {#wave-edit-read}).
 - The line: drawn on the OSC panel's wave display (`UiWaveDisplay`) while the control is held, so it rides with item 6's
   display.
 
@@ -79,6 +80,11 @@ results (V-Trainer runs natively here), held to what the XT plays.
 - Research first, names first: the XT's wave edit pages and their routines; where a wave's start, end, loop and events
   sit in a .vpw and a .w00; the XT's own writer for each.
 - **d-8. Where an edit goes.** Recommended: into the session's copy first (the wave as loaded, edited, saved with the
-  session), then written to a file by the firmware's own writer, as its own version.
+  session), then written to a file by the firmware's own writer, as its own version. **Decided (the user, 2026-11-27):
+  the session, then a file** by rom.2's writer (`0x89496590`, HARDWARE_FIRMWARE.md {#wave-edit-read}).
+- **d-8a. Start and end** (asked when the research found the XT has no start or end point of a wave). **Decided (the
+  user, 2026-11-27): start is the OSC's Start Offset on the display, end the XT's Edit Start/End with Truncate** cutting
+  the session's copy; both loops (FWD, BWD) drawn and dragged.
 - **d-9. The order.** Recommended: the points first (start, end, loop: the XT's own edit), then the events (V-Producer's),
-  each a version or more; item 5's line comes with the first.
+  each a version or more; item 5's line comes with the first. **Decided (the user, 2026-11-27): the points, then the
+  events**, which the research found are the XT's own edit too (its Encode screen's add and delete).
