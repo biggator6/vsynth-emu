@@ -14,6 +14,7 @@
 // sees of it, so a change to how the list is made can be shown to leave it as it was (v190's split of PluginProcessor.cpp).
 // Run: VSynthEmuArpPluginTest <rom.2.bin> [params].  Exit 0 if every check holds.
 #include "MsmPluginTest.h"
+#include "StartOffsetPluginTest.h"
 #include "Vc2ParamPluginTest.h"
 #include "Vc2PatchPluginTest.h"
 #include "ZonePluginTest.h"
@@ -187,9 +188,9 @@ int arpPluginTest(const juce::File& rom, const juce::File& work) {
     throughProcessor(check, rom, true);
     throughProcessor(check, rom, false);
     const int arp = check.summary();
-    // the MSM's (v193), the zones' (v195), the VC-2's parameters (v451) and a .p02 onto them (v452)
+    // the MSM's (v193), the zones' (v195), the VC-2's parameters (v451), a .p02 onto them (v452), Start Offset's text (v478)
     return msmPluginTest(rom, work) | zonePluginTest(rom, work) | vc2ParamPluginTest(rom, work)
-           | vc2PatchPluginTest(rom, work) | arp;
+           | vc2PatchPluginTest(rom, work) | startOffsetPluginTest(rom, work) | arp;
 }
 
 // Every parameter as a host sees it, one a line: rom.4 in from beside rom.2 first, as an instance with both finds it

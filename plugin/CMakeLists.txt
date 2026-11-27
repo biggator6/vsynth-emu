@@ -53,6 +53,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginParams.cpp
     Source/PluginParamsOsc.cpp
+    Source/PluginStartOffset.cpp
     Source/PluginParamsCosm.cpp
     Source/PluginParamsTone.cpp
     Source/PluginControlsRead.cpp
@@ -242,7 +243,7 @@ vse_add_test(VSynthEmuArpTest Tests/ArpTest.cpp Tests/TestMain.cpp)
 # then the Multi Step Modulator's: its parameters, the image's patches with it on, a note, a patch's load stopping it (v193);
 # the VC-2's parameters against rom.4 (v451), and a .p02 onto them and the session (v452)
 vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.cpp Tests/ZonePluginTest.cpp
-             Tests/Vc2ParamPluginTest.cpp Tests/Vc2PatchPluginTest.cpp Tests/TestMain.cpp)
+             Tests/Vc2ParamPluginTest.cpp Tests/Vc2PatchPluginTest.cpp Tests/StartOffsetPluginTest.cpp Tests/TestMain.cpp)
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp

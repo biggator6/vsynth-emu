@@ -3,6 +3,7 @@
 // descriptors and names, and each parameter to its ID's name, range, default and text.
 #include "PluginVc2Params.h"
 #include "PluginParamIds.h"
+#include "PluginStartOffset.h"
 #include "Vc2Params.h"
 #include "Vc2SystemStore.h"
 #include <algorithm>
@@ -122,7 +123,9 @@ std::unique_ptr<juce::RangedAudioParameter> vc2HostParameter(const Vc2HostParam&
                     if (t.trim() == juce::String(vc2ValueText(id, v)).trim()) return v;
             return t.getIntValue();
         });
-    return std::make_unique<juce::AudioParameterInt>(p.paramId, hostName(p, rom4), lo, hi, r.def, text);
+    // a Start Offset's text the time, as the V-Synth's (d-7, v478)
+    return std::make_unique<juce::AudioParameterInt>(p.paramId, hostName(p, rom4), lo, hi, r.def,
+                                                     startOffsetId(id) ? startOffsetAttributes() : text);
 }
 
 void vc2AddHostParameters(std::vector<std::unique_ptr<juce::RangedAudioParameter>>& params) {

@@ -1546,6 +1546,75 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The XT's Truncate and its loop setters, read (2026-11-27, for v479 on) {#wave-truncate-read}
+
+Read for d-8a (the Edit region with Truncate) and the WAVE page's loops, by a read-only pass over rom.2 (Ghidra and
+the listing; addresses spot-checked here: the clamps after Truncate at `0x89381336`, the gap at `0x89382a20`).
+
+**The screens' values** (built from immediates, `mov #20; shll8; add #k`, so a pool scan finds none): 0x139d the forward
+loop's start, 0x139e its end, 0x139f the backward loop's upper point (vplp +0xc), 0x13a0 its lower (vplp +0x10), none
+of the four kept in RAM (a set writes the wave store); 0x13a1 Edit Start, 0x13a2 Edit End, 0x139c Current, 0x13a3 the
+last frame, all in RAM; 0x13a4 the link (a pair moved together); 0x13a8 the edit function, 0…11 in the manual's order
+(Truncate 1). 0x139c…0x13a3 range over [0, frames − 1] (`0x89379c70`). Screens 0x14f edit, 0x150 Loop FWD, 0x151 Loop BWD.
+
+**The loop setters** (0x139d `0x89382560`→`0x89382990`, 0x139e `0x893825f0`, 0x139f `0x893827c0`→`0x89382aa0`, 0x13a0
+`0x89382850`): the gap is 16 when the last frame is 16 or more, else 0 (`0x89382a20`). Unlinked, a value is clamped,
+never refused: the start at most the end less the gap, the end at least the start plus it and at most the last frame,
+the backward loop's the same. Linked, the other end moves by as much, held in the wave. A loop point's set
+(`0x894a4e30`, through `0x894a48e0`…`0x894a4940`) writes vplp +4, +8, +0xc or +0x10, marks the record (+0x50) and builds
+the cached loop events again (`0x894a1960`: from the vpdt when there is one, `0x895103e0`, else LITE's, `0x89510380`):
+**the encode stays**. Edit Start and End hold to each other with no gap (`0x89380a00`, `0x893823a0`).
+
+**Truncate** (the edit window's button 0x3f at `0x893b33a0` → `0x89380dc0` → `0x89380e00(function)`; the engine at
+`*0x899687c4`: `0x894a8990` makes the function's object, `0x894a8b80` gives it the range, `0x894a8c00`/`0x894a8c70` run it;
+the one object at `0x89cecf10`, made by `0x894a9d00` from the wave: its data, frames, channels and type; Truncate's
+methods at `0x898319e4`):
+- `0x894aa0f0` refuses (−2) unless Edit Start < Edit End, and keeps **Edit Start … Edit End, both kept**: end − start + 1
+  frames. `0x894a9e00` first copies the audio to the store's backup block (tag 0xb) for Undo (`0x894a9e30`).
+- `0x894aa130` moves the kept frames to the data's start (`0x8949dfa0`), sizes the data block to them (`0x894a1770`), and
+  `0x894a2480` sets vpsc +4 to the kept frames and the loop record to the whole wave (+4 0, +8 and +0xc kept − 1, +0x10 0),
+  then the cached loop events again.
+- `0x894a9db0` drops the encode: vpsc byte 1 (the type) to 0, LITE (`0x894a2270`); the data block's +0x3c to 0
+  (`0x894a2310`, not read further); the vpno, vpdt and rdmd blocks deleted (`0x894a1530`, tags 3, 5, 7). The loop modes
+  (+0x18, +0x19), rates (+0x14, +0x16), vmdl and LIST stay.
+- Then the screen (`0x893810f0`, the clamps at `0x89381336`/`0x89381340`), newLast the kept frames less one: if Edit Start
+  < the forward loop's start and its end < Edit End, both strictly, the loop moves with the audio (both less Edit Start);
+  otherwise, an end on an edit point too, it is the whole wave (0, newLast); the start held to 0 and the end to newLast.
+  It sets 0x139d, 0x139e, then **0x139f newLast and 0x13a0 0: the backward loop is the whole wave**, the link off first.
+- Edit Start, End and Current aren't moved by it; the edit screen, opened again (`0x89439de0` → `0x89380b60`), puts Edit
+  Start and Current at the forward loop's start and Edit End at its end (read, not run).
+
+So the plugin's Truncate (v480) is: keep [Edit Start, Edit End] of the 44.1 kHz wave, the forward loop moved with it only
+when strictly inside the region, else the whole wave; the backward loop the whole wave; the wave LITE until it is
+encoded again (the plugin's Encode Type then picks, as on the XT the Encode screen does), its events gone.
+
+### Start Offset in time (2026-11-27, v478) {#start-offset-time}
+
+The user's d-7 (research/NEXT_ISSUES.md item 5): Start Offset reads as the time a note plays from, ms below a second
+and s from it, where the XT shows the sample count. The stored value is the samples as before, a patch's word, so
+patches, sessions and automation are unchanged and every port reads what it read.
+
+**The law** (`PluginStartOffset.cpp`, the plugin's own): the value / 44100 s on every wave ({#wave-edit-read}: the XT's
+data is 44.1 kHz, and the plugin brings any other rate there by the XT's converter before it encodes). Below 44100
+samples "250.00 ms", two places, so each sample has a text of its own (a sample is 0.0227 ms); from 44100 "1.250 s",
+three places; 2^24 − 1 is "380.436 s". Typed: a number with "ms", "s" or "sec", or "smp" for samples as they are; a
+bare number is ms, as the box reads below a second; to the nearest sample, held to 0 … 2^24 − 1. Read back, a text
+below a second gives its own sample; above, a sample with the same text.
+
+**Where.** `startOffsetAttributes()` on the V-Synth's two (`startOffset`, `osc2StartOffset`) and on the VC-2's four
+(rom.4's 0x306 and 0x33a in each zone, `vc2HostParameter`), the same law, as its waves are the XT's too. Every control
+shows a parameter's own text (JUCE's attachments), so DETAILS' Start knob reads the time with no change to the editor.
+
+**The check.** `VSynthEmuArpPluginTest`'s `startoffset` (`StartOffsetPluginTest.cpp`, new): the law at eight values as
+literals written from the rule, not from the code (0, 1, 441, 11025, 44099, 44100, 55125, 2^24 − 1); eleven typed forms
+each to its sample; each of the six parameters by its ID at those values, said and read back. 128/128. The VC-2's
+parameter check (`vc2params`, `textsAsRom4`) takes a Start Offset's text as the plugin's own by its IDs, the law's, where
+it took the plain number; 16/16. Planted errors (`panel_muts.txt`'s 12 `startoffset-` lines, `mutate_panel.py`): the
+second's edge, either count of places, the rate, a bare number as samples, "s" unread, a time below zero or past the
+top, the sample truncated, and each of the three wirings left plain: 12 caught. The 19 `vc2-param-` plants (its file
+changed): 19 caught, `vc2-param-default` moved first onto its line's text, which v457 had rewritten (it said NOTEXT).
+`mutate_tone.py` and `mutate_vc2.py --changed`: no plant reached. `verify.sh` clean, the editor 5225/5225.
+
 ### Start Offset's unit and the XT's own wave edit, read (2026-11-27, for v478 on) {#wave-edit-read}
 
 The user's request (2026-11-27, research/NEXT_ISSUES.md items 5 and 6): "start offset - change to ms/sec rather than

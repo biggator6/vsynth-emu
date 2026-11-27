@@ -260,7 +260,7 @@ vc2-param-assigns|{ 0x89, 0x96 }|{ 0x89, 0x94 }|plugin/Source/PluginVc2Params.cp
 vc2-param-id-zone|(zone ? "z2" : "")|(zone ? "z1" : "")|plugin/Source/PluginVc2Params.cpp|arpplugin
 vc2-param-id-hex|paddedLeft('0', 3)|paddedLeft('0', 4)|plugin/Source/PluginVc2Params.cpp|arpplugin
 vc2-param-centre|const int lo = d->min - d->centre, hi = d->max - d->centre;|const int lo = d->min, hi = d->max - d->centre;|plugin/Source/PluginVc2Params.cpp|arpplugin
-vc2-param-default|return { lo, hi, std::clamp(d->def - d->centre, lo, hi) };|return { lo, hi, lo };|plugin/Source/PluginVc2Params.cpp|arpplugin
+vc2-param-default|return { lo, hi, std::clamp(vc2SystemDefault(id, system) ? system : d->def - d->centre, lo, hi) };|return { lo, hi, lo };|plugin/Source/PluginVc2Params.cpp|arpplugin
 vc2-param-typed-range|return { t->min, t->max, std::clamp(t->def, t->min, t->max) };|return { t->min, t->max + 1, std::clamp(t->def, t->min, t->max) };|plugin/Source/PluginVc2Params.cpp|arpplugin
 vc2-param-text|return named ? juce::String(vc2ValueText(id, v)) : juce::String(v);|return juce::String(v);|plugin/Source/PluginVc2Params.cpp|arpplugin
 vc2-param-read-back|if (t.trim() == juce::String(vc2ValueText(id, v)).trim()) return v;|if (t.trim() == juce::String(vc2ValueText(id, v)).trim()) return lo;|plugin/Source/PluginVc2Params.cpp|arpplugin
@@ -389,3 +389,16 @@ vc2play-bands-out-on-mic|    topOut_ = std::max(loudOut, topOut_ * fall);|    to
 editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : "";|    said_ = bands == 0 ? kOff : "";|plugin/Source/UiVc2Bands.cpp|layout
 # v460: the MIC IN card's level the mic's own, not the vocoder's modulator's (018 FemaleChoirs' is its own wave)
 vc2play-view-mic-is-modulator|    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);|    view->micPeak.store(in, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+# v478: Start Offset's text in time (the user's d-7), by VSynthEmuArpPluginTest's startoffset and vc2params checks
+startoffset-ms-edge|    if (v < kStartOffsetRate) return|    if (v <= kStartOffsetRate) return|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-ms-places|constexpr int kMsPlaces = 2, kSecondPlaces = 3;|constexpr int kMsPlaces = 1, kSecondPlaces = 3;|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-s-places|constexpr int kMsPlaces = 2, kSecondPlaces = 3;|constexpr int kMsPlaces = 2, kSecondPlaces = 2;|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-rate|constexpr double kSamplesPerMs = kStartOffsetRate / 1000.0;|constexpr double kSamplesPerMs = 48000 / 1000.0;|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-bare-samples|unit.startsWith("smp") \|\| unit.startsWith("sample") ? number|unit.startsWith("smp") \|\| unit.startsWith("sample") \|\| unit.isEmpty() ? number|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-s-unread|                         : unit.startsWith("s")  |                         : unit.startsWith("sec")|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-below-zero|    if (!(samples > 0.0)) return 0;|    ;|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-past-top|    return samples >= (double)kStartOffsetMax ? kStartOffsetMax : (int)std::lround(samples);|    return (int)std::lround(samples);|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-truncated|kStartOffsetMax : (int)std::lround(samples);|kStartOffsetMax : (int)samples;|plugin/Source/PluginStartOffset.cpp|arpplugin
+startoffset-osc1-plain|                                                               0, startOffsetAttributes()));|                                                               0));|plugin/Source/PluginParamsOsc.cpp|arpplugin
+startoffset-osc2-plain|                                                                   0, kStartOffsetMax, 0, startOffsetAttributes()));|                                                                   0, kStartOffsetMax, 0));|plugin/Source/PluginParamsOsc.cpp|arpplugin
+startoffset-vc2-plain|                                                     startOffsetId(id) ? startOffsetAttributes() : text);|                                                     text);|plugin/Source/PluginVc2Params.cpp|arpplugin

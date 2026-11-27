@@ -2,6 +2,7 @@
 // own copies of OSC 1's.  Moved as they stood from createParameterLayout (v190), which calls them in its order.
 #include "PluginProcessor.h"
 #include "PluginParamIds.h"
+#include "PluginStartOffset.h"
 
 namespace {
 // OSC Type's values as the firmware has them (0 ANALOG, 1 PCM, 2 EXT IN, v206), both OSCs': appended, so a session's
@@ -117,8 +118,9 @@ void VSynthEmuProcessor::addOscParams(ParamList& params, const juce::AudioParame
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         Params::kLoopEnd, "Loop End", juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
     // Samples, as a patch stores it; the firmware takes the wave's last sample for anything past it.  2^24 − 1 holds the longest
-    // wave the XT's memory takes and stays exact in a float
-    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kStartOffset, "Start Offset", 0, kStartOffsetMax, 0));
+    // wave the XT's memory takes and stays exact in a float.  Its text the time, the plugin's own (d-7, v478)
+    params.push_back(std::make_unique<juce::AudioParameterInt>(Params::kStartOffset, "Start Offset", 0, kStartOffsetMax,
+                                                               0, startOffsetAttributes()));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(Params::kPlaybackMode, "Playback Mode",
         juce::StringArray { "RETRIGGER", "LEGATO", "STEP", "EVENT" }, 0));
     params.push_back(std::make_unique<juce::AudioParameterBool>(Params::kPorta, "Portamento", false));
@@ -248,7 +250,8 @@ void VSynthEmuProcessor::addOsc2Params(ParamList& params, const IntText& noteVal
             juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, twoPlaces));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(oscId(1, Params::kLoopEnd), n + "Loop End",
             juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, twoPlaces));
-        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kStartOffset), n + "Start Offset", 0, kStartOffsetMax, 0));
+        params.push_back(std::make_unique<juce::AudioParameterInt>(oscId(1, Params::kStartOffset), n + "Start Offset",
+                                                                   0, kStartOffsetMax, 0, startOffsetAttributes()));
         params.push_back(std::make_unique<juce::AudioParameterChoice>(oscId(1, Params::kPlaybackMode), n + "Playback Mode",
             juce::StringArray { "RETRIGGER", "LEGATO", "STEP", "EVENT" }, 0));
     }

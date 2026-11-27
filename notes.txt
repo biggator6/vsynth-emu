@@ -738,6 +738,15 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+Start Offset in time v478 (2026-11-27, on claude/wave-editor from vc2-mode f1c0797; HARDWARE_FIRMWARE.md, "Start
+  Offset in time"; the user's d-7): the six Start Offsets (the V-Synth's two, the VC-2's four) read "250.00 ms" below a
+  second and "1.250 s" from it, the value / 44100 on every wave (the XT's data is 44.1 kHz; "Start Offset's unit and the
+  XT's own wave edit, read"); typed in ms, s or smp, a bare number ms; the stored value the samples as before.
+  PluginStartOffset.cpp (startOffsetText, startOffsetFromText, startOffsetAttributes). VSynthEmuArpPluginTest's
+  startoffset (StartOffsetPluginTest.cpp, new) 128/128, the law as literals; vc2params takes the text by its IDs, 16/16.
+  mutate_panel.py's 12 startoffset- plants and the 19 vc2-param- ones caught (vc2-param-default moved onto its line,
+  stale since v457); verify.sh clean.
+
 The VC-2 heard dry in REAPER v461 (2026-11-26; HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"): not the
   plugin's. VSynthEmuVc2PlayTest's render mode (Vc2PlayRender.cpp: a .p02 or a session's state, a rate, Effects, a
   saw or a file on the input, a held chord, `seconds=`) vocodes the user's own project state and vocal offline; the

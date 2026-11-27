@@ -10,6 +10,7 @@
 #include "TestMain.h"
 #include "TestPatches.h"
 #include "../Source/PluginProcessor.h"
+#include "../Source/PluginStartOffset.h"
 #include "../Source/PluginVc2Params.h"
 #include "../Source/Vc2Params.h"
 #include "../Source/Vc2SystemStore.h"
@@ -117,7 +118,8 @@ bool namedAsRom4(const juce::String& name, const Vc2HostParam& h) {
 bool textsAsRom4(juce::RangedAudioParameter& r, int id, const Rom4Range& want) {
     for (const int v : { want.lo, want.def, want.hi, (want.lo + want.def) / 2, (want.def + want.hi) / 2 }) {
         const juce::String text = r.getText(r.convertTo0to1((float)v), 64);
-        const juce::String rom = startOffset(id) ? juce::String(v) : juce::String(vc2ValueText(id, v));
+        // a Start Offset's text is the plugin's own, by its IDs: the time (d-7, v478; StartOffsetPluginTest's law)
+        const juce::String rom = startOffset(id) ? startOffsetText(v) : juce::String(vc2ValueText(id, v));
         const float back = r.convertFrom0to1(r.getValueForText(text));
         if (text != rom || r.getText(r.convertTo0to1(back), 64) != text) return false;
     }
