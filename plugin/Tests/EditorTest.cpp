@@ -202,6 +202,7 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     waveChecks(ed, p, work, check);
     keyChecks(l, ed, p, check);
     padChecks(l, ed, p, check);
+    patternChecks(l, ed, p, check);
     vc2Checks(l, ed, p, check, [&] { sizes(l, ed, check); });
     vc2TextChecks(ed, p, check);
     ed.showMode(PluginMode::vsynth);

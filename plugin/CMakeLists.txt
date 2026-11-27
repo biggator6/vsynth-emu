@@ -107,6 +107,7 @@ target_sources(VSynthEmu PRIVATE
     Source/UiMatrix.cpp
     Source/UiModPage.cpp
     Source/UiArpPattern.cpp
+    Source/UiArpPatternEdit.cpp
     Source/UiPlayPage.cpp
     Source/UiZoneStrip.cpp
     Source/UiZonesPage.cpp
@@ -149,6 +150,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtArpeggioStep.cpp
     Source/XtArpeggioMotifs.cpp
     Source/XtArpeggioPatch.cpp
+    Source/XtArpPatternEdit.cpp
     Source/XtSynthRom.cpp
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
@@ -246,8 +248,8 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
-             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/TestMain.cpp
-             Tests/TestWave.cpp)
+             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/EditorArpTest.cpp
+             Tests/TestMain.cpp Tests/TestWave.cpp)
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
 # against XtSynth given the input by the law, the Effects off and on
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)

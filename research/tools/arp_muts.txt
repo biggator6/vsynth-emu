@@ -1,5 +1,7 @@
 # The arpeggiator's planted errors: name|old|new|port (arp XtArpeggio.cpp, arpstep XtArpeggioStep.cpp, arpmotif
-# XtArpeggioMotifs.cpp, ticks XtTempoTicks.cpp: the tempo ticks it steps on, v189; arpring XtRing.h, the keys' ring, v354).  mutate_arp.py runs them, each through xt_arp against the firmware's own object.
+# XtArpeggioMotifs.cpp, ticks XtTempoTicks.cpp: the tempo ticks it steps on, v189; arpring XtRing.h, the keys' ring, v354;
+# arpedit XtArpPatternEdit.cpp, the Pattern Edit's edits, v468).  mutate_arp.py runs them, each through xt_arp against the
+# firmware's own object, screen and setters.
 key-numbers|keys[k].key = (uint8_t)k;|keys[k].key = (uint8_t)(k + 1);|arp
 shuffle-8th-span|const int span = 120 * r / 100;|const int span = 121 * r / 100;|arp
 shuffle-8th-tail|(2 * span + 2 * k - k * span / 60 - 120)|(2 * span + 2 * k - k * span / 60 - 119)|arp
@@ -93,3 +95,23 @@ ticks-take|    fed = ticks;|    fed = ticks & ~1u;|ticks
 # The Multi Step Modulator's arpeggio flag (v193)
 msm-flag-unset|        msmFlag = 1;||arpstep
 msm-flag-uncleared|    msmFlag = 0;||arpstep
+# The Pattern Edit's edits (v468, arpedit XtArpPatternEdit.cpp), under xt_arp's edits section; and the layout the object
+# takes a patch's pattern by (0x8930ca30, XtArpeggio.cpp), held there to the firmware's own
+edit-button-32|    { 33, 33, "32", "32" },|    { 32, 33, "32", "32" },|arpedit
+edit-button-zero-ctrl|    { kRest, kTie, "0", "0" },|    { kRest, kRest, "0", "0" },|arpedit
+edit-button-127|    { 128, 128, "127", "127" },|    { 127, 128, "127", "127" },|arpedit
+edit-button-clr|    { kTie, kRest, "Tie", "Clr" },|    { kTie, kTie, "Tie", "Clr" },|arpedit
+edit-cell-most|constexpr int kCellMost = 128;|constexpr int kCellMost = 127;|arpedit
+edit-note-most|constexpr int kNoteMost = 127;|constexpr int kNoteMost = 126;|arpedit
+edit-state-clamp|std::clamp(state, 0, 1) != 0|state != 0|arpedit
+edit-note-state|(p.line[line] & kCtrlBit) \| std::clamp(note, 0, kNoteMost)|std::clamp(note, 0, kNoteMost)|arpedit
+edit-clear-line-state|    for (auto& step : p.cell) step[line] = kRest;|    for (auto& step : p.cell) step[line] = kRest, p.line[line] &= kNoteBits;|arpedit
+edit-clear-all-last|line < XtArpPattern::kLines; ++line) xtArpClearLine|line < XtArpPattern::kLines - 1; ++line) xtArpClearLine|arpedit
+edit-init-cell|constexpr uint8_t kInitCell = 101;|constexpr uint8_t kInitCell = 100;|arpedit
+edit-init-note|constexpr int kInitNote = 60;|constexpr int kInitNote = 59;|arpedit
+edit-mark-tie|{ XtArpMark::tie, "Tie" }|{ XtArpMark::note, "Tie" }|arpedit
+edit-mark-ctrl-one|{ XtArpMark::control, nullptr }, { XtArpMark::control, nullptr }|{ XtArpMark::tie, nullptr }, { XtArpMark::control, nullptr }|arpedit
+edit-text-ctrl-rest|{ XtArpMark::none, "***" }|{ XtArpMark::none, "  0" }|arpedit
+edit-text-number|"%3d", p.cell[at.step][at.line] - 1|"%3d", p.cell[at.step][at.line]|arpedit
+laid-out-ctrl-most|std::min<int>(line & kLineNumber, kXtArpCtrlMost)|(line & kLineNumber)|arp
+laid-out-ctrl-only|        if (line & kCtrlLine) line =|        line =|arp

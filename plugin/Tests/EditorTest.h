@@ -60,6 +60,9 @@ void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
 // The Time Trip pad (EditorPadTest.cpp, v202): a press's, a drag's and a release's controllers by the assigns as they
 // stand, Hold, an assign OFF
 void padChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// The arpeggio pattern's card (EditorArpTest.cpp, v468): each edit of the XT's Pattern Edit through it into the session,
+// Value and the buttons following the cursor, the clears and INIT, the pattern played and back from a saved session
+void patternChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 // The VC-2 mode (EditorVc2Test.cpp, v453; research/UI_DESIGN_VC2.md): the header's switch and the session's mode, each
 // page and block at three sizes (`sizes`), each zone's, OSC's and COSM's controls on every face moving their own
 // parameters alone, after a change of zone too, each Matrix Control's and zone's; and (EditorVc2TextTest.cpp) the

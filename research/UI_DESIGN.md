@@ -130,9 +130,14 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   made for each Control by index; and the controller assigns' card, the twelve boxes by the processor's names.
 - **PLAY:** the arpeggio's card and its pattern's down the left; portamento, keys (Voices, Legato, Octave), tune (Coarse,
   Fine, Bend Up and Down) and tempo (Clock, Tempo) down the right, each a grid from a table. The pattern is a patch's
-  data, no parameter, so it is drawn and not edited: its 16 lines down, each a note or a controller named at the left,
-  its 32 steps across, a played step's cell in the accent by its velocity, a tie a thin bar carrying the line on, the
-  steps past the End Point faint; a line says so when no step plays.
+  data, no parameter: its 16 lines down, each its State (NOTE, CTRL in `mod`) and Note/CC at the left, its 32 steps
+  across in beats of four, each cell as the XT's screen marks it (a note in the accent by its velocity, a tie a thin bar
+  carrying the line on, a controller a ring in `mod`), the steps past the End Point faint; a line says so when no step
+  plays. From v468 it is edited by the XT's Pattern Edit (`UiArpPatternEdit`; HARDWARE_FIRMWARE.md, "The arpeggio's
+  Pattern Edit"): a click on a cell is the cursor (ringed in `text`), a drag up or down on it or the wheel its value; a
+  click on a State turns it, a drag or the wheel moves a Note/CC; under the pattern Value and the six buttons (0, 32,
+  64, 96, 127, Tie or Clr by the cursor's line), then LINE CLEAR, ALL CLEAR and INIT (the initialized patch's pattern,
+  the user's d-6), each into the session. The VC-2's is drawn only.
 - **ZONES:** the keys' card: the 128 keys with each zone's range in its colour (the footer's), as a note picks its zone,
   its number on it, the C keys named every other octave (`UiZoneStrip`); and the
   zones' card, a cell for each of the sixteen made by index: its colour and name, its Range Upper as a bar in its colour,

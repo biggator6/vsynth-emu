@@ -26,9 +26,12 @@ const Pages::CardRows kCards[] = {
     { "TEMPO", { { { "clockSource", "Clock" }, { "patchTempo", "Tempo" } } }, 1 },
 };
 
+// The V-Synth's: its pattern edited into the session (v468)
 PlayPage::Mode vsynthPlay(VSynthEmuProcessor& p) {
     return { { std::begin(kCards), std::end(kCards) }, Pages::rowAsId,
-             { [&p] { return p.arpPattern(); }, "arpPattern", "arpEndPoint" }, {} };
+             { [&p] { return p.arpPattern(); }, "arpPattern", "arpEndPoint",
+               [&p](const XtArpPattern& edited) { p.setArpPattern(edited); } },
+             {} };
 }
 
 }
@@ -42,7 +45,8 @@ PlayPage::PlayPage(VSynthEmuProcessor& p, Mode mode) {
         addAndMakeVisible(*cards_.back());
     }
     pattern_ = std::make_unique<Card>("ARPEGGIO PATTERN");
-    pattern_->setBody(std::make_unique<ArpPatternView>(p, mode.pattern));
+    if (mode.pattern.set) editor_ = &pattern_->setBody(std::make_unique<ArpPatternEditor>(p, mode.pattern));
+    else pattern_->setBody(std::make_unique<ArpPatternView>(p, mode.pattern));   // drawn only (the VC-2's)
     addAndMakeVisible(*pattern_);
     if (mode.last) {
         last_ = mode.last();

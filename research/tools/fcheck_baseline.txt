@@ -735,6 +735,7 @@ presets: 117 cases, 646719 operations, 10790 messages, 10717 states, 0 different
 random: 1000 cases, 4537707 operations, 224687 messages, 110830 states, 0 different
 messages alike by motif: UP 25626 DOWN 28839 UP&DOWN 26690 RANDOM 23502 NOTE-ORDER 34656 RHYTHM 35626 PHRASE 29704 AUTO 30834
 ticks: 100 cases, 300000 ms, 2455125 values, 0 different
+edits: 200 cases, 12000 edits, 9411642 values, 0 different
 == xt_msm
 presets: 55 cases, 356944 events, 356999 states, 489446 terms: 0 different
 random: 300 cases, 811357 events, 811657 states, 1340938 terms: 0 different

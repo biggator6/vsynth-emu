@@ -22,13 +22,18 @@ struct XtArpSettings {
     bool operator==(const XtArpSettings&) const = default;
 };
 
-// The pattern as 0x8930ca30 lays it out from the patch (0x89880f83): a line's State and Note/CC, and each step's cell
+// A patch's pattern, laid out as 0x8930ca30 lays it out (0x89880f83): a line's State and Note/CC, and each step's cell.
+// The patch holds a CTRL line's controller as 0…127 (ID 0x44b, the Pattern Edit's range); the layout makes it at most
+// kXtArpCtrlMost, which is what the object plays (v468: setPattern lays it out, where the reads did before)
 struct XtArpPattern {
     static constexpr int kLines = 16, kSteps = 32;
-    uint8_t line[kLines] = {};          // bit 7 CTRL, else NOTE; the low 7 bits the note or controller (a controller at most 95)
+    uint8_t line[kLines] = {};          // bit 7 CTRL, else NOTE; the low 7 bits the note or controller
     uint8_t cell[kSteps][kLines] = {};  // 0 REST, 1 TIE, 2…128 velocity (or a controller's value + 1)
     bool operator==(const XtArpPattern&) const = default;
 };
+inline constexpr int kXtArpCtrlMost = 95;      // a CTRL line's controller as laid out [FW 0x8930cac0]
+// The pattern as the object takes it: each CTRL line's controller at most kXtArpCtrlMost [FW 0x8930ca30]
+XtArpPattern xtArpLaidOut(const XtArpPattern& p);
 
 // What it sends: a MIDI message on its channel (0x90 note-on, 0x80 note-off at velocity 64, 0xb0 controller)
 struct XtArpEvent {
@@ -61,7 +66,7 @@ public:
     void reset();                                  // back to it
     void setChannel(int ch) { channel = (int8_t)ch; }   // +0xbc, from +0xd2d (0x89304920); −1 sends nothing
     void setSettings(const XtArpSettings& s);      // 0x8930c190's part for this object
-    void setPattern(const XtArpPattern& p) { pattern = p; }
+    void setPattern(const XtArpPattern& p) { pattern = xtArpLaidOut(p); }   // a patch's, as 0x8930ca30 lays it out
     void noteOn(int key, int velocity);            // 0x89303830
     void noteOff(int key);                         // 0x893039c0
     void pedal(int value);                         // 0x89303a80: the Hold pedal (CC 64)
@@ -122,7 +127,7 @@ public:
     int32_t fired = 0;
     int32_t now = 0;                          // the tempo timer's count (0x898586f0)
     bool on = false;                          // +0xd2c
-    XtArpPattern pattern;                     // what +0xf8 points at
+    XtArpPattern pattern;                     // what +0xf8 points at, laid out
     // The Multi Step Modulator's arpeggio flag (its +0x25) as the last call left it, for its owner to give it: 1 set after
     // a step's note ends (0x893027e6 → 0x894d9920), 0 cleared at a halt (0x89302558 → 0x894d9930), −1 untouched
     int8_t msmFlag = -1;

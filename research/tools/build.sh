@@ -268,9 +268,10 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxCheck*.cpp \
    XtFxControl.cpp XtFxUnit.cpp XtFxImage.cpp XtFxValueText.cpp XtFxInput.cpp XtExtIn.cpp "${SH4[@]}" -o "$O/xt_fx" &
-# The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on (v189)
+# The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on
+# (v189); the Pattern Edit's edits against its screen, setter and clears (v468)
 ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp XtArpeggioCases.cpp XtTempoTicks.cpp
-     XtTempoTicksCheck.cpp XtArpeggioPatch.cpp)
+     XtTempoTicksCheck.cpp XtArpeggioPatch.cpp XtArpPatternEdit.cpp XtArpPatternEditCheck.cpp)
 [ -f XtArpeggio.cpp ] && cc -DXT_ARP_MAIN "${ARP[@]}" "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_arp" &
 # the Multi Step Modulator (v192 on), with the patches' reads for the presets

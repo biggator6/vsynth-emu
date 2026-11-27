@@ -156,6 +156,13 @@ void report(const char* what, const XtArpCheck& c, long cases) {
     std::printf("%s: %ld cases, %ld operations, %ld messages, %ld states, %ld different\n", what, cases, c.ops,
                 c.events, c.states, c.different);
 }
+
+// A section's line after the object's: the ticks', the edits' (v468)
+bool reportTally(const char* what, const char* steps, const XtArpTally& t) {
+    std::printf("%s: %ld cases, %ld %s, %ld values, %ld different%s\n", what, t.cases, t.steps, steps, t.values,
+                t.different, t.failed ? ", a routine failed" : "");
+    return t.different == 0 && !t.failed;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -200,9 +207,8 @@ int main(int argc, char** argv) {
     std::printf("messages alike by motif:");
     for (int m = 0; m < 8; ++m) std::printf(" %s %ld", kMotifNames[m], presets.byMotif[m] + random.byMotif[m]);
     std::printf("\n");
-    const XtTicksTally ticks = xtTempoTicksCheck(rom, kTickCases, seed, presets.first);
-    std::printf("ticks: %ld cases, %ld ms, %ld values, %ld different%s\n", ticks.cases, ticks.ms, ticks.values,
-                ticks.different, ticks.failed ? ", a routine failed" : "");
-    return presets.different + random.different + ticks.different == 0 && !ticks.failed ? 0 : 1;
+    const bool ticks = reportTally("ticks", "ms", xtTempoTicksCheck(rom, kTickCases, seed, presets.first));
+    const bool edits = reportTally("edits", "edits", xtArpPatternEditCheck(rom, cases / 5, seed, presets.first));
+    return presets.different + random.different == 0 && ticks && edits ? 0 : 1;
 }
 #endif

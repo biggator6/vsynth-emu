@@ -11,7 +11,6 @@
 #include <vector>
 
 inline constexpr int kXtArpSwitchId = 0x42e;
-inline constexpr int kXtArpCtrlMost = 95;      // a CTRL line's controller [FW 0x8930ca30]
 
 // A setting's ID and its field
 struct XtArpSettingId {

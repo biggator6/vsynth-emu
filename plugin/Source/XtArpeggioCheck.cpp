@@ -92,8 +92,9 @@ void XtArpFw::settings(const XtArpSettings& s) {
 }
 
 void XtArpFw::pattern(const XtArpPattern& p) {
-    m.cpu.write(kPatternBuf, p.line, sizeof p.line);
-    m.cpu.write(kPatternBuf + sizeof p.line, p.cell, sizeof p.cell);
+    const XtArpPattern laid = xtArpLaidOut(p);   // as 0x8930ca30 writes it there, which the port's setPattern does too
+    m.cpu.write(kPatternBuf, laid.line, sizeof laid.line);
+    m.cpu.write(kPatternBuf + sizeof laid.line, laid.cell, sizeof laid.cell);
     m.cpu.wr32(kObj + 0xb8, kPatternBuf);
 }
 

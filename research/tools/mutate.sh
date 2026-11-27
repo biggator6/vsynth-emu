@@ -18,7 +18,8 @@
 # PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone; PORT=tonearp: XtSynthArp.cpp under xt_tone (v189).
 # PORT=arp: XtArpeggio.cpp (the arpeggiator's keys and settings, v188), PORT=arpstep: XtArpeggioStep.cpp (its timer and
 # step), PORT=arpmotif: XtArpeggioMotifs.cpp (its motifs), PORT=ticks: XtTempoTicks.cpp (the tempo ticks it steps on,
-# v189), under xt_arp; [cases] its random cases, after the presets.
+# v189), PORT=arpedit: XtArpPatternEdit.cpp (the Pattern Edit's edits, v468), under xt_arp; [cases] its random cases,
+# after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
 # PORT=vc2…: rom.4's ports under their checks, on rom.4 ($ROM4): mutate_vc2ports.sh's list (v220).
@@ -87,19 +88,20 @@ elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu|fx4c|fx4i|fx4u|fx4in)$ ]]; then
     esac
     [[ "$PORT" == fx4* ]] && IMAGE="$ROM4"
     fxParts XtFxChip "${KEEP[@]}"
-elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks|arpring)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
+elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks|arpring|arpedit)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
         arpstep) F=XtArpeggioStep.cpp ;;
         arpmotif) F=XtArpeggioMotifs.cpp ;;
         arpring) F=XtRing.h ;;   # v354: the keys' ring, a header: every part built from a copy (below)
+        arpedit) F=XtArpPatternEdit.cpp ;;   # v468: the Pattern Edit's edits, under xt_arp's edits section
         *) F=XtArpeggio.cpp ;;
     esac
     harnessParts XT_ARP_MAIN arp_obj XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases \
-                 XtTempoTicks XtTempoTicksCheck XtArpeggioPatch
+                 XtTempoTicks XtTempoTicksCheck XtArpeggioPatch XtArpPatternEdit XtArpPatternEditCheck
     PARTS=(XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases XtTempoTicks XtTempoTicksCheck
-           XtArpeggioPatch XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer
-           XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup)
+           XtArpeggioPatch XtArpPatternEdit XtArpPatternEditCheck XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware
+           XtFwMachine XtMultiBandPlayer XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup)
     TONE=(-DXT_ARP_MAIN -DXT_HARNESS_SWITCHES)   # the header's plant's flags, as the tone's own
 elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     # The Multi Step Modulator against xt_msm: XtMsm.cpp, with PORT=msmtrack XtMsmTrack.cpp, with PORT=msmpatch

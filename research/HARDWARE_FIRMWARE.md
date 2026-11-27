@@ -1546,6 +1546,116 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The arpeggio's Pattern Edit, and the pattern an initialized patch has (2026-11-27, v468) {#arp-pattern-edit}
+
+The user's report (research/NEXT_ISSUES.md, item 3): "arpeggiator only reads from patches - no ability to program
+patterns. with no pattern, it should still handle live input for repeat/up/down/etc". Names first: the manual's Pattern
+Edit (pp. 65–67) and Arpeggio (pp. 82–83), then rom.2's strings for that screen, then its code.
+
+**The manual.** A pattern is up to 32 steps × 16 lines. Each line has a State (NOTE, CTRL) and a Note/CC (a note C-1–G9,
+or a controller 0–127). The input area shows a note as ●, a tie as =, a controller as ○; Value shows the cell under the
+cursor. Six buttons, 0, 32, 64, 96, 127 and Tie/Clr, put that velocity (or a controller's value) at the cursor, or a tie,
+or clear a controller, and change the one there when editing; the VALUE dial and INC/DEC set it too. Grid, End Point (the
+pattern's length, 1–32), Clear (LINE CLEAR, ALL CLEAR, CANCEL), Real Rec and Step Rec (at most 16 pitches and controllers
+in a pattern, a new one each taking a line). The motifs: UP, DOWN, UP&DOWN, RANDOM, NOTE ORDER sound the keys held;
+RHYTHM "the notes that you specified when inputting the pattern", whatever is played; PHRASE the phrase moved to the last
+key; AUTO the keys given to the lines from the lowest.
+
+**rom.2's screen.** Its strings sit at `0x897786d8`…`0x89778795`: the buttons' "0", "32", "64", "96", "127", "Tie", "Clr",
+"Value :", "State", "Note/CC", "Grid", "End Point", "Pattern Edit", the Value texts "***", "  0", "---", "Real", "Rec",
+"Step", "Stop", and the clear dialog's "CANCEL", "LINE CLEAR", "ALL CLEAR" (with "PATTERN CLEAR" and "This Will Clear One
+or All Lines." at `0x8975cd74`…`0x8975cd94`). The code that loads them is `0x893f8200`…`0x893fb9xx`. It keeps its cursor in
+three work IDs of the system store (`0x89968728`, getter `0x8937ce90`, setter `0x8937ced0`, which clamps to the ID's
+range): 0x1403 the cursor's line (0…15), 0x1402 its cell, line × 32 + step (0…511), and 0x1401 the cell's value
+(0…128; the ranges at `0x8937a320`…`0x8937a34a`, in `0x89379c70`). Setting 0x1401 writes the patch: `0x893787f0`'s case
+points a write object at line [0x1403] and writes ID 0x44d + 2 × ([0x1402] & 31), Step 1…32's Velocity (`0x89379a44`).
+Nothing else is touched: no other cell, no line's State or Note/CC.
+- **The buttons** (`0x893f9400`, buttons 10…15 by the table at `0x893f9494`; each writes only with the cursor in the input
+  area, focus 0x20 by `0x89374e00`), by the cursor line's State (ID 0x44a):
+
+  | button | NOTE line | CTRL line |
+  |---|---|---|
+  | 0 | 0, REST (`0x893f99f0`) | 1, the value 0 (`0x893f94b8`) |
+  | 32, 64, 96 | 33, 65, 97 (`0x893f9930`, `0x893f9960`, `0x893f998c`) | the same |
+  | 127 | 128 (`0x893f99bc`) | the same |
+  | Tie / Clr | 1, TIE (`0x893f9a1c`) | 0, REST (`0x893f99f0`) |
+
+  So a NOTE line's 0 is a rest, never a velocity of 0, and a CTRL line's 0 is a controller sent at 0.
+- **INC/DEC** in the input area move the cell by 1, by 10 with SHIFT (`0x893f8b10`, keys 0x13 and 0x15), and the dial sets it
+  (`0x893fa400`), all through 0x1401's 0…128. On a NOTE line's Note/CC SHIFT moves it by 12; otherwise by 1, by 10 with SHIFT.
+  The line's State and Note/CC are patch IDs 0x44a (0…1) and 0x44b (0…127, the descriptors'), set as any other ID, cells
+  left as they are: a NOTE line's TIE becomes a CTRL line's value 0 and back.
+- **What it draws** (`0x893f9fe0`, and the same loop in `0x893f9400`): a cell 0 blank; on a NOTE line 1 a tie and 2…128 a
+  note; on a CTRL line any cell past 0 a controller. Value at the cursor: on a NOTE line "  0" for a rest, "Tie" for 1,
+  else the cell less 1; on a CTRL line "***" for a rest, else the cell less 1; "---" off the input area. The steps past End
+  Point are drawn in another colour (the box from 0x127 − 6 × (31 − End Point)).
+- **Clear** (the dialog `0x893f9a50`, its answer `0x893fb940`): ALL CLEAR is `0x89304000` → `0x893052f0` on the Pattern
+  Edit object `0x8987f7b8`, which writes 0 (`0x89479e50` → `0x89484330`) to Step 1…32 of each of the 16 lines; LINE CLEAR is
+  `0x89304010` → `0x89305360`, the same for the cursor's line. Neither touches a State or a Note/CC. Each then reads the
+  lines into the object again (`0x89305250`), and ALL CLEAR sets its tables to −1 (`0x893057f0`): Rec's, not read further.
+- Real Rec and Step Rec are that object's (`0x8987f7b8`, the players of v188's "Pattern Edit's players", constructor
+  `0x89304bb0`; their pattern writes `0x89304e2e`…`0x89305fc8`), not read here.
+
+**What an empty pattern plays.** Nothing. A step plays a cell other than 0, and on a NOTE line other than 1 (`0x89302700`,
+v188), and with the Switch on the keys go to the arpeggio and not the part (`0x89307c80`, v189): keys held over a pattern
+of rests sound nothing at all. The plugin before any patch has the descriptors' pattern (v190), every cell 0, so the
+Arpeggio switched on in a fresh plugin silences the keys: what the user met.
+
+**What an initialized patch has.** The XT's PATCH initialize, `0x89482540` (it names the patch "INIT PATCH" when given no
+name; `0x89482bc0` beside it is a variant with a third argument, one caller, `0x8947fdf0`), sets every block to its
+descriptors' defaults, the pattern's 16 lines too (`0x89482834` on 0x44a…, 0x43 IDs a line, from store + 0x128c), and then
+writes 101, velocity 100, to Step 1…32 of line 1 (`0x89482b1c`…`0x89482b3c`: ID 0x44d + 2k, `mov #101`, 32 times). So an
+initialized patch has every line NOTE C4, line 1 at velocity 100 on every step and the rest at REST, with the settings'
+defaults (Motif UP, Grid 16TH, End Point 32): switched on, it plays the keys held one a 16th, up. The presets show the same
+pattern: of the disk image's 512, 291 have line 1 at velocity 100 on every step and nothing else (189 and 9 with every line
+at C4, Switch off and on; 89 and 4 with line 1's note 80, G#5, and not every line at C4), and one, Solid Bass (Switch
+off), has a pattern of rests.
+
+**How the lines and the motif share the keys** (v188's engine, as it stands): a NOTE line with a velocity at a step asks the
+motif for a key. UP, DOWN, UP&DOWN, RANDOM and NOTE-ORDER give each such line the walk's next key, so two lines at one step
+play two keys at once, and the line's own note is not read; AUTO gives line i the (i mod count)-th key held from the lowest;
+RHYTHM plays the line's own note, the keys only starting and stopping it; PHRASE plays the line's note moved by the last
+key less line 1's note. The cell scales the key's velocity (or Keyboard Velocity's), and the ties after it lengthen the
+note. A CTRL line sends its controller at the cell less 1 whatever the motif, at most CC 95 as the engine lays the line out
+(`0x8930ca30`), though the screen and the store take 0…127.
+
+**So for the plugin** (d-6, the user's): what the XT does without a patch's pattern is an initialized patch's, line 1 on
+every step, which with Motif and Grid is the live "repeat/up/down"; an all-rest pattern stays silent.
+
+**The port (v468).** `XtArpPatternEdit` (no JUCE): each button's cell by the line's State, 0x1401's write at the cursor
+clamped to 0…128, a line's State and Note/CC clamped to their descriptors' 0…1 and 0…127, LINE CLEAR and ALL CLEAR, the
+initialized pattern (`xtArpInitPattern`), and what the screen draws of a cell (`xtArpMarkOf`, `xtArpValueText`), each a
+table by State and the cell's kind (rest, 1, a value). The PLAY page's pattern card edits through it (`UiArpPattern` the
+grid, `UiArpPatternEdit` Value, the six buttons, the clears and INIT): a click on a cell is the touch that moves the
+cursor, a drag or the wheel the dial (INC/DEC: 1, 10 with SHIFT; a NOTE line's Note/CC 12 with SHIFT, a CTRL line's 10,
+the screen's generic step there not read). Each edit goes to the session as a patch's pattern does (`setArpPattern`:
+the audio thread's words and the state's `arpPattern`). The VC-2's pattern stays drawn only.
+- **A CTRL line's controller.** The patch and the Pattern Edit hold it as 0…127; the object plays it at 95 at most, which
+  0x8930ca30 does as it lays a patch's pattern out (`0x8930cac0`). The reads (`xtArpPatternRead`) clamped it at 95 since
+  v188, so an edit to 120 would have shown 95 and a patch saved by the plugin lost it; now the session and a saved patch
+  keep the patch's value, and `XtArpeggio::setPattern` lays it out (`xtArpLaidOut`). No preset has a CTRL line past CC 81,
+  so no preset's sound moves.
+
+**The check** (xt_arp's edits section, `XtArpPatternEditCheck.cpp`). A machine whose part 0 has its three stores (+4, +8
+and the write object's +0x10, which `0x8947b5b0` reads) at a patch's store, the firmware's default patch's: the OS's
+semaphores, the screen's lock and drawing calls and Rec's tables (`0x893057f0`) answered with nothing, the focus
+(`0x89374e00`) answering the input area, the text and glyph draws (`0x89325310`, `0x89324660`) recorded. Each case 60
+edits drawn: the cursor (0x1403, 0x1402 through the setter), a value at it (0x1401, −20…150), a button through the
+handler itself (`0x893f9400`, 10…15), a line's State (−2…3) or Note/CC (−20…150) through the setter, LINE CLEAR, ALL
+CLEAR; the port given the same. After each the store's pattern against the port's; after one in four the arpeggio's own
+read of the store (`0x8930ca30`) against `xtArpLaidOut`, and the redraw (`0x893f9fe0`): Value's text and every cell's
+glyph against `xtArpValueText` and `xtArpMarkOf`. And `xtArpInitPattern` against the default patch's pattern. Its draws
+are its own generator's (seed + 468), so no other section's cases move.
+- **The result.** At fcheck's 1000 cases, 200 of 60 edits: 12,000 edits, 9,411,642 values, 0 different; the first run
+  with nothing planted was 0 different too, so 18 plants were made to show it can fail (`arp_muts.txt`, `PORT=arpedit`
+  and two on the layout): each button's cell, the clamps of 0x1401, State and Note/CC, a clear touching a line's State
+  or missing the last line, the initialized pattern's cell and note, a mark and two Value texts, the layout's limit and
+  its State: 18 caught. The card's own check is VSynthEmuEditorTest's (`EditorArpTest.cpp`): each edit through it into
+  the session against the port, the pattern in the synth's controls and back from a saved session.
+
+**Not yet:** Real Rec and Step Rec (d-10: later, their own item); the VC-2's pattern, rom.4's, drawn only; the screen's
+generic INC/DEC on a CTRL line's Note/CC and on a State with SHIFT (the plugin takes 10 and a click).
+
 ### The VC-2 heard dry in REAPER: REAPER adds an instrument's input to its output; an effect build (2026-11-26, v461) {#vc2-plugin-reaper-dry}
 
 The user's report: in REAPER (AU and VST3 alike), VC-2 mode, 001 LargeChoir 1, a vocal into the plugin and notes

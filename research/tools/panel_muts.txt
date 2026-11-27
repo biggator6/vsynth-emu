@@ -389,3 +389,16 @@ vc2play-bands-out-on-mic|    topOut_ = std::max(loudOut, topOut_ * fall);|    to
 editor-vc2-bands-never-wait|    said_ = !playing ? kWaits : bands == 0 ? kOff : "";|    said_ = bands == 0 ? kOff : "";|plugin/Source/UiVc2Bands.cpp|layout
 # v460: the MIC IN card's level the mic's own, not the vocoder's modulator's (018 FemaleChoirs' is its own wave)
 vc2play-view-mic-is-modulator|    view->micPeak.store(peakOf(s.mixer.b.mic, kBlock), relaxed);|    view->micPeak.store(in, relaxed);|plugin/Source/Vc2PartPlayer.cpp|vc2play
+# v468: the arpeggio pattern's card, edited by the XT's Pattern Edit (VSynthEmuEditorTest's EditorArpTest.cpp)
+editor-d-arp-unsaved|               [&p](const XtArpPattern& edited) { p.setArpPattern(edited); } },|               [](const XtArpPattern&) {} },|plugin/Source/UiPlayPage.cpp|layout
+editor-d-arp-cursor-swapped|                setCursor({ line, step });\n                press_ = { Press::On::cell, line, at.y, 0 };|                setCursor({ step % XtArpPattern::kLines, line });\n                press_ = { Press::On::cell, line, at.y, 0 };|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-state-one-way|xtArpSetState(p, line, xtArpIsCtrl(p, line) ? 0 : 1)|xtArpSetState(p, line, 1)|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-drag-down|    const int steps = (press_.startY - e.getPosition().y) / kDragPx;|    const int steps = (e.getPosition().y - press_.startY) / kDragPx;|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-wheel-down|    const int by = w.deltaY > 0.0f ? 1 : -1;|    const int by = w.deltaY > 0.0f ? -1 : 1;|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-note-wheel-cell|        if (noteBounds(line).contains(at)) return nudge(Press::On::note, line, by, e.mods.isShiftDown());|        if (noteBounds(line).contains(at)) return nudge(Press::On::cell, line, by, e.mods.isShiftDown());|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-button-first|own(*buttons_[(size_t)b], [b](XtArpPattern& pattern, XtArpCursor at) { xtArpPress(pattern, at, b); });|own(*buttons_[(size_t)b], [](XtArpPattern& pattern, XtArpCursor at) { xtArpPress(pattern, at, 0); });|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-clear-first-line|    xtArpClearLine(p, at.line);|    xtArpClearLine(p, 0);|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-init-cleared|    p = xtArpInitPattern();|    xtArpClearAll(p);|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-value-stale|    value_.setText("Value : " + juce::String(xtArpValueText(pattern, at)), juce::dontSendNotification);|    value_.setText("Value : " + juce::String(xtArpValueText(pattern, {})), juce::dontSendNotification);|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-names-note|        buttons_[(size_t)b]->setButtonText(xtArpButtonName(b, ctrl));|        buttons_[(size_t)b]->setButtonText(xtArpButtonName(b, false));|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-drawn-only|    if (mode.pattern.set) editor_ =|    if (false) editor_ =|plugin/Source/UiPlayPage.cpp|layout

@@ -50,6 +50,14 @@ editable.
 - **d-6. Live input with no pattern.** Recommended: the engine stays the firmware's; "repeat/up/down" come from the motif
   with starter patterns given as data (e.g. a step on every beat, a line a key), which the user picks and then edits. If
   the XT plays nothing with an empty pattern, an empty pattern does the same here.
+  **Decided (the user, 2026-11-27: "XT's init pattern"), on the research** (HARDWARE_FIRMWARE.md, "The arpeggio's Pattern
+  Edit"): the XT's PATCH initialize (`0x89482540`) gives line 1 velocity 100 on every step, which with the Motif and Grid
+  is the live repeat/up/down, and 291 of the 512 presets have it; a pattern of rests plays nothing, the keys included. So
+  the plugin's pattern before any patch is the initialized one, an INIT on the card puts it back beside LINE CLEAR and ALL
+  CLEAR, a pattern of rests stays silent, and no starter pattern the XT doesn't have.
+- **d-10. Real Rec and Step Rec.** The user had no preference (2026-11-27), so the recommendation stands: later, its own
+  item, each held to the Pattern Edit object's own (`0x8987f7b8`, the 16-pitch limit) in a harness; this group does the
+  grid's edits.
 
 ### 4. A patch init
 "need a patch init". Today: none. The XT has its own PATCH initialize (and rom.4 its own, by Patch Category, for the
