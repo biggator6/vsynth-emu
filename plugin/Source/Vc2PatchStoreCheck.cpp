@@ -10,6 +10,7 @@
 #include "Vc2PatchCheck.h"
 #include "Vc2Params.h"
 #include "Vc2PatchFile.h"
+#include "Vc2PatchInit.h"
 #include "Vc2PatchStore.h"
 #include "XtFiles.h"
 #include <algorithm>
@@ -103,13 +104,16 @@ std::vector<FoundTyped> findTyped(Vc2Fw& fw, const std::vector<Found>& found) {
     return out;
 }
 
-// Part 0's entry in the part table: a store at +8 (A) and +4 (B)
-void pointAtStores(Vc2Fw& fw) {
+} // namespace
+
+void vc2PointAtStores(Vc2Fw& fw) {
     fw.cpu.wr8(kVc2Entry, 1);
     fw.cpu.wr32(kVc2Entry + 4, kVc2StoreB);
     fw.cpu.wr32(kVc2Entry + 8, kVc2StoreA);
     fw.cpu.wr32(kVc2Parts, kVc2Entry);
 }
+
+namespace {
 
 // Where rom.4's routine aims a read object: its +4 less the store; -1 on a fault
 long aimed(Vc2Fw& fw, uint32_t routine, uint32_t store, int block, int cosm) {
@@ -215,29 +219,37 @@ int main(int argc, char** argv) {
         return 1;
     }
     saySections(found, typed);
-    pointAtStores(fw);
+    vc2PointAtStores(fw);
     long different = sections(fw, found);
     Vc2PatchTally values { "reads" }, slots { "typed reads" };
     std::mt19937 rng((unsigned)run->seed);
-    for (int s = 0; s < (int)files.size() + run->cases; ++s) {
+    const std::vector<Vc2PatchFile> inits = vc2PatchInitStores();   // v473: each Category's PATCH Init, after the files
+    for (int s = 0; s < (int)(files.size() + inits.size()) + run->cases; ++s) {
         const bool onDisk = s < (int)files.size();
+        const size_t init = (size_t)s - files.size();   // past the files: an init, then the random stores
         std::vector<uint8_t> store(kVc2StoreBytes);
         Vc2PatchFile read;
         if (onDisk && vc2PatchRead(files[(size_t)s].bytes.data(), files[(size_t)s].bytes.size(), read))
             store = read.store;
+        else if (!onDisk && init < inits.size())
+            store = inits[init].store;
         else
             for (uint8_t& b : store) b = (uint8_t)rng();
-        const std::string which = onDisk ? files[(size_t)s].name : "random store " + std::to_string(s);
+        const std::string which = onDisk ? files[(size_t)s].name
+                                  : init < inits.size() ? "the init of Category " + std::to_string(init)
+                                                        : "random store " + std::to_string(s);
         fw.cpu.write(kVc2StoreA, store.data(), store.size());
         reads(fw, found, store, which, values);
         typedReads(fw, typed, store, which, slots);
     }
-    const std::string over = std::to_string(files.size()) + " patches and " + std::to_string(run->cases) + " random";
+    const std::string over = std::to_string(files.size()) + " patches, " + std::to_string(inits.size()) + " inits and "
+                             + std::to_string(run->cases) + " random";
     different += values.say("values in every block, bits and value, over " + over);
     different += slots.say("typed values in every zone, over " + over);
     different += vc2PatchFiles(fw, files);
     different += vc2PatchSaves(files, run->cases, run->seed);
     different += vc2PatchSetters(files, run->seed);
+    different += vc2PatchInits(argv[1], files) + (inits.size() != (size_t)kVc2PatchCategories);   // v473
     std::printf("xt_vc2patch: %ld different\n", different);
     return different ? 1 : 0;
 }

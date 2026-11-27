@@ -56,6 +56,10 @@ editable.
 VC-2), load-time code, so it runs in the interpreter as the loaders do (CLAUDE.md) and is applied as a patch is
 (`loadPatch`). The work: find the routine (names first: the manual's Initialize), run it, a button in the patch box; with
 step 6, each plugin its own init.
+- v473 (claude/patch-init): both, each by its window's EXECUTE: rom.2's `0x89482540` and rom.4's `0x893291c0` by
+  Patch Category, the patch box's INIT a menu (Execute; the 12 Categories by rom.4's names) (HARDWARE_FIRMWARE.md,
+  "PATCH Init: the V-Synth's, and the VC-2's by Patch Category"). How the VC-2's offers its Category is asked of the
+  user; the menu is the recommendation, taken meanwhile.
 
 ### 5. Start Offset in time, and a line on the wave
 "start offset - change to ms/sec rather than samples - display a vertical line when editing". Today: Start Offset is

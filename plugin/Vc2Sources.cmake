@@ -196,5 +196,6 @@ target_sources(VSynthEmu PRIVATE
     Source/Vc2SynthOsMidiStart.cpp
     Source/Vc2PatchStore.cpp
     Source/Vc2PatchFile.cpp
+    Source/Vc2PatchInit.cpp
     Source/Vc2PartPlayer.cpp
 )

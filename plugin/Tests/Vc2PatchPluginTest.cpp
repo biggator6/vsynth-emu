@@ -3,7 +3,8 @@
 // in its zone and COSM (Vc2PatchStore, held to rom.4's own reads by xt_vc2patch), the store kept whole, the name its
 // own, and no V-Synth parameter moved.  Files that aren't one refused, nothing moved.  A session after a load: the VC-2's
 // parameters, the store and the name back in a new instance; one from before v452 (no store) its parameters as saved and
-// no store, in a new instance and in one that had a patch; one from before v451 too.
+// no store, in a new instance and in one that had a patch; one from before v451 too.  And (v473) each Category's PATCH
+// Init as rom.4's init of it reads, a Category past 11 refused.
 #include "Vc2PatchPluginTest.h"
 #include "TestChecks.h"
 #include "TestControls.h"
@@ -11,7 +12,9 @@
 #include "../Source/PluginParamIds.h"
 #include "../Source/PluginProcessor.h"
 #include "../Source/PluginVc2Params.h"
+#include "../Source/PluginVc2PatchInit.h"
 #include "../Source/Vc2PatchFile.h"
+#include "../Source/Vc2PatchInit.h"
 #include "../Source/Vc2PatchStore.h"
 #include <optional>
 
@@ -53,6 +56,12 @@ std::map<juce::String, float> systemOf(VSynthEmuProcessor& p, bool top) {
     return out;
 }
 
+// The patch `p` holds is `patch`: every VC-2 parameter as its store reads, the store kept whole, the name its own
+bool holds(VSynthEmuProcessor& p, const Vc2PatchFile& patch) {
+    return againstStore(p, patch.store) == 0 && p.vc2PatchStore() == patch.store
+           && p.vc2PatchName() == juce::String(patch.name);
+}
+
 void eachFile(TestChecks& check, const std::vector<DiskPatch>& patches, const juce::File& work) {
     VSynthEmuProcessor p;
     const auto system = systemOf(p, true);
@@ -66,14 +75,38 @@ void eachFile(TestChecks& check, const std::vector<DiskPatch>& patches, const ju
             ++refused;
             continue;
         }
-        const bool asRead = againstStore(p, read.store) == 0 && p.vc2PatchStore() == read.store
-                            && p.vc2PatchName() == juce::String(read.name);
-        if (!asRead && wrong++ < 3) check(false, d.name + " isn't on the VC-2's parameters as its store reads");
+        if (!holds(p, read) && wrong++ < 3) check(false, d.name + " isn't on the VC-2's parameters as its store reads");
         if (parameterValues(p, false) != before || systemOf(p, false) != system) ++movedOthers;
     }
     check(patches.size() == kDiskPatches, "the disk image's 128 VC-2 patches, not " + std::to_string(patches.size()));
     check(refused == 0 && wrong == 0, std::to_string(refused) + " refused, " + std::to_string(wrong) + " not as read");
     check(movedOthers == 0, std::to_string(movedOthers) + " moved a V-Synth parameter or a VC-2 system one");
+}
+
+// The PATCH Init of each Category (v473), one after another on one processor: the patch it holds rom.4's init of that
+// Category, named INIT PATCH, no V-Synth parameter or VC-2 system one moved; a Category past 11 refused, nothing moved
+void inits(TestChecks& check) {
+    VSynthEmuProcessor p;
+    const auto system = systemOf(p, true);
+    long wrong = 0, movedOthers = 0;
+    for (int c = 0; c < kVc2PatchCategories; ++c) {
+        Vc2PatchFile init;
+        std::string why;
+        const auto before = parameterValues(p, false);
+        if (!vc2PatchInit(c, init, &why) || !initVc2Patch(p, c, &why)) {
+            check(false, "Category " + std::to_string(c) + "'s init should run: " + why);
+            continue;
+        }
+        if ((!holds(p, init) || init.name != "INIT PATCH") && wrong++ < 3)
+            check(false, "Category " + std::to_string(c) + " isn't on the VC-2's parameters as its init reads");
+        if (parameterValues(p, false) != before || systemOf(p, false) != system) ++movedOthers;
+    }
+    check(wrong == 0, std::to_string(wrong) + " Categories' inits not as rom.4's reads");
+    check(movedOthers == 0, std::to_string(movedOthers) + " inits moved a V-Synth parameter or a VC-2 system one");
+    const auto before = parameterValues(p, true);
+    const std::vector<uint8_t> store = p.vc2PatchStore();
+    check(!initVc2Patch(p, kVc2PatchCategories) && parameterValues(p, true) == before && p.vc2PatchStore() == store,
+          "a Category past 11 should be refused, nothing moved");
 }
 
 // A V-Synth patch, a file of text, one too short and none: refused, nothing moved
@@ -132,5 +165,6 @@ int vc2PatchPluginTest(const juce::File& rom, const juce::File& work) {
     eachFile(check, patches, work);
     notOnes(check, rom, work);
     sessions(check, patches, work);
+    inits(check);   // v473
     return check.summary();
 }

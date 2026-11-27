@@ -730,6 +730,7 @@ patches: 512 in the image (lengths 0x146c 0, 0x14ac 0, 0x14f2 0, other 512), 512
 short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 values the firmware's defaults, after it 98 its own, 0 not; 3 of those defaults aren't the descriptors'
 links: 224 preset waves, 77 SOLO, 134 BACKING, 13 ENSEMBLE, 9556574 frames, the last PRC-UduPot at 0x218b200; 224 link files in Internal.prj/Wave naming 224 of them, 0 wrong; 0 unread; hash 3f103b01fd1f2034
 saved: 512 of the image's 512 patches back as their files; 1481 values set by the firmware's setter, 0 read otherwise; 1131 typed, 0 read otherwise
+init: EXECUTE (0x893c5a10) on part 0 over an image patch against xtFwPatchInit, 0 bytes different, the other 15 parts' 0 moved, the change asked for part 0; CANCEL 0 bytes moved, closed; named "INIT PATCH"; the default under a file against the init named "", 0 bytes different, which is apart from this one in 401 values; 12385 values against the firmware's reads, 0 out of range, 0 different; 0 wrong
 == xt_arp
 presets: 117 cases, 646719 operations, 10790 messages, 10717 states, 0 different
 random: 1000 cases, 4537707 operations, 224687 messages, 110830 states, 0 different
@@ -915,13 +916,14 @@ xt_vc2synth: 0 different
 == xt_vc2patch
 sections from 0x120 0x1b6 0x23c 0x270 0x2d3 0x390 0x439 0x462 0x4a6 0x4b4 to 0x4f6; typed blocks from 0x56a (slots from 0x1bb) 0x7ce (slots from 0x23f) 0x819 (slots from 0x272) 0x926 (slots from 0x464)
 sections: 8972 IDs placed, at every block, against rom.4's pointing routines, 0 different
-reads: 1439592 values in every block, bits and value, over 128 patches and 40 random, 0 different
-typed reads: 880992 typed values in every zone, over 128 patches and 40 random, 0 different
+reads: 1542420 values in every block, bits and value, over 128 patches, 12 inits and 40 random, 0 different
+typed reads: 943920 typed values in every zone, over 128 patches, 12 inits and 40 random, 0 different
 files: 149 read, 128 of them the disk image's, the rest made otherwise, 0 different
 saved, the image's patches: 128 back as their files and their stores, 0 different
 saved, drawn stores: 40 whose files read back write them again, 0 different
 set, first bank: 1517 values by rom.4's setter, read back, no other byte moved, 0 different
 set, typed: 1224 typed values by rom.4's setter, read back, no other byte moved, 0 different
+inits: 25 checked: the EXECUTEs of the 12 Categories (12 stores distinct) and the other window's against vc2PatchInit, the 12 names against the labels rom.4 draws; CANCEL, the default under a .p02, 0 different
 xt_vc2patch: 0 different
 == xt_vc2waves
 the disk image's index: 58 waves, 43 maps, 192 samples

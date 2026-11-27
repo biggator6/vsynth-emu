@@ -75,13 +75,16 @@ void presses(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {
     ed.showPage(Blocks::kSynthPage);
 }
 
-// Whether c is drawn: a size, and it and every parent up to root shown (the editor is on no desktop, so not isShowing)
+} // namespace
+
 bool seen(juce::Component* c, juce::Component& root) {
     if (c == nullptr || c->getBounds().isEmpty()) return false;
     for (juce::Component* at = c; at != nullptr && at != &root; at = at->getParentComponent())
         if (!at->isVisible()) return false;
     return true;
 }
+
+namespace {
 
 // A patch's note as a session brings it back, and the header told (its timer's refresh)
 void withNote(VSynthEmuProcessor& p, SynthEditor& ed, const juce::String& note) {
@@ -101,7 +104,7 @@ void chrome(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& 
         return l.firstOf<juce::Label>([&text](juce::Label& x) { return x.getText() == text; });
     };
     check(seen(labelOf(build), ed), ("the build, " + build + ", isn't on the header").toStdString());
-    for (const char* text : { "Browse...", "Save...", "ROM..." })   // Save… from v602
+    for (const char* text : { "Browse...", "Save...", "INIT", "ROM..." })   // Save… from v602, INIT v473
         check(seen(l.buttonOf(text), ed), std::string(text) + " isn't on the header");
     for (int osc = 0; osc < Blocks::kOscs; ++osc) setParam(p, Params::oscId(osc, Params::kOscType), 1.0f);
     for (FacedPanel* panel : LayoutCheck::allOf<FacedPanel>(ed.drawing())) panel->refresh();   // as the timer does

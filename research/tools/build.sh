@@ -18,11 +18,13 @@ FW=(XtFirmware.cpp $( [ -f XtFwMachine.cpp ] && echo XtFwMachine.cpp ))   # the 
 SH4=(Sh4Interp.cpp $( [ -f Sh4Setup.cpp ] && echo Sh4Setup.cpp ))   # the interpreter and its setup (v197 on)
 # V-Synth's files: patches, a wave's chunks, and the firmware's disk image (its own file from v177 on); the patch store's
 # layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on); the preset waves a
-# project's link reaches, and their check (v600); a patch's save by the firmware's routines, and its check (v602)
+# project's link reaches, and their check (v600); a patch's save by the firmware's routines, and its check (v602); the
+# PATCH Init by the firmware's, its check, and the shorter patch's check moved out of the store's (v473)
 VF=(XtFiles.cpp XtWaveFile.cpp $( [ -f XtDiskImage.cpp ] && echo XtDiskImage.cpp )
     $( [ -f XtPatchStore.cpp ] && echo XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp )
     $( [ -f XtPresetWaves.cpp ] && echo XtPresetWaves.cpp XtPresetWavesCheck.cpp )
-    $( [ -f XtFwPatchFile.cpp ] && echo XtFwPatchFile.cpp XtPatchSaveCheck.cpp ))
+    $( [ -f XtFwPatchFile.cpp ] && echo XtFwPatchFile.cpp XtPatchSaveCheck.cpp )
+    $( [ -f XtFwPatchInit.cpp ] && echo XtFwPatchInit.cpp XtPatchInitCheck.cpp XtPatchShortCheck.cpp ))
 # The arpeggiator in XtSynth (v189): the router and what it sends, the engine (v188), the tempo ticks and a patch's reads
 SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp \
       XtTempoTicks.cpp ))
@@ -47,11 +49,12 @@ BUILT=(xt_osc xt_cosm xt_lfo xt_env xt_fw xt_enc xt_analog xt_synth xt_tone xt_f
        xt_vc2keys xt_vc2sets xt_vc2settings xt_vc2midi xt_vc2synth xt_vc2patch xt_vc2waves xt_vc2kernel)
 for b in "${BUILT[@]}"; do rm -f "$O/$b"; done
 # rom.4's patch store and its .p02 reader (v450) against rom.4's own routines, on the disk image's patches; and from
-# v505 rom.4's patch save, its writer and setters run in the interpreter, against the reader and the port's reads
+# v505 rom.4's patch save, its writer and setters run in the interpreter, against the reader and the port's reads; from
+# v473 rom.4's PATCH Init by Patch Category, its window's EXECUTE run
 [ -f Vc2PatchStoreCheck.cpp ] && cc -DXT_VC2PATCH_MAIN Vc2PatchStoreCheck.cpp Vc2PatchFileCheck.cpp Vc2PatchStore.cpp \
    Vc2PatchFile.cpp Vc2Params.cpp XtFxValueText.cpp XtPatchStore.cpp XtDiskImage.cpp "${FW[@]}" XtMultiBandPlayer.cpp \
    $( [ -f Vc2PatchSave.cpp ] && echo Vc2PatchSave.cpp Vc2PatchSaveCheck.cpp ) XtSoloVoice.cpp "${SH4[@]}" \
-   -o "$O/xt_vc2patch" &
+   $( [ -f Vc2PatchInit.cpp ] && echo Vc2PatchInit.cpp Vc2PatchInitCheck.cpp ) -o "$O/xt_vc2patch" &
 # rom.4's wave loaders (v500) against rom.4's own, their file calls answered alike: the index's parse, the store's pool
 [ -f Vc2WavesCheck.cpp ] && cc -DXT_VC2WAVES_MAIN Vc2WavesCheck.cpp Vc2WaveIndexCheck.cpp Vc2WaveIndex.cpp \
    Vc2WaveSets.cpp Vc2WaveStore.cpp Vc2PartSettingsWords.cpp XtDiskImage.cpp \

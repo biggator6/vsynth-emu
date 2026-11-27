@@ -67,6 +67,9 @@ void padChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
 void vc2Checks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check,
                const std::function<void()>& sizes);
 void vc2TextChecks(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// Whether c is drawn: a size, and it and every parent up to root shown (the editor is on no desktop, so not isShowing;
+// EditorTest.cpp's, from v473 the VC-2's INIT's too)
+bool seen(juce::Component* c, juce::Component& root);
 // The patch box's project (EditorPatchBoxTest.cpp, v601): its arrows grey with no patch browsed and at a project's ends,
 // ▶ and ◀ loading the next and the one before, the project's line saying where; a project's patches by slot
 void patchBoxChecks(LayoutCheck& l, VSynthEmuProcessor& p, const juce::File& rom, const juce::File& work,

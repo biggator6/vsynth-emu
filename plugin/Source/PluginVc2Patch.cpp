@@ -95,16 +95,20 @@ bool VSynthEmuProcessor::loadVc2Patch(const juce::File& file) {
         setStatus("Not a VC-2 patch: " + file.getFileName() + ": " + juce::String(why));
         return false;
     }
+    applyVc2Patch(read.name, read.store);
+    return true;
+}
+
+void VSynthEmuProcessor::applyVc2Patch(const std::string& name, const std::vector<uint8_t>& store) {
     for (const Vc2HostParam& h : vc2HostParams())
-        if (const auto v = vc2PatchValue(read.store, h)) set(h.paramId, (float)*v);
+        if (const auto v = vc2PatchValue(store, h)) set(h.paramId, (float)*v);
     {
         const std::lock_guard<std::mutex> hold(vc2Patch_.lock);
-        vc2Patch_.store = read.store;
-        vc2Patch_.name = read.name;
+        vc2Patch_.store = store;
+        vc2Patch_.name = name;
         ++vc2Patch_.gen;   // v455: the part's patch starts again from it
     }
-    setStatus("VC-2 patch: " + juce::String(read.name));
-    return true;
+    setStatus("VC-2 patch: " + juce::String(name));
 }
 
 std::vector<uint8_t> VSynthEmuProcessor::vc2PatchStore() const {

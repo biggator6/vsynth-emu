@@ -40,10 +40,15 @@ and (v602, the user's choice: Save and Save As) Save…, a menu of Save over the
 As…, a file to choose with the project's next free slot offered and the patch named after it (`UiPatchSave`); the
 file saved becomes the patch browsed; and (v603) Save Project As…, a new project's folder to name, the project
 copied with the patch in its slot and its outside waves added, what it wrote said after, with the plain WAVs the XT
-must import. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save….
+must import. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save…. And (v473, the user's
+"need a patch init") INIT, left of Browse…, 44 wide: a menu under the XT's own words, INITIALIZE PATCH, whose choice
+runs the mode's PATCH Init: the V-Synth's one item, Execute (rom.2's init, "INIT PATCH"); the VC-2's the 12 Patch
+Categories by rom.4's own names, as its window offers them (rom.4's init of the one chosen); the patch played changes,
+the patch browsed and its project stay, as on the XT. The name squeezes to half its width before it is cut, as the lines
+under it do: in VC-2 mode INIT and the MIC chip leave it 74 wide.
 A project is the XT's folder (`NAME.prj`, a VC-2's `NAME.vc2`) and its `Patch` folder's patches by slot
 (`PluginProject`); a patch outside a Patch folder is browsed with its own folder's. A mode's patches are a row of one
-table (`kPatchKinds`: the V-Synth's `.p00`, the VC-2's `.p02`, each load, name and note), so the VC-2's projects browse
+table (`kPatchKinds`: the V-Synth's `.p00`, the VC-2's `.p02`, each load, name, note, save and init), so the VC-2's projects browse
 the same way. The session keeps the patch browsed (`patchFile`, `vc2PatchFile`), so a reopened session browses on.
 `VSynthEmuEditorTest`'s `patchBoxChecks` (`EditorPatchBoxTest.cpp`) and the `editor-d-box-` plants.
 

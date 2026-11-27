@@ -2,11 +2,12 @@
 // takes"): the header's switch and the session's mode; each page and each block at three sizes; for each zone, chosen by
 // the path's chips, each OSC's and COSM's panel on every face, each block's SELECTED and DETAILS on every face, the Time
 // Trip column and AMP moving their own instance's parameters alone, the zone's and the patch's; each Matrix Control and
-// zone cell its own.
+// zone cell its own; and (v473) INIT on the header, its Category's choice giving that Category's PATCH Init.
 #include "EditorTest.h"
 #include "TestControls.h"
 #include "../Source/PluginVc2Params.h"
 #include "../Source/UiModPage.h"
+#include "../Source/UiPatchBox.h"
 #include "../Source/UiVc2Kinds.h"
 #include "../Source/UiVc2Text.h"
 #include "../Source/UiZonesPage.h"
@@ -17,6 +18,8 @@ namespace {
 using Blocks::Kind;
 constexpr int kCurrentZone = 0x140, kMatrixFirst = 0x16a, kMatrixLast = 0x191, kMatrixStride = 5, kFirstUpper = 0x141;
 constexpr int kOscType = 0x2e5, kCosmType = 0x463, kOscKnobs = OscPanel::kBig + OscPanel::kSmall;
+constexpr int kPatchCategory = 0x12c, kInitCategory = 3;   // [FW] Patch Category; the one INIT's check chooses (v473)
+constexpr int kCategories = 12;                             // [FW] its range, 0…11
 
 // A VC-2 host ID read back: its rom.4 ID, zone and COSM, and whether it is a zone's (its zone 2 twin is in the set)
 struct HostId {
@@ -190,4 +193,18 @@ void vc2Checks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
     ed.vc2Synth().refresh();
     pages(l, ed, check, sizes);
     ed.showPage(Blocks::kSynthPage);
+    // INIT in VC-2 mode (v473): on the header, and its menu's Category 3 gives that Category's PATCH Init
+    PatchBox* box = l.firstOf<PatchBox>([](PatchBox&) { return true; });
+    juce::Button* init = l.buttonOf("INIT");
+    check(box != nullptr && seen(init, ed), "INIT isn't on the VC-2's header");
+    const juce::StringArray choices = box != nullptr ? box->initChoices() : juce::StringArray();
+    juce::StringArray distinct = choices;
+    distinct.removeDuplicates(false);
+    distinct.removeEmptyStrings();
+    check(choices.size() == kCategories && distinct.size() == kCategories,
+          "INIT's menu should offer the 12 Categories by name, not " + choices.joinIntoString(", ").toStdString());
+    if (box != nullptr) box->initialize(kInitCategory);
+    check(p.vc2PatchName() == "INIT PATCH"
+              && Controls::paramValue(p.apvts, vc2HostParamId(kPatchCategory, 0, 0)) == kInitCategory,
+          "INIT's Category 3 should give its PATCH Init, not " + p.vc2PatchName().toStdString());
 }

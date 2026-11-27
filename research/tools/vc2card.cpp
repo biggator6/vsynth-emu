@@ -41,15 +41,7 @@ constexpr uint32_t kPatchFolder = 0x89341e90;
 constexpr uint32_t kMakeBank = 0x8931a940;
 // In the RAM the boot maps (0x8C000000, 1 MB), well below its stack (0x8C0E0000)
 constexpr uint32_t kScratch = 0x8C0A0000, kRecord = 0x8C0A1000, kOut = 0x8C0A1010;
-constexpr int kNameFirst = 0x120, kNameChars = 12;   // [FW] Patch Name 1-12
 constexpr const char* kDiskImage = "V-SynthXTDiskImage.bin.0.bin";
-
-std::string storeName(const std::vector<uint8_t>& store) {
-    std::string name;
-    for (int k = 0; k < kNameChars; ++k) name += (char)xtStoreRaw(vc2Store(), store, kNameFirst + k);
-    while (!name.empty() && name.back() == ' ') name.pop_back();
-    return name;
-}
 
 // A file's patch name as v450's reader reads it (rom.4's reader on its own file calls), to know it in the bank
 std::string storeNameOfFile(const std::vector<uint8_t>& file) {
@@ -109,7 +101,7 @@ void printBank(Sh4& c) {
     for (uint32_t n = 1; first && n <= count; ++n) {
         std::vector<uint8_t> store(kPatchBytes);
         c.read(first + kPatchBytes * (n - 1), store.data(), store.size());
-        const std::string name = storeName(store);
+        const std::string name = vc2PatchStoreName(store);   // Vc2PatchFile's (v474)
         if (!name.empty() && name != "INIT PATCH") std::printf("     %3u  %s\n", n, name.c_str());
     }
 }

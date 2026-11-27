@@ -738,6 +738,35 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+PATCH Init v473 (2026-11-27, on claude/patch-init from vc2-mode f1c0797; HARDWARE_FIRMWARE.md, "PATCH Init: the
+  V-Synth's, and the VC-2's by Patch Category"; NEXT_ISSUES.md item 4), the V-Synth's and the VC-2's in one version
+  (the patch box, CMakeLists and the editor's tests hold both), each found by the manual's PATCH Init and INITIALIZE
+  PATCH (both images' strings) and its window's EXECUTE, run in the interpreter, applied as its mode's patch is:
+  - the V-Synth's: rom.2's 0x89482540(store, no name) (0x893c5a10 → 0x8947fdb0 on part 0), xtFwPatchInit, initPatch
+    (applyPatch with no wave folder), "INIT PATCH". A finding: a .p00's default base is the same routine with an empty
+    name, which skips the effects' and zones' settings PATCH Init writes (401 values apart). xt_files' init: line (the
+    EXECUTE run on part 0, 0 bytes different; CANCEL; the default; the store against the firmware's reads, 12,385
+    values 0 different; fcheck baseline +1 line, the only difference); VSynthEmuProjectTest's init part (saved
+    unchanged, the init's store byte for byte).
+  - the VC-2's: rom.4's 0x893291c0(store, no name, category) (0x89493f40 → 0x89326c60 on part 0, the Category its
+    window's buttons chose), vc2PatchInit, initVc2Patch (applyVc2Patch, loadVc2Patch's apply made its own); the 12
+    Categories' names from rom.4's table (0x8994a638), as its patch display draws them. xt_vc2patch's inits: line (each
+    Category's EXECUTE 0 bytes different, 12 distinct, the other window's Category 0, the names as rom.4 draws them,
+    each two lines, CANCEL, the .p02's default Category 0's init itself, as rom.4 takes an empty name as none, unlike
+    rom.2; the 12 read by rom.4's reads, 0 different).
+  Plants: mutate_files.py whole 70, 0 missed (4 patchinit new); mutate_panel.py 32 (the box's, init-, save-, project-)
+  and 46 (vc2-patch-, vc2-init-, editor-vc2-, the box's again, rom4-no-patchfiles, step-), 0 missed; mutate_vc2.py
+  --patch --changed 38, 2 missed and both answered (an empty name is none in rom.4, so that plant now names the patch;
+  the names' read was checked by itself, so each name must now be two lines, which showed the first reader wrong: a
+  label is one string with a newline between its lines; then init-named, init-label-lines and init-label-cut caught),
+  --synth --changed 7, 0 missed; verify.sh: every line passed (fcheck as baseline, the editor 5232/5232, the project
+  test 53/53, the VC-2 patch part 19/19, auval on both AUs);
+  mutate_tone.py --changed: no plants reach the files changed.
+  The patch box's INIT: a menu under INITIALIZE PATCH, the V-Synth's Execute, the VC-2's 12 Categories (the
+  recommendation asked of the user, taken while the answer is pending). Made one: xtfw::forCalls (rom.4's machines),
+  vc2PatchTake/vc2PatchStoreName, xtPatchStoreName, xtfile::storeBytesApart, XtInitAsked (XtPatchInitWindow.h);
+  XtPatchStoreCheck.cpp split (the shorter patch's check to XtPatchShortCheck.cpp).
+
 The VC-2 heard dry in REAPER v461 (2026-11-26; HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"): not the
   plugin's. VSynthEmuVc2PlayTest's render mode (Vc2PlayRender.cpp: a .p02 or a session's state, a rate, Effects, a
   saw or a file on the input, a held chord, `seconds=`) vocodes the user's own project state and vocal offline; the

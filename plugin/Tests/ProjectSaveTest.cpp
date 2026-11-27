@@ -17,21 +17,18 @@
 namespace {
 constexpr int kMfxType = 0x177, kCosmType = 0x3e8, kTvf = 10, kTvfCutoff = 0x924, kTvaLevel = 0x29a;
 constexpr int kMfxMaster = 0x178, kFieldBytes = 4;   // a moved value's bytes in the store, at most (32-bit IDs)
+using xtfile::storeBytesApart;
+} // namespace
 
-// How many bytes of two stores differ
-int storeBytesMoved(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
-    int n = 0;
-    for (size_t i = 0; i < std::min(a.size(), b.size()); ++i) n += a[i] != b[i];
-    return n + static_cast<int>(std::max(a.size(), b.size()) - std::min(a.size(), b.size()));
-}
-
-// The patch as the processor would save it now, read back by the firmware's reader
+// The patch as the processor would save it now, read back by the firmware's reader (ProjectTest.h; v473's init too)
 std::optional<XtPatchFile> savedNow(const VSynthEmuProcessor& p, const juce::String& name) {
     std::vector<uint8_t> file;
     XtPatchFile read;
     if (!patchFileOf(p, name, file) || !xtPatchRead(file.data(), file.size(), read)) return std::nullopt;
     return read;
 }
+
+namespace {
 
 void unchangedSaves(VSynthEmuProcessor& p, const std::vector<ImagePatch>& image, const juce::File& work,
                     TestChecks& check) {
@@ -47,7 +44,7 @@ void unchangedSaves(VSynthEmuProcessor& p, const std::vector<ImagePatch>& image,
         }
         XtPatchFile read;
         const bool readable = xtPatchRead(file.data(), file.size(), read);
-        const int moved = readable ? storeBytesMoved(read.store, m.store) : -1;
+        const long moved = readable ? storeBytesApart(read.store, m.store) : -1;
         const std::string ids = readable ? ", " + idsMoved(m.store, read.store) : std::string();
         if (first.empty())
             first = m.name + ": " + (why.empty() ? std::to_string(moved) + " bytes of its store moved" + ids : why);
@@ -69,7 +66,8 @@ void movedLands(VSynthEmuProcessor& p, const ImagePatch& m, const juce::File& wo
     p.applyPatch(m.name, m.store, 0, work);
     v.move();
     const auto saved = savedNow(p, juce::String(m.name));
-    const int read = saved ? v.read(saved->store) : -1, moved = saved ? storeBytesMoved(saved->store, m.store) : -1;
+    const int read = saved ? v.read(saved->store) : -1;
+    const long moved = saved ? storeBytesApart(saved->store, m.store) : -1;
     check(saved && read == v.want && moved > 0 && moved <= kFieldBytes,
           v.what + " should land in the saved patch alone: read " + std::to_string(read) + ", wanted "
               + std::to_string(v.want) + "; " + std::to_string(moved) + " bytes of the store moved");
