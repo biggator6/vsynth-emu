@@ -2,8 +2,6 @@
 #include "UiPatchBox.h"
 #include "PluginPatchInit.h"
 #include "PluginPatchSave.h"
-#include "PluginVc2PatchInit.h"
-#include "Vc2PatchInit.h"
 #include "UiLook.h"
 #include "UiParts.h"
 #include "UiPatchSave.h"
@@ -15,12 +13,13 @@ constexpr int kBrowseW = 76, kPatchTagW = 56, kArrowW = 18, kArrowH = 14, kButto
 constexpr int kSaveW = 56, kInitW = 44;
 constexpr float kMark = 3.5f;   // the menu mark's half width
 constexpr const char* kInitTitle = "INITIALIZE PATCH";   // [FW] the XT's own words over its PATCH Init's EXECUTE
+constexpr const char* kInitRun = "Execute";               // INIT's one choice, as the XT's window's EXECUTE
 constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                        | juce::FileBrowserComponent::canSelectDirectories;
 
 // A mode's patches: what Browse… asks for, their files' extension, where the session keeps the one browsed, the load,
 // the name and note shown, the save (v602) and the project's (v603): none for the VC-2's, whose patches rom.4 writes;
-// the PATCH Init (v473) by the choice its menu offers, and those choices
+// the PATCH Init (v473): none for the VC-2's (v474, the user's "vc-2 mode doesn't need an init")
 struct PatchKind {
     const char* title;
     const char* extension;
@@ -30,31 +29,19 @@ struct PatchKind {
     juce::String (*note)(const VSynthEmuProcessor&);
     bool (*save)(const VSynthEmuProcessor&, const juce::String&, const juce::File&, std::string*);
     bool (*saveProject)(const VSynthEmuProcessor&, const juce::File&, const juce::File&, ProjectSaved&, std::string*);
-    bool (*init)(VSynthEmuProcessor&, int choice, std::string*);
-    juce::StringArray (*initChoices)();
+    bool (*init)(VSynthEmuProcessor&, std::string*);
 };
-
-// The V-Synth's PATCH Init takes no choice: its menu's one, Execute.  The VC-2's (v473) takes a Patch Category, its
-// menu rom.4's 12 by its own names, as rom.4's window offers them
-bool vsynthInit(VSynthEmuProcessor& p, int, std::string* why) { return initPatch(p, why); }
-juce::StringArray vsynthInitChoices() { return juce::StringArray("Execute"); }
-juce::StringArray vc2InitChoices() {
-    juce::StringArray out;
-    for (const std::string& name : vc2PatchCategoryNames()) out.add(juce::String(name));
-    return out;
-}
 
 // In PluginMode's order
 constexpr std::array<PatchKind, 2> kPatchKinds { {
     { "Load a V-Synth patch, or a project's folder", "p00", "patchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadPatch(f); },
       [](const VSynthEmuProcessor& p) { return p.getPatchName(); },
-      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch, saveProject, vsynthInit,
-      vsynthInitChoices },
+      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch, saveProject, initPatch },
     { "Load a VC-2 patch, or a project's folder", "p02", "vc2PatchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadVc2Patch(f); },
       [](const VSynthEmuProcessor& p) { return p.vc2PatchName(); },
-      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr, nullptr, initVc2Patch, vc2InitChoices },
+      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr, nullptr, nullptr },
 } };
 
 const PatchKind& patchKindOf(PluginMode mode) { return kPatchKinds[static_cast<size_t>(mode)]; }
@@ -69,7 +56,7 @@ PatchBox::PatchBox(VSynthEmuProcessor& p)
     Look::setTextLook(projectLine_, Look::sans(10.0f), Look::muted, juce::Justification::centredLeft);
     patchNote_.setMinimumHorizontalScale(0.5f);
     projectLine_.setMinimumHorizontalScale(0.5f);
-    patchName_.setMinimumHorizontalScale(0.5f);   // v473: as the lines under it, where INIT and the MIC chip leave less
+    patchName_.setMinimumHorizontalScale(0.5f);   // v473: as the lines under it, where the buttons beside it leave less
     patchName_.setInterceptsMouseClicks(false, false);   // a click on the name is the box's: the project's menu
     browse_.onClick = [this] { choose(); };
     save_.onClick = [this] { save(); };
@@ -95,29 +82,22 @@ void PatchBox::setMode(PluginMode mode) {
     refresh();
 }
 
-// INIT: the mode's choices under the XT's own words, the one chosen run.  Told nothing once the box is gone.
+// INIT: Execute under the XT's own words, run when chosen.  Told nothing once the box is gone.
 void PatchBox::askInit() {
-    const PatchKind& kind = patchKindOf(mode_);
-    if (!kind.init) return;
+    if (!patchKindOf(mode_).init) return;
     juce::PopupMenu menu;
     menu.addSectionHeader(kInitTitle);
-    const juce::StringArray choices = initChoices();
-    for (int i = 0; i < choices.size(); ++i) menu.addItem(i + 1, choices[i]);
+    menu.addItem(1, kInitRun);
     const juce::Component::SafePointer<PatchBox> box(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&init_), [box](int chosen) {
-        if (box != nullptr && chosen > 0) box->initialize(chosen - 1);
+        if (box != nullptr && chosen > 0) box->initialize();
     });
 }
 
-juce::StringArray PatchBox::initChoices() const {
-    const PatchKind& kind = patchKindOf(mode_);
-    return kind.initChoices ? kind.initChoices() : juce::StringArray();
-}
-
-void PatchBox::initialize(int choice) {
+void PatchBox::initialize() {
     const PatchKind& kind = patchKindOf(mode_);
     std::string why;
-    if (kind.init && !kind.init(processor_, choice, &why))
+    if (kind.init && !kind.init(processor_, &why))
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, kInitTitle, juce::String(why));
     refresh();
 }

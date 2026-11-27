@@ -3,10 +3,9 @@
 // it out): the patch's name, under it what the patch asks for that isn't here, Browse… to load a patch or (v601) a
 // project; and the patch's project to browse (v601, the user's choice of 2026-11-24): ◀ and ▶ load the previous and next
 // of its patches, a click on the name opens a menu of them all, the project's name over them; and (v602) Save…, Save over
-// its file or Save As (UiPatchSave.h); and (v473) INIT, a menu under the XT's own words, INITIALIZE PATCH, whose choice
-// runs the mode's PATCH Init.  Each mode's patches are a row of one table (kPatchKinds: its file type, its load, its name
-// and note, where the session keeps the patch browsed, its save: none for the VC-2's; its init and the choices it
-// offers).
+// its file or Save As (UiPatchSave.h); and (v473) INIT, a menu under the XT's own words, INITIALIZE PATCH, whose Execute
+// runs the V-Synth's PATCH Init.  Each mode's patches are a row of one table (kPatchKinds: its file type, its load, its
+// name and note, where the session keeps the patch browsed, its save and its init: neither for the VC-2's, v474).
 #include "PluginMode.h"
 #include "PluginProcessor.h"
 #include "PluginProject.h"
@@ -21,9 +20,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     void mouseUp(const juce::MouseEvent&) override;   // on the name: the project's menu
-    // INIT's menu chose `choice` (0 for the V-Synth's one): the mode's PATCH Init, a failure said (v473; a test's way in)
-    void initialize(int choice);
-    juce::StringArray initChoices() const;   // what INIT's menu offers in the mode shown (v473: the VC-2's Categories)
+    // INIT's menu chose Execute: the mode's PATCH Init, a failure said (v473; a test's way in)
+    void initialize();
 
 private:
     VSynthEmuProcessor& processor_;

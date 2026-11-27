@@ -63,9 +63,8 @@ tables with D's parts:
 The page bar reads SYNTH, VOCODER, MODULATION, FX, PLAY, ZONES. What the VC-2 mode differs in, against D's V-Synth pages:
 
 - **The header**: the mode switch at VC-2 (lit, no longer greyed); the patch box a `.p02`'s name (`vc2PatchName`), its
-  Browse… loading a `.p02` (`loadVc2Patch`), and (v473) its INIT a menu of the 12 Patch Categories by rom.4's names,
-  rom.4's PATCH Init of the one chosen (`initVc2Patch`); the tempo the Patch Tempo, 0x13a; a MIC chip between the patch box and the
-  tempo ("6. The mic's state"); the Effects switch and the ROM's state as they are, the state rom.4's.
+  Browse… loading a `.p02` (`loadVc2Patch`), and no INIT (v474, the user's "vc-2 mode doesn't need an init"); the
+  tempo the Patch Tempo, 0x13a; a MIC chip between the patch box and the tempo ("6. The mic's state"); the Effects switch and the ROM's state as they are, the state rom.4's.
 - **No Multi Step Modulator**: rom.4 has none, so MODULATION has no MSM card.
 - **No loaded waves**: a VC-2 OSC on PCM plays the VC-2's library by its Wave Number, so the OSC panel has no Load…
   and DETAILS no Key, Loop Start, Loop End or Original Tempo (the plugin's own settings for a loaded file).

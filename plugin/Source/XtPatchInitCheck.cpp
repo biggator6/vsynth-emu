@@ -5,7 +5,7 @@
 // routine given an empty name: that run's store byte for byte.  It differs from the PATCH Init's in what 0x89482540
 // writes only for a patch it names itself (its branch at 0x894828a0: the effects' switch and types, Matrix Control 5,
 // each zone's tone and COSMs).  And the init's store against the firmware's reads, as the image's patches are checked
-// (xtPatchCheckStore).  The callback's hooked calls are XtPatchInitWindow.h's, xt_vc2patch's too.
+// (xtPatchCheckStore).  The callback's hooked calls are XtPatchInitWindow.h's.
 #ifdef XT_FILES_MAIN
 #include "XtFirmware.h"
 #include "XtFwMachine.h"

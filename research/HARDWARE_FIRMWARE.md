@@ -1546,6 +1546,24 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 mode without a PATCH Init (2026-11-27, v474) {#vc2-no-init}
+
+The user's answer to v473's question of how the VC-2's INIT should offer its Patch Category: "vc-2 mode doesn't need
+an init". So the patch box shows INIT in V-Synth mode alone (its VC-2 row has no init, so no button), and what v473
+added for rom.4's init is out: `vc2PatchInit` and `vc2PatchCategoryNames` (Vc2PatchInit.cpp), `initVc2Patch`
+(PluginVc2PatchInit.cpp), xt_vc2patch's `inits:` part (Vc2PatchInitCheck.cpp) and the 12 inits among its reads, their
+plants and tests. The V-Synth's PATCH Init is unchanged. Kept, each with callers of its own: `applyVc2Patch`
+(loadVc2Patch's apply), `xtfw::forCalls`, `vc2PatchStoreName`, and `XtInitAsked` (XtPatchInitWindow.h, now xt_files'
+alone); `vc2PatchTake` went back into `vc2PatchRead`.
+
+What rom.4's init is stays as v473 found it (below): `0x893291c0(store, name, category)`, its window, the Category
+names' table and how rom.4 draws them, and that a .p02's base is Category 0's init itself. Its port and check are in
+d696a0f (claude/patch-init), should the VC-2 mode want one later.
+
+**Checks.** VSynthEmuEditorTest: no INIT on the VC-2's header (`editor-vc2-box-init-shown` and
+`editor-vc2-box-init-given` plant one); the V-Synth's INIT as v473 left it. xt_vc2patch's reads back to the image's
+patches and the random stores, fcheck's baseline as before v473 there.
+
 ### PATCH Init: the V-Synth's, and the VC-2's by Patch Category (2026-11-27, v473) {#patch-init}
 
 For research/NEXT_ISSUES.md item 4, the user's "need a patch init" (2026-11-27). Each image's own initialize, run in

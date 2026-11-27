@@ -1,8 +1,7 @@
 #pragma once
-// The PATCH Init window's callback as xt_files (rom.2) and xt_vc2patch (rom.4) run it (v473): what its EXECUTE asks
-// for past the init (the patch's change for the part, the screen's refresh and its move to the edit screen) and its
-// CANCEL's close, each hooked to answer 0 and be counted.  Both images' callbacks make these four calls, each at its own
-// addresses.  XT_FILES_MAIN and XT_VC2PATCH_MAIN builds only.
+// The PATCH Init window's callback as xt_files runs it on rom.2 (v473): what its EXECUTE asks for past the init (the
+// patch's change for the part, the screen's refresh and its move to the edit screen) and its CANCEL's close, each
+// hooked to answer 0 and be counted.  XT_FILES_MAIN builds only.
 #include "Sh4Interp.h"
 #include <cstdint>
 #include <cstdio>

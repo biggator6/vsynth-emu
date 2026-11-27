@@ -4350,7 +4350,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
   argument to `analyse` broke the shape law, so the cutter got a function that makes an analysis by class. The shared CLI
   now picks one by a flag, which fxcut doesn't use.
 
-### Session 27 (2026-11-27) — v473: a patch init, both modes
+### Session 27 (2026-11-27) — v473, v474: a patch init, the V-Synth's
 
 - The user's "need a patch init" (NEXT_ISSUES.md item 4), a side session in its own worktree. The manual names it PATCH
   Init and its message INITIALIZE PATCH, Are You Sure?; both images have both strings. The message's number (41 in
@@ -4372,3 +4372,6 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The kit pushed for one copy of several things on the way: rom.4's machines' set-up (`xtfw::forCalls`), the store's
   name and take, a store's bytes apart, the window's hooked calls, and the shorter patch's check moved out of a file
   near its limit. A shell `$N` in zsh passed thirty-two plant names as one; the runner planted none and said so.
+- The user's answer to the Category question: "vc-2 mode doesn't need an init". v474 took the VC-2's out (its init,
+  check, menu, plants and baseline lines) and left the V-Synth's as it was; what rom.4's init is stays in the
+  findings, its code in d696a0f.

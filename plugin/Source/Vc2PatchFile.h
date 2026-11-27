@@ -20,8 +20,5 @@ const std::string& vc2PatchFilesRom();
 // A .p02 into its store: false, and why, for a file rom.4's reader refuses, one under its two 16-byte headers (whose
 // short count rom.4's caller would take as read, with nothing laid out), a fault, or before the image is kept
 bool vc2PatchRead(const uint8_t* file, size_t size, Vc2PatchFile& out, std::string* why = nullptr);
-// A store's name (Patch Name 1-12), trailing spaces gone: the read's, and (v473) the PATCH Init's (Vc2PatchInit.h)
+// A store's name (Patch Name 1-12), trailing spaces gone: the read's, and vc2card's (research/tools, v473)
 std::string vc2PatchStoreName(const std::vector<uint8_t>& store);
-// The store a rom.4 routine left at `at` in `cpu`'s memory, and its name, into `out` (the read's, and v473's init)
-class Sh4;
-void vc2PatchTake(Sh4& cpu, uint32_t at, Vc2PatchFile& out);

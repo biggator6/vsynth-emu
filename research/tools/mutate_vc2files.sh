@@ -94,7 +94,7 @@ VC2SETTINGS=(Vc2PartSettings Vc2PartSettingsCheck Vc2SetChildHead Vc2PartSetting
     Vc2PartVoicesTables Vc2TimeTrip Vc2TimeTripCheck Vc2PartChannel Vc2PartChannelCheck Vc2MidiDispatch
     Vc2MidiDispatchCheck Vc2NotesTask Vc2NotesTaskCheck)
 VC2PATCH=(Vc2PatchStore Vc2PatchFile Vc2PatchStoreCheck Vc2PatchFileCheck Vc2Params XtFxValueText Vc2PatchSave
-          Vc2PatchSaveCheck Vc2PatchInit Vc2PatchInitCheck)   # v505: rom.4's patch save and its parts; v473 its init
+          Vc2PatchSaveCheck)   # v505: rom.4's patch save and its parts
 # xt_vc2waves' (v500): the wave loaders and the sets and store they fill; (v503) rom.4's own load and its files
 VC2WAVES=(Vc2WavesCheck Vc2WaveIndexCheck Vc2WaveIndex Vc2WaveSets Vc2WaveStore Vc2PartSettingsWords Vc2WavePool
           Vc2WavePoolCheck Vc2WavePoolDraws Vc2WaveRecords Vc2WaveRecordsCheck Vc2WaveBoot Vc2WaveBootKernel

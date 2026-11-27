@@ -2,7 +2,6 @@
 // xt_vc2patch's parts (v450): the store's (Vc2PatchStoreCheck.cpp, with the main) and the files' (Vc2PatchFileCheck.cpp).
 // XT_VC2PATCH_MAIN builds only.
 #include "Vc2CheckRig.h"
-#include "Vc2PatchFile.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -13,8 +12,6 @@ inline constexpr long kVc2PatchShown = 5;   // differences said under a part's l
 inline constexpr uint32_t kVc2StoreA = 0x8C020000, kVc2StoreB = 0x8C030000, kVc2Object = 0x8C040000;
 inline constexpr uint32_t kVc2Entry = 0x8C041000, kVc2FileImage = 0x8C050000, kVc2FileStore = 0x8C060000;
 inline constexpr uint32_t kVc2Parts = 0x8950d8e0;   // [FW] a pointer a part: +0 1 when it has a store, +8 it, +4 the other
-// Part 0's entry in the part table: a store at +8 (A) and +4 (B), the one rom.4's PATCH Init writes (Vc2PatchStoreCheck.cpp)
-void vc2PointAtStores(Vc2Fw& fw);
 
 // A part's count of what it compared and what differed, the first few said under its line
 struct Vc2PatchTally {
@@ -43,9 +40,3 @@ long vc2PatchFiles(Vc2Fw& fw, const std::vector<Vc2PatchOnDisk>& files);
 // and read back; and every ID set by vc2PatchSet on the first file's store and read back
 long vc2PatchSaves(const std::vector<Vc2PatchOnDisk>& files, int cases, int seed);
 long vc2PatchSetters(const std::vector<Vc2PatchOnDisk>& files, int seed);
-
-// rom.4's PATCH Init by Patch Category (v473, Vc2PatchInitCheck.cpp): the window's EXECUTE run at each Category on its
-// own machine of `rom`, against vc2PatchInit; the other window's, CANCEL, and the default under a .p02.  And the 12
-// inits, for the store check's reads (none if one fails)
-long vc2PatchInits(const std::string& rom, const std::vector<Vc2PatchOnDisk>& files);
-std::vector<Vc2PatchFile> vc2PatchInitStores();

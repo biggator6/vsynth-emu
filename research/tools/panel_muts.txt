@@ -280,8 +280,6 @@ vc2-patch-not-saved|    vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.c
 vc2-patch-not-restored|    vc2PatchFromState(vc2Patch_, apvts.state);   // v452: none from a session before it|    ;|plugin/Source/PluginState.cpp|arpplugin
 vc2-patch-stale|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : std::vector<uint8_t>();|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : patch.store;|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-name-saved|    state.setProperty(kNameKey, patch.name, nullptr);|    ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-init-unapplied|    p.applyVc2Patch(init.name, init.store);|    ;|plugin/Source/PluginVc2PatchInit.cpp|arpplugin
-vc2-init-category|    if (!vc2PatchInit(category, init, why)) return false;|    if (!vc2PatchInit(0, init, why)) return false;|plugin/Source/PluginVc2PatchInit.cpp|arpplugin
 # The VC-2 mode's pages (v453): each by VSynthEmuEditorTest, its VC-2 checks (EditorVc2Test.cpp, EditorVc2TextTest.cpp)
 editor-vc2-osc-one|    return id + index * stepOf(kRunsOf[(size_t)kind], id);|    return id + 0 * stepOf(kRunsOf[(size_t)kind], id);|plugin/Source/UiVc2Kinds.cpp|layout
 editor-vc2-zone-one|    return vc2HostParamId(instanceId(kind, index, id), zone, cosm);|    return vc2HostParamId(instanceId(kind, index, id), 0, cosm);|plugin/Source/UiVc2Kinds.cpp|layout
@@ -317,10 +315,10 @@ save-as-slot|juce::String(last + 1).paddedLeft('0', kSlotDigits)|juce::String(la
 save-as-name|return slotOfFile(file) ? n.substring(kSlotDigits + 1) : n;|return n;|plugin/Source/PluginProject.cpp|project
 editor-d-box-unsaving|    save_.setVisible(patchKindOf(mode_).save != nullptr);|    save_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
 editor-d-box-init-hidden|    init_.setVisible(patchKindOf(mode_).init != nullptr);|    init_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
-editor-d-box-init-unrun|    if (kind.init && !kind.init(processor_, choice, &why))|    if (false)|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-unrun|    if (kind.init && !kind.init(processor_, &why))|    if (false)|plugin/Source/UiPatchBox.cpp|layout
 editor-d-box-init-unplaced|    if (init_.isVisible()) init_.setBounds(|    if (false) init_.setBounds(|plugin/Source/UiPatchBox.cpp|layout
-editor-vc2-box-init-none|nullptr, nullptr, initVc2Patch, vc2InitChoices },|nullptr, nullptr, nullptr, nullptr },|plugin/Source/UiPatchBox.cpp|layout
-editor-vc2-box-init-unnamed|    for (const std::string& name : vc2PatchCategoryNames()) out.add(juce::String(name));|    ;|plugin/Source/UiPatchBox.cpp|layout
+editor-vc2-box-init-shown|    init_.setVisible(patchKindOf(mode_).init != nullptr);|    init_.setVisible(true);|plugin/Source/UiPatchBox.cpp|layout
+editor-vc2-box-init-given|juce::String(); }, nullptr, nullptr, nullptr },|juce::String(); }, nullptr, nullptr, initPatch },|plugin/Source/UiPatchBox.cpp|layout
 # A project saved, by VSynthEmuProjectTest (v603): its system files, patches and waves copied, a folder there refused, an
 # outside wave in at the next slot (any file holding a slot) with the patch on it and a plain one named to import, a
 # patch from no project at 001; and the save's Loop kept where the wave decides it (found with it, v602's save too).

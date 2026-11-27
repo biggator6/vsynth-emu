@@ -175,7 +175,6 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginExtIn.cpp
     Source/PluginVc2Params.cpp
     Source/PluginVc2Patch.cpp
-    Source/PluginVc2PatchInit.cpp
     Source/PluginVc2Play.cpp
     Source/PluginVc2Fx.cpp
     Source/PluginRender.cpp

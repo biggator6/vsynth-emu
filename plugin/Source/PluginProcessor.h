@@ -86,7 +86,7 @@ public:
     // Message thread.  A VC-2 patch (.p02, v452; PluginVc2Patch.h): rom.4's reader's values onto the VC-2's parameters, its
     // store kept for the session; false, the status saying why, for a file that isn't one.  The store and name kept last.
     bool loadVc2Patch(const juce::File& file);
-    void applyVc2Patch(const std::string& name, const std::vector<uint8_t>& store);   // its apply (v473: the init's too)
+    void applyVc2Patch(const std::string& name, const std::vector<uint8_t>& store);   // its apply (v473)
     std::vector<uint8_t> vc2PatchStore() const;
     juce::String vc2PatchName() const;
     void applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder);
