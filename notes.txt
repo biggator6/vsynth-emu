@@ -738,6 +738,20 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VC-2 mode without a PATCH Init v474 (2026-11-27, on claude/patch-init; HARDWARE_FIRMWARE.md, "The VC-2 mode
+  without a PATCH Init"): the user's "vc-2 mode doesn't need an init", their answer to v473's question. INIT is the
+  V-Synth's alone: the patch box's VC-2 row has no init, so no button, and its menu is Execute without a choice taken.
+  Out: Vc2PatchInit (vc2PatchInit, vc2PatchCategoryNames), PluginVc2PatchInit (initVc2Patch), xt_vc2patch's inits: part
+  (Vc2PatchInitCheck.cpp) and the 12 inits among its reads (fcheck's baseline there as before v473), the vc2patchinit
+  port and its plants, the VC-2 tests' init checks; vc2PatchTake back into vc2PatchRead. Kept, each with callers:
+  applyVc2Patch, xtfw::forCalls, vc2PatchStoreName, XtInitAsked. The V-Synth's PATCH Init unchanged.
+  Checks: xt_vc2patch 0 different; fcheck as baseline; VSynthEmuEditorTest 5229/5229 (no INIT on the VC-2's header),
+  the VC-2 patch part 16/16, VSynthEmuProjectTest 53/53. Plants: mutate_vc2.py --patch --changed d696a0f 13, 0 missed;
+  mutate_files.py's 4 patchinit, 0 missed; mutate_panel.py 49 (the box's, editor-vc2-box-init-shown and -given new,
+  init-, vc2-patch-, editor-vc2-), 0 missed; mutate_tone.py --changed: no plants reach the files changed. verify.sh
+  d696a0f: every line passed (ab 4/4 identical, auval on both AUs; installed into ~/Library as this build). The work
+  in progress was committed first as 62e2a53 (the coordinator's ask), this on top.
+
 PATCH Init v473 (2026-11-27, on claude/patch-init from vc2-mode f1c0797; HARDWARE_FIRMWARE.md, "PATCH Init: the
   V-Synth's, and the VC-2's by Patch Category"; NEXT_ISSUES.md item 4), the V-Synth's and the VC-2's in one version
   (the patch box, CMakeLists and the editor's tests hold both), each found by the manual's PATCH Init and INITIALIZE
