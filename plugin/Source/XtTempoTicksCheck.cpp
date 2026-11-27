@@ -46,7 +46,7 @@ struct Side {
 struct Case {
     Side& fw;
     XtTempoTicks port;
-    XtTicksTally& t;
+    XtArpTally& t;
     bool first;
     long ms = 0;
     void differs(const char* what, long fwValue, long portValue) {
@@ -74,7 +74,7 @@ struct Case {
         const int32_t d = port.take();
         if (fw.given != d) differs("ticks fed", fw.given, d);
         compare();
-        ++t.ms;
+        ++t.steps;
         return true;
     }
 };
@@ -82,8 +82,8 @@ struct Case {
 int quarterMsOf(int tempo10) { return 3000 * 20 / (tempo10 / 10); }   // [FW 0x894714b0] as XtSynth::clockPeriod
 } // namespace
 
-XtTicksTally xtTempoTicksCheck(const std::string& rom, long cases, unsigned seed, bool first) {
-    XtTicksTally t;
+XtArpTally xtTempoTicksCheck(const std::string& rom, long cases, unsigned seed, bool first) {
+    XtArpTally t;
     Side fw(rom);
     if (!fw.m.ok) {
         t.failed = true;

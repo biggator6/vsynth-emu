@@ -18,11 +18,13 @@ FW=(XtFirmware.cpp $( [ -f XtFwMachine.cpp ] && echo XtFwMachine.cpp ))   # the 
 SH4=(Sh4Interp.cpp $( [ -f Sh4Setup.cpp ] && echo Sh4Setup.cpp ))   # the interpreter and its setup (v197 on)
 # V-Synth's files: patches, a wave's chunks, and the firmware's disk image (its own file from v177 on); the patch store's
 # layout and xt_files' checks of patches and of a wave's own chunks (their own files from v187 on); the preset waves a
-# project's link reaches, and their check (v600); a patch's save by the firmware's routines, and its check (v602)
+# project's link reaches, and their check (v600); a patch's save by the firmware's routines, and its check (v602); the
+# PATCH Init by the firmware's, its check, and the shorter patch's check moved out of the store's (v473)
 VF=(XtFiles.cpp XtWaveFile.cpp $( [ -f XtDiskImage.cpp ] && echo XtDiskImage.cpp )
     $( [ -f XtPatchStore.cpp ] && echo XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp )
     $( [ -f XtPresetWaves.cpp ] && echo XtPresetWaves.cpp XtPresetWavesCheck.cpp )
-    $( [ -f XtFwPatchFile.cpp ] && echo XtFwPatchFile.cpp XtPatchSaveCheck.cpp ))
+    $( [ -f XtFwPatchFile.cpp ] && echo XtFwPatchFile.cpp XtPatchSaveCheck.cpp )
+    $( [ -f XtFwPatchInit.cpp ] && echo XtFwPatchInit.cpp XtPatchInitCheck.cpp XtPatchShortCheck.cpp ))
 # The arpeggiator in XtSynth (v189): the router and what it sends, the engine (v188), the tempo ticks and a patch's reads
 SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp \
       XtTempoTicks.cpp ))
@@ -269,9 +271,10 @@ VHI=(Vc2HiresoWarp.cpp Vc2HiresoTables.cpp Vc2HiresoRate.cpp Vc2HiresoAnalysis.c
 # xt_fx: the chip and its check, the check's parts in XtFxCheck*.cpp from v204
 [ -f XtFxChip.cpp ] && cc -DXT_FX_MAIN -I"$REPO/research/third_party/gearmulator_esp" XtFxChip.cpp XtFxCheck*.cpp \
    XtFxControl.cpp XtFxUnit.cpp XtFxImage.cpp XtFxValueText.cpp XtFxInput.cpp XtExtIn.cpp "${SH4[@]}" -o "$O/xt_fx" &
-# The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on (v189)
+# The arpeggiator against the firmware's own object (v188), on the disk image's patches; the tempo ticks it steps on
+# (v189); the Pattern Edit's edits against its screen, setter and clears (v468)
 ARP=(XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp XtArpeggioCheck.cpp XtArpeggioCases.cpp XtTempoTicks.cpp
-     XtTempoTicksCheck.cpp XtArpeggioPatch.cpp)
+     XtTempoTicksCheck.cpp XtArpeggioPatch.cpp XtArpPatternEdit.cpp XtArpPatternEditCheck.cpp)
 [ -f XtArpeggio.cpp ] && cc -DXT_ARP_MAIN "${ARP[@]}" "${VF[@]}" "${FW[@]}" XtMultiBandPlayer.cpp \
    XtSoloVoice.cpp XtSoloEncoder.cpp "${SH4[@]}" -o "$O/xt_arp" &
 # the Multi Step Modulator (v192 on), with the patches' reads for the presets

@@ -6,8 +6,10 @@
 #include <atomic>
 #include <cstdint>
 
-// The XT's own pattern before any patch: every line NOTE C4 and every cell REST, the defaults of IDs 0x44a, 0x44b and the
-// steps [FW 0x897a167c: 0, 60, 0]; with it the arpeggio plays nothing until a patch brings one
+// The pattern before any patch, and for a session from before there was one: an initialized patch's (v469, the user's
+// d-6), every line NOTE C4 and line 1 at velocity 100 on every step (0x89482540; XtArpPatternEdit.h), so the arpeggio
+// switched on plays the keys held by its Motif and Grid as an initialized XT does.  Until v469 the descriptors' defaults,
+// every cell REST, with which it played nothing until a patch brought a pattern.
 XtArpPattern xtArpDefaultPattern();
 // Whether no step of it starts a note or a controller: every cell REST (0) or TIE (1), so the arpeggio is silent
 bool xtArpPatternSilent(const XtArpPattern& p);

@@ -2,7 +2,7 @@
 // takes"): the header's switch and the session's mode; each page and each block at three sizes; for each zone, chosen by
 // the path's chips, each OSC's and COSM's panel on every face, each block's SELECTED and DETAILS on every face, the Time
 // Trip column and AMP moving their own instance's parameters alone, the zone's and the patch's; each Matrix Control and
-// zone cell its own.
+// zone cell its own; and (v474) no INIT on the header, the VC-2 mode having none.
 #include "EditorTest.h"
 #include "TestControls.h"
 #include "../Source/PluginVc2Params.h"
@@ -190,4 +190,5 @@ void vc2Checks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
     ed.vc2Synth().refresh();
     pages(l, ed, check, sizes);
     ed.showPage(Blocks::kSynthPage);
+    check(!seen(l.buttonOf("INIT"), ed), "INIT is the V-Synth's: the VC-2 mode has none");   // v474
 }

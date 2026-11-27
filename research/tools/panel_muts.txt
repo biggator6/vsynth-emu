@@ -31,7 +31,7 @@ arp-pattern-unwritten|    setArpPattern(c.arpPattern);|    ;|plugin/Source/Plugi
 arp-pattern-unsaved|    apvts.state.setProperty("arpPattern", juce::Base64::toBase64(&p, sizeof p), nullptr);|    ;|plugin/Source/PluginArp.cpp|arpplugin
 arp-pattern-unrestored|    restoreArpPattern();   // v190: a session before it has none|    ;|plugin/Source/PluginState.cpp|arpplugin
 arp-old-session-kept|    XtArpPattern p = xtArpDefaultPattern();|    XtArpPattern p = arpWords_.load();|plugin/Source/PluginArp.cpp|arpplugin
-arp-default-line|uint8_t { 60 }|uint8_t { 0 }|plugin/Source/PluginArp.cpp|arpplugin
+arp-default-empty|    return xtArpInitPattern();|    return XtArpPattern {};|plugin/Source/PluginArp.cpp|arpplugin
 arp-words-half|for (size_t i = 0; i < kWords; ++i)|for (size_t i = 0; i < kWords / 2; ++i)|plugin/Source/PluginArp.cpp|arpplugin
 arp-patch-tone-only|xtWithPatchArp(store, xtPatchControls(store, zone, xtControls()))|xtPatchControls(store, zone, xtControls())|plugin/Source/PluginProcessor.cpp|patch
 arp-said-missing|    // The arpeggio is done too: XtSynth plays it (v189), and loadPatch puts it on the plugin's parameters (v190); and the\n    // Multi Step Modulator (v193)|    if (p(0x42e)) m.push_back("arpeggio");|plugin/Source/XtPatch.cpp|arpplugin
@@ -273,9 +273,9 @@ vc2-patch-system|    if (p.id < kStoreFirst) return std::nullopt;|    if (p.id <
 vc2-patch-zone|xtStoreValue(vc2Store(), store, p.id, p.zone, p.cosm);|xtStoreValue(vc2Store(), store, p.id, 0, p.cosm);|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-cosm|return vc2StoreTyped(store, p.id, p.zone, p.cosm);|return vc2StoreTyped(store, p.id, p.zone, 0);|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-typed|    if (p.id >= kVc2FirstTyped) return vc2StoreTyped(store, p.id, p.zone, p.cosm);\n||plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-patch-refused-goes-on|        return false;\n    }\n    for (const Vc2HostParam& h|    }\n    for (const Vc2HostParam& h|plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-patch-store-not-kept|        vc2Patch_.store = read.store;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-patch-name-not-kept|        vc2Patch_.name = read.name;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-refused-goes-on|        return false;\n    }\n    applyVc2Patch(|    }\n    applyVc2Patch(|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-store-not-kept|        vc2Patch_.store = store;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-name-not-kept|        vc2Patch_.name = name;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-not-saved|    vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name|    ;|plugin/Source/PluginState.cpp|arpplugin
 vc2-patch-not-restored|    vc2PatchFromState(vc2Patch_, apvts.state);   // v452: none from a session before it|    ;|plugin/Source/PluginState.cpp|arpplugin
 vc2-patch-stale|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : std::vector<uint8_t>();|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : patch.store;|plugin/Source/PluginVc2Patch.cpp|arpplugin
@@ -314,6 +314,11 @@ save-effects-typed|setChanged(store, merged(tone, effectIds(p, store, true)), tr
 save-as-slot|juce::String(last + 1).paddedLeft('0', kSlotDigits)|juce::String(last).paddedLeft('0', kSlotDigits)|plugin/Source/PluginProject.cpp|project
 save-as-name|return slotOfFile(file) ? n.substring(kSlotDigits + 1) : n;|return n;|plugin/Source/PluginProject.cpp|project
 editor-d-box-unsaving|    save_.setVisible(patchKindOf(mode_).save != nullptr);|    save_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-hidden|    init_.setVisible(patchKindOf(mode_).init != nullptr);|    init_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-unrun|    if (kind.init && !kind.init(processor_, &why))|    if (false)|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-unplaced|    if (init_.isVisible()) init_.setBounds(|    if (false) init_.setBounds(|plugin/Source/UiPatchBox.cpp|layout
+editor-vc2-box-init-shown|    init_.setVisible(patchKindOf(mode_).init != nullptr);|    init_.setVisible(true);|plugin/Source/UiPatchBox.cpp|layout
+editor-vc2-box-init-given|juce::String(); }, nullptr, nullptr, nullptr },|juce::String(); }, nullptr, nullptr, initPatch },|plugin/Source/UiPatchBox.cpp|layout
 # A project saved, by VSynthEmuProjectTest (v603): its system files, patches and waves copied, a folder there refused, an
 # outside wave in at the next slot (any file holding a slot) with the patch on it and a plain one named to import, a
 # patch from no project at 001; and the save's Loop kept where the wave decides it (found with it, v602's save too).
@@ -325,6 +330,9 @@ projsave-import|if (!isVSynthWave(wave)) report.toImport.add(to.getFileName());|
 projsave-alone|"001 " + name + ".p00"|"002 " + name + ".p00"|plugin/Source/PluginProjectSave.cpp|project
 save-loop-kept|            ids.erase(kLoopSwitch + kOscStride * osc);|            ;|plugin/Source/PluginPatchSave.cpp|project
 save-slot-any-file|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false);|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false, "*." + extension);|plugin/Source/PluginProject.cpp|project
+init-not-applied|    p.applyPatch(init.name, init.store, 0, juce::File());|    ;|plugin/Source/PluginPatchInit.cpp|project
+init-unnamed|    p.applyPatch(init.name, init.store, 0, juce::File());|    p.applyPatch("", init.store, 0, juce::File());|plugin/Source/PluginPatchInit.cpp|project
+init-rom-refused|    if (!xtSynthRomReady()) return|    if (xtSynthRomReady()) return|plugin/Source/PluginPatchInit.cpp|project
 # v455: the VC-2 mode's audio (VSynthEmuVc2PlayTest): the part's blocks heard, at its level, MAIN and MULTI; the input
 # at each block's own place and in buffers that outlive a wait; messages before their block; the front's start; the
 # patch's store given at a block's edge, a parameter written into it, kept as the session's; the mode read; no
@@ -429,3 +437,16 @@ editor-d-ring-stale|    if (at == reach_.end() \|\| !view.sounding()) return 0;|
 editor-d-ring-not-taken|        modView_.take(synth_);                  // v464|        ;   // v464|plugin/Source/PluginProcess.cpp|layout
 editor-d-watch-deaf|            values_[at] = v;\n|            (void)v;\n|plugin/Source/UiWatch.cpp|layout
 editor-d-ring-held-first|        if (!v.active) continue;|        if (!v.active \|\| !v.releasing) continue;|plugin/Source/XtSynthView.cpp|layout
+# v468: the arpeggio pattern's card, edited by the XT's Pattern Edit (VSynthEmuEditorTest's EditorArpTest.cpp)
+editor-d-arp-unsaved|               [&p](const XtArpPattern& edited) { p.setArpPattern(edited); } },|               [](const XtArpPattern&) {} },|plugin/Source/UiPlayPage.cpp|layout
+editor-d-arp-cursor-swapped|                setCursor({ line, step });\n                press_ = { Press::On::cell, line, at.y, 0 };|                setCursor({ step % XtArpPattern::kLines, line });\n                press_ = { Press::On::cell, line, at.y, 0 };|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-state-one-way|xtArpSetState(p, line, xtArpIsCtrl(p, line) ? 0 : 1)|xtArpSetState(p, line, 1)|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-drag-down|    const int steps = (press_.startY - e.getPosition().y) / kDragPx;|    const int steps = (e.getPosition().y - press_.startY) / kDragPx;|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-wheel-down|    const int by = w.deltaY > 0.0f ? 1 : -1;|    const int by = w.deltaY > 0.0f ? -1 : 1;|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-note-wheel-cell|        if (noteBounds(line).contains(at)) return nudge(Press::On::note, line, by, e.mods.isShiftDown());|        if (noteBounds(line).contains(at)) return nudge(Press::On::cell, line, by, e.mods.isShiftDown());|plugin/Source/UiArpPattern.cpp|layout
+editor-d-arp-button-first|own(*buttons_[(size_t)b], [b](XtArpPattern& pattern, XtArpCursor at) { xtArpPress(pattern, at, b); });|own(*buttons_[(size_t)b], [](XtArpPattern& pattern, XtArpCursor at) { xtArpPress(pattern, at, 0); });|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-clear-first-line|    xtArpClearLine(p, at.line);|    xtArpClearLine(p, 0);|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-init-cleared|    p = xtArpInitPattern();|    xtArpClearAll(p);|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-value-stale|    value_.setText("Value : " + juce::String(xtArpValueText(pattern, at)), juce::dontSendNotification);|    value_.setText("Value : " + juce::String(xtArpValueText(pattern, {})), juce::dontSendNotification);|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-names-note|        buttons_[(size_t)b]->setButtonText(xtArpButtonName(b, ctrl));|        buttons_[(size_t)b]->setButtonText(xtArpButtonName(b, false));|plugin/Source/UiArpPatternEdit.cpp|layout
+editor-d-arp-drawn-only|    if (mode.pattern.set) editor_ =|    if (false) editor_ =|plugin/Source/UiPlayPage.cpp|layout

@@ -92,8 +92,7 @@ bool vc2PatchRead(const uint8_t* file, size_t size, Vc2PatchFile& out, std::stri
     if (!file || size < (size_t)kHeaders) return fail(why, "not a VC-2 patch");
     Sh4 cpu;
     if (!cpu.loadRom(g_image.path().c_str())) return fail(why, "rom.4 can't be read again");
-    cpu.mapRam(xtfw::kRam, xtfw::kRamSize);
-    cpu.stepLimit = xtfw::kCallSteps;
+    xtfw::forCalls(cpu);
     FileCalls calls(file, size);
     calls.serve(cpu);
     cpu.write(kPath, "A:\\", 4);
@@ -104,7 +103,13 @@ bool vc2PatchRead(const uint8_t* file, size_t size, Vc2PatchFile& out, std::stri
     if (!cpu.call(kToStore, { kStore, kFileImage }, xtfw::kStack)) return fail(why, "rom.4's patch routines failed");
     out.store.resize(kVc2StoreBytes);
     cpu.read(kStore, out.store.data(), out.store.size());
-    for (int k = 0; k < kNameChars; ++k) out.name += (char)xtStoreRaw(vc2Store(), out.store, kNameFirst + k);
-    while (!out.name.empty() && out.name.back() == ' ') out.name.pop_back();
+    out.name = vc2PatchStoreName(out.store);
     return true;
+}
+
+std::string vc2PatchStoreName(const std::vector<uint8_t>& store) {
+    std::string name;
+    for (int k = 0; k < kNameChars; ++k) name += (char)xtStoreRaw(vc2Store(), store, kNameFirst + k);
+    while (!name.empty() && name.back() == ' ') name.pop_back();
+    return name;
 }

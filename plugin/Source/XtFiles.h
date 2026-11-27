@@ -19,6 +19,13 @@ inline bool fail(std::string* why, const char* what) {
     if (why) *why = what;
     return false;
 }
+// How many bytes two stores differ in, a length's difference counted whole: the checks' measure of a store moved
+// (ProjectSaveTest's, v602; the PATCH Init's, v473)
+inline long storeBytesApart(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+    long n = 0;
+    for (size_t i = 0; i < a.size() && i < b.size(); ++i) n += a[i] != b[i];
+    return n + static_cast<long>(a.size() > b.size() ? a.size() - b.size() : b.size() - a.size());
+}
 inline uint64_t fnv(const void* p, size_t n, uint64_t h = 0xcbf29ce484222325ull) {
     const auto* b = static_cast<const uint8_t*>(p);
     for (size_t i = 0; i < n; ++i) {
@@ -72,6 +79,8 @@ struct XtPatchFile {
 // A .p00 into the store: the firmware's defaults under the file's bytes (a shorter file is an older one), then its layout
 // upgrade.  False (and why) if it isn't a patch.
 bool xtPatchRead(const uint8_t* file, size_t size, XtPatchFile& out, std::string* why = nullptr);
+// A store's name (IDs 0x103…0x10e), trailing spaces gone: xtPatchRead's, and (v473) the PATCH Init's (XtFwPatchInit.h)
+std::string xtPatchStoreName(const std::vector<uint8_t>& store);
 // The name alone, without the firmware: for a list of hundreds.  Empty if it isn't a patch.
 std::string xtPatchName(const uint8_t* file, size_t size);
 
@@ -173,8 +182,14 @@ struct XtPatchCheck {
     uint64_t hash = 0xcbf29ce484222325ull;
 };
 XtPatchCheck xtPatchCheckValues(const XtDiskImage& disk, bool first);
+// One store as the image's patches are checked (v473, the PATCH Init's): every value, every type's parameters and the
+// blocks with no zone against the firmware's reads, its counts as xtPatchCheckValues's
+XtPatchCheck xtPatchCheckStore(const XtPatchFile& p, bool first);
 void xtPatchCheckPrint(const XtPatchCheck& c);
-int xtPatchCheckShort(const XtDiskImage& disk);
+int xtPatchCheckShort(const XtDiskImage& disk);   // XtPatchShortCheck.cpp (moved from XtPatchStoreCheck.cpp, v473)
+// The PATCH Init (XtPatchInitCheck.cpp, v473): the window's EXECUTE run on part 0 against xtFwPatchInit, CANCEL, the
+// default a file is read over, and the store against the firmware's reads; prints its line, gives how many are wrong
+int xtPatchInitCheck(const XtDiskImage& disk, bool first);
 // The preset wave at `at`, edited in its chunks, as a project's RIFF and LITE wave, and plain and short WAVs that aren't
 // waves (XtWaveFileCheck.cpp): prints its line, and gives how many came out wrong
 int xtWaveCheckOwn(const std::vector<uint8_t>& disk, size_t at);

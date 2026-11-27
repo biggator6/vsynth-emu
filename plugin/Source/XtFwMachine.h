@@ -44,4 +44,11 @@ std::unique_ptr<Machine> waveMachine(const std::string& rom, const int16_t* pcm,
 // harness)
 void roundNearest(bool on);
 
+// An image already loaded given the harness memory and kCallSteps a call, none of rom.2's OS calls answered: rom.4's
+// machines, which make none (its patch files' reads and saves, its system's defaults)
+inline void forCalls(Sh4& cpu) {
+    cpu.mapRam(kRam, kRamSize);
+    cpu.stepLimit = kCallSteps;
+}
+
 } // namespace xtfw

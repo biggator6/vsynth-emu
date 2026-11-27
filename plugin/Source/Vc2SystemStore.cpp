@@ -39,8 +39,7 @@ static_assert(std::size(kDefaults) == std::size(Vc2System::kAreas));
 struct Read {
     std::unique_ptr<Vc2System> system;
     bool read(Sh4& image) {
-        image.mapRam(xtfw::kRam, xtfw::kRamSize);
-        image.stepLimit = xtfw::kCallSteps;
+        xtfw::forCalls(image);
         auto s = std::make_unique<Vc2System>();
         for (size_t k = 0; k < std::size(kDefaults); ++k) {
             const Vc2System::Area& a = Vc2System::kAreas[k];

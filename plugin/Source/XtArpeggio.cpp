@@ -9,7 +9,17 @@
 namespace {
 constexpr uint8_t kNoKey = 0x80;         // +0x718 with no key [FW 0x893038d4]
 constexpr int kPedalDown = 64;           // the Hold pedal at or past it holds [FW 0x89303866]
+constexpr uint8_t kCtrlLine = 0x80, kLineNumber = 0x7f;   // a line's State over its Note/CC [FW 0x8930ca30]
 } // namespace
+
+// 0x8930ca30: a CTRL line's controller, as the patch has it, made kXtArpCtrlMost at most (0x8930cac0); a NOTE line's note
+// and every cell as they are
+XtArpPattern xtArpLaidOut(const XtArpPattern& p) {
+    XtArpPattern laid = p;
+    for (uint8_t& line : laid.line)
+        if (line & kCtrlLine) line = (uint8_t)(kCtrlLine | std::min<int>(line & kLineNumber, kXtArpCtrlMost));
+    return laid;
+}
 
 // The fields as declared, each key's node holding its key (0x89301d20), the shuffle at 50 (0x89304200)
 XtArpeggio::XtArpeggio() {
