@@ -120,6 +120,7 @@ int run(const juce::File& rom, const juce::File& work) {
     projectSaveChecks(q, rom, work.getChildFile("Saves"), check);   // v602
     projectSaveAsChecks(*p, project.getChildFile("Patch").getChildFile("001 Linked.p00"), rom,
                         work.getChildFile("Projects"), check);   // v603
+    projectInitChecks(rom, work.getChildFile("Init"), check);   // v473
     return check.summary("patch " + c->patch.name + ", slot " + std::to_string(c->own) + " linked to preset "
                          + std::to_string(c->other));
 }

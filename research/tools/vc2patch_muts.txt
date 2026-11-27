@@ -32,8 +32,9 @@ caller-test|(int32_t)r0 < 0)|(int32_t)r0 < -100)|vc2patchfile
 no-default|!cpu.call(kDefaultPatch, { 1 }, xtfw::kStack) \|\| ||vc2patchfile
 store-args|cpu.call(kToStore, { kStore, kFileImage }|cpu.call(kToStore, { kFileImage, kStore }|vc2patchfile
 name-first|kNameFirst = 0x120|kNameFirst = 0x121|vc2patchfile
-name-spaces|out.name.back() == ' '|out.name.back() == '_'|vc2patchfile
-step-limit|cpu.stepLimit = xtfw::kCallSteps;|cpu.stepLimit = 1000;|vc2patchfile
+name-spaces|name.back() == ' '|name.back() == '_'|vc2patchfile
+step-limit|    xtfw::forCalls(cpu);|    xtfw::forCalls(cpu);\n    cpu.stepLimit = 1000;|vc2patchfile
+take-unnamed|    out.name = vc2PatchStoreName(out.store);|    ;|vc2patchfile
 # The store's reads both images share (XtPatchStore.cpp): the range's rule, the centre, the 32-bit fields, COSM 2, a zone,
 # the store's end, a typed ID's slot and range
 xt-range-one|if (d->min != d->max && (v < d->min \|\| v > d->max)) v = d->def;|if ((v < d->min \|\| v > d->max)) v = d->def;|vc2patchxt

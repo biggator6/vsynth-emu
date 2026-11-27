@@ -88,4 +88,8 @@ void patchBoxChecks(LayoutCheck& l, VSynthEmuProcessor& p, const juce::File& rom
     check(p.getPatchName() == juce::String(names[kPatches - 2]), "◀ should load the patch before");
     check(saysWhere(l, *prev, juce::String(kProject) + ", " + juce::String(kPatches - 1) + of),
           "where the box says should follow the patch");
+    box->initialize();   // INIT's menu, its Execute (v473): the patch played initialized, the one browsed kept
+    check(p.getPatchName() == "INIT PATCH", "INIT should give the PATCH Init, not " + p.getPatchName().toStdString());
+    check(saysWhere(l, *prev, juce::String(kProject) + ", " + juce::String(kPatches - 1) + of),
+          "INIT should leave the patch browsed as it was");
 }

@@ -60,8 +60,7 @@ std::unique_ptr<Sh4> rom4Holding(const std::vector<uint8_t>& store, std::string*
         fail(why, "rom.4 can't be read");
         return nullptr;
     }
-    cpu->mapRam(xtfw::kRam, xtfw::kRamSize);
-    cpu->stepLimit = xtfw::kCallSteps;
+    xtfw::forCalls(*cpu);
     cpu->write(kStore, store.data(), store.size());
     return cpu;
 }

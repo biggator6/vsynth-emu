@@ -1546,6 +1546,144 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The VC-2 mode without a PATCH Init (2026-11-27, v474) {#vc2-no-init}
+
+The user's answer to v473's question of how the VC-2's INIT should offer its Patch Category: "vc-2 mode doesn't need
+an init". So the patch box shows INIT in V-Synth mode alone (its VC-2 row has no init, so no button), and what v473
+added for rom.4's init is out: `vc2PatchInit` and `vc2PatchCategoryNames` (Vc2PatchInit.cpp), `initVc2Patch`
+(PluginVc2PatchInit.cpp), xt_vc2patch's `inits:` part (Vc2PatchInitCheck.cpp) and the 12 inits among its reads, their
+plants and tests. The V-Synth's PATCH Init is unchanged. Kept, each with callers of its own: `applyVc2Patch`
+(loadVc2Patch's apply), `xtfw::forCalls`, `vc2PatchStoreName`, and `XtInitAsked` (XtPatchInitWindow.h, now xt_files'
+alone); `vc2PatchTake` went back into `vc2PatchRead`.
+
+What rom.4's init is stays as v473 found it (below): `0x893291c0(store, name, category)`, its window, the Category
+names' table and how rom.4 draws them, and that a .p02's base is Category 0's init itself. Its port and check are in
+d696a0f (claude/patch-init), should the VC-2 mode want one later.
+
+**Checks.** VSynthEmuEditorTest: no INIT on the VC-2's header (`editor-vc2-box-init-shown` and
+`editor-vc2-box-init-given` plant one); the V-Synth's INIT as v473 left it. xt_vc2patch's reads back to the image's
+patches and the random stores, fcheck's baseline as before v473 there.
+
+### PATCH Init: the V-Synth's, and the VC-2's by Patch Category (2026-11-27, v473) {#patch-init}
+
+For research/NEXT_ISSUES.md item 4, the user's "need a patch init" (2026-11-27). Each image's own initialize, run in
+the interpreter as a patch's read is (load-time code, CLAUDE.md), applied as its mode's patch is: rom.2's for the
+V-Synth, rom.4's for the VC-2, which takes a Patch Category. Kept apart in the code (XtFwPatchInit and PluginPatchInit;
+Vc2PatchInit and PluginVc2PatchInit), as step 6 gives each plugin its own.
+
+#### The V-Synth's
+
+**Names first.** The XT's manual, "Initializing Patch Settings (PATCH Init)": ▼MENU on the PATCH PLAY or edit screen,
+PATCH Init, EXECUTE; it "returns the settings of the currently selected patch to a standard set of values", the patch
+in the temporary area alone; its message is "INITIALIZE PATCH, Are You Sure?". All three are rom.2's strings:
+- the pulldown item "PATCH Init", in both patch menus' tables (.data 0x89877738, 0x89877850);
+- the message, entry 41 of the message table at 0x89858e94 (40 bytes an entry: WARNING, INITIALIZE PATCH, Are You
+  Sure ?); 42 is INITIALIZE RHYTHM KIT;
+- the name "INIT PATCH" (0x897a13d0).
+
+**Two sources for the routine.**
+- The dialogs that show message 41, `0x893c59c0` and `0x893c3ae0` (each asks `0x894612d0` first, which gives a rhythm
+  kit message 42), both CANCEL and EXECUTE with the callback `0x893c5a10`. EXECUTE (its button word 1) runs
+  `0x8947fdb0(&part 0, no name)`, then the patch's change `0x8947e270(&part, 1)`, the screen's refresh `0x893716b0`
+  and the edit screen `0x89372450(6)`; CANCEL closes the window (`0x893724a0`).
+- `0x8947fdb0` takes the part's object from the part table `0x897a0fc8` (+0 1 when it holds a patch, +4 its store) and
+  runs `0x89482540(store, name)`, the routine that writes "INIT PATCH": it clears the store's 0x14fa bytes
+  (`0x8952fedc`), writes every ID by the setters `0x89484360` and `0x89484330`, and with no name writes "INIT PATCH",
+  then the MFX Switch, the three effects' types and parameters, Matrix Control 5 and in each zone the MOD and TVA
+  Switches, the two sends, OSC 1's Switch and both COSMs (its branch `0x894828a0`…`0x894829c2`). A name given skips
+  that branch.
+
+**The default a file is read over is the same routine.** `0x8947e230` runs `0x89482540` with an empty name
+(0x897a1344), then the store's file layout (`0x8947de90`), which `0x8947dad0` copies under a .p00's data ("V-Synth's
+files"). So that default is the init named "" byte for byte, and apart from PATCH Init in 401 values, all the branch's:
+a file's base has its effects and zones off where PATCH Init has a patch that sounds.
+
+**The port.** None: `xtFwPatchInit` (XtFwPatchInit.cpp) runs `0x89482540(store, 0)` on a fresh machine and gives the
+store and its name. `initPatch` (PluginPatchInit.cpp) applies it as a loaded patch is (`applyPatch`): zone 1 onto the
+parameters, its effects, arpeggio and zones, no wave (its PCM OSCs name none), its name. As on the XT, only the patch
+played changes: the system's settings, the Effects switch and the patch browsed stay. The patch box's INIT
+(UI_DESIGN.md, "The patch box"): a menu under the XT's words, INITIALIZE PATCH, Execute.
+
+**Checks.**
+- `xt_files`' init line (XtPatchInitCheck.cpp): the window's EXECUTE run in the interpreter, on the 16 parts' patches
+  as the start-up makes them (`0x89478510`) with part 0 holding an image patch, the callback's other calls hooked: part
+  0's store is xtFwPatchInit's, 0 bytes different; the other 15 parts' 0 moved; the change asked once, for part 0; the
+  edit screen. CANCEL: 0 bytes moved, the window closed. Named "INIT PATCH". The default under a file against the
+  routine run with an empty name, 0 bytes different. The init's store against the firmware's reads as the image's
+  patches are checked (`xtPatchCheckStore`: every value in every zone and COSM, every type's parameters, the blocks
+  with no zone by the firmware's pointing routines): 12,385 values, 0 out of range, 0 different.
+- `VSynthEmuProjectTest`'s init part (ProjectInitTest.cpp): INIT on a fresh processor, and on one holding an image
+  patch of several zones with a project's patch browsed: its name, its zones, zone 1's controls and the arpeggio as
+  the store gives them (`xtPatchControls`, `xtWithPatchArp`), the store kept for the session, and saved unchanged the
+  init's store byte for byte, so no parameter reads otherwise; no wave and no note; the patch browsed as it was. 22
+  checks. `VSynthEmuEditorTest`: INIT on the header, and its Execute through the box gives the init and keeps the
+  project's place.
+- Planted errors: `mutate_files.py`'s four `patchinit-` (the routine, a name given, the store short, read a byte
+  off); `mutate_panel.py`'s `init-` (not applied, unnamed, refused with an image) and `editor-d-box-init-` (hidden,
+  not run, not placed).
+
+**A split on the way** (CLAUDE.md, files over the limit): the shorter patch's check moved from XtPatchStoreCheck.cpp to
+XtPatchShortCheck.cpp as it stood, and the store check gained `xtPatchCheckStore`, its comparisons for one store.
+`xtfile::storeBytesApart` is the checks' one measure of a store moved (ProjectSaveTest's `storeBytesMoved` was it);
+`xtPatchStoreName` the name's read (xtPatchRead's).
+
+#### The VC-2's, by Patch Category
+
+**Names first.** No VC-2 manual here, so rom.4's strings and code are both sources, held to each other. rom.4 has the
+pulldown item "PATCH Init" (.data 0x8992037c), the message INITIALIZE PATCH, Are You Sure? (its table's entry 41
+again, at 0x8994137c) and the name "INIT PATCH" (0x8950dd40, loaded by the init at 0x89329356).
+
+**The window.** Its handler `0x89493d80` takes buttons 10…21, each putting a Patch Category 0…11 at `0x89abb75c`, and
+button 9 shows message 41 with the callback `0x89493f40`, as does `0x89493ff0`. EXECUTE runs `0x89326c60(&part 0, no
+name, [0x89abb75c])`, then the patch's change `0x89325360(&part, 1)`, the refresh `0x8940b5b0` and the edit screen
+`0x8940c230(7)`. `0x89326c60` takes part 0's object from rom.4's part table (`0x8950d8e0`, +0 1 when it holds a patch,
++4 the store) and runs **`0x893291c0(store, name, category)`**: the store's 0x13a4 bytes cleared, every ID by rom.4's
+setters, Patch Category (0x12c) set to the one given and a 12-way switch writing each Category's own settings; with no
+name, "INIT PATCH". A second dialog, `0x8943da40` (callback `0x8943da70`), inits with Category 0.
+
+**The Categories' names.** rom.4's text for Patch Category is only "range 0..11". Its names are a table of 12
+pointers at .data 0x8994a638, each a label of two lines, one string with a newline between (`strings` shows the two as
+strings of their own, and the first reader here took the padding after the label for an empty second line: the check's
+two-lines rule found it), which `0x894958c0` draws
+for a patch by its Patch Category (`0x8940f1c0(0x12c)`, then `table[value]` to `0x894f4370`): Modelng Choir, Modelng
+Vocal, Modelng Analog, Vocoder Choir, Vocoder Solo, Vocoder Vintage, Poly PShift, Kbd Choir, Kbd Vocal, Kbd Analog,
+Process Type 1, Process Type 2. The SysEx's Category law ("rom.4's SysEx") fits them: OSC 1 Pulse Width writes under
+2, 5 and 9 (Modelng Analog, Vocoder Vintage, Kbd Analog), Formant Shift under 3…5 and 11.
+
+**The default a .p02 is read over** (`0x89325300`, "rom.4's patch store and a .p02") is `0x893291c0` with an empty
+name (0x8950dcb4) at Category 0. Unlike rom.2's, rom.4's init takes an empty name as none (`0x89329312`…`0x8932931a`:
+a null pointer or a NUL first), so that default is Category 0's PATCH Init itself, named INIT PATCH, byte for byte. A
+planted name given as "" rather than none was so caught by nothing, rightly; the plant now gives a name.
+
+**The port.** None: `vc2PatchInit(category)` (Vc2PatchInit.cpp) runs `0x893291c0(store, 0, category)` on the rom.4
+image the .p02 reads run on; `vc2PatchCategoryNames()` reads the table. `initVc2Patch` (PluginVc2PatchInit.cpp)
+applies it as a .p02 is (`applyVc2Patch`, loadVc2Patch's apply made its own): the VC-2's parameters, the store and
+name kept for the session and the part. The patch box's INIT in VC-2 mode: the menu INITIALIZE PATCH, the 12
+Categories by rom.4's names, as rom.4's window offers them (the recommendation asked of the user, taken while the
+answer is pending).
+
+**Checks.**
+- `xt_vc2patch`'s `inits:` line (Vc2PatchInitCheck.cpp): the window's EXECUTE at each Category, on a machine of its
+  own with part 0 holding an image patch, against vc2PatchInit: 0 bytes different at all 12, each its Patch Category
+  and named INIT PATCH, the change asked once for part 0; the 12 stores distinct; the other window's EXECUTE gives
+  Category 0's; CANCEL moves nothing; the 12 names equal the labels `0x894958c0` draws, run with its value read
+  answered by each Category, each two lines; the default under a .p02 against Category 0's init, 0 bytes. And the 12
+  inits' every value and typed value against rom.4's reads, with the image's patches: 0 different. (The names' first
+  check read the drawn label by the same routine as the names, so a plant there was missed: each name must now be two
+  lines as well, said on one, which then showed the first reader wrong, as above.)
+- `VSynthEmuArpPluginTest`'s VC-2 patch part: each Category's INIT on one processor, every VC-2 parameter but the
+  system's as its init's store reads, the store and name kept, no V-Synth or VC-2 system parameter moved; Category 12
+  refused, nothing moved. `VSynthEmuEditorTest`: INIT on the VC-2's header, its menu 12 distinct names, Category 3's
+  choice giving its init.
+- Planted errors: `mutate_vc2.py --patch`'s eight `init-`/`take-` (a name given, Category 0, Category + 1, the store
+  read off, the names' table, their newline kept and a label cut short, the read's name), `mutate_panel.py`'s
+  `vc2-init-` and `editor-vc2-box-init-`.
+
+**Made one on the way:** `xtfw::forCalls` (XtFwMachine.h), the memory and step limit every rom.4 machine had by hand
+(the .p02 read, its save, the system's defaults, the init); `vc2PatchTake` and `vc2PatchStoreName` (Vc2PatchFile.cpp,
+the read's and the init's; vc2card.cpp's copy gone); `XtInitAsked` (XtPatchInitWindow.h), the window's callback's
+hooked calls for both checks; xt_vc2patch's `vc2PointAtStores`.
+
 ### The pattern before any patch: an initialized patch's (2026-11-27, v469) {#arp-default-init}
 
 The user's d-6 (research/NEXT_ISSUES.md), on v468's finding below: the plugin's pattern before any patch, and a session's

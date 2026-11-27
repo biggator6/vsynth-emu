@@ -4371,3 +4371,29 @@ Round-2 recordings.  First build-out after that: real-time granular port
   the worktree has no `.claude/`. The worktree got a copy of the main checkout's, as vsynth-files' has. The harness's
   worktree check refuses any shell command that names the folder `plugin/Source` (it reads it as `source`), so those
   files were reached through `plugin` paths and the Read tool.
+
+### Session 28 (2026-11-27) — v473, v474: a patch init, the V-Synth's
+
+- The user's "need a patch init" (NEXT_ISSUES.md item 4), a side session in its own worktree. The manual names it PATCH
+  Init and its message INITIALIZE PATCH, Are You Sure?; both images have both strings. The message's number (41 in
+  each image's table) led to each window's dialog, and its EXECUTE to the routine: rom.2's `0x89482540`, rom.4's
+  `0x893291c0`, which takes a Patch Category from its window's 12 buttons.
+- Each is run in the interpreter as the loaders run theirs, and each check runs the window's own EXECUTE against it:
+  0 bytes different, at every Category for rom.4.
+- A surprise, run and then read: the base a .p00 is read over is the same routine with an empty name, and a name
+  given skips the branch that writes the effects' and zones' settings. So a file's base is silent where PATCH Init
+  sounds: 401 values apart.
+- The VC-2's Category names aren't in rom.4's parameter text ("range 0..11"); they are a table its patch display
+  draws by Patch Category, which the check runs with the value read answered. Each label is one string with a newline
+  between its lines; `strings` had shown two, and the first reader took the padding for an empty second line. Two
+  missed plants found it: the check had read the drawn label by the same routine, and an empty name given to rom.4's
+  init is the same as none (unlike rom.2's), so that plant changed nothing.
+- The patch box, CMakeLists and the editor's tests ended up holding both modes' inits, so the two halves became one
+  version. How the VC-2's INIT offers its Category was asked of the user; the menu of 12 by rom.4's names, the
+  recommendation, was taken meanwhile.
+- The kit pushed for one copy of several things on the way: rom.4's machines' set-up (`xtfw::forCalls`), the store's
+  name and take, a store's bytes apart, the window's hooked calls, and the shorter patch's check moved out of a file
+  near its limit. A shell `$N` in zsh passed thirty-two plant names as one; the runner planted none and said so.
+- The user's answer to the Category question: "vc-2 mode doesn't need an init". v474 took the VC-2's out (its init,
+  check, menu, plants and baseline lines) and left the V-Synth's as it was; what rom.4's init is stays in the
+  findings, its code in d696a0f.

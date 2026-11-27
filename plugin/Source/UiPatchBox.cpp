@@ -1,5 +1,6 @@
 // D's patch box: see UiPatchBox.h (v601).
 #include "UiPatchBox.h"
+#include "PluginPatchInit.h"
 #include "PluginPatchSave.h"
 #include "UiLook.h"
 #include "UiParts.h"
@@ -9,13 +10,16 @@
 namespace {
 // Where each part sits, left to right, in the drawing's units (UI_DESIGN.md, "The patch box")
 constexpr int kBrowseW = 76, kPatchTagW = 56, kArrowW = 18, kArrowH = 14, kButtonH = 26, kNoteH = 11, kMarkW = 10;
-constexpr int kSaveW = 56;
+constexpr int kSaveW = 56, kInitW = 44;
 constexpr float kMark = 3.5f;   // the menu mark's half width
+constexpr const char* kInitTitle = "INITIALIZE PATCH";   // [FW] the XT's own words over its PATCH Init's EXECUTE
+constexpr const char* kInitRun = "Execute";               // INIT's one choice, as the XT's window's EXECUTE
 constexpr auto kOpen = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                        | juce::FileBrowserComponent::canSelectDirectories;
 
 // A mode's patches: what Browse… asks for, their files' extension, where the session keeps the one browsed, the load,
-// the name and note shown, the save (v602) and the project's (v603): none for the VC-2's, whose patches rom.4 writes
+// the name and note shown, the save (v602) and the project's (v603): none for the VC-2's, whose patches rom.4 writes;
+// the PATCH Init (v473): none for the VC-2's (v474, the user's "vc-2 mode doesn't need an init")
 struct PatchKind {
     const char* title;
     const char* extension;
@@ -25,17 +29,19 @@ struct PatchKind {
     juce::String (*note)(const VSynthEmuProcessor&);
     bool (*save)(const VSynthEmuProcessor&, const juce::String&, const juce::File&, std::string*);
     bool (*saveProject)(const VSynthEmuProcessor&, const juce::File&, const juce::File&, ProjectSaved&, std::string*);
+    bool (*init)(VSynthEmuProcessor&, std::string*);
 };
+
 // In PluginMode's order
 constexpr std::array<PatchKind, 2> kPatchKinds { {
     { "Load a V-Synth patch, or a project's folder", "p00", "patchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadPatch(f); },
       [](const VSynthEmuProcessor& p) { return p.getPatchName(); },
-      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch, saveProject },
+      [](const VSynthEmuProcessor& p) { return p.getPatchNote(); }, savePatch, saveProject, initPatch },
     { "Load a VC-2 patch, or a project's folder", "p02", "vc2PatchFile",
       [](VSynthEmuProcessor& p, const juce::File& f) { return p.loadVc2Patch(f); },
       [](const VSynthEmuProcessor& p) { return p.vc2PatchName(); },
-      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr, nullptr },
+      [](const VSynthEmuProcessor&) { return juce::String(); }, nullptr, nullptr, nullptr },
 } };
 
 const PatchKind& patchKindOf(PluginMode mode) { return kPatchKinds[static_cast<size_t>(mode)]; }
@@ -50,9 +56,11 @@ PatchBox::PatchBox(VSynthEmuProcessor& p)
     Look::setTextLook(projectLine_, Look::sans(10.0f), Look::muted, juce::Justification::centredLeft);
     patchNote_.setMinimumHorizontalScale(0.5f);
     projectLine_.setMinimumHorizontalScale(0.5f);
+    patchName_.setMinimumHorizontalScale(0.5f);   // v473: as the lines under it, where the buttons beside it leave less
     patchName_.setInterceptsMouseClicks(false, false);   // a click on the name is the box's: the project's menu
     browse_.onClick = [this] { choose(); };
     save_.onClick = [this] { save(); };
+    init_.onClick = [this] { askInit(); };
     prev_.onClick = [this] { step(-1); };
     next_.onClick = [this] { step(1); };
     prev_.getProperties().set(Look::editorsOwn, true);   // the editor's own, no parameter's (LayoutCheck's walk)
@@ -60,6 +68,7 @@ PatchBox::PatchBox(VSynthEmuProcessor& p)
     for (juce::Component* c : Parts { &patchNote_, &projectLine_ }) addChildComponent(c);
     for (juce::Component* c : Parts { &patchName_, &browse_, &prev_, &next_ }) addAndMakeVisible(c);
     addChildComponent(save_);
+    addChildComponent(init_);
     setMode(mode_);
 }
 
@@ -68,7 +77,28 @@ void PatchBox::setMode(PluginMode mode) {
     browsed_ = juce::File();
     project_ = {};
     save_.setVisible(patchKindOf(mode_).save != nullptr);
+    init_.setVisible(patchKindOf(mode_).init != nullptr);
     resized();
+    refresh();
+}
+
+// INIT: Execute under the XT's own words, run when chosen.  Told nothing once the box is gone.
+void PatchBox::askInit() {
+    if (!patchKindOf(mode_).init) return;
+    juce::PopupMenu menu;
+    menu.addSectionHeader(kInitTitle);
+    menu.addItem(1, kInitRun);
+    const juce::Component::SafePointer<PatchBox> box(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&init_), [box](int chosen) {
+        if (box != nullptr && chosen > 0) box->initialize();
+    });
+}
+
+void PatchBox::initialize() {
+    const PatchKind& kind = patchKindOf(mode_);
+    std::string why;
+    if (kind.init && !kind.init(processor_, &why))
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, kInitTitle, juce::String(why));
     refresh();
 }
 
@@ -138,6 +168,7 @@ void PatchBox::resized() {
     auto box = getLocalBounds().reduced(4, 0);
     if (save_.isVisible()) save_.setBounds(box.removeFromRight(kSaveW).withSizeKeepingCentre(kSaveW, kButtonH));
     browse_.setBounds(box.removeFromRight(kBrowseW).withSizeKeepingCentre(kBrowseW, kButtonH));
+    if (init_.isVisible()) init_.setBounds(box.removeFromRight(kInitW).withSizeKeepingCentre(kInitW, kButtonH));
     next_.setBounds(box.removeFromRight(kArrowW).withSizeKeepingCentre(kArrowW, kArrowH));
     prev_.setBounds(box.removeFromRight(kArrowW).withSizeKeepingCentre(kArrowW, kArrowH));
     box.removeFromLeft(kPatchTagW);

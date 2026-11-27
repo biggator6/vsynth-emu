@@ -738,6 +738,49 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The VC-2 mode without a PATCH Init v474 (2026-11-27, on claude/patch-init; HARDWARE_FIRMWARE.md, "The VC-2 mode
+  without a PATCH Init"): the user's "vc-2 mode doesn't need an init", their answer to v473's question. INIT is the
+  V-Synth's alone: the patch box's VC-2 row has no init, so no button, and its menu is Execute without a choice taken.
+  Out: Vc2PatchInit (vc2PatchInit, vc2PatchCategoryNames), PluginVc2PatchInit (initVc2Patch), xt_vc2patch's inits: part
+  (Vc2PatchInitCheck.cpp) and the 12 inits among its reads (fcheck's baseline there as before v473), the vc2patchinit
+  port and its plants, the VC-2 tests' init checks; vc2PatchTake back into vc2PatchRead. Kept, each with callers:
+  applyVc2Patch, xtfw::forCalls, vc2PatchStoreName, XtInitAsked. The V-Synth's PATCH Init unchanged.
+  Checks: xt_vc2patch 0 different; fcheck as baseline; VSynthEmuEditorTest 5229/5229 (no INIT on the VC-2's header),
+  the VC-2 patch part 16/16, VSynthEmuProjectTest 53/53. Plants: mutate_vc2.py --patch --changed d696a0f 13, 0 missed;
+  mutate_files.py's 4 patchinit, 0 missed; mutate_panel.py 49 (the box's, editor-vc2-box-init-shown and -given new,
+  init-, vc2-patch-, editor-vc2-), 0 missed; mutate_tone.py --changed: no plants reach the files changed. verify.sh
+  d696a0f: every line passed (ab 4/4 identical, auval on both AUs; installed into ~/Library as this build). The work
+  in progress was committed first as 62e2a53 (the coordinator's ask), this on top.
+
+PATCH Init v473 (2026-11-27, on claude/patch-init from vc2-mode f1c0797; HARDWARE_FIRMWARE.md, "PATCH Init: the
+  V-Synth's, and the VC-2's by Patch Category"; NEXT_ISSUES.md item 4), the V-Synth's and the VC-2's in one version
+  (the patch box, CMakeLists and the editor's tests hold both), each found by the manual's PATCH Init and INITIALIZE
+  PATCH (both images' strings) and its window's EXECUTE, run in the interpreter, applied as its mode's patch is:
+  - the V-Synth's: rom.2's 0x89482540(store, no name) (0x893c5a10 → 0x8947fdb0 on part 0), xtFwPatchInit, initPatch
+    (applyPatch with no wave folder), "INIT PATCH". A finding: a .p00's default base is the same routine with an empty
+    name, which skips the effects' and zones' settings PATCH Init writes (401 values apart). xt_files' init: line (the
+    EXECUTE run on part 0, 0 bytes different; CANCEL; the default; the store against the firmware's reads, 12,385
+    values 0 different; fcheck baseline +1 line, the only difference); VSynthEmuProjectTest's init part (saved
+    unchanged, the init's store byte for byte).
+  - the VC-2's: rom.4's 0x893291c0(store, no name, category) (0x89493f40 → 0x89326c60 on part 0, the Category its
+    window's buttons chose), vc2PatchInit, initVc2Patch (applyVc2Patch, loadVc2Patch's apply made its own); the 12
+    Categories' names from rom.4's table (0x8994a638), as its patch display draws them. xt_vc2patch's inits: line (each
+    Category's EXECUTE 0 bytes different, 12 distinct, the other window's Category 0, the names as rom.4 draws them,
+    each two lines, CANCEL, the .p02's default Category 0's init itself, as rom.4 takes an empty name as none, unlike
+    rom.2; the 12 read by rom.4's reads, 0 different).
+  Plants: mutate_files.py whole 70, 0 missed (4 patchinit new); mutate_panel.py 32 (the box's, init-, save-, project-)
+  and 46 (vc2-patch-, vc2-init-, editor-vc2-, the box's again, rom4-no-patchfiles, step-), 0 missed; mutate_vc2.py
+  --patch --changed 38, 2 missed and both answered (an empty name is none in rom.4, so that plant now names the patch;
+  the names' read was checked by itself, so each name must now be two lines, which showed the first reader wrong: a
+  label is one string with a newline between its lines; then init-named, init-label-lines and init-label-cut caught),
+  --synth --changed 7, 0 missed; verify.sh: every line passed (fcheck as baseline, the editor 5232/5232, the project
+  test 53/53, the VC-2 patch part 19/19, auval on both AUs);
+  mutate_tone.py --changed: no plants reach the files changed.
+  The patch box's INIT: a menu under INITIALIZE PATCH, the V-Synth's Execute, the VC-2's 12 Categories (the
+  recommendation asked of the user, taken while the answer is pending). Made one: xtfw::forCalls (rom.4's machines),
+  vc2PatchTake/vc2PatchStoreName, xtPatchStoreName, xtfile::storeBytesApart, XtInitAsked (XtPatchInitWindow.h);
+  XtPatchStoreCheck.cpp split (the shorter patch's check to XtPatchShortCheck.cpp).
+
 The pattern before any patch an initialized patch's v469 (2026-11-27, after v468; HARDWARE_FIRMWARE.md, "The pattern
   before any patch"): the user's d-6. xtArpDefaultPattern is xtArpInitPattern (line 1 at velocity 100 on every step),
   for a new processor and a session from before v190, so the Arpeggio on with no patch plays the keys held by its

@@ -273,9 +273,9 @@ vc2-patch-system|    if (p.id < kStoreFirst) return std::nullopt;|    if (p.id <
 vc2-patch-zone|xtStoreValue(vc2Store(), store, p.id, p.zone, p.cosm);|xtStoreValue(vc2Store(), store, p.id, 0, p.cosm);|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-cosm|return vc2StoreTyped(store, p.id, p.zone, p.cosm);|return vc2StoreTyped(store, p.id, p.zone, 0);|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-typed|    if (p.id >= kVc2FirstTyped) return vc2StoreTyped(store, p.id, p.zone, p.cosm);\n||plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-patch-refused-goes-on|        return false;\n    }\n    for (const Vc2HostParam& h|    }\n    for (const Vc2HostParam& h|plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-patch-store-not-kept|        vc2Patch_.store = read.store;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
-vc2-patch-name-not-kept|        vc2Patch_.name = read.name;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-refused-goes-on|        return false;\n    }\n    applyVc2Patch(|    }\n    applyVc2Patch(|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-store-not-kept|        vc2Patch_.store = store;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
+vc2-patch-name-not-kept|        vc2Patch_.name = name;|        ;|plugin/Source/PluginVc2Patch.cpp|arpplugin
 vc2-patch-not-saved|    vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name|    ;|plugin/Source/PluginState.cpp|arpplugin
 vc2-patch-not-restored|    vc2PatchFromState(vc2Patch_, apvts.state);   // v452: none from a session before it|    ;|plugin/Source/PluginState.cpp|arpplugin
 vc2-patch-stale|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : std::vector<uint8_t>();|    patch.store = has ? std::vector<uint8_t>(b, b + bytes.getSize()) : patch.store;|plugin/Source/PluginVc2Patch.cpp|arpplugin
@@ -314,6 +314,11 @@ save-effects-typed|setChanged(store, merged(tone, effectIds(p, store, true)), tr
 save-as-slot|juce::String(last + 1).paddedLeft('0', kSlotDigits)|juce::String(last).paddedLeft('0', kSlotDigits)|plugin/Source/PluginProject.cpp|project
 save-as-name|return slotOfFile(file) ? n.substring(kSlotDigits + 1) : n;|return n;|plugin/Source/PluginProject.cpp|project
 editor-d-box-unsaving|    save_.setVisible(patchKindOf(mode_).save != nullptr);|    save_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-hidden|    init_.setVisible(patchKindOf(mode_).init != nullptr);|    init_.setVisible(false);|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-unrun|    if (kind.init && !kind.init(processor_, &why))|    if (false)|plugin/Source/UiPatchBox.cpp|layout
+editor-d-box-init-unplaced|    if (init_.isVisible()) init_.setBounds(|    if (false) init_.setBounds(|plugin/Source/UiPatchBox.cpp|layout
+editor-vc2-box-init-shown|    init_.setVisible(patchKindOf(mode_).init != nullptr);|    init_.setVisible(true);|plugin/Source/UiPatchBox.cpp|layout
+editor-vc2-box-init-given|juce::String(); }, nullptr, nullptr, nullptr },|juce::String(); }, nullptr, nullptr, initPatch },|plugin/Source/UiPatchBox.cpp|layout
 # A project saved, by VSynthEmuProjectTest (v603): its system files, patches and waves copied, a folder there refused, an
 # outside wave in at the next slot (any file holding a slot) with the patch on it and a plain one named to import, a
 # patch from no project at 001; and the save's Loop kept where the wave decides it (found with it, v602's save too).
@@ -325,6 +330,9 @@ projsave-import|if (!isVSynthWave(wave)) report.toImport.add(to.getFileName());|
 projsave-alone|"001 " + name + ".p00"|"002 " + name + ".p00"|plugin/Source/PluginProjectSave.cpp|project
 save-loop-kept|            ids.erase(kLoopSwitch + kOscStride * osc);|            ;|plugin/Source/PluginPatchSave.cpp|project
 save-slot-any-file|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false);|juce::File::findFiles \| juce::File::ignoreHiddenFiles, false, "*." + extension);|plugin/Source/PluginProject.cpp|project
+init-not-applied|    p.applyPatch(init.name, init.store, 0, juce::File());|    ;|plugin/Source/PluginPatchInit.cpp|project
+init-unnamed|    p.applyPatch(init.name, init.store, 0, juce::File());|    p.applyPatch("", init.store, 0, juce::File());|plugin/Source/PluginPatchInit.cpp|project
+init-rom-refused|    if (!xtSynthRomReady()) return|    if (xtSynthRomReady()) return|plugin/Source/PluginPatchInit.cpp|project
 # v455: the VC-2 mode's audio (VSynthEmuVc2PlayTest): the part's blocks heard, at its level, MAIN and MULTI; the input
 # at each block's own place and in buffers that outlive a wait; messages before their block; the front's start; the
 # patch's store given at a block's edge, a parameter written into it, kept as the session's; the mode read; no

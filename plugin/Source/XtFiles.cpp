@@ -32,9 +32,15 @@ bool xtPatchRead(const uint8_t* file, size_t size, XtPatchFile& out, std::string
     const uint8_t* data = nullptr; size_t bytes = 0;
     if (!patchData(file, size, data, bytes)) return fail(why, "not a V-Synth patch");
     if (!xtFwPatchStore(data, bytes, out.store)) return fail(why, "the firmware's patch routines failed");
-    for (int k = 0; k < 12; ++k) out.name += (char)xtPatchRaw(out.store, 0x103 + k);
-    while (!out.name.empty() && out.name.back() == ' ') out.name.pop_back();
+    out.name = xtPatchStoreName(out.store);
     return true;
+}
+
+std::string xtPatchStoreName(const std::vector<uint8_t>& store) {
+    std::string name;
+    for (int k = 0; k < 12; ++k) name += (char)xtPatchRaw(store, 0x103 + k);
+    while (!name.empty() && name.back() == ' ') name.pop_back();
+    return name;
 }
 
 std::string xtPatchName(const uint8_t* file, size_t size) {
@@ -232,6 +238,7 @@ int main(int argc, char** argv) {
     const int shortBad = xtPatchCheckShort(diskImage);
     const int linksWrong = xtPresetWavesCheck(diskImage, first);   // XtPresetWavesCheck.cpp, v600
     const int savesWrong = xtPatchSaveCheck(diskImage, first);     // XtPatchSaveCheck.cpp, v602
-    return (wavesWrong || patches.different || shortBad || linksWrong || savesWrong) ? 1 : 0;
+    const int initWrong = xtPatchInitCheck(diskImage, first);      // XtPatchInitCheck.cpp, v473
+    return (wavesWrong || patches.different || shortBad || linksWrong || savesWrong || initWrong) ? 1 : 0;
 }
 #endif

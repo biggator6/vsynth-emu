@@ -67,6 +67,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginPresetWaves.cpp
     Source/PluginProject.cpp
     Source/PluginPatchSave.cpp
+    Source/PluginPatchInit.cpp
     Source/PluginProjectSave.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
@@ -165,6 +166,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtDiskImage.cpp
     Source/XtPresetWaves.cpp
     Source/XtFwPatchFile.cpp
+    Source/XtFwPatchInit.cpp
     Source/XtPatchIds.cpp
     Source/XtPatch.cpp
     Source/XtFxChip.cpp
@@ -259,9 +261,9 @@ vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/T
 # part's view (v456) and the system's parameters (v457)
 vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayRun.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp
              Tests/Vc2PlaySystem.cpp Tests/Vc2PlayFx.cpp Tests/Vc2PlayRender.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
-# A project's own files (v600 on): a link to a preset wave followed to the wave it names
+# A project's own files (v600 on): a link to a preset wave followed to the wave it names; the PATCH Init (v473)
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
-             Tests/TestMain.cpp Tests/TestWave.cpp)
+             Tests/ProjectInitTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuFx_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
