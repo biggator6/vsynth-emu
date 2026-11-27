@@ -1663,3 +1663,50 @@ The questions as asked, each with the recommendation:
   Recommended: a fixed or marked output level, written down; without it the input's level is known only against the input.
 - **d-5. MIDI both ways**: USB-MIDI, or a MIDI interface's IN and OUT. Recommended: USB-MIDI if the Mac sees the XT, else a MIDI
   interface both ways: the map check (the guide's step 4) needs the XT's own messages.
+
+### 6. The V-Synth and the VC-2 as two plugins (later)
+
+The user's question and answer, 2026-11-26: the V-Synth as the instrument only and the VC-2 as the effect only, "later after
+final testing and modification of UI"; written down here on the user's "Yes, add it". It starts after the user's UI testing
+and changes, so the editor changes once. Size: one version, from the plugin side's block (v462 on). It changes a rule:
+CLAUDE.md's "as its own mode beside the V-Synth, as the XT's [V-CARD] switches applications" and UI_DESIGN_VC2.md's d-15
+(the mode a session setting) become two plugins, each with its one mode, which the user approves when the step starts.
+
+**Where the code stands** (read 2026-11-26, at v461 1ee8d32):
+- The mode is one session property (`PluginMode.h`, `instrumentMode`), not a host parameter. `PluginVc2Play::readMode` reads
+  it for the sound and `SynthEditor::showMode` (UiEditor.cpp) for the pages. processBlock (PluginProcess.cpp) plays the
+  VC-2's part when `vc2Play_.block()` gives one, else the V-Synth.
+- The header's V-SYNTH/VC-2 pair (`Header`, UiHeader.cpp) sets it; the page bar (`showVc2`), the footer (`setVc2`) and the
+  patch box (`setMode`) follow. The VC-2 button's tooltip still says it "plays nothing yet", from before step 4.3.
+- The parameters are one list: the V-Synth's, then rom.4's 1332 appended (`vc2AddHostParameters`, PluginParams.cpp); the
+  editor's check counts 2078 of 2095 with a control.
+- The effect build (v461, plugin/FxPlugin.cmake, "V-Synth Emu FX", AU aumf VsEf Gato, VST3 Fx) compiles the instrument's
+  own sources, so both plugins hold both modes today. The VC-2's part reads rom.2's tables too (`PluginVc2Play`: rom.4
+  and rom.2 ready) and plays through `XtFxChip`, so the effect still needs both ROMs and the chip.
+
+**The work:**
+- [ ] A product per build target, set in `vse_plugin_setup`: the instrument V-Synth only, the effect VC-2 only. The test
+  build keeps both modes, so the checks that switch modes today (EditorTest, EditorVc2Test, VSynthEmuVc2PlayTest) stand.
+- [ ] The editor by the product: no V-SYNTH/VC-2 pair (its tooltip with it), only the product's pages, page bar, footer
+  and patch box.
+- [ ] The parameters, by d-6.
+- [ ] The checks: each product opens in its own mode and can't reach the other, and its parameters all have a control
+  (the editor's check per product); verify.sh's auval lines and buildid.sh as they are, for the two builds.
+- [ ] The docs: CLAUDE.md's rule, UI_DESIGN_VC2.md's d-15, CODE_MAP.md, TOOLS.md, HARDWARE_FIRMWARE.md's section.
+
+**The user's decisions**, each with the recommendation:
+- **d-6. The other mode's parameters**: kept in both plugins and hidden, or each plugin with only its own. Recommended: only
+  its own (the instrument the V-Synth's, the effect rom.4's and what both use), so a host lists each plugin's own controls.
+  The sessions it changes are the instrument's saved in VC-2 mode, test sessions so far: they open on the V-Synth. To check
+  when it starts: the parameters kept keep their host IDs (JUCE's IDs from the parameter's ID string; neither target sets
+  JUCE_FORCE_USE_LEGACY_PARAM_IDS).
+- **d-7. The effect's name**: "V-Synth Emu FX" as now, or another, e.g. "V-Synth Emu VC-2". Only the name the host shows;
+  the codes (VsEf Gato, the bundle ID) stay, so sessions saved with it still open. Recommended: "V-Synth Emu VC-2", beside
+  the instrument in a host's list and saying what it is.
+- **d-8. A Standalone for the VC-2**: the instrument's Standalone plays the VC-2 with the computer's input today, and the
+  split would take that away. Recommended: a Standalone of the effect build (JUCE builds one for an effect, its input the
+  audio device's).
+- **d-9. The instrument's audio input**: kept, as the V-Synth's EXT IN OSC needs it (v207). Recommended: kept. A note for the
+  manual: REAPER plays an instrument track's own audio beside the instrument's output (HARDWARE_FIRMWARE.md, "The VC-2 heard
+  dry in REAPER"), so EXT IN there wants that section's way round: the audio on the track's channels 3/4, the plugin's
+  inputs from 3/4, the parent send of 1/2 only.
