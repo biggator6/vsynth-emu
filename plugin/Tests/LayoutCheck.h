@@ -230,19 +230,19 @@ struct LayoutCheck {
     void asItsParameter(juce::Component& k, const juce::RangedAudioParameter& moved, double shown,
                         const juce::String& where);
     static double shownOf(juce::Component& k);   // a slider's value, a box's chosen ID, a switch's state
-    // A right-click on c as the editor gets one: c's own press, then the editor's listener, a drag up, the release
+    // A right-click on c as the editor gets one, c's own press then the editor's listener: a click, then a drag
     static void rightClick(juce::Component& c, MidiLearn::Menus& menus);
 
     // The mouse at a point of c, having gone down at `from`; pressed there, as a click sends it (D's page bar, path and
-    // blocks, UI step 1)
+    // blocks, UI step 1); `dragged` as a drag past JUCE's few pixels sends it, not a click (v465, a bar's right-drag)
     static inline const juce::ModifierKeys rightButton { juce::ModifierKeys::rightButtonModifier };
     static juce::MouseEvent mouseAt(juce::Component& c, juce::Point<float> at, juce::Point<float> from,
-                                    juce::ModifierKeys mods = {}) {
+                                    juce::ModifierKeys mods = {}, bool dragged = false) {
         using Src = juce::MouseInputSource;
         const juce::Time now = juce::Time::getCurrentTime();
         const Src mouse = juce::Desktop::getInstance().getMainMouseSource();
         return juce::MouseEvent(mouse, at, mods, Src::defaultPressure, Src::defaultOrientation, Src::defaultRotation,
-                                Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, from, now, 1, false);
+                                Src::defaultTiltX, Src::defaultTiltY, &c, &c, now, from, now, 1, dragged);
     }
     static void pressAt(juce::Component& c, juce::Point<float> at) { c.mouseDown(mouseAt(c, at, at)); }
     // A press at `from`, a drag to `to` and the release there (D's envelope points, UI step 3)

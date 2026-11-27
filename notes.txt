@@ -738,6 +738,12 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The MIDI learn checks made able to fail v465 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "The checks the
+  v464 gates' four missed plants showed blind"): v464's gates missed 4 of 184 plants. MidiTest's learn check reads what
+  the synth itself takes of CC 5 by a Matrix route from it on a held note (TestMidi.h: levelRoute, holdBlocks,
+  toDefaults; the ring check uses them too); LayoutCheck::rightClick is a click, then a drag JUCE counts as one, across
+  and up. Checks only. VSynthEmuMidiTest 39/39, VSynthEmuEditorTest 5255/5255; the four plants caught.
+
 A modulator as the knob's ring v464 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "A modulator as the knob's
   ring"): research/NEXT_ISSUES.md item 2's second half, d-5. XtSynthView (a friend of XtSynth's: the newest note's
   Matrix sums and MSM terms into atomics after each block the players play; none otherwise), ModRings (UiModRings.cpp,

@@ -20,9 +20,15 @@ double LayoutCheck::shownOf(juce::Component& k) {
     return 0.0;
 }
 
+// v465: both a click and a drag, as the two plants a drag alone let by showed.  A switch toggles on a click's release:
+// the drag takes it off the switch (the mouse is over nothing here), so it never would.  A bar with a text box moves
+// only on a drag JUCE counts as one (a click edits its text), across as well as up, a bar being across.
 void LayoutCheck::rightClick(juce::Component& c, MidiLearn::Menus& menus) {
-    const auto at = c.getLocalBounds().getCentre().toFloat(), to = at.translated(0.0f, -30.0f);
-    const juce::MouseEvent down = mouseAt(c, at, at, rightButton), drag = mouseAt(c, to, at, rightButton);
+    const auto at = c.getLocalBounds().getCentre().toFloat(), to = at.translated(20.0f, -30.0f);
+    const juce::MouseEvent down = mouseAt(c, at, at, rightButton), drag = mouseAt(c, to, at, rightButton, true);
+    c.mouseDown(down);
+    menus.mouseDown(down);
+    c.mouseUp(down);
     c.mouseDown(down);
     menus.mouseDown(down);
     c.mouseDrag(drag);

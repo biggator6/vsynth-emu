@@ -54,7 +54,8 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   and the makers call; `MidiLearn::Menus`, the editor's listener and the menu), `UiMidiMap` (`MidiMapView`, the map in
   a call-out). Checked by `VSynthEmuMidiTest`'s learn part, `VSynthEmuEditorTest` (`LayoutCheck::asItsParameter` on every
   control, `LayoutControls.cpp`, `EditorLearnTest.cpp`, `EditorLiveTest.cpp`) and the `midi-learn-` and `editor-d-learn-` plants. `plugin/Tests/TestMidi.h`: a
-  controller and a block of messages into a processor, MidiTest's and the editor's. v464, the knobs' rings:
+  controller and a block of messages into a processor, MidiTest's and the editor's; v465, `levelRoute` (a Matrix route
+  from a controller onto OSC 1's Level, what the synth itself takes of it read by its sum) and `holdBlocks`. v464, the knobs' rings:
   `XtSynthView` (the newest note's Matrix sums and MSM terms, copied from XtSynth's voices by a friend after each block
   into atomics; the processor's `modulation()`), `UiModRings` (`ModRings`, the editor's: which knob a sum lands on
   straight, by a table, each instance's by index; each shown knob's ring on the timer). Checked by

@@ -139,10 +139,13 @@ void mapInSession(TestChecks& check, const juce::File& rom, VSynthEmuProcessor& 
     check(back.p.midiIn().learn.entries().empty(), "a session with no map should leave none");
 }
 
-// MIDI learn on LFO 1's Rate, by CC 5, which the firmware takes as Portamento Time
+// MIDI learn on LFO 1's Rate, by CC 5, which the firmware takes as Portamento Time; what the synth itself takes of CC 5
+// read by a Matrix route from it on a held note (v465: the parameter's path alone didn't see a learnt one reach it)
 void learnt(TestChecks& check, const juce::File& rom) {
     Playing s(rom);
     VSynthEmuProcessor& p = s.p;
+    levelRoute(p, 5);
+    holdBlocks(p, { juce::MidiMessage::noteOn(1, 60, (juce::uint8)100) }, 2);
     PluginMidiLearn& learn = p.midiIn().learn;
     const int rate = p.midiIn().edits.indexOf(Params::kLfoRate);
     const auto& range = p.midiIn().edits.param(rate)->getNormalisableRange();
@@ -151,10 +154,12 @@ void learnt(TestChecks& check, const juce::File& rom) {
     p.sendFromEditor(controller(82, 64));   // the pad's, the editor's own
     playMessages(p, {});
     check(learn.armed() == rate && learn.parameterOf(82) < 0, "the editor's own controllers shouldn't be learnt");
-    playMessages(p, { controller(5, 127) });
+    holdBlocks(p, { controller(5, 127) }, 2);
     check(learn.parameterOf(5) == rate && learn.armed() < 0, "the next controller should be learnt for the parameter");
     check(p.currentControls().lfoRate == top, "its value moving the parameter at once, 127 to the top");
     check(p.currentControls().portaTime == 20, "and no longer reaching the firmware, whose CC 5 it is (d-3)");
+    check(p.modulation().sounding() && p.modulation().matrix(xtmx::OscLevel) == 0,
+          "nor the synth's own CC 5: its Matrix route adding nothing");
     playMessages(p, { controller(5, 0) });
     p.midiIn().edits.flush();
     check((int)stored(p, Params::kLfoRate) == bottom, "0 to the bottom, onto the parameter when handed on");
@@ -163,10 +168,11 @@ void learnt(TestChecks& check, const juce::File& rom) {
     playMessages(p, { controller(21, 0) });
     check(learn.parameterOf(21) == rate && learn.parameterOf(5) < 0, "a second controller should let the first go");
     learn.forget(rate);
-    playMessages(p, { controller(21, 127), controller(5, 100) });
+    holdBlocks(p, { controller(21, 127), controller(5, 100) }, 2);
     p.midiIn().edits.flush();
     check((int)stored(p, Params::kLfoRate) == bottom, "a forgotten controller should move nothing of its own");
     check(stored(p, Params::kPortaTime) == 100, "CC 5 reaching the firmware again");
+    check(p.modulation().matrix(xtmx::OscLevel) > 0, "and the synth's own, its Matrix route adding again");
 }
 
 int midiTest(const juce::File& rom, const juce::File&) {

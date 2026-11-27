@@ -52,30 +52,21 @@ bool shownUnder(juce::Component& c, juce::Component& root) {
         if (!at->isVisible()) return false;
     return true;
 }
-
-void blocks(VSynthEmuProcessor& p, std::initializer_list<juce::MidiMessage> first, int more) {
-    playMessages(p, first);
-    for (int b = 0; b < more; ++b) playMessages(p, {});
-}
 }  // namespace
 
-// v464 (d-5): a modulator as the knob's ring.  Matrix Control 1 puts CC 1 onto OSC 1's Level at +63; OSC 1 Level stored at
-// 64, on ANALOG so it plays with no wave; a note held.  CC 1 at 127 rings Level's knob from 64 up by the newest note's sum, the knob itself staying on 64;
-// CC 1 at 0 takes the ring away; with the note let go and ended, none.
+// v464 (d-5): a modulator as the knob's ring.  TestMidi.h's levelRoute from CC 1: Matrix Control 1 onto OSC 1's Level
+// at +63, Level stored at 64, on ANALOG; a note held.  CC 1 at 127 rings Level's knob from 64 up by the newest note's
+// sum, the knob itself staying on 64; CC 1 at 0 takes the ring away; with the note let go and ended, none.
 void ringChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
     ed.showPage(Blocks::kSynthPage);
-    const std::pair<juce::String, float> route[] = { { VSynthEmuProcessor::matrixParamId(0, "Source"), 1 },
-                                                     { VSynthEmuProcessor::matrixParamId(0, "Dest1"), 4 },
-                                                     { VSynthEmuProcessor::matrixParamId(0, "Sens1"), 63 },
-                                                     { "oscLevel", 64 }, { "oscType", 0 } };   // ANALOG: no wave
-    for (const auto& [id, v] : route) setParam(p, id, v);
+    const auto route = levelRoute(p, 1);
     auto* knob = l.firstOf<LearnSlider>([&](LearnSlider& s) {
         return MidiLearn::learnsFor(s) == "oscLevel" && shownUnder(s, ed.drawing());
     });
     check(knob != nullptr, "OSC 1's Level knob should show");
     if (knob == nullptr) return;
     const float at64 = p.apvts.getParameter("oscLevel")->getValue();
-    blocks(p, { controller(1, 127), juce::MidiMessage::noteOn(1, 60, (juce::uint8)100) }, 4);
+    holdBlocks(p, { controller(1, 127), juce::MidiMessage::noteOn(1, 60, (juce::uint8)100) }, 4);
     check(p.modulation().sounding(), "the note should sound, for the rings to read");
     const int sum = p.modulation().matrix(xtmx::OscLevel);
     check(sum > 0, "CC 1 at 127 through Sens +63 should add to OSC 1's Level, not " + std::to_string(sum));
@@ -83,14 +74,11 @@ void ringChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChec
     const auto [lo, hi] = knobRing(*knob);
     check(juce::approximatelyEqual(lo, at64) && hi > lo, "a Matrix route on a held note should ring the knob up");
     check(juce::approximatelyEqual(knob->getValue(), 64.0), "the knob itself on what's stored");
-    blocks(p, { controller(1, 0) }, 4);
+    holdBlocks(p, { controller(1, 0) }, 4);
     ed.showRings();
     check(knobRing(*knob).first < 0.0f, "nothing added, no ring");
-    blocks(p, { controller(1, 127), juce::MidiMessage::noteOff(1, 60) }, 400);
+    holdBlocks(p, { controller(1, 127), juce::MidiMessage::noteOff(1, 60) }, 400);
     ed.showRings();
     check(knobRing(*knob).first < 0.0f, "no note sounding, no ring");
-    for (const auto& [id, v] : route) {
-        auto* param = p.apvts.getParameter(id);
-        param->setValueNotifyingHost(param->getDefaultValue());
-    }
+    toDefaults(p, route);
 }

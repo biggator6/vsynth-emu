@@ -4350,7 +4350,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
   argument to `analyse` broke the shape law, so the cutter got a function that makes an analysis by class. The shared CLI
   now picks one by a flag, which fxcut doesn't use.
 
-### Session 27 (2026-11-27) — v462 to v464: MIDI learn, and controls that follow their values
+### Session 27 (2026-11-27) — v462 to v465: MIDI learn, and controls that follow their values
 
 - The coordinator's brief: research/NEXT_ISSUES.md items 1 and 2, research first, the user's d-3, d-4 and d-5 asked
   with what it found. rom.2 has rom.4's OS library: each control change goes to the port's listeners, and the OS's
@@ -4376,3 +4376,8 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The machine's build queue was the bottleneck: four sessions' plant runs each hold a slot for their whole run. A
   gates worktree inside this one ran a version's long gates while the next was written; its first run was stopped so
   the editor's list runs once on the last version, which holds every one's changes.
+- That run (verify.sh clean) missed 4 of 184 plants, each a check that couldn't fail, and v465 mended the checks alone.
+  "Kept from the firmware" had been read off the parameter's path, which a CC handed to the synth doesn't move; a Matrix
+  route from it on a held note reads the synth's own. The test's right-click was a press and a drag, and in a test a
+  button's drag finds the mouse over nothing and lets the button up, and JUCE counts no event as a drag unless told:
+  a click, then a drag it counts, across as well as up, caught both.

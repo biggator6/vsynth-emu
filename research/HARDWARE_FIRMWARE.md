@@ -1546,6 +1546,25 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The checks the v464 gates' four missed plants showed blind (2026-11-27, v465) {#midi-learn-checks}
+
+v464's gates (verify.sh clean; 184 of the plants v462–v464 reach) missed four. Each was a check that couldn't fail;
+v465 changes only the checks, no code of the plugin's.
+- `midi-learn-host-whole`, `midi-learn-reaches-firmware` (a learnt controller handed to the firmware as well): MidiTest's
+  "no longer reaching the firmware" read `currentControls().portaTime`, the parameter's path through `raw()`, which a CC
+  reaching `XtSynth::controller` doesn't move (the firmware's channel keeps it in `cc[]`, the Matrix's sources). Now the
+  learn check holds a note with a Matrix route from CC 5 onto OSC 1's Level (TestMidi.h's `levelRoute`, v464's ring
+  check's route made one) and reads the sum by `XtSynthView::matrix`: 0 with CC 5 learnt, above 0 once it's forgotten.
+- `editor-d-learn-switch-toggles` (no `setState(buttonNormal)` on a switch's right-click): `LayoutCheck::rightClick` sent
+  a press, a drag and the release. A juce::Button's drag asks whether the mouse is over it (`isMouseSourceOver`), which,
+  with no real mouse in a test, says no and lets the button up, so its release never clicked, kept up or not.
+- `editor-d-learn-bar-drags` (UiFields' bar a plain juce::Slider): `LayoutCheck::mouseAt` made every event as a click
+  (`mouseWasDragged` false). JUCE doesn't move a LinearBar with an editable text box on a click (a click edits its text),
+  and the drag went straight up, along no bar.
+- Now `rightClick` is a click (press, the editor's listener, release at the same point), then a drag 20 across and 30
+  up that JUCE counts as one (`mouseAt`'s `dragged`). With the four plants in, the MIDI check and the editor's say so; the
+  plugin as it is passes both (VSynthEmuMidiTest 39/39, VSynthEmuEditorTest 5255/5255).
+
 ### A modulator as the knob's ring (2026-11-27, v464) {#mod-rings}
 
 research/NEXT_ISSUES.md item 2's second half, the user's d-5: the knob says what's stored, a modulator shows as a ring
