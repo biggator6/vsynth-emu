@@ -422,3 +422,10 @@ editor-d-learn-no-forget|    if (const int cc = learnt.controllerOf(index); cc >
 editor-d-learn-silent|    return param ? "MIDI learn: move a controller for "|    return false ? "MIDI learn: move a controller for "|plugin/Source/UiMidiLearn.cpp|layout
 editor-d-learn-map-empty|        rows_.push_back(std::move(row));|        ;|plugin/Source/UiMidiMap.cpp|layout
 editor-d-learn-map-forget|void MidiMapView::forgetAll() { processor_.midiIn().learn.forgetAll(); }|void MidiMapView::forgetAll() {}|plugin/Source/UiMidiMap.cpp|layout
+# v464: a modulator as the knob's ring, by VSynthEmuEditorTest's ringChecks: taken, by its slot, gone with no note
+editor-d-ring-never|        if (!ringIs(knob->dial(), lo, hi)) knob->setModulation(lo, hi);|        ;|plugin/Source/UiModRings.cpp|layout
+editor-d-ring-slot|{ OscLevel + dO, os + xtmsm::OscLevel }|{ OscTime + dO, os + xtmsm::OscLevel }|plugin/Source/UiModRings.cpp|layout
+editor-d-ring-stale|    if (at == reach_.end() \|\| !view.sounding()) return 0;|    if (at == reach_.end()) return 0;|plugin/Source/UiModRings.cpp|layout
+editor-d-ring-not-taken|        modView_.take(synth_);                  // v464|        ;   // v464|plugin/Source/PluginProcess.cpp|layout
+editor-d-watch-deaf|            values_[at] = v;\n|            (void)v;\n|plugin/Source/UiWatch.cpp|layout
+editor-d-ring-held-first|        if (!v.active) continue;|        if (!v.active \|\| !v.releasing) continue;|plugin/Source/XtSynthView.cpp|layout

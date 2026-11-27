@@ -4349,3 +4349,30 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The coordinator kept the four, with their verdicts made to depend on whether the user found the setting. A seventh
   argument to `analyse` broke the shape law, so the cutter got a function that makes an analysis by class. The shared CLI
   now picks one by a flag, which fxcut doesn't use.
+
+### Session 27 (2026-11-27) — v462 to v464: MIDI learn, and controls that follow their values
+
+- The coordinator's brief: research/NEXT_ISSUES.md items 1 and 2, research first, the user's d-3, d-4 and d-5 asked
+  with what it found. rom.2 has rom.4's OS library: each control change goes to the port's listeners, and the OS's
+  part objects (class 0x8982ffa4) turn CC 5, 65, 126, 127 and RPN 0…2 into edits of the patch through one edit
+  object. Everything else only modulates. The user took all three recommendations, and "Not now" for a program change,
+  the tuning message and SysEx DT1, which write stored values too.
+- v462 ported the six as XtMidiPort, checked by a new harness, xt_midi, on the firmware's own handler and a part object
+  its constructor builds, 0 different and 26 plants caught. Onto the parameters they went without the audio thread
+  touching JUCE's parameters: a lock-free overlay the synth's reads take at once, handed to the parameter and the
+  host by a timer, the later setter winning. That needed every parameter read for the synth to go through one
+  function (raw), and the editor's queue moved out of a header at its limit.
+- v463's live check found v462's mistake: the edits were made in toSynth, which runs only while the players play, so
+  with no wave a CC 5 edited nothing. The XT's OS makes them whatever the tone generator does. They moved into the
+  first pass of processBlock, beside MIDI learn, in the block's order.
+- MIDI learn needed a right-click on every control without the control's own handling of one: a slider drags and a
+  switch toggles. The kit refused a static menu listener, so the editor owns it and listens to every press beneath it;
+  a slider that learns ignores a right-click, and a switch's own press is put back up. Every maker marks its control
+  through one attachment function, and the editor's check holds every control on every page to its own parameter,
+  both ways, and a right-click to moving nothing.
+- v464's ring had been D's drawing since v196 with nothing calling it. It shows what the converters add straight in a
+  knob's own units, the Matrix's sums and the MSM's terms of the newest note, read from XtSynth's voices by a friend
+  class so no port file changed.
+- The machine's build queue was the bottleneck: four sessions' plant runs each hold a slot for their whole run. A
+  gates worktree inside this one ran a version's long gates while the next was written; its first run was stopped so
+  the editor's list runs once on the last version, which holds every one's changes.

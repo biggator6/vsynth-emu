@@ -12,6 +12,7 @@
 #include "UiLook.h"
 #include "UiLowerPanel.h"
 #include "UiMidiLearn.h"
+#include "UiModRings.h"
 #include "UiPageBar.h"
 #include "UiPath.h"
 #include "UiRack.h"
@@ -44,6 +45,7 @@ public:
     bool vc2() const { return mode_ == PluginMode::vc2; }
     Vc2SynthPage& vc2Synth() { return *vc2Synth_; }   // only once the VC-2 mode has been shown
     MidiLearn::Menus& learnMenus() { return learnMenus_; }   // v463: MIDI learn's, on every control under the editor
+    void showRings() { rings_.show(drawing_); }   // v464: what the timer does for the knobs' rings, a test's at once
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -51,6 +53,7 @@ public:
 private:
     VSynthEmuProcessor& processor_;
     MidiLearn::Menus learnMenus_ { processor_ };
+    ModRings rings_ { processor_ };   // v464: the knobs' modulation rings, on the timer
     Look::Feel feel_;
     juce::Component drawing_;
     Header header_;

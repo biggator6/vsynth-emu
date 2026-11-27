@@ -9,4 +9,6 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginMidiLearn.cpp
     Source/UiMidiLearn.cpp
     Source/UiMidiMap.cpp
+    Source/XtSynthView.cpp
+    Source/UiModRings.cpp
 )

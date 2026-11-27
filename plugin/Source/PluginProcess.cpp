@@ -18,6 +18,7 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     // ── The VC-2 mode: its part plays the block, the editor's messages first (PluginVc2Play.h, v455) ───────
     if (vc2) {
+        modView_.none();   // v464: the V-Synth's rings show nothing in the VC-2 mode
         takeFromEditor([&vc2](const juce::MidiMessage& m) { vc2.message(m); });
         vc2.process(buffer, host, numIn);
         return;
@@ -49,11 +50,13 @@ void VSynthEmuProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
         takeFromEditor([this](const juce::MidiMessage& m) { toSynth(m); });   // the editor's, at the block's start (v201)
         playMidi(buffer, host, numIn, L, R);   // the host's at their frames, the input's spans between (v207)
+        modView_.take(synth_);                  // v464: the newest note's sums, for the knobs' rings
         if (numOut == 1) for (int i = 0; i < numSamples; ++i) L[i] = 0.5f * (L[i] + R[i]);
         return;
     }
 
     // ── Without the firmware: the loaded file as it is ──────────────────────────
+    modView_.none();
     playFile(buffer, host, numOut);
 }
 

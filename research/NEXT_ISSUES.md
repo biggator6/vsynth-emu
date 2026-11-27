@@ -47,7 +47,9 @@ Step Modulator), which move a value at run time without changing what's stored.
   the host's parameter, a modulator shows as the knob's ring. And of the other three paths, none in this group ("Not
   now"): a program change, the tuning message and SysEx DT1 are follow-ups.
 - **Done:** the six edits onto the parameters, v462; made in processBlock's first pass whatever plays, and every control
-  held to follow a host's automation and the six edits, v463.
+  held to follow a host's automation and the six edits, v463; a modulator as the knob's ring, the Matrix's and the
+  MSM's straight sums on their knobs, v464. Left for later: rings on the knobs whose sums go in by another unit or by
+  COSM Type, and the LFOs' and envelopes' own movement.
 
 ### 3. The arpeggiator's pattern
 "arpeggiator only reads from patches - no ability to program patterns. with no pattern, it should still handle live input

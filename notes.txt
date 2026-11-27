@@ -738,6 +738,13 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+A modulator as the knob's ring v464 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "A modulator as the knob's
+  ring"): research/NEXT_ISSUES.md item 2's second half, d-5. XtSynthView (a friend of XtSynth's: the newest note's
+  Matrix sums and MSM terms into atomics after each block the players play; none otherwise), ModRings (UiModRings.cpp,
+  the editor's: the knobs a sum lands on straight in their own units, by a table, each OSC's and COSM's rows by index;
+  each shown knob's ring on the timer, only when it moved, through Knob::setModulation, D's ring from v196 that nothing
+  had called). VSynthEmuEditorTest's ringChecks (EditorLiveTest.cpp); plants: 5 editor-d-ring-.
+
 MIDI learn v463 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "MIDI learn"; research/UI_DESIGN.md, "MIDI
   learn"): research/NEXT_ISSUES.md item 1, d-3 and d-4. PluginMidiLearn (a controller to a parameter, armed from a
   control, learnt on the audio thread, the session's midiMap by ID); PluginMidiIn::ahead (the host's block without

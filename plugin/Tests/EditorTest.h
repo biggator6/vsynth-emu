@@ -74,5 +74,7 @@ void vc2TextChecks(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 void learnChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 // Live values (EditorLiveTest.cpp, v464): the firmware's MIDI edits of the patch moving their controls on the PLAY page
 void liveChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// and (v464) a modulator as the knob's ring: a Matrix route on a held note, none with nothing added or no note
+void ringChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 void patchBoxChecks(LayoutCheck& l, VSynthEmuProcessor& p, const juce::File& rom, const juce::File& work,
                     TestChecks& check);

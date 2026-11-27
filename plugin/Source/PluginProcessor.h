@@ -11,6 +11,7 @@
 #include "PluginArp.h"
 #include "PluginLoadedWave.h"
 #include "PluginMidiIn.h"
+#include "XtSynthView.h"
 #include "PluginVc2Play.h"
 #include "PluginWaveView.h"
 #include <climits>
@@ -118,6 +119,7 @@ public:
     template <class Take>
     void takeFromEditor(Take&& take) { midi_.take(take); }
     PluginMidiIn& midiIn() { return midi_; }
+    const XtSynthView& modulation() const { return modView_; }   // v464: the newest note's, for the knobs' rings
 
     // ── The XT's firmware (rom.2) ────────────────────────────────────────────
     // Message thread.  The image the user chose: used now and kept for every project and plugin format, so a new
@@ -202,6 +204,7 @@ private:
     std::shared_ptr<const WaveView> waveView_[2];
     std::atomic<int> waveViewGen_[2] {};
     PluginMidiIn midi_ { apvts };   // v462: the editor's queue and the MIDI edits (PluginMidiIn.h)
+    XtSynthView modView_;           // v464: taken after each block the XT's players play, none sounding otherwise
     void toSynth(const juce::MidiMessage& msg);   // one message to the synth, the host's or the editor's
     void toFile(const juce::MidiMessage& msg);    // or to the file played without the firmware
     void playFile(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int numOut);   // that file's block

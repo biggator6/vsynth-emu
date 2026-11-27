@@ -176,6 +176,13 @@ round ends; its value arc is `accent` from the bottom of the sweep, or from the 
 has a `mod` ring 3.2 outside the track over the modulation's reach; a big knob has a cap (`2A2D33`); a pointer in `text`
 runs from the centre to 6 inside the track. Its name is under it, its value under that.
 
+The ring (v464; research/NEXT_ISSUES.md item 2, d-5) is live: from the knob's stored value to that plus what the
+newest note's Matrix routes and Multi Step Modulator add to it, on the editor's timer, so a controller moving a Matrix
+source sweeps it while the knob stays on what's stored. Only the knobs whose converter adds those straight in their own
+units are rung (`ModRings`' table: each OSC's Level, LFO Rate and depths, PW and Fat LFO; each COSM's LFO Rate; the
+TVA's Level, Pan, their LFO depths, LFO Rate and sends; Portamento Time). No note sounding, or nothing added, no ring.
+HARDWARE_FIRMWARE.md, "A modulator as the knob's ring".
+
 ### MIDI learn {#midi-learn}
 
 v463 (research/NEXT_ISSUES.md item 1; the user's d-3 and d-4, 2026-11-27). Every control made from a parameter's ID can

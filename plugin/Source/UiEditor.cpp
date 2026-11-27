@@ -153,6 +153,7 @@ void SynthEditor::timerCallback() {
         path_.refresh();
         rack_.refresh();
         lower_.refresh();
+        showRings();   // v464
         return;
     }
     vc2Synth_->refresh();

@@ -54,7 +54,11 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   and the makers call; `MidiLearn::Menus`, the editor's listener and the menu), `UiMidiMap` (`MidiMapView`, the map in
   a call-out). Checked by `VSynthEmuMidiTest`'s learn part, `VSynthEmuEditorTest` (`LayoutCheck::asItsParameter` on every
   control, `LayoutControls.cpp`, `EditorLearnTest.cpp`, `EditorLiveTest.cpp`) and the `midi-learn-` and `editor-d-learn-` plants. `plugin/Tests/TestMidi.h`: a
-  controller and a block of messages into a processor, MidiTest's and the editor's.
+  controller and a block of messages into a processor, MidiTest's and the editor's. v464, the knobs' rings:
+  `XtSynthView` (the newest note's Matrix sums and MSM terms, copied from XtSynth's voices by a friend after each block
+  into atomics; the processor's `modulation()`), `UiModRings` (`ModRings`, the editor's: which knob a sum lands on
+  straight, by a table, each instance's by index; each shown knob's ring on the timer). Checked by
+  `VSynthEmuEditorTest`'s `ringChecks` (EditorLiveTest.cpp) and the `editor-d-ring-` plants.
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.
 - `IOS_companion/`: a companion application for iPhone and iPad, developed separately from the plugin, that works as the XT's Time Trip or X-Y pad over MIDI; tested and working (the user, 2026-11-13). It is not part of the plugin's build, tests or outstanding work; its `IOS_COMPANION_PLAN.md` still reads "Planned" and is out of date.
 - `research/HARDWARE_FIRMWARE.md`: the findings, newest version first (addresses,

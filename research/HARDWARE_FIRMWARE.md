@@ -1546,6 +1546,34 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A modulator as the knob's ring (2026-11-27, v464) {#mod-rings}
+
+research/NEXT_ISSUES.md item 2's second half, the user's d-5: the knob says what's stored, a modulator shows as a ring
+beside it (research/UI_DESIGN.md, "The look": `mod`, 3.2 outside the track, over the modulation's reach; the ring's
+drawing was D's from v196, `Knob::setModulation`, and nothing had called it).
+
+**What the ring shows.** XtSynth's converters add, to some knobs, the Matrix's sum by slot (`XtVoice::mx`) and the
+Multi Step Modulator's term by destination (`XtVoice::msm`) straight, in the knob's own units, as the voice's last
+conversion pass left them (XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp): each OSC's Level (`o.oscLevel + term + mx`), its
+LFO's Rate (`withSum`) and its four depths, the analog's PW and Fat LFO (on time's and formant's terms); each COSM's LFO
+Rate; the TVA's Level, Pan, Level and Pan LFO, its LFO's Rate and the three sends; Portamento Time (the MSM's term
+alone, `portaSettings`). Those knobs are rung from the stored value to it plus the newest note's sum and term, clamped
+to the range: a Matrix route from a controller, the bender, the pad or the velocity, and the MSM's steps, as they move.
+The newest note is the one held last, else the one let go last that still sounds; none sounding, no ring. Not rung
+(follow-ups): the knobs whose sums the converter takes in another unit or by type (each OSC's Pitch, Time and Formant,
+whose sums go into the pitch, time and formant laws; each COSM's PRM1, PRM2 and LFO-PRMs, whose knobs depend on its
+Type), the envelopes' times (bars, not knobs), and the LFOs' and envelopes' own output, which moves within a note.
+
+**How.** `XtSynthView` (a friend of XtSynth's, reading its voices, changing nothing) copies the newest note's 79 sums
+and 72 terms into atomics after each block the XT's players play (`modView_.take`, processBlock), none sounding in the
+VC-2 mode and with no image. `ModRings` (the editor's) holds a table of each ringed parameter's slot and destination,
+each OSC's and COSM's rows made by its index, and on the editor's timer sets each shown knob's ring when it has moved
+(`Knob::setModulation`; a hidden page's knobs are passed by).
+
+**The check.** `VSynthEmuEditorTest` (`EditorLiveTest.cpp`, `ringChecks`): Matrix Control 1 with CC01 onto OSC1-LVL at
++63 and OSC 1 Level at 64, a note held and CC 1 at 127: Level's knob rung from 64 up, the knob itself still 64; CC 1 at
+0, no ring; the note let go and ended, no ring. Plants: the `editor-d-ring-` names.
+
 ### MIDI learn; controls that follow a host and MIDI's edits (2026-11-27, v463) {#midi-learn}
 
 research/NEXT_ISSUES.md item 1, the user's d-3 (a learnt controller is the plugin's alone) and d-4 (the map is the
