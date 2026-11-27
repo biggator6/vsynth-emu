@@ -63,6 +63,10 @@ std::string xtSynthVc2RomPath();
 // which is played as it is, no encode, as the XT plays a wave it loads: a SOLO wave's plan read from it (xtSoloReadVpdt), a band wave's
 // players reading it with the bands rebuilt from the audio (xtFwLoadBands).  Taken when its events run from 0 to the end, never back,
 // on the file's own audio at 44.1 kHz, and a SOLO plan reads; else the encode above (`events`, then the detection).
+// The channels as the XT imports them, which xtSynthEncode encodes: to int16 (16 bits rounded, wider ones their top 16),
+// then the XT's converter to 44.1 kHz where the rate differs; interleaved frames (XtSynthImport.cpp, v480: a wave cut
+// in the XT's frames is cut on these)
+std::vector<int16_t> xtSynthImport(const std::vector<std::vector<float>>& channels, double sampleRate, int bits);
 std::shared_ptr<XtEncoded> xtSynthEncode(const std::vector<std::vector<float>>& channels, double sampleRate,
                                          int type, int depth, std::string* err = nullptr, int bits = 16,
                                          const std::vector<int32_t>* events = nullptr, const std::vector<uint8_t>* stored = nullptr);

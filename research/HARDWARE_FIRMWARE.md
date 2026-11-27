@@ -1546,6 +1546,43 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Truncate on the WAVE page, the XT's own (2026-11-27, v480) {#wave-truncate}
+
+The user's d-8a: end is the XT's Edit Start and End with Truncate. The law is rom.2's, read in {#wave-truncate-read}.
+
+**On the page.** The Edit region's two ends in the ruler under the wave (a press there takes them; Edit Start never past
+Edit End, no gap, as the XT's 0x89380a00), drawn as a pale span; when a wave comes or is cut, the region is its forward
+loop's, as the XT's edit screen puts it when it opens. Truncate and Revert on the wave card's title line.
+
+**Truncate** (`PluginWaveEdits::truncate`, `waveLoopAfterCut`, `waveCutOnto`): refused unless Edit Start < Edit End
+inside the wave (the XT's −2); else frames Edit Start … Edit End kept, both ends. The forward loop (the OSC's Loop Start
+and End, set to the frame through `waveLoopPercentFor`, a gesture each) moves with them where it lies strictly inside,
+else it is the whole wave, held to it; the backward loop is the whole wave, its mode kept. The session keeps the cut as
+the file's frames (`PluginWaveEdit::cut`, `keepFrom`, `keepTo`; "cut=from,to" in `waveEdit`): a cut of a cut adds the
+first's start. The encode job cuts before it encodes: the channels as the XT imports them (`xtSynthImport`: int16, then
+the XT's converter to 44.1 kHz; moved as it stood out of `xtSynthEncode` into `XtSynthImport.cpp`, XtSynth.cpp being past
+the line limit), the kept frames of those, at 44.1 kHz and 16 bits, which the encode then takes as they are (16-bit
+samples ÷ 32768 come back the same). So a file at another rate is cut in the XT's frames. A V-Synth wave's own then is
+the XT's after its Truncate: type LITE, its events, list and vpdt gone, its length the kept frames; so Auto encodes it as
+LITE, as the XT plays it until it is encoded again, and another Encode Type encodes it as that. Start Offset is the
+patch's and stays. **Revert**: no edit kept, a V-Synth wave's own settings back on the parameters, the wave encoded again.
+
+**The check.** `VSynthEmuEditorTest`'s `waveCutChecks` (`EditorWaveCutTest.cpp`, new; its shared helpers with the page's
+in `WavePageTest.h`, and `shownPage` moved into EditorTest.h): on the 2-second wave, the Edit region dragged to
+22050 … 66149 and Truncate pressed keep 44100 frames, the file's from 22050 sample for sample; the forward loop
+30000 … 40000 plays at 7950 … 17950, the backward loop is 0 … 44099; a cut of the cut at 10000 … 30000 is the file's
+32050 … 52050, 20001 frames, the loop then the whole wave; an empty region and a one-frame one refused; the region's end
+held to its start; a loop end on an edit point (either side) the whole wave; a backward loop dragged after the cut keeps
+the cut; a saved session's restore cuts its own encode; a 48 kHz wave cut at 1000 … 20000 of the XT's frames is 19001
+frames of `xtSynthImport`'s; a V-Synth SOLO wave (a RIFF with its vpsc and vplp, as a project keeps one) encodes as its
+own SOLO and, cut, as LITE; Revert is the file's 88200. The editor 5272/5272. Planted errors (`panel_muts.txt`'s 14
+`editor-cut-`): the end frame dropped, the cut on the file's rate, a loop on an edit point taken as inside, the loop not
+moved, the backward loop left, a cut of a cut not added up, a one-frame region allowed, a SOLO wave's own type kept,
+Revert keeping the edit, the cut unapplied or unsaved, a backward drag wiping the cut, the button unwired and the
+region's end past its start: all caught, with the 18 `editor-wave-` (`editor-wave-bwd-unkept` moved onto the line v480
+rewrote) and the 8 old ones on `PluginEncodes.cpp`. `mutate_tone.py --changed` (XtSynth.cpp's import moved out): 187,
+all caught, once mutate.sh's own list of xt_tone's parts had `XtSynthImport.cpp`. `verify.sh` clean, fcheck as baseline.
+
 ### The WAVE page: a wave's points dragged as XtSynth plays them (2026-11-27, v479) {#wave-page}
 
 The user's choices (2026-11-27): a page of its own, as the XT's SAMPLE mode is apart from its patch; start is the OSC's

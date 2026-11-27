@@ -152,8 +152,9 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   about the pointer, to a sample a column at most; a drag on the wave away from the handles scrolls it. Under the wave
   the chosen OSC's points' card from its IDs (`Pages::gridCard`): Start Offset (its time), Loop, Loop Mode, Loop Start,
   Loop End and Playback Mode. The rack's OSC display draws the Start Offset line too, while that parameter's gesture
-  runs (its DETAILS knob held, or a drag here). Built in v479 (`UiWavePage`, `UiWaveEdit`); the Edit region with
-  Truncate (d-8a) and the events (d-9) come next.
+  runs (its DETAILS knob held, or a drag here). Built in v479 (`UiWavePage`, `UiWaveEdit`). v480: the Edit region's two
+  ends in the ruler, its span pale over the wave, Truncate and Revert on the wave card's title line (d-8a); the line of
+  what the wave is says what the session keeps besides the file. The events (d-9) come next.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

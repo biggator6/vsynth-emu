@@ -410,7 +410,7 @@ editor-wave-bwd-strip|    if (pos.y > w.getBottom()) strip = { Point::bwdStart, 
 editor-wave-zoom-none|        span_ = std::clamp((long)std::lround((double)span_ * wider), least, frames_);|        span_ = frames_;|plugin/Source/UiWaveEdit.cpp|layout
 editor-wave-zoom-unpinned|        first_ = within(pinned - (long)std::lround(share * (double)span_), 0, frames_ - span_);|        first_ = within(first_, 0, frames_ - span_);|plugin/Source/UiWaveEdit.cpp|layout
 editor-wave-percent-plain|    long off = std::abs((long)waveLoopFrame(held(p, plain), frames) - frame);|    long off = 0;|plugin/Source/PluginWaveEdit.cpp|layout
-editor-wave-bwd-unkept|        p.wave_[osc].edit = edit;|        ;|plugin/Source/PluginWaveEdit.cpp|layout
+editor-wave-bwd-unkept|        if (edit.backward) waveEditBackward(kept, edit.bwdMode, edit.bwdStart, edit.bwdEnd);|        if (edit.backward) {}|plugin/Source/PluginWaveEdit.cpp|layout
 editor-wave-bwd-unplayed|            waveEditOnto(wave_[osc].edit, *e);|            ;|plugin/Source/PluginEncodes.cpp|layout
 editor-wave-edit-unsaved|    PluginWaveEdits::toState(*this, state);|    ;|plugin/Source/PluginState.cpp|layout
 editor-wave-edit-unrestored|    PluginWaveEdits::fromState(*this, apvts.state);|    ;|plugin/Source/PluginState.cpp|layout
@@ -421,3 +421,18 @@ editor-wave-rack-unheard|    void parameterGestureChanged(int, bool starting) ov
 editor-wave-page-missing|made<ZonesPage>, made<WavePage> };|made<ZonesPage>, noPage };|plugin/Source/UiPages.cpp|layout
 editor-wave-bwd-onto-start|    e.bwdStart = (int)start;|    e.bwdStart = (int)start + 1;|plugin/Source/XtPatch.cpp|layout
 editor-wave-bwd-onto-mode|    e.bwdMode = std::clamp(mode, 0, 2);|    e.bwdMode = -1;|plugin/Source/XtPatch.cpp|layout
+# v480: Truncate (PluginWaveCut, the WAVE page's Edit region), by VSynthEmuEditorTest's waveCutChecks
+editor-cut-end-dropped|    for (long i = from; i <= to; ++i)|    for (long i = from; i < to; ++i)|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-file-rate|    const std::vector<int16_t> pcm = xtSynthImport(chans, rate, bits);|    const std::vector<int16_t> pcm = xtSynthImport(chans, kXtRate, bits);|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-inside-loose|    const bool inside = from < start && end < to;|    const bool inside = from <= start && end <= to;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-loop-unmoved|    const long s = inside ? start - from : 0, e = inside ? end - from : last;|    const long s = inside ? start : 0, e = inside ? end : last;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-bwd-kept|        waveEditBackward(e, bwdMode, 0, (int)(to - from));|        ;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-not-composed|        const long base = e.cut ? e.keepFrom : 0;|        const long base = 0;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-refuse-equal|    if (from < 0 \|\| to >= frames \|\| from >= to) return false;|    if (from < 0 \|\| to >= frames \|\| from > to) return false;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-own-typed|    if (ownType >= 0) ownType = 0;|    ;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-revert-keeps|    forget(p, osc);|    ;|plugin/Source/PluginWaveCut.cpp|layout
+editor-cut-unapplied|        waveCutOnto(edit, chans, rate, bits);|        ;|plugin/Source/PluginEncodes.cpp|layout
+editor-cut-unsaved|    if (edit.cut) words.add(|    if (false) words.add(|plugin/Source/PluginWaveEdit.cpp|layout
+editor-cut-bwd-wipes|        if (edit.backward) waveEditBackward(kept, edit.bwdMode, edit.bwdStart, edit.bwdEnd);|        if (edit.backward) kept = edit;|plugin/Source/PluginWaveEdit.cpp|layout
+editor-cut-button|    truncate_->onClick = [this] { views_[(size_t)osc_]->truncate(); };|    truncate_->onClick = [] {};|plugin/Source/UiWavePage.cpp|layout
+editor-cut-region-free|        case Point::editEnd: editTo_ = within(frame, editFrom_, last); break;|        case Point::editEnd: editTo_ = within(frame, 0, last); break;|plugin/Source/UiWaveEdit.cpp|layout

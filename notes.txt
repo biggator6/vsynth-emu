@@ -738,6 +738,13 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+Truncate v480 (2026-11-27, on claude/wave-editor after v479; HARDWARE_FIRMWARE.md, "Truncate on the WAVE page"; the
+  user's d-8a): the Edit region's ends in the ruler, Truncate and Revert on the WAVE card. The XT's law: Edit Start …
+  End kept; the forward loop moved with them only strictly inside, else the whole wave; the backward loop the whole
+  wave; a V-Synth wave LITE, its events gone. The session keeps the cut (file frames; a cut of a cut adds up); the encode
+  cuts on the XT's import to 44.1 kHz (xtSynthImport, moved out of xtSynthEncode into XtSynthImport.cpp). PluginWaveCut,
+  UiWaveEditPaint (the view's drawing, moved out), EditorWaveCutTest, WavePageTest.h (new). Editor 5272/5272.
+
 The WAVE page v479 (2026-11-27, on claude/wave-editor after v478; HARDWARE_FIRMWARE.md, "The WAVE page"; the user's
   choice of a page, d-8, d-8a): a sixth page, the chosen OSC's wave in XT frames (44.1 kHz) with the Start Offset's line,
   the forward loop's ends (Loop Start and End, set to the sample through XtSynth's own reading: every frame of a wave

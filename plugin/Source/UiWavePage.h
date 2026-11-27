@@ -19,6 +19,8 @@ public:
     void showOsc(int osc);
     int osc() const { return osc_; }
     WaveEditView& view(int osc) { return *views_[(size_t)osc]; }
+    juce::Button& truncateButton() { return *truncate_; }   // the title line's (v480), for the checks
+    juce::Button& revertButton() { return *revert_; }
     juce::String said() const { return info_.getText(); }   // the wave's line, for the checks
     void refresh();                                         // the editor's timer, while the page shows
     void resized() override;
@@ -28,6 +30,8 @@ private:
     int osc_ = 0;
     Card waveCard_ { "WAVE" };
     Ui::Segmented* oscs_ = nullptr;
+    juce::TextButton* truncate_ = nullptr;   // v480: Truncate on the Edit region, and Revert to the wave's file
+    juce::TextButton* revert_ = nullptr;
     juce::Label info_;
     std::array<std::unique_ptr<WaveEditView>, kOscs> views_;
     std::array<std::unique_ptr<Card>, kOscs> points_;

@@ -55,6 +55,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginParamsOsc.cpp
     Source/PluginStartOffset.cpp
     Source/PluginWaveEdit.cpp
+    Source/PluginWaveCut.cpp
     Source/PluginParamsCosm.cpp
     Source/PluginParamsTone.cpp
     Source/PluginControlsRead.cpp
@@ -114,6 +115,7 @@ target_sources(VSynthEmu PRIVATE
     Source/UiZonesPage.cpp
     Source/UiWaveDisplay.cpp
     Source/UiWaveEdit.cpp
+    Source/UiWaveEditPaint.cpp
     Source/UiWavePage.cpp
     Source/UiTripPad.cpp
     Source/FxPanel.cpp
@@ -135,6 +137,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtSynthTva.cpp
     Source/XtSynthClock.cpp
     Source/XtSynthOut.cpp
+    Source/XtSynthImport.cpp
     Source/XtSinc.cpp
     Source/XtRateOut.cpp
     Source/XtExtIn.cpp
@@ -249,7 +252,8 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
              Tests/Vc2ParamPluginTest.cpp Tests/Vc2PatchPluginTest.cpp Tests/StartOffsetPluginTest.cpp Tests/TestMain.cpp)
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
-             Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorWavePageTest.cpp Tests/EditorKeysTest.cpp
+             Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorWavePageTest.cpp Tests/EditorWaveCutTest.cpp
+             Tests/EditorKeysTest.cpp
              Tests/EditorPadTest.cpp
              Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/TestMain.cpp
              Tests/TestWave.cpp)

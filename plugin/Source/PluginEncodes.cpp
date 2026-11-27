@@ -58,8 +58,10 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
     int bits, own;
     XtWaveFile ownWave;
     bool isOwn = false;
+    PluginWaveEdit edit;   // v480: Truncate's cut, made in the job on the XT's import
     {
         juce::CriticalSection::ScopedLockType lock(bufferLock_);
+        edit = w.edit;
         own = w.ownType == 0 || w.ownType == 1 || w.ownType == 3 || w.ownType == 5 ? w.ownType : -1;
         if (w.isOwn) {
             ownWave = w.own;
@@ -70,11 +72,13 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
         rate = w.rate;
         bits = w.bits;
     }
-    publishWaveView(osc, chans, rate);   // the editor's picture of it (PluginWaveView.cpp, v200)
+    if (!edit.cut) publishWaveView(osc, chans, rate);   // the editor's picture of it (PluginWaveView.cpp, v200)
     const int gen = ++w.gen;
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");
-    addEncode([=, this, chans = std::move(chans), ownWave = std::move(ownWave)](const std::atomic<bool>& stop) {
+    addEncode([=, this, chans = std::move(chans), ownWave = std::move(ownWave)](const std::atomic<bool>& stop) mutable {
+        waveCutOnto(edit, chans, rate, bits);   // v480: the kept frames, at 44.1 kHz, and the wave's own LITE
+        waveCutOnto(edit, ownWave, own, (long)chans[0].size());
         int type = choice >= 1 && choice <= 4 ? kTypeOfChoice[choice - 1] : own;   // Auto: what the wave says it is, or
         if (0 > type) {   // Auto: the plugin's content classifier (ContentClassifier.cpp)
             std::vector<float> mono(chans[0].size());

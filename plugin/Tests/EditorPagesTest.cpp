@@ -27,15 +27,6 @@ juce::String trackPrefix(int t) {
     return sharedPrefix(msmParamId(msmTrackFwId(t, 0)), msmParamId(msmTrackFwId(t, 1)));
 }
 
-// A page as the kind it should be, shown; none, and said, if it isn't
-template <class T>
-T* shownPage(SynthEditor& ed, int page, TestChecks& check) {
-    auto* view = dynamic_cast<T*>(ed.pageView(page));
-    check(view != nullptr, std::string(Blocks::kPages[(size_t)page]) + " isn't the page it should be");
-    if (view != nullptr) ed.showPage(page);
-    return view;
-}
-
 // The every-instance passes of MODULATION: each MSM track, each Matrix Control, their controls all made and moving
 // their own parameters alone; the assigns all made
 void modulation(LayoutCheck& l, SynthEditor& ed, TestChecks& check) {

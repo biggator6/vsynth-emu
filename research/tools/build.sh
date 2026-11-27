@@ -34,6 +34,7 @@ SARP+=($( [ -f XtSynthBlock.cpp ] && echo XtSynthStart.cpp XtSynthOscStart.cpp X
        XtSynthTva.cpp XtSynthClock.cpp ))
 SARP+=($( [ -f XtExtIn.cpp ] && echo XtExtIn.cpp ))   # the EXT IN OSC's player and input (v203)
 SARP+=($( [ -f XtSynthOut.cpp ] && echo XtSynthOut.cpp ))   # its output, busOut and render (v204)
+SARP+=($( [ -f XtSynthImport.cpp ] && echo XtSynthImport.cpp ))   # a wave's import to 44.1 kHz (v480)
 SARP+=($( [ -f XtSinc.cpp ] && echo XtSinc.cpp ))   # render's windowed sinc, its own file (v207)
 SARP+=($( [ -f XtRateOut.cpp ] && echo XtRateOut.cpp ))   # render's read at the host's rate, its own file (v455)
 # rom.4's tables, which XtSynthRom.cpp loads (v199 on), and what they read with: vc2_tables.sh's list (v231); the

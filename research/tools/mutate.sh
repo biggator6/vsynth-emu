@@ -54,7 +54,8 @@ if [ -n "$TF" ]; then   # XtSynth's wiring, against xt_tone (the rest built once
            XtSynthZones XtSynthNotes XtSynthUpdate XtSynthKnobs XtSynthEnvKnobs XtSynthMsm XtMsm XtMsmTrack XtMsmPatch
            XtToneFirmware XtToneCases XtToneCarry XtToneMsm XtTonePatchIds XtPatchIds
            XtSynthStart XtSynthOscStart XtSynthTrip XtSynthBlock XtSynthTva XtSynthClock XtExtIn XtSynthOut XtSinc
-           $( [ -f "$S/XtRateOut.cpp" ] && echo XtRateOut ) $(vc2Tables "$S"))   # XtRateOut: render's read (v455)   # rom.4's tables, which XtSynthRom.cpp loads: vc2_tables.sh's list (v231)
+           $( [ -f "$S/XtRateOut.cpp" ] && echo XtRateOut ) $( [ -f "$S/XtSynthImport.cpp" ] && echo XtSynthImport ) \
+           $(vc2Tables "$S"))   # XtRateOut: render's read (v455)   # rom.4's tables, which XtSynthRom.cpp loads: vc2_tables.sh's list (v231)
     TONE=(-DXT_TONE_MAIN -DXT_TONE_CHECK -DXT_HARNESS_SWITCHES)
     for f in "${PARTS[@]}"; do
         [ "$f.cpp" = "$F" ] && continue

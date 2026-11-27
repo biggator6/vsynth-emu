@@ -1,21 +1,14 @@
-// The WAVE page's wave (UiWaveEdit.h, v479)
+// The WAVE page's wave (UiWaveEdit.h, v479; the Edit region and Truncate, v480); its drawing is UiWaveEditPaint.cpp's
 #include "UiWaveEdit.h"
 #include "PluginParamIds.h"
-#include "PluginStartOffset.h"
-#include "UiLook.h"
-#include "UiParts.h"
-#include "UiWaveDisplay.h"
 #include <array>
 #include <cmath>
 
 namespace {
 
-enum Watched : size_t { kStart, kLoop, kLoopMode, kLoopStart, kLoopEnd, kNone };
-constexpr float kStrip = 16.0f, kRulerH = 18.0f, kReach = 8.0f, kHandleW = 9.0f;
+constexpr float kReach = 8.0f;
 constexpr float kZoomPerDelta = 4.0f;   // the wheel's delta to the power of two the window narrows by
 constexpr float kPanPerDelta = 0.5f;    // and a sideways delta to the share of the window it moves by
-constexpr float kFaint = 0.45f, kBwdAlpha = 0.08f;
-constexpr int kRulerMarks = 6;
 
 // In Watched's order, the OSC's own (Params::oscId)
 juce::StringArray watched(int osc) {
@@ -26,24 +19,27 @@ juce::StringArray watched(int osc) {
     return ids;
 }
 
-// The watched parameter each point is, in Point's order (none, start, the forward loop's ends, the backward's); kNone
-// for the backward loop's, which is the session's edit
-constexpr std::array<size_t, 6> kWatchedOf { kNone, kStart, kLoopStart, kLoopEnd, kNone, kNone };
-size_t watchedOf(WaveEditView::Point p) {
-    return kWatchedOf[(size_t)p];
-}
-
 long within(long f, long lo, long hi) {
     return std::clamp(f, lo, std::max(lo, hi));
 }
 
 } // namespace
 
+// In Point's order (none, start, the forward loop's ends, the backward's, the Edit region's); none for the backward
+// loop's (the session's edit) and the Edit region's (the page's own, as the XT's are its RAM's)
+size_t WaveEditView::watchedOf(Point p) {
+    static constexpr std::array<size_t, 8> kWatchedOf { kNone, kStart, kLoopStart, kLoopEnd,
+                                                        kNone, kNone,  kNone,      kNone };
+    return kWatchedOf[(size_t)p];
+}
+
 WaveEditView::WaveEditView(VSynthEmuProcessor& p, int osc)
     : processor_(p), osc_(osc), watch_(p.apvts, watched(osc), [this] { repaint(); }) {
     refresh();
 }
 
+// A new wave, or the wave cut: the window all of it, the Edit region the forward loop's, as the XT's edit screen puts
+// it when it opens (0x89380b60)
 void WaveEditView::refresh() {
     if (const int gen = processor_.waveViewGen(osc_); gen != viewGen_) {
         viewGen_ = gen;
@@ -53,6 +49,8 @@ void WaveEditView::refresh() {
             frames_ = frames;
             first_ = 0;
             span_ = frames;
+            editFrom_ = at(Point::fwdStart);
+            editTo_ = at(Point::fwdEnd);
         }
         madeSpan_ = -1;
         repaint();
@@ -72,6 +70,8 @@ long WaveEditView::at(Point p) const {
         case Point::fwdEnd: return waveLoopFrame(watch_.value(kLoopEnd), frames_);
         case Point::bwdStart: return bwd_.backward ? bwd_.bwdStart : at(Point::fwdStart);
         case Point::bwdEnd: return bwd_.backward ? bwd_.bwdEnd : at(Point::fwdEnd);
+        case Point::editStart: return editFrom_;
+        case Point::editEnd: return editTo_;
         case Point::none: break;
     }
     return 0;
@@ -98,17 +98,20 @@ juce::Point<float> WaveEditView::handle(Point p) const {
     const float x = xOf(at(p));
     if (p == Point::fwdStart || p == Point::fwdEnd) return { x, w.getY() - kStrip / 2.0f };
     if (p == Point::bwdStart || p == Point::bwdEnd) return { x, w.getBottom() + kStrip / 2.0f };
+    if (p == Point::editStart || p == Point::editEnd) return { x, (float)getHeight() - kRulerH / 2.0f };
     return { x, w.getCentreY() };
 }
 
-// The point a press takes: in the strip above the wave the forward loop's ends, below it the backward loop's, on the
-// wave the Start Offset's line; the nearest in reach, the later of two on one another (which can be drawn off it)
+// The point a press takes: in the strip above the wave the forward loop's ends, below it the backward loop's, in the
+// ruler the Edit region's, on the wave the Start Offset's line; the nearest in reach, the later of two on one another
+// (which can be drawn off it)
 WaveEditView::Point WaveEditView::nearest(juce::Point<float> pos) const {
     if (frames_ <= 0) return Point::none;
     const auto w = wave();
     std::array<Point, 2> strip { Point::start, Point::start };
     if (pos.y < w.getY()) strip = { Point::fwdStart, Point::fwdEnd };
     if (pos.y > w.getBottom()) strip = { Point::bwdStart, Point::bwdEnd };
+    if (pos.y > w.getBottom() + kStrip) strip = { Point::editStart, Point::editEnd };
     Point best = Point::none;
     float reach = kReach;
     for (const Point p : strip) {
@@ -120,26 +123,48 @@ WaveEditView::Point WaveEditView::nearest(juce::Point<float> pos) const {
     return best;
 }
 
+void WaveEditView::setLoopEnd(size_t i, long frame, long frames) {
+    if (auto* prm = watch_.parameter(i)) watch_.dragTo(i, waveLoopPercentFor(*prm, (int)frame, frames));
+}
+
 // A point moved to `frame`, held where the XT holds it: the Start Offset in the wave; a loop's end held to its start
 // and the wave, 16 frames apart at the least, none on a wave whose last frame is under 16 (the Loop screens' setters,
-// 0x89382990 and 0x89382aa0: clamped, not refused; HARDWARE_FIRMWARE.md {#wave-truncate-read})
+// 0x89382990 and 0x89382aa0: clamped, not refused; HARDWARE_FIRMWARE.md {#wave-truncate-read}); the Edit region's
+// ends held to each other with no gap (0x89380a00)
 void WaveEditView::place(Point p, long frame) {
     const long last = std::max(0L, frames_ - 1);
     const long shortest = last >= kWaveLoopShortest ? kWaveLoopShortest : 0;
-    const auto loopEnd = [&](size_t i, long f) {
-        if (auto* prm = watch_.parameter(i)) watch_.dragTo(i, waveLoopPercentFor(*prm, (int)f, frames_));
-    };
     const long fwdLeast = std::min(last, at(Point::fwdStart) + shortest);
     const long bwdLeast = std::min(last, (long)bwd_.bwdStart + shortest);
     switch (p) {
         case Point::start: watch_.dragTo(kStart, (float)within(frame, 0, last)); break;
-        case Point::fwdStart: loopEnd(kLoopStart, within(frame, 0, at(Point::fwdEnd) - shortest)); break;
-        case Point::fwdEnd: loopEnd(kLoopEnd, within(frame, fwdLeast, last)); break;
+        case Point::fwdStart: setLoopEnd(kLoopStart, within(frame, 0, at(Point::fwdEnd) - shortest), frames_); break;
+        case Point::fwdEnd: setLoopEnd(kLoopEnd, within(frame, fwdLeast, last), frames_); break;
         case Point::bwdStart: bwd_.bwdStart = (int)within(frame, 0, bwd_.bwdEnd - shortest); break;
         case Point::bwdEnd: bwd_.bwdEnd = (int)within(frame, bwdLeast, last); break;
+        case Point::editStart: editFrom_ = within(frame, 0, editTo_); break;
+        case Point::editEnd: editTo_ = within(frame, editFrom_, last); break;
         case Point::none: break;
     }
     repaint();
+}
+
+bool WaveEditView::truncate() {
+    if (frames_ <= 0 || editFrom_ >= editTo_) return false;
+    const auto [start, end] = waveLoopAfterCut(at(Point::fwdStart), at(Point::fwdEnd), editFrom_, editTo_);
+    const int mode = bwd_.backward ? bwd_.bwdMode : (int)watch_.value(kLoopMode);
+    const long kept = editTo_ - editFrom_ + 1;
+    if (!PluginWaveEdits::truncate(processor_, osc_, editFrom_, editTo_, mode)) return false;
+    for (const auto& [i, frame] : { std::pair<size_t, long> { kLoopStart, start }, { kLoopEnd, end } }) {
+        watch_.begin(i);
+        setLoopEnd(i, frame, kept);
+        watch_.end(i);
+    }
+    return true;
+}
+
+void WaveEditView::revert() {
+    PluginWaveEdits::revert(processor_, osc_);
 }
 
 void WaveEditView::mouseDown(const juce::MouseEvent& e) {
@@ -150,7 +175,7 @@ void WaveEditView::mouseDown(const juce::MouseEvent& e) {
     if (const size_t i = watchedOf(dragging_); i != kNone) watch_.begin(i);
     const bool bwd = dragging_ == Point::bwdStart || dragging_ == Point::bwdEnd;
     if (bwd && !bwd_.backward)   // a backward loop of its own from here, the forward loop's until now
-        bwd_ = { true, (int)watch_.value(kLoopMode), (int)at(Point::fwdStart), (int)at(Point::fwdEnd) };
+        waveEditBackward(bwd_, (int)watch_.value(kLoopMode), (int)at(Point::fwdStart), (int)at(Point::fwdEnd));
 }
 
 void WaveEditView::mouseDrag(const juce::MouseEvent& e) {
@@ -162,8 +187,9 @@ void WaveEditView::mouseDrag(const juce::MouseEvent& e) {
 }
 
 void WaveEditView::mouseUp(const juce::MouseEvent&) {
+    const bool bwd = dragging_ == Point::bwdStart || dragging_ == Point::bwdEnd;
     if (const size_t i = watchedOf(dragging_); i != kNone) watch_.end(i);
-    else if (dragging_ != Point::none) PluginWaveEdits::setBackward(processor_, osc_, bwd_);
+    else if (bwd) PluginWaveEdits::setBackward(processor_, osc_, bwd_);
     dragging_ = Point::none;
     scrolling_ = false;
 }
@@ -195,53 +221,4 @@ void WaveEditView::makeColumns() {
 
 void WaveEditView::resized() {
     madeSpan_ = -1;
-}
-
-void WaveEditView::paint(juce::Graphics& g) {
-    Ui::fillRounded(g, getLocalBounds().toFloat(), Look::field, 6.0f);
-    if (frames_ <= 0) {
-        Ui::drawText(g, "No wave loaded", getLocalBounds().reduced(10), { Look::sans(11.0f), Look::label });
-        return;
-    }
-    makeColumns();
-    const auto w = wave();
-    const auto share = [&](long f) { return (xOf(f) - w.getX()) / w.getWidth(); };
-    if (bwd_.backward) {   // the backward loop's span, fainter than the forward's
-        const float x0 = xOf(at(Point::bwdStart)), x1 = std::max(x0 + 1.0f, xOf(at(Point::bwdEnd)));
-        const auto span = juce::Rectangle<float>::leftTopRightBottom(x0, w.getY(), x1, w.getBottom());
-        Ui::fill(g, span.toNearestInt(), Look::mod.withAlpha(kBwdAlpha));
-    }
-    PluginWaveView shown;
-    shown.columns = columns_;
-    const WaveDisplay::Loop loop { watch_.value(kLoop) >= 0.5f, share(at(Point::fwdStart)), share(at(Point::fwdEnd)) };
-    WaveDisplay::paintWave(g, w, shown, loop);
-    paintPoints(g);
-    paintRuler(g);
-}
-
-// The forward loop's ends above the wave, the backward's below, fainter; the Start Offset's line across it
-void WaveEditView::paintPoints(juce::Graphics& g) const {
-    const auto w = wave();
-    for (const Point p : { Point::fwdStart, Point::fwdEnd, Point::bwdStart, Point::bwdEnd }) {
-        const bool fwd = p == Point::fwdStart || p == Point::fwdEnd;
-        const auto colour = fwd ? Look::mod : Look::mod.withMultipliedAlpha(kFaint);
-        Ui::fillRounded(g, juce::Rectangle<float>(kHandleW, kStrip - 4.0f).withCentre(handle(p)), colour, 2.0f);
-    }
-    const float x = xOf(at(Point::start));
-    WaveDisplay::paintStartLine(g, w, x);   // the rack's display draws the same line while it's held
-    Ui::drawText(g, "START " + startOffsetText((int)at(Point::start)),
-                 juce::Rectangle<float>(x + 4.0f, w.getY() + 2.0f, 140.0f, 14.0f).toNearestInt(),
-                 { Look::sans(10.0f), Look::accent });
-}
-
-void WaveEditView::paintRuler(juce::Graphics& g) const {
-    const auto w = wave();
-    const auto ruler = getLocalBounds().toFloat().removeFromBottom(kRulerH);
-    for (int k = 0; k < kRulerMarks; ++k) {
-        const float x = w.getX() + w.getWidth() * (float)k / (float)kRulerMarks;
-        Ui::fill(g, juce::Rectangle<float>(x, ruler.getY(), 1.0f, 4.0f).toNearestInt(), Look::dim);   // its mark
-        Ui::drawText(g, startOffsetText((int)frameAt(x)),
-                     juce::Rectangle<float>(x + 3.0f, ruler.getY(), 90.0f, ruler.getHeight()).toNearestInt(),
-                     { Look::sans(10.0f), Look::muted });
-    }
 }

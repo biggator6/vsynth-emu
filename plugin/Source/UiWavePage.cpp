@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr int kInfoH = 18, kViewH = 340, kOscsW = 150;
+constexpr int kInfoH = 18, kViewH = 340, kOscsW = 150, kButtonW = 76;
 constexpr int kOscsGroup = 1005;   // the OSC buttons' radio group, after the FX page's 1004
 // The points' card: each row an OSC's own parameter, made for each OSC by index (Params::oscId), and its name
 const std::array<std::pair<juce::String, const char*>, 6> kPointRows { {
@@ -23,6 +23,10 @@ WavePage::WavePage(VSynthEmuProcessor& p) : processor_(p) {
     auto oscs = std::make_unique<Ui::Segmented>(juce::StringArray { "OSC 1", "OSC 2" }, kOscsGroup, Look::cards);
     oscs_ = &waveCard_.toTitle(std::move(oscs), kOscsW);
     oscs_->onChange = [this](int osc) { showOsc(osc); };
+    revert_ = &waveCard_.toTitle(std::make_unique<juce::TextButton>("Revert"), kButtonW);
+    truncate_ = &waveCard_.toTitle(std::make_unique<juce::TextButton>("Truncate"), kButtonW);
+    truncate_->onClick = [this] { views_[(size_t)osc_]->truncate(); };
+    revert_->onClick = [this] { views_[(size_t)osc_]->revert(); };
     info_.setFont(Look::sans(11.0f));
     info_.setColour(juce::Label::textColourId, Look::label);
     waveCard_.addAndMakeVisible(info_);
@@ -60,7 +64,11 @@ juce::String WavePage::says() const {
     const long frames = views_[(size_t)osc_]->frames();
     const juce::String length = startOffsetText((int)std::min<long>(frames, kStartOffsetMax));
     juce::String s = processor_.getLoadedFileName(osc_) + "    " + length + ", " + juce::String(frames) + " samples";
-    if (PluginWaveEdits::edit(processor_, osc_).backward) s << "    the session keeps its own backward loop";
+    const PluginWaveEdit edit = PluginWaveEdits::edit(processor_, osc_);
+    juce::StringArray kept;   // what isn't its file's (d-8)
+    if (edit.cut) kept.add("its cut (Revert for the file's)");
+    if (edit.backward) kept.add("its own backward loop");
+    if (!kept.isEmpty()) s << "    the session keeps " << kept.joinIntoString(", ");
     return s;
 }
 

@@ -15,6 +15,16 @@ inline std::vector<juce::MidiMessage> taken(VSynthEmuProcessor& p) {
     return got;
 }
 
+// A page as the kind it should be, shown; none, and said, if it isn't (moved here from EditorPagesTest.cpp in v480,
+// the WAVE page's checks taking it too)
+template <class T>
+T* shownPage(SynthEditor& ed, int page, TestChecks& check) {
+    auto* view = dynamic_cast<T*>(ed.pageView(page));
+    check(view != nullptr, std::string(Blocks::kPages[(size_t)page]) + " isn't the page it should be");
+    if (view != nullptr) ed.showPage(page);
+    return view;
+}
+
 // The one T in the editor's drawing (its footer, its pad), or none, and said
 template <class T>
 T* theOne(SynthEditor& ed, const std::string& what, TestChecks& check) {
@@ -57,6 +67,9 @@ void waveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder
 // The WAVE page (EditorWavePageTest.cpp, v479): the Start Offset's line and both loops' ends dragged to the frame, as
 // XtSynth reads them, the backward loop's edit kept in the session, the wheel's zoom, the rack's line while it's held
 void wavePageChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
+// Its Truncate (EditorWaveCutTest.cpp, v480): the Edit region kept, the loops as the XT leaves them, a cut of a cut,
+// the session, a 48 kHz file cut on the XT's import, a SOLO wave cut LITE, Revert
+void waveCutChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
 // The footer's keyboard (EditorKeysTest.cpp, v201): a key's press, drag and release as their notes, a press sounding
 // through processBlock, and the fold
 void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

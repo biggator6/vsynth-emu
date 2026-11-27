@@ -9,44 +9,23 @@
 //   session brings it back on its own encode;
 // - the wheel narrows the window about the frame under the pointer;
 // - the rack's OSC display draws the Start Offset's line while that parameter's gesture runs, and not after.
-#include "EditorTest.h"
 #include "TestControls.h"
 #include "TestWave.h"
+#include "WavePageTest.h"
 #include "../Source/PluginParamIds.h"
 #include "../Source/PluginWaveEdit.h"
 #include "../Source/UiOscPanel.h"
-#include "../Source/UiWavePage.h"
-#include <chrono>
 #include <random>
-#include <thread>
 
 namespace {
 
+using namespace WavePageTest;
 using Point = WaveEditView::Point;
 constexpr int kWaveSeconds = 2;
 // A wave as long as every frame holds (under 2^23 frames, 190 s), and one past it, whose ends near its last frame
 // XtSynth's share can't all hold: there the nearest
 constexpr long kWaveFrames = kWaveSeconds * 44100L, kLongFrames = 8'000'000L, kLongestFrames = 16'000'000L;
 constexpr int kTries = 1000;
-constexpr auto kWait = std::chrono::milliseconds(50);
-constexpr int kWaits = 600;   // 30 s for an encode
-
-// XtSynth's own loop end from the controls the processor plays from (XtSynth::waveLoop's reading of the OSC's Loop Start
-// and End: a share of the last frame, rounded)
-long played(float share, long frames) {
-    return std::lround((double)std::clamp(share, 0.0f, 1.0f) * (double)(frames - 1));
-}
-
-// A drag of `p` from its handle to the x of `frame`, released there
-void dragTo(WaveEditView& v, Point p, long frame) {
-    const auto from = v.handle(p);
-    LayoutCheck::dragFrom(v, from, { v.xOf(frame), from.y });
-}
-
-bool waitFor(const std::function<bool()>& done) {
-    for (int i = 0; i < kWaits && !done(); ++i) std::this_thread::sleep_for(kWait);
-    return done();
-}
 
 void dragsStartOffset(WaveEditView& v, VSynthEmuProcessor& p, TestChecks& check) {
     dragTo(v, Point::start, 44100);
@@ -122,9 +101,7 @@ void rackDrawsStartLine(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& chec
 } // namespace
 
 void wavePageChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check) {
-    ed.showPage(Blocks::kWavePage);
-    auto* page = dynamic_cast<WavePage*>(ed.pageView(Blocks::kWavePage));
-    check(page != nullptr, "there's no WAVE page");
+    auto* page = shownPage<WavePage>(ed, Blocks::kWavePage, check);
     if (page == nullptr) return;
     setParam(p, Params::kOscType, 1.0f);
     p.loadFile(writeTestWave(folder, kWaveSeconds), 0);
