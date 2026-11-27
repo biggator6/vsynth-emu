@@ -26,6 +26,9 @@ struct XtWaveFile;
 void xtWaveOntoControls(const XtWaveFile& wave, XtSynth::OscControls& o);
 // And on its encoded form: the fine tuning and backward loop, which aren't controls.
 void xtWaveOntoEncoded(const XtWaveFile& wave, XtEncoded& e);
+// A backward loop on an encoded wave: its Loop Mode and region in frames (the loop record's +0x19, +0x10, +0xc), or the
+// forward loop's (bwdMode −1) where the region isn't in a wave of `frames` (v479: the WAVE page's edit takes it too)
+void xtWaveBackwardOnto(int mode, long start, long end, long frames, XtEncoded& e);
 
 // What this zone of the patch asks for that the plugin doesn't do yet, one short phrase each, for the status line.
 std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone);

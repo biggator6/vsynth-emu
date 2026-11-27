@@ -236,10 +236,14 @@ void xtWaveOntoEncoded(const XtWaveFile& w, XtEncoded& e) {
     e.loopRate[0] = xtWaveLoopRate(w.loopRateFwd);
     e.loopRate[1] = xtWaveLoopRate(w.loopRateBwd);
     if (w.vpnoCount >= 0) { e.vpno = w.vpno; e.vpnoCount = w.vpnoCount; }   // its own list in place of the encode's
-    if (w.bwdStart < 0 || w.bwdStart > w.bwdEnd || w.bwdEnd >= w.frames) { e.bwdMode = -1; return; }   // a region that isn't in the wave: the forward loop's
-    e.bwdMode = std::clamp(w.bwdMode, 0, 2);
-    e.bwdStart = (int)w.bwdStart;
-    e.bwdEnd = (int)w.bwdEnd;
+    xtWaveBackwardOnto(w.bwdMode, w.bwdStart, w.bwdEnd, w.frames, e);
+}
+
+void xtWaveBackwardOnto(int mode, long start, long end, long frames, XtEncoded& e) {
+    if (start < 0 || start > end || end >= frames) { e.bwdMode = -1; return; }   // a region that isn't in the wave: the forward loop's
+    e.bwdMode = std::clamp(mode, 0, 2);
+    e.bwdStart = (int)start;
+    e.bwdEnd = (int)end;
 }
 
 std::vector<std::string> xtPatchMissing(const std::vector<uint8_t>& store, int zone) {

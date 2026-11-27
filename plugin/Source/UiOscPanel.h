@@ -12,7 +12,7 @@
 #include <memory>
 #include <vector>
 
-class OscPanel : public FacedPanel {
+class OscPanel : public FacedPanel, private juce::AudioProcessorParameter::Listener {
 public:
     static constexpr int kBig = 4, kSmall = 6;
     // What a Type shows: the box beside Type (none: empty), the big knobs and the small, as a mode's rows
@@ -38,6 +38,7 @@ public:
     };
     OscPanel(VSynthEmuProcessor& p, int osc);   // the V-Synth's
     OscPanel(VSynthEmuProcessor& p, int osc, Model model);
+    ~OscPanel() override;
     // and the wave's name, its view, its loop or the analog cycles, or whether the host gives an input, if any has moved
     void refresh() override;
     static constexpr int kTypes = 3;         // the V-Synth's OSC Type's values: ANALOG, PCM, EXT IN (v206)
@@ -51,6 +52,9 @@ public:
     // What the display draws now, for the checks: the analog cycles, and the wave's view
     const std::vector<float>& cycles() const { return cycles_; }
     const WaveDisplay::View* view() const { return view_.get(); }
+    // Whether the display draws the Start Offset's line: while that parameter's gesture runs (its knob held, a drag on
+    // the WAVE page, a host's), the user's item 5 (v479)
+    bool drawsStartLine() const { return lineAt_ >= 0; }
 
 private:
     VSynthEmuProcessor& processor_;
@@ -69,6 +73,11 @@ private:
     std::vector<float> cycles_;                       // the analog cycles as drawn, made from drawn_
     WaveDisplay::AnalogSettings drawn_;
     juce::String shown_;                              // what a mode's own drawing was made from
+    juce::RangedAudioParameter* start_ = nullptr;     // its Start Offset (a PCM OSC that loads its wave, v479)
+    std::atomic<bool> startHeld_ { false };           // its gesture running, as the parameter says on any thread
+    int lineAt_ = -1;                                 // the line as drawn: the Start Offset, or -1 for none
+    void parameterValueChanged(int, float) override {}
+    void parameterGestureChanged(int, bool starting) override { startHeld_.store(starting); }
 
     void refreshWave();
     void refreshCycles();

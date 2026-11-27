@@ -738,6 +738,16 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The WAVE page v479 (2026-11-27, on claude/wave-editor after v478; HARDWARE_FIRMWARE.md, "The WAVE page"; the user's
+  choice of a page, d-8, d-8a): a sixth page, the chosen OSC's wave in XT frames (44.1 kHz) with the Start Offset's line,
+  the forward loop's ends (Loop Start and End, set to the sample through XtSynth's own reading: every frame of a wave
+  under 2^23 frames, the nearest past it) and the backward loop's (the session's edit, given to the synth by the wave's
+  encode) dragged, the wheel's zoom; the rack's OSC display draws the Start Offset's line while its gesture runs. The
+  edit kept in the session (waveEdit, waveEdit2). UiWavePage, UiWaveEdit, PluginWaveEdit (new); PluginWaveView keeps
+  the frames and its windows; xtWaveBackwardOnto out of xtWaveOntoEncoded; Watch::dragTo. VSynthEmuEditorTest's
+  wavePageChecks (EditorWavePageTest.cpp) 5244/5244; panel_muts.txt's 18 editor-wave- plants and the 44 on the files
+  it touched caught (three moved onto their rewritten lines), the 25 tonepatch ones; verify.sh clean.
+
 Start Offset in time v478 (2026-11-27, on claude/wave-editor from vc2-mode f1c0797; HARDWARE_FIRMWARE.md, "Start
   Offset in time"; the user's d-7): the six Start Offsets (the V-Synth's two, the VC-2's four) read "250.00 ms" below a
   second and "1.250 s" from it, the value / 44100 on every wave (the XT's data is 44.1 kHz; "Start Offset's unit and the

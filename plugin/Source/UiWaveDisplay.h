@@ -30,6 +30,9 @@ struct Loop {
     bool operator==(const Loop&) const = default;
 };
 void paintWave(juce::Graphics& g, juce::Rectangle<float> area, const View& view, const Loop& loop);
+// The Start Offset's line across a wave's area at x, in the accent (v479: the rack's display while it's held, the WAVE
+// page's always)
+void paintStartLine(juce::Graphics& g, juce::Rectangle<float> area, float x);
 void paintCycles(juce::Graphics& g, juce::Rectangle<float> area, const std::vector<float>& samples);
 
 } // namespace WaveDisplay

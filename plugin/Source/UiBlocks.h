@@ -43,8 +43,9 @@ constexpr int indexOf(Kind kind, int index) {
 inline constexpr int kFirstSelected = indexOf(Kind::cosm, 0);
 
 // The page bar's pages, in order; SYNTH is the path, the rack and the lower panel
-inline constexpr std::array<const char*, 5> kPages = { "SYNTH", "MODULATION", "FX", "PLAY", "ZONES" };
-inline constexpr int kSynthPage = 0, kModulationPage = 1, kFxPage = 2, kPlayPage = 3, kZonesPage = 4;
+// (WAVE, v479: the XT's SAMPLE mode, an OSC's wave and its points; UiWavePage)
+inline constexpr std::array<const char*, 6> kPages = { "SYNTH", "MODULATION", "FX", "PLAY", "ZONES", "WAVE" };
+inline constexpr int kSynthPage = 0, kModulationPage = 1, kFxPage = 2, kPlayPage = 3, kZonesPage = 4, kWavePage = 5;
 // The VC-2 mode's (v453; research/UI_DESIGN_VC2.md, d-1): its SYNTH is a zone's path, rack and lower panel
 inline constexpr std::array<const char*, 6> kVc2Pages = { "SYNTH", "VOCODER", "MODULATION", "FX", "PLAY", "ZONES" };
 inline constexpr int kVc2VocoderPage = 1, kVc2ModulationPage = 2, kVc2FxPage = 3, kVc2PlayPage = 4, kVc2ZonesPage = 5;

@@ -72,6 +72,11 @@ void paintWave(juce::Graphics& g, juce::Rectangle<float> area, const View& view,
     Ui::fillPath(g, bars, Look::accent);
 }
 
+void paintStartLine(juce::Graphics& g, juce::Rectangle<float> area, float x) {
+    constexpr float kLineW = 2.0f;
+    Ui::fillRounded(g, { x - kLineW / 2.0f, area.getY(), kLineW, area.getHeight() }, Look::accent, 0.0f);
+}
+
 void paintCycles(juce::Graphics& g, juce::Rectangle<float> area, const std::vector<float>& samples) {
     if (samples.size() < 2) return;
     std::vector<juce::Point<float>> points;

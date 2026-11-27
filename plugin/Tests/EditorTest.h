@@ -54,6 +54,9 @@ void pagesChecks(LayoutCheck& l, SynthEditor& ed, TestChecks& check);
 // The OSC displays (EditorWaveTest.cpp, v200): the analog oscillator's own cycles at the panel's settings, following them;
 // a loaded wave's view, holding the file's own extremes; test waves are written in `folder`
 void waveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
+// The WAVE page (EditorWavePageTest.cpp, v479): the Start Offset's line and both loops' ends dragged to the frame, as
+// XtSynth reads them, the backward loop's edit kept in the session, the wheel's zoom, the rack's line while it's held
+void wavePageChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
 // The footer's keyboard (EditorKeysTest.cpp, v201): a key's press, drag and release as their notes, a press sounding
 // through processBlock, and the fold
 void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

@@ -6,6 +6,7 @@
 #include "UiParts.h"
 #include "UiVc2Pages.h"
 #include "UiVc2VocoderPage.h"
+#include "UiWavePage.h"
 
 namespace {
 constexpr int kRefreshHz = 4;
@@ -151,6 +152,8 @@ void SynthEditor::timerCallback() {
         path_.refresh();
         rack_.refresh();
         lower_.refresh();
+        if (auto* wave = dynamic_cast<WavePage*>(pages_[(size_t)Blocks::kWavePage].get()))   // v479, while it shows
+            if (wave->isVisible()) wave->refresh();
         return;
     }
     vc2Synth_->refresh();

@@ -5,6 +5,7 @@
 #include "UiLook.h"
 #include "UiModPage.h"
 #include "UiPlayPage.h"
+#include "UiWavePage.h"
 #include "UiZonesPage.h"
 
 namespace Pages {
@@ -59,9 +60,9 @@ std::unique_ptr<juce::Component> effects(VSynthEmuProcessor& p) {
     return std::make_unique<FxPanel>(p, Look::cards);
 }
 
-// Each page's maker, in Blocks::kPages' order: SYNTH, MODULATION, FX, PLAY, ZONES
+// Each page's maker, in Blocks::kPages' order: SYNTH, MODULATION, FX, PLAY, ZONES, WAVE
 constexpr std::array<Maker, Blocks::kPages.size()> kMakers { noPage, made<ModulationPage>, effects, made<PlayPage>,
-                                                             made<ZonesPage> };
+                                                             made<ZonesPage>, made<WavePage> };
 
 }
 

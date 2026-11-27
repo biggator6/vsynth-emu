@@ -42,6 +42,14 @@ void Watch::drag(size_t i, float proportion) {
     atts_[i]->setValueAsPartOfGesture(to);
 }
 
+void Watch::dragTo(size_t i, float value) {
+    if (i < atts_.size() && atts_[i]) atts_[i]->setValueAsPartOfGesture(value);
+}
+
+juce::RangedAudioParameter* Watch::parameter(size_t i) const {
+    return i < params_.size() ? params_[i] : nullptr;
+}
+
 void Watch::end(size_t i) {
     if (i < atts_.size() && atts_[i]) atts_[i]->endGesture();
 }

@@ -13,6 +13,7 @@ void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
     }
     state.setProperty("fxEdits", edits, nullptr);
     vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name
+    PluginWaveEdits::toState(*this, state);   // v479: the WAVE page's edits of each OSC's wave
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -37,6 +38,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
     if (rom.isNotEmpty() && !xtSynthRomReady() && juce::File(rom).existsAsFile())
         openRom(juce::File(rom));
     juce::StringArray gone;   // what the session names and isn't here now
+    PluginWaveEdits::fromState(*this, apvts.state);   // v479: before the waves, whose encodes put them on
     for (int k = 0; k < 2; ++k) {
         const juce::String path = apvts.state.getProperty(k ? "loadedFilePath2" : "loadedFilePath").toString();
         if (path.isEmpty()) continue;

@@ -201,9 +201,10 @@ private:
     using LoadedWave = PluginLoadedWave;
     LoadedWave               wave_[2];
     juce::CriticalSection    bufferLock_;
-    // Each OSC's wave as the editor draws it (PluginWaveView.cpp, v200), made from the channels its encode copies; the
-    // lock is the message thread's alone, never the audio thread's
-    void publishWaveView(int osc, const std::vector<std::vector<float>>& chans);
+    friend struct PluginWaveEdits;   // the WAVE page's edits of a loaded wave (PluginWaveEdit.h, v479)
+    // Each OSC's wave as the editor draws it (PluginWaveView.cpp, v200), made from the channels its encode copies (v479:
+    // their rate, and the frames its encode holds once known); the lock never the audio thread's
+    void publishWaveView(int osc, const std::vector<std::vector<float>>& chans, double rate, long frames = -1);
     mutable juce::CriticalSection viewLock_;
     std::shared_ptr<const WaveView> waveView_[2];
     std::atomic<int> waveViewGen_[2] {};

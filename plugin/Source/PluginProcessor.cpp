@@ -133,6 +133,7 @@ void VSynthEmuProcessor::unloadWave(int osc) {
 
 void VSynthEmuProcessor::loadFile(const juce::File& file, int osc, bool waveSettings)
 {
+    if (waveSettings) PluginWaveEdits::forget(*this, osc);   // v479: a new wave; a restore keeps the edit it set
     if (xtSynthRomReady() && isVSynthWave(file)) {
         XtWaveFile wave;
         std::string why;
@@ -213,6 +214,7 @@ void VSynthEmuProcessor::applyPatch(const std::string& name, const std::vector<u
     }
     fxPatchPending_ = true;
     for (int k = 0; k < 2; ++k) {
+        PluginWaveEdits::forget(*this, k);   // a patch's wave is a wave of its own: no edit kept (v479)
         if (found[k]) takeWave(waves[k], files[k], k);
         else unloadWave(k);
     }

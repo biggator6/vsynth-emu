@@ -16,7 +16,9 @@ public:
     float proportion(size_t i) const;      // of its range, 0 to 1
     void begin(size_t i);                  // a drag's start, its moves and its end
     void drag(size_t i, float proportion);
+    void dragTo(size_t i, float value);    // a move to a value as the parameter counts it (v479: a loop end to the frame)
     void end(size_t i);
+    juce::RangedAudioParameter* parameter(size_t i) const;   // none where its ID named none
 
 private:
     std::vector<juce::RangedAudioParameter*> params_;

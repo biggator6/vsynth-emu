@@ -54,6 +54,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginParams.cpp
     Source/PluginParamsOsc.cpp
     Source/PluginStartOffset.cpp
+    Source/PluginWaveEdit.cpp
     Source/PluginParamsCosm.cpp
     Source/PluginParamsTone.cpp
     Source/PluginControlsRead.cpp
@@ -112,6 +113,8 @@ target_sources(VSynthEmu PRIVATE
     Source/UiZoneStrip.cpp
     Source/UiZonesPage.cpp
     Source/UiWaveDisplay.cpp
+    Source/UiWaveEdit.cpp
+    Source/UiWavePage.cpp
     Source/UiTripPad.cpp
     Source/FxPanel.cpp
     Source/ContentClassifier.cpp
@@ -246,7 +249,8 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
              Tests/Vc2ParamPluginTest.cpp Tests/Vc2PatchPluginTest.cpp Tests/StartOffsetPluginTest.cpp Tests/TestMain.cpp)
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
-             Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
+             Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorWavePageTest.cpp Tests/EditorKeysTest.cpp
+             Tests/EditorPadTest.cpp
              Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/TestMain.cpp
              Tests/TestWave.cpp)
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor

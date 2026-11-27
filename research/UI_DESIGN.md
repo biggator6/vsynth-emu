@@ -140,6 +140,20 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
 - **FX:** the Effects panel (`FxPanel`), in D's palette (`Look::cards`, which `FxPanel`, its `Ui::Page` of cards and its
   `Ui::Segmented` page buttons are given), so its cards, boxes, buttons, switches and sliders are drawn in D's look. A
   click on MFX, CHORUS or REVERB on the path opens the FX page at that effect's own page.
+- **WAVE** (v479 on; research/NEXT_ISSUES.md items 5 and 6, the user's choice of 2026-11-27: a page of its own, as the
+  XT's SAMPLE mode is apart from its patch): the sixth page, after ZONES. Across the top the wave's card: OSC 1 and OSC 2
+  (`Ui::Segmented`), its name, encode type, channels and length (time and samples), and what isn't the file's own (an
+  edit the session keeps, d-8). Under it the wave large, the page's width by about 300, in XT samples (44.1 kHz, as
+  every position the firmware takes): each column its lowest and highest sample, a time ruler under it in Start
+  Offset's text (d-7). On it, each to drag (a press takes the nearest in reach): the Start Offset, a line in the accent
+  the wave's height with a flag (the OSC's parameter, d-8a); the forward loop's span in `mod` with Loop On, its Start and
+  End handles above the wave (the OSC's Loop Start and End, set to the sample); the backward loop's span, fainter, its
+  handles below (the wave's own, kept in the session); and later the Edit region and the events. The mouse wheel zooms
+  about the pointer, to a sample a column at most; a drag on the wave away from the handles scrolls it. Under the wave
+  the chosen OSC's points' card from its IDs (`Pages::gridCard`): Start Offset (its time), Loop, Loop Mode, Loop Start,
+  Loop End and Playback Mode. The rack's OSC display draws the Start Offset line too, while that parameter's gesture
+  runs (its DETAILS knob held, or a drag here). Built in v479 (`UiWavePage`, `UiWaveEdit`); the Edit region with
+  Truncate (d-8a) and the events (d-9) come next.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

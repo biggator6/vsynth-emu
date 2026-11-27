@@ -200,6 +200,7 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     lowerChecks(l, ed, p, check);
     pagesChecks(l, ed, check);
     waveChecks(ed, p, work, check);
+    wavePageChecks(ed, p, work, check);
     keyChecks(l, ed, p, check);
     padChecks(l, ed, p, check);
     vc2Checks(l, ed, p, check, [&] { sizes(l, ed, check); });

@@ -70,7 +70,7 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
         rate = w.rate;
         bits = w.bits;
     }
-    publishWaveView(osc, chans);   // the editor's picture of it (PluginWaveView.cpp, v200)
+    publishWaveView(osc, chans, rate);   // the editor's picture of it (PluginWaveView.cpp, v200)
     const int gen = ++w.gen;
     const juce::String who = osc ? "OSC 2: " : "";
     setStatus(who + "Encoding...");
@@ -101,6 +101,12 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
             return;
         }
         if (isOwn) xtWaveOntoEncoded(ownWave, *e);
+        {   // v479: the session's edits after the wave's own, and the wave as the synth now plays it, for the WAVE page
+            const juce::ScopedLock lock(bufferLock_);
+            waveEditOnto(wave_[osc].edit, *e);
+            wave_[osc].encoded = e;
+        }
+        publishWaveView(osc, chans, rate, e->frames);
         synth_.setSample(e, osc);
         xtActive_.store(true);
         static const char* names[] = { "LITE", "SOLO", "", "BACKING", "", "ENSEMBLE" };

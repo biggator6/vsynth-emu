@@ -219,9 +219,9 @@ extin-prepare-rate|    hostIn_.prepare(sampleRate, synth_.input);|    hostIn_.pr
 editor-d-extin-no-word|    return processor_.hasInput() ? juce::String() : "No input: the host gives none, or the input is off";|    return juce::String();|plugin/Source/UiOscPanel.cpp|layout
 # The OSC displays (v200), by VSynthEmuEditorTest's EditorWaveTest.cpp: a loaded wave's view made and replaced, its
 # columns' extremes, the analog cycles made again as a setting moves, from the OSC's own settings.
-editor-d-wave-unmade|    publishWaveView(osc, chans);|    ;|plugin/Source/PluginEncodes.cpp|layout
-editor-d-wave-first-only|    for (size_t i = from + 1; i < to; ++i) {|    for (size_t i = to; i < to; ++i) {|plugin/Source/PluginWaveView.cpp|layout
-editor-d-wave-stale|    if (gen == viewGen_ && loop == loop_) return;|    if (viewGen_ >= 0 && loop == loop_) return;|plugin/Source/UiOscPanel.cpp|layout
+editor-d-wave-unmade|    waveView_[osc] = std::move(view);|    ;|plugin/Source/PluginWaveView.cpp|layout
+editor-d-wave-first-only|std::minmax_element(mono.begin() + i0, mono.begin() + i1);|std::minmax_element(mono.begin() + i0, mono.begin() + i0 + 1);|plugin/Source/PluginWaveView.cpp|layout
+editor-d-wave-stale|    if (gen == viewGen_ && loop == loop_ && line == lineAt_) return;|    if (viewGen_ >= 0 && loop == loop_ && line == lineAt_) return;|plugin/Source/UiOscPanel.cpp|layout
 editor-d-cycles-stale|    if (!cycles_.empty() && now == drawn_) return;|    if (!cycles_.empty()) return;|plugin/Source/UiOscPanel.cpp|layout
 editor-d-cycles-osc1|    const XtSynth::OscControls& o = osc ? c.osc2 : c;|    const XtSynth::OscControls& o = c;|plugin/Source/UiWaveDisplay.cpp|layout
 # The footer's keyboard (v201), by VSynthEmuEditorTest's EditorKeysTest.cpp: a key let go, a black key over the white,
@@ -402,3 +402,22 @@ startoffset-truncated|kStartOffsetMax : (int)std::lround(samples);|kStartOffsetM
 startoffset-osc1-plain|                                                               0, startOffsetAttributes()));|                                                               0));|plugin/Source/PluginParamsOsc.cpp|arpplugin
 startoffset-osc2-plain|                                                                   0, kStartOffsetMax, 0, startOffsetAttributes()));|                                                                   0, kStartOffsetMax, 0));|plugin/Source/PluginParamsOsc.cpp|arpplugin
 startoffset-vc2-plain|                                                     startOffsetId(id) ? startOffsetAttributes() : text);|                                                     text);|plugin/Source/PluginVc2Params.cpp|arpplugin
+# v479: the WAVE page (UiWavePage, UiWaveEdit), the session's wave edit (PluginWaveEdit) and the rack's Start Offset line, by VSynthEmuEditorTest's wavePageChecks
+editor-wave-start-off|        case Point::start: watch_.dragTo(kStart, (float)within(frame, 0, last)); break;|        case Point::start: watch_.dragTo(kStart, (float)within(frame + 1, 0, last)); break;|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-loop-shortest|    const long shortest = last >= kWaveLoopShortest ? kWaveLoopShortest : 0;|    const long shortest = last >= kWaveLoopShortest ? kWaveLoopShortest - 1 : 0;|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-frame-truncated|    return std::clamp((long)std::lround(f), 0L, std::max(0L, frames_ - 1));|    return std::clamp((long)f, 0L, std::max(0L, frames_ - 1));|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-bwd-strip|    if (pos.y > w.getBottom()) strip = { Point::bwdStart, Point::bwdEnd };|    ;|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-zoom-none|        span_ = std::clamp((long)std::lround((double)span_ * wider), least, frames_);|        span_ = frames_;|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-zoom-unpinned|        first_ = within(pinned - (long)std::lround(share * (double)span_), 0, frames_ - span_);|        first_ = within(first_, 0, frames_ - span_);|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-percent-plain|    long off = std::abs((long)waveLoopFrame(held(p, plain), frames) - frame);|    long off = 0;|plugin/Source/PluginWaveEdit.cpp|layout
+editor-wave-bwd-unkept|        p.wave_[osc].edit = edit;|        ;|plugin/Source/PluginWaveEdit.cpp|layout
+editor-wave-bwd-unplayed|            waveEditOnto(wave_[osc].edit, *e);|            ;|plugin/Source/PluginEncodes.cpp|layout
+editor-wave-edit-unsaved|    PluginWaveEdits::toState(*this, state);|    ;|plugin/Source/PluginState.cpp|layout
+editor-wave-edit-unrestored|    PluginWaveEdits::fromState(*this, apvts.state);|    ;|plugin/Source/PluginState.cpp|layout
+editor-wave-restore-forgets|    if (waveSettings) PluginWaveEdits::forget(*this, osc);|    PluginWaveEdits::forget(*this, osc);|plugin/Source/PluginProcessor.cpp|layout
+editor-wave-rack-never|    const int line = start_ != nullptr && startHeld_.load() ? (int)value(Params::kStartOffset) : -1;|    const int line = -1;|plugin/Source/UiOscPanel.cpp|layout
+editor-wave-rack-always|    const int line = start_ != nullptr && startHeld_.load() ? (int)value(Params::kStartOffset) : -1;|    const int line = start_ != nullptr ? (int)value(Params::kStartOffset) : -1;|plugin/Source/UiOscPanel.cpp|layout
+editor-wave-rack-unheard|    void parameterGestureChanged(int, bool starting) override { startHeld_.store(starting); }|    void parameterGestureChanged(int, bool) override {}|plugin/Source/UiOscPanel.h|layout
+editor-wave-page-missing|made<ZonesPage>, made<WavePage> };|made<ZonesPage>, noPage };|plugin/Source/UiPages.cpp|layout
+editor-wave-bwd-onto-start|    e.bwdStart = (int)start;|    e.bwdStart = (int)start + 1;|plugin/Source/XtPatch.cpp|layout
+editor-wave-bwd-onto-mode|    e.bwdMode = std::clamp(mode, 0, 2);|    e.bwdMode = -1;|plugin/Source/XtPatch.cpp|layout

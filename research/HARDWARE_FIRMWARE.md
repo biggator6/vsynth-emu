@@ -1546,6 +1546,62 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The WAVE page: a wave's points dragged as XtSynth plays them (2026-11-27, v479) {#wave-page}
+
+The user's choices (2026-11-27): a page of its own, as the XT's SAMPLE mode is apart from its patch; start is the OSC's
+Start Offset (d-8a); an edit is the session's first (d-8). research/UI_DESIGN.md, "The pages", WAVE.
+
+**What it draws.** The chosen OSC's wave in XT frames, 44.1 kHz, the frames every point counts ({#wave-edit-read}):
+the processor's view keeps the loaded frames mixed and their rate (`PluginWaveView::mono`, `rate`), and the frame
+count the encode holds (`frames`, published again by the encode job with `XtEncoded::frames`; before it the file's at its
+rate). `PluginWaveView::window(first, span, n)` gives n columns of any window, each the lowest and highest of the file's
+frames under it; the OSC panel's 512 come from it too, as they were. A time ruler under the wave in Start Offset's text.
+
+**The points, each dragged to the frame under the pointer** (`WaveEditView`; a press takes the nearest in reach: above
+the wave the forward loop's ends, below it the backward's, on it the Start Offset's line):
+- The Start Offset: its parameter, held to the wave's last frame.
+- The forward loop: the OSC's Loop Start and End, the shares of the last frame XtSynth reads (`XtSynth::waveLoop`: the
+  parameter ÷ 100 in single precision, × the last frame, rounded). `waveLoopPercentFor` finds the float that gives the
+  frame back through the parameter as JUCE holds it (set, then read back denormalised from its normalised copy, two
+  round trips) and that reading. Every frame of a wave under 2^23 frames (190 s) has one; past that the shares a float
+  holds near the wave's end are more than a frame apart (a raw value's ulp ÷ 100 lands on a grid of 2^−24, so two
+  neighbours can be 2^−23 apart), and it gives the nearest frame it can, within one.
+- The backward loop: the wave's own (`XtEncoded::bwd*`, the vplp's), or the forward loop's where it has none; dragged,
+  it becomes the session's edit (`PluginWaveEdit`), given to the synth by the wave's next encode, which puts it on after
+  the wave's own (`waveEditOnto`, through `xtWaveBackwardOnto`, moved as it stood out of `xtWaveOntoEncoded`). An encoded
+  wave can't be copied to carry it: its band player reads its own vpdt and bands through pointers. On the XT a loop
+  point's change keeps the encode and only rebuilds the cached loop events ({#wave-truncate-read}); the encode again
+  gives the same wave, as it is deterministic on the same audio, so what plays is the same.
+- The loops held as the XT's setters hold them: an end at least 16 frames from the other, none on a wave whose last
+  frame is under 16; clamped, not refused.
+- The wheel narrows the window about the frame under the pointer, to a frame a column at most; sideways it moves it;
+  a drag away from the points scrolls.
+
+**The session** (d-8): `PluginLoadedWave::edit` and `encoded`, under the processor's buffer lock; the state's
+`waveEdit` and `waveEdit2` ("bwd=mode,start,end"), put back before a restore loads the waves so their encodes take it;
+a new wave (a file loaded, a patch's waves) keeps none. `PluginWaveEdits`, the processor's friend, is the page's way in.
+
+**The rack.** An OSC panel that loads its wave draws the Start Offset's line on its display while that parameter's
+gesture runs (a knob held, a drag on the page, a host's), the user's item 5, and not after (`WaveDisplay::paintStartLine`,
+the page's line too).
+
+**The check.** `VSynthEmuEditorTest`'s `wavePageChecks` (`EditorWavePageTest.cpp`, new): the page's wave and its length
+said; the Start Offset's line dragged to 44100 sets 44100; the forward loop's ends dragged to 22050 and 66150 play there
+by XtSynth's reading of the processor's controls, an end dragged within 16 of the other held 16 away; a thousand random
+frames of an 8-million-frame wave each given back exactly through Loop End, and of a 16-million-frame one each within a
+frame; the backward loop's start dragged kept in the session, reaching the wave the synth plays, and a saved session's
+restore playing it on its own encode; the wheel; the rack's line while the gesture runs and not after. The editor
+5244/5244 (412 states). The first run found the 2^23 limit (28 of a thousand frames of a 10-million-frame wave).
+Planted errors (`panel_muts.txt`'s 18 `editor-wave-`): the line one frame off, the shortest loop 15, a frame truncated
+for rounded, the backward strip unread, the wheel not narrowing or not about the pointer, the share's search skipped,
+the edit not kept, not played, not saved, not restored or forgotten on a restore, the rack's line never, always, or
+deaf to the gesture, the page unmade, and `xtWaveBackwardOnto`'s start and mode (moved there from the tone list:
+xt_tone, 0 different on both, holds no edited backward loop; the page's check does). One of mine went as equivalent
+within the check's reach: the second round trip of `held` (a value once round-tripped comes back the same). The 44 old
+plants on the files v479 touched: 41 caught and three said NOTEXT, as v479 rewrote their lines
+(`editor-d-wave-unmade` now on the view's store, `-first-only` on a column's search, `-stale` on the panel's compare),
+then caught. `mutate_tone.py --changed`: the 25 `tonepatch` plants caught. `verify.sh` clean, fcheck as its baseline.
+
 ### The XT's Truncate and its loop setters, read (2026-11-27, for v479 on) {#wave-truncate-read}
 
 Read for d-8a (the Edit region with Truncate) and the WAVE page's loops, by a read-only pass over rom.2 (Ghidra and

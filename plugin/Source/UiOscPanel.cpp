@@ -72,7 +72,14 @@ OscPanel::OscPanel(VSynthEmuProcessor& p, int osc, Model model)
     }
     load_.onClick = [this] { chooseWave(); };
     for (juce::Component* c : pcmLine()) addChildComponent(c);
+    if (model_.loads)   // the Start Offset's line while it's held (v479)
+        start_ = dynamic_cast<juce::RangedAudioParameter*>(p.apvts.getParameter(id(Params::kStartOffset)));
+    if (start_ != nullptr) start_->addListener(this);
     refresh();
+}
+
+OscPanel::~OscPanel() {
+    if (start_ != nullptr) start_->removeListener(this);
 }
 
 juce::String OscPanel::id(const juce::String& name) const {
@@ -118,11 +125,13 @@ void OscPanel::refreshWave() {
     };
     const WaveDisplay::Loop loop { value(Params::kLoop) >= 0.5f, value(Params::kLoopStart) / kPercent,
                                    value(Params::kLoopEnd) / kPercent };
+    const int line = start_ != nullptr && startHeld_.load() ? (int)value(Params::kStartOffset) : -1;
     const int gen = processor_.waveViewGen(osc_);
-    if (gen == viewGen_ && loop == loop_) return;
+    if (gen == viewGen_ && loop == loop_ && line == lineAt_) return;
     viewGen_ = gen;
     view_ = processor_.waveView(osc_);
     loop_ = loop;
+    lineAt_ = line;
     repaint(display_);
 }
 
@@ -183,6 +192,10 @@ void OscPanel::paintDisplay(juce::Graphics& g) const {
     auto inner = display_.reduced(10, 6);
     const auto name = inner.removeFromTop(kNameH);
     if (view_ && processor_.hasFileLoaded(osc_)) WaveDisplay::paintWave(g, inner.toFloat(), *view_, loop_);
+    if (view_ && lineAt_ >= 0 && view_->frames > 0) {   // the Start Offset while it's held (v479), at its share of the wave
+        const float share = std::min(1.0f, (float)lineAt_ / (float)view_->frames);
+        WaveDisplay::paintStartLine(g, inner.toFloat(), (float)inner.getX() + share * (float)inner.getWidth());
+    }
     Ui::drawText(g, wave_, name, { Look::sans(11.0f), Look::label });
 }
 
