@@ -1693,20 +1693,31 @@ CLAUDE.md's "as its own mode beside the V-Synth, as the XT's [V-CARD] switches a
 - [ ] The checks: each product opens in its own mode and can't reach the other, and its parameters all have a control
   (the editor's check per product); verify.sh's auval lines and buildid.sh as they are, for the two builds.
 - [ ] The docs: CLAUDE.md's rule, UI_DESIGN_VC2.md's d-15, CODE_MAP.md, TOOLS.md, HARDWARE_FIRMWARE.md's section.
+- [ ] The effect's new name (d-7): PRODUCT_NAME in plugin/FxPlugin.cmake, buildid.sh's and buildid_test.sh's FX names, the
+  old "V-Synth Emu FX" bundles taken out of ~/Library at the install (two AUs with one type, subtype and maker confuse a
+  host). To check: a REAPER session saved with "V-Synth Emu FX" finds the renamed plugin.
+- [ ] VST3 and AU only (d-8): no Standalone in either target; what reads the Standalone's build id (buildid.sh, verify.sh)
+  without it.
 
-**The user's decisions**, each with the recommendation:
-- **d-6. The other mode's parameters**: kept in both plugins and hidden, or each plugin with only its own. Recommended: only
-  its own (the instrument the V-Synth's, the effect rom.4's and what both use), so a host lists each plugin's own controls.
-  The sessions it changes are the instrument's saved in VC-2 mode, test sessions so far: they open on the V-Synth. To check
-  when it starts: the parameters kept keep their host IDs (JUCE's IDs from the parameter's ID string; neither target sets
-  JUCE_FORCE_USE_LEGACY_PARAM_IDS).
-- **d-7. The effect's name**: "V-Synth Emu FX" as now, or another, e.g. "V-Synth Emu VC-2". Only the name the host shows;
-  the codes (VsEf Gato, the bundle ID) stay, so sessions saved with it still open. Recommended: "V-Synth Emu VC-2", beside
-  the instrument in a host's list and saying what it is.
-- **d-8. A Standalone for the VC-2**: the instrument's Standalone plays the VC-2 with the computer's input today, and the
-  split would take that away. Recommended: a Standalone of the effect build (JUCE builds one for an effect, its input the
-  audio device's).
-- **d-9. The instrument's audio input**: kept, as the V-Synth's EXT IN OSC needs it (v207). Recommended: kept. A note for the
-  manual: REAPER plays an instrument track's own audio beside the instrument's output (HARDWARE_FIRMWARE.md, "The VC-2 heard
-  dry in REAPER"), so EXT IN there wants that section's way round: the audio on the track's channels 3/4, the plugin's
-  inputs from 3/4, the parent send of 1/2 only.
+**The user's decisions** (2026-11-26, the user's answers to the recommendations; d-9 open):
+- **d-6. The other mode's parameters. Decided: each plugin keeps only its own** ("each plugin should keep only its own
+  parameters"; the recommendation): the instrument the V-Synth's, the effect rom.4's and what both use, so a host lists each
+  plugin's own controls. The sessions it changes are the instrument's saved in VC-2 mode, test sessions so far: they open
+  on the V-Synth. To check when it starts: the parameters kept keep their host IDs (JUCE's IDs from the parameter's ID
+  string; neither target sets JUCE_FORCE_USE_LEGACY_PARAM_IDS).
+- **d-7. The effect's name. Decided: "V-Synth Emu VC-2"** (the recommendation). Only the name the host shows; the codes
+  (VsEf Gato, the bundle ID) stay, so sessions saved with it still open.
+- **d-8. A Standalone. Decided: none** ("standalone app isn't needed at this time at all, only VST/AU"; not the
+  recommendation): both plugins VST3 and AU only. Read as the instrument's Standalone going too, which the user confirms
+  when the step starts; the VC-2 is then heard only in a host.
+- **d-9. The instrument's audio input** (open). The recommendation was to keep it, as the V-Synth's EXT IN OSC needs it
+  (v207). The user's question: can EXT IN simply be an oscillator, treated like a PCM type? It is one already: OSC Type
+  is ANALOG, PCM or EXT IN, the XT's three (`oscTypeNames`), and the firmware makes EXT IN a voice on the PCM converter's
+  terms (level, Wave Gain, the pitch for what follows; HARDWARE_FIRMWARE.md, "The EXT IN OSC"), through the COSMs, MOD, TVA
+  and effects as a PCM OSC. What differs is its player: a PCM OSC plays a stored wave, EXT IN the audio coming in as it
+  comes, with no wave, pitch or Time Trip of its own and its level opened by the notes. So it needs live audio, and the
+  instrument an input, whichever way. Audio from a file played as an OSC is PCM's already: the file loaded as the OSC's
+  wave (the XT samples its input into a wave the same way). Recommended still: keep the input. In the step, try it as a
+  side-chain input, the way hosts commonly hand audio to an instrument, and measure in REAPER whether that ends the dry
+  double (HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"); until then the way round there: the audio on the track's
+  channels 3/4, the plugin's inputs from 3/4, the parent send of 1/2 only.
