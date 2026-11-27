@@ -38,6 +38,9 @@ Step Modulator), which move a value at run time without changing what's stored.
   UI_DESIGN.md takes the ring's design.
 
 ### 3. The arpeggiator's pattern
+**Done** (2026-11-27, claude/arp-pattern): v468, the pattern edited on its card by the XT's Pattern Edit; v469, d-6's
+initialized pattern before any patch. HARDWARE_FIRMWARE.md, "The arpeggio's Pattern Edit" and "The pattern before any
+patch".
 "arpeggiator only reads from patches - no ability to program patterns. with no pattern, it should still handle live input
 for repeat/up/down/etc". Today: the ten settings are host parameters (PluginArp.cpp, v190), among them the motif, the
 eight of the firmware's table (UP, DOWN, NOTE-ORDER, PHRASE, RHYTHM and the rest; XtArpeggioMotifs.cpp), which choose the

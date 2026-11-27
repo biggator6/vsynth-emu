@@ -1546,6 +1546,22 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The pattern before any patch: an initialized patch's (2026-11-27, v469) {#arp-default-init}
+
+The user's d-6 (research/NEXT_ISSUES.md), on v468's finding below: the plugin's pattern before any patch, and a session's
+from before v190, is an initialized patch's (`xtArpDefaultPattern` → `xtArpInitPattern`: every line NOTE C4, line 1 at
+velocity 100 on every step), where it was the descriptors' all-rest pattern. So the Arpeggio switched on in a fresh plugin
+plays the keys held by its Motif, Octave Range and Grid (UP, a 16th each, at the defaults), as an initialized XT does;
+INIT on the card puts it back; ALL CLEAR leaves a pattern of rests, which plays nothing, the keys included, as on the XT.
+No starter pattern the XT doesn't have. A patch, a session and the card bring their own pattern as before.
+- **Checks.** `VSynthEmuArpPluginTest`: a new processor's pattern is the firmware's own default patch's (`0x8947e230`,
+  then `0x8947dae0` on no file's bytes, as the plugin's save makes it), not silent; the chord through processBlock with
+  the arpeggio on now plays on that pattern, with no patch and none set: a note each quarter at 120 BPM on QUARTER, XtSynth's
+  render sample for sample; xt_arp's edits section holds `xtArpInitPattern` to the same patch. The v190 plant on the
+  default's line became `arp-default-empty` (the old all-rest default), caught. The whole `arp_muts.txt` list (v468's
+  and the earlier) 110/110; the editor's and arpeggio's panel plants 120 of 121, the one left, `arp-said-missing`,
+  plants into text that v206 took out of `XtPatch.cpp`, so it plants nothing: stale before this branch.
+
 ### The arpeggio's Pattern Edit, and the pattern an initialized patch has (2026-11-27, v468) {#arp-pattern-edit}
 
 The user's report (research/NEXT_ISSUES.md, item 3): "arpeggiator only reads from patches - no ability to program

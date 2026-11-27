@@ -738,6 +738,16 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The pattern before any patch an initialized patch's v469 (2026-11-27, after v468; HARDWARE_FIRMWARE.md, "The pattern
+  before any patch"): the user's d-6. xtArpDefaultPattern is xtArpInitPattern (line 1 at velocity 100 on every step),
+  for a new processor and a session from before v190, so the Arpeggio on with no patch plays the keys held by its
+  Motif and Grid as an initialized XT does; ALL CLEAR still leaves it silent, as the XT. VSynthEmuArpPluginTest: the
+  default against the firmware's own default patch, not silent, and the chord through processBlock on it with no
+  pattern set, a note each quarter against XtSynth; panel_muts' arp-default-line became arp-default-empty. Gates:
+  VSynthEmuArpPluginTest 430/430; the whole arp_muts.txt list 110/110 caught; mutate_panel.py --editor and the 17 arp-
+  plants 121 planted, 120 caught, arp-said-missing not planted (its text left XtPatch.cpp in v206, before this branch);
+  verify.sh every line (fcheck as baseline, ab 4/4, editor 5284/5284, arp 24/24, patch apply 0 failed, auval both).
+
 The arpeggio's pattern programmed v468 (2026-11-27, on claude/arp-pattern from vc2-mode f1c0797; HARDWARE_FIRMWARE.md,
   "The arpeggio's Pattern Edit"; research/NEXT_ISSUES.md item 3): the PLAY page's pattern card edits the pattern by the
   XT's Pattern Edit, read in rom.2 (the screen at 0x893f8200, its work IDs 0x1401-0x1403, the setter 0x8937ced0, the

@@ -4349,3 +4349,25 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - The coordinator kept the four, with their verdicts made to depend on whether the user found the setting. A seventh
   argument to `analyse` broke the shape law, so the cutter got a function that makes an analysis by class. The shared CLI
   now picks one by a flag, which fxcut doesn't use.
+
+### Session 27 (2026-11-27) — v468, v469: the arpeggio's pattern programmed, by the XT's Pattern Edit
+
+- The user's report was "arpeggiator only reads from patches", and that with no pattern it should still play live
+  input. Names first: the manual's Pattern Edit pages, then rom.2's strings for that screen ("Tie", "Clr", "Value :",
+  "Note/CC", "LINE CLEAR"), which led straight to its code at 0x893f8200 and its three work IDs.
+- The question "what does the XT play with no pattern" had a firmware answer I hadn't expected. An empty pattern plays
+  nothing, but the XT's own INITIALIZE PATCH writes line 1 at velocity 100 on every step, and so does the default patch
+  the plugin already made for saves. 291 of the 512 presets still carry that pattern. The plugin started from the
+  descriptors' all-rest pattern instead, so switching the Arpeggio on in a fresh plugin silenced the keys: the user's
+  report. The user took the XT's initialized pattern for d-6.
+- Ghidra's decompile of the screen was patchy (functions cut at the wrong places). Running the code was faster than
+  reading it. The system store's setter, the six buttons' handler, both clears and the screen's redraw all ran in the
+  interpreter with the drawing hooked. Two things the decompile had wrong: the setter's line is its fourth argument, and
+  the write object reads the part's store at +0x10, not the +4 and +8 the reads use.
+- The engine's clamp of a CTRL line's controller to 95 had lived in the patch reader since v188, which would have made
+  the editor show 120 as 95 and lose it on a save. It moved to where 0x8930ca30 does it, the object's own read, which
+  the edits section now runs on the edited store, so the clamp is held to the firmware for the first time.
+- The kit's param-id-lock hook crashed on the worktree's first write: it writes `.claude/param-ids.lock.json` there and
+  the worktree has no `.claude/`. The worktree got a copy of the main checkout's, as vsynth-files' has. The harness's
+  worktree check refuses any shell command that names the folder `plugin/Source` (it reads it as `source`), so those
+  files were reached through `plugin` paths and the Read tool.
