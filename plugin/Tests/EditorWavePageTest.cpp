@@ -101,13 +101,9 @@ void rackDrawsStartLine(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& chec
 } // namespace
 
 void wavePageChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check) {
-    auto* page = shownPage<WavePage>(ed, Blocks::kWavePage, check);
+    auto* page = pageWithWave(ed, p, folder, kWaveSeconds, check);
     if (page == nullptr) return;
-    setParam(p, Params::kOscType, 1.0f);
-    p.loadFile(writeTestWave(folder, kWaveSeconds), 0);
-    page->showOsc(0);
     WaveEditView& v = page->view(0);
-    check(v.frames() == kWaveFrames, "the page's wave has " + std::to_string(v.frames()) + " frames");
     check(page->said().contains(juce::String(kWaveFrames) + " samples"), "the wave's line doesn't say its length");
     setParam(p, Params::kLoop, 1.0f);
     dragsStartOffset(v, p, check);

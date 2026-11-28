@@ -73,6 +73,9 @@ void waveCutChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& fol
 // Its events (EditorWaveEventTest.cpp, v481): the XT's own add and delete in the encode, the law at its edges, the
 // refusals said, Next and Prev, the session, a depth's change dropping them
 void waveEventChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
+// Its zoom and key (EditorWaveZoomTest.cpp, v484): Fit, - and + about the middle and their readout, the key's marks
+// in the colours the view draws them
+void waveZoomChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
 // The footer's keyboard (EditorKeysTest.cpp, v201): a key's press, drag and release as their notes, a press sounding
 // through processBlock, and the fold
 void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

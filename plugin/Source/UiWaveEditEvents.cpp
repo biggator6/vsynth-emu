@@ -6,10 +6,6 @@
 #include "UiParts.h"
 #include <algorithm>
 
-namespace {
-constexpr float kMarkW = 8.0f, kMarkH = 7.0f;
-}
-
 void WaveEditView::setCurrent(long frame) {
     current_ = std::clamp(frame, 0L, std::max(0L, frames_ - 1));
     repaint();
@@ -44,10 +40,8 @@ void WaveEditView::paintEvents(juce::Graphics& g) const {
     for (const long e : events_) {
         const float x = xOf(e);
         if (x < w.getX() - kMarkW || x > w.getRight() + kMarkW) continue;
-        juce::Path mark;
-        mark.addTriangle(x - kMarkW / 2.0f, w.getY(), x + kMarkW / 2.0f, w.getY(), x, w.getY() + kMarkH);
-        Ui::fillPath(g, mark, Look::text);
+        paintMark(g, Mark::event, { x, w.getY() + kMarkH / 2.0f });   // its top on the wave's (v484: the key's too)
     }
     const float x = xOf(at(Point::current));
-    Ui::fill(g, juce::Rectangle<float>(x, w.getY(), 1.0f, w.getHeight()).toNearestInt(), Look::label);
+    Ui::fill(g, juce::Rectangle<float>(x, w.getY(), 1.0f, w.getHeight()).toNearestInt(), colourOf(Mark::current));
 }

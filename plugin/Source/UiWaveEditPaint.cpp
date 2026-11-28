@@ -6,11 +6,68 @@
 #include "UiLook.h"
 #include "UiParts.h"
 #include "UiWaveDisplay.h"
+#include <array>
 
 namespace {
-constexpr float kHandleW = 9.0f;
+constexpr float kHandleW = 9.0f, kHandleRadius = 2.0f, kLineW = 2.0f;
 constexpr float kFaint = 0.45f, kBwdAlpha = 0.08f, kEditAlpha = 0.07f;
 constexpr int kRulerMarks = 6;
+}
+
+// v484: each mark's colour, the one place the view's drawing and the page's key take it from
+juce::Colour WaveEditView::colourOf(Mark m) {
+    switch (m) {
+        case Mark::loop: return Look::mod;
+        case Mark::backward: return Look::mod.withMultipliedAlpha(kFaint);
+        case Mark::edit: return Look::text;
+        case Mark::start: return Look::accent;   // as WaveDisplay::paintStartLine draws it, on the rack's display too
+        case Mark::event: return Look::text;
+        case Mark::current: return Look::label;
+        case Mark::kMarks: break;
+    }
+    return Look::text;
+}
+
+WaveEditView::Mark WaveEditView::markOf(Point p) {
+    switch (p) {
+        case Point::fwdStart:
+        case Point::fwdEnd: return Mark::loop;
+        case Point::bwdStart:
+        case Point::bwdEnd: return Mark::backward;
+        case Point::editStart:
+        case Point::editEnd: return Mark::edit;
+        case Point::current: return Mark::current;
+        case Point::start:
+        case Point::none: break;
+    }
+    return Mark::start;
+}
+
+const char* WaveEditView::nameOf(Mark m) {
+    static constexpr std::array<const char*, (size_t)Mark::kMarks> kNames {
+        "Loop Start, End", "Backward loop", "Edit region: Truncate keeps it", "Start Offset", "Event", "Current"
+    };
+    return m == Mark::kMarks ? "" : kNames[(size_t)m];
+}
+
+// A handle a rounded bar the strip's height, an event the XT's ▼, Start and Current a line
+void WaveEditView::paintMark(juce::Graphics& g, Mark m, juce::Point<float> centre) {
+    const juce::Colour c = colourOf(m);
+    if (m == Mark::loop || m == Mark::backward || m == Mark::edit) {
+        Ui::fillRounded(g, juce::Rectangle<float>(kHandleW, kStrip - 4.0f).withCentre(centre), c, kHandleRadius);
+        return;
+    }
+    if (m == Mark::event) {
+        juce::Path mark;
+        const float top = centre.y - kMarkH / 2.0f;
+        mark.addTriangle(centre.x - kMarkW / 2.0f, top, centre.x + kMarkW / 2.0f, top, centre.x, top + kMarkH);
+        Ui::fillPath(g, mark, c);
+        return;
+    }
+    const float w = m == Mark::start ? kLineW : 1.0f;   // Start centred on its frame, Current from it, as drawn on the wave
+    const float left = m == Mark::start ? centre.x - w / 2.0f : centre.x;
+    const float h = kStrip - 4.0f;
+    Ui::fill(g, juce::Rectangle<float>(left, centre.y - h / 2.0f, w, h).toNearestInt(), c);
 }
 
 void WaveEditView::paint(juce::Graphics& g) {
@@ -26,8 +83,8 @@ void WaveEditView::paint(juce::Graphics& g) {
         return juce::Rectangle<float>::leftTopRightBottom(x0, w.getY(), x1, w.getBottom()).toNearestInt();
     };
     if (bwd_.backward)   // the backward loop's span, fainter than the forward's
-        Ui::fill(g, spanOf(Point::bwdStart, Point::bwdEnd), Look::mod.withAlpha(kBwdAlpha));
-    Ui::fill(g, spanOf(Point::editStart, Point::editEnd), Look::text.withAlpha(kEditAlpha));   // the Edit region
+        Ui::fill(g, spanOf(Point::bwdStart, Point::bwdEnd), colourOf(Mark::backward).withAlpha(kBwdAlpha));
+    Ui::fill(g, spanOf(Point::editStart, Point::editEnd), colourOf(Mark::edit).withAlpha(kEditAlpha));
     const auto share = [&](long f) { return (xOf(f) - w.getX()) / w.getWidth(); };
     PluginWaveView shown;
     shown.columns = columns_;
@@ -43,17 +100,13 @@ void WaveEditView::paint(juce::Graphics& g) {
 void WaveEditView::paintPoints(juce::Graphics& g) const {
     const auto w = wave();
     for (const Point p : { Point::fwdStart, Point::fwdEnd, Point::bwdStart, Point::bwdEnd, Point::editStart,
-                           Point::editEnd }) {
-        const bool fwd = p == Point::fwdStart || p == Point::fwdEnd;
-        const bool edit = p == Point::editStart || p == Point::editEnd;
-        const auto colour = edit ? Look::text : fwd ? Look::mod : Look::mod.withMultipliedAlpha(kFaint);
-        Ui::fillRounded(g, juce::Rectangle<float>(kHandleW, kStrip - 4.0f).withCentre(handle(p)), colour, 2.0f);
-    }
+                           Point::editEnd })
+        paintMark(g, markOf(p), handle(p));
     const float x = xOf(at(Point::start));
     WaveDisplay::paintStartLine(g, w, x);   // the rack's display draws the same line while it's held
     Ui::drawText(g, "START " + startOffsetText((int)at(Point::start)),
                  juce::Rectangle<float>(x + 4.0f, w.getY() + 2.0f, 140.0f, 14.0f).toNearestInt(),
-                 { Look::sans(10.0f), Look::accent });
+                 { Look::sans(10.0f), colourOf(Mark::start) });
 }
 
 void WaveEditView::paintRuler(juce::Graphics& g) const {

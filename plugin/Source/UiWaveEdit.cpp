@@ -1,6 +1,7 @@
 // The WAVE page's wave (UiWaveEdit.h, v479; the Edit region and Truncate, v480); its drawing is UiWaveEditPaint.cpp's
 #include "UiWaveEdit.h"
 #include "PluginParamIds.h"
+#include "PluginStartOffset.h"
 #include <array>
 #include <cmath>
 
@@ -197,22 +198,42 @@ void WaveEditView::mouseUp(const juce::MouseEvent& e) {
     scrolling_ = false;
 }
 
-// The wheel narrows or widens the window about the frame under the pointer, to a frame a column at most; sideways, it
-// moves the window
+// The wheel narrows or widens the window about the frame under the pointer; sideways, it moves the window
 void WaveEditView::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) {
     if (frames_ <= 0) return;
-    const auto w = wave();
     if (wheel.deltaX != 0.0f)
         first_ = within(first_ - (long)std::lround(wheel.deltaX * kPanPerDelta * (float)span_), 0, frames_ - span_);
-    if (wheel.deltaY != 0.0f) {
-        const long least = std::min(frames_, std::max(1L, (long)w.getWidth()));
-        const long pinned = frameAt(e.position.x);
-        const double share = (double)(e.position.x - w.getX()) / (double)w.getWidth();
-        const double wider = std::pow(2.0, -(double)wheel.deltaY * kZoomPerDelta);
-        span_ = std::clamp((long)std::lround((double)span_ * wider), least, frames_);
-        first_ = within(pinned - (long)std::lround(share * (double)span_), 0, frames_ - span_);
-    }
+    if (wheel.deltaY != 0.0f) zoomAbout(e.position.x, std::pow(2.0, -(double)wheel.deltaY * kZoomPerDelta));
     repaint();
+}
+
+// The window `wider` times as wide about the frame at x, which stays under it, to a frame a column at most and the
+// whole wave at the widest: the wheel's, and the page's - and + about the middle (v484)
+void WaveEditView::zoomAbout(float x, double wider) {
+    if (frames_ <= 0) return;
+    const auto w = wave();
+    const long least = std::min(frames_, std::max(1L, (long)w.getWidth()));
+    const long pinned = frameAt(x);
+    const double share = (double)(x - w.getX()) / (double)w.getWidth();
+    span_ = std::clamp((long)std::lround((double)span_ * wider), least, frames_);
+    first_ = within(pinned - (long)std::lround(share * (double)span_), 0, frames_ - span_);
+    repaint();
+}
+
+void WaveEditView::zoomBy(double wider) {
+    zoomAbout(wave().getCentreX(), wider);
+}
+
+void WaveEditView::fit() {
+    first_ = 0;
+    span_ = frames_;
+    repaint();
+}
+
+juce::String WaveEditView::shown() const {
+    if (frames_ <= 0) return {};
+    return startOffsetText((int)first_) + " to " + startOffsetText((int)(first_ + span_)) + " of " +
+           startOffsetText((int)frames_);
 }
 
 void WaveEditView::makeColumns() {

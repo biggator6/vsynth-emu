@@ -1546,6 +1546,32 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The WAVE page's zoom and key (2026-11-28, v484) {#wave-zoom}
+
+The user's word after trying the page: what the blue and white handles are wasn't plain, nor that the wheel zooms. No
+firmware: the XT's SAMPLE screens zoom by their own keys, which the page doesn't take (the user's choice of a page of
+its own, d-8a). What it has (`research/UI_DESIGN.md`, WAVE, v484):
+
+- **Zoom.** -, + and Fit at the right of the wave's line: - and + widen and narrow the window by two about its
+  middle, Fit shows it all; the wheel zooms about the pointer through the same routine (`WaveEditView::zoomAbout`,
+  the wheel's own code made one), to a frame a column at the closest. Beside them the window shown, as the ruler counts
+  it ("0.00 ms to 2.000 s of 2.000 s").
+- **The key.** Under the wave, each mark as the view draws it, in its colour, then its name: Loop Start, End (above the
+  wave), Backward loop (below it, faint), Edit region: Truncate keeps it (in the ruler), Start Offset, Event, Current.
+  The colours and the marks' shapes are one table and one painter (`WaveEditView::colourOf`, `paintMark`) the view and
+  the key both use, and the key's places one routine (`WaveKey::items`) its painting and its check read.
+- **The page's buttons** one table (`kButtonDefs`, `UiWavePage.cpp`): each its name, width, line and act, where the
+  title line's names and acts were two.
+
+**The check.** `EditorWaveZoomTest.cpp` (new, in `VSynthEmuEditorTest`): Fit, + by half about the middle, - back, +
+to a frame a column and no further, Fit back, the line saying each; the key's six marks whole, each drawn in its
+colour (the key drawn into an image, each swatch's pixel), the forward loop's handles in the key's Loop colour (the
+view drawn), and the marks to tell apart each their own colour. The WAVE page's checks share the page with a wave
+loaded (`WavePageTest::pageWithWave`). The plants: 14 new (`editor-zoom-`, `editor-key-`) and the WAVE page's
+others its files reach, 31, all caught; seven older ones follow the code they plant in (the buttons' table, the zoom
+made one). One was missed first, + let stop at four columns a frame: the check asked only for a window within the
+view's width, and now asks a frame a column.
+
 ### A band wave saved, its bands made by rom.2's rebuild (2026-11-28, v483) {#wave-writer-bands}
 
 d-8's second half, its second part: band waves (types 3 to 5, BACKING and ENSEMBLE) written by the writer as the XT

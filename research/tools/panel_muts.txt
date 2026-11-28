@@ -468,8 +468,8 @@ editor-wave-start-off|        case Point::start: watch_.dragTo(kStart, (float)wi
 editor-wave-loop-shortest|    const long shortest = last >= kWaveLoopShortest ? kWaveLoopShortest : 0;|    const long shortest = last >= kWaveLoopShortest ? kWaveLoopShortest - 1 : 0;|plugin/Source/UiWaveEdit.cpp|layout
 editor-wave-frame-truncated|    return std::clamp((long)std::lround(f), 0L, std::max(0L, frames_ - 1));|    return std::clamp((long)f, 0L, std::max(0L, frames_ - 1));|plugin/Source/UiWaveEdit.cpp|layout
 editor-wave-bwd-strip|    if (pos.y > w.getBottom()) strip = { Point::bwdStart, Point::bwdEnd };|    ;|plugin/Source/UiWaveEdit.cpp|layout
-editor-wave-zoom-none|        span_ = std::clamp((long)std::lround((double)span_ * wider), least, frames_);|        span_ = frames_;|plugin/Source/UiWaveEdit.cpp|layout
-editor-wave-zoom-unpinned|        first_ = within(pinned - (long)std::lround(share * (double)span_), 0, frames_ - span_);|        first_ = within(first_, 0, frames_ - span_);|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-zoom-none|    span_ = std::clamp((long)std::lround((double)span_ * wider), least, frames_);|    span_ = frames_;|plugin/Source/UiWaveEdit.cpp|layout
+editor-wave-zoom-unpinned|    first_ = within(pinned - (long)std::lround(share * (double)span_), 0, frames_ - span_);|    first_ = within(first_, 0, frames_ - span_);|plugin/Source/UiWaveEdit.cpp|layout
 editor-wave-percent-plain|    long off = std::abs((long)waveLoopFrame(held(p, plain), frames) - frame);|    long off = 0;|plugin/Source/PluginWaveEdit.cpp|layout
 editor-wave-bwd-unkept|        if (edit.backward) waveEditBackward(kept, edit.bwdMode, edit.bwdStart, edit.bwdEnd);|        if (edit.backward) {}|plugin/Source/PluginWaveEdit.cpp|layout
 editor-wave-bwd-unplayed|            waveEditOnto(wave_[osc].edit, *e);|            ;|plugin/Source/PluginEncodes.cpp|layout
@@ -495,9 +495,9 @@ editor-cut-revert-keeps|    forget(p, osc);|    ;|plugin/Source/PluginWaveCut.cp
 editor-cut-unapplied|        waveCutOnto(edit, chans, rate, bits);|        ;|plugin/Source/PluginEncodes.cpp|layout
 editor-cut-unsaved|    if (edit.cut) words.add(|    if (false) words.add(|plugin/Source/PluginWaveEdit.cpp|layout
 editor-cut-bwd-wipes|        if (edit.backward) waveEditBackward(kept, edit.bwdMode, edit.bwdStart, edit.bwdEnd);|        if (edit.backward) kept = edit;|plugin/Source/PluginWaveEdit.cpp|layout
-editor-cut-button|    [](WaveEditView& v) { v.truncate(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
+editor-cut-button|[](WaveEditView& v) { v.truncate(); } }|[](WaveEditView&) {} }|plugin/Source/UiWavePage.cpp|layout
 editor-cut-region-free|        case Point::editEnd: editTo_ = within(frame, editFrom_, last); break;|        case Point::editEnd: editTo_ = within(frame, 0, last); break;|plugin/Source/UiWaveEdit.cpp|layout
-editor-cut-revert-button|    [](WaveEditView& v) { v.revert(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
+editor-cut-revert-button|[](WaveEditView& v) { v.revert(); } }|[](WaveEditView&) {} }|plugin/Source/UiWavePage.cpp|layout
 # v481: the events (XtFwEvents, the encodes' calls, PluginWaveEvents, the session's text, the page's Current and buttons),
 # by VSynthEmuEditorTest's waveEventChecks. Not planted: which refusal is said when two are (each edit is encoded on its
 # own, so one at most is refused); the results' count against the edits' (an encode that never reached the detection,
@@ -523,11 +523,29 @@ editor-event-unsaved|    if (!edit.events.empty()) {   // "ev=|    if (false) { 
 editor-event-depth-unrestored|edit.eventsDepth = said.upToFirstOccurrenceOf(":", false, false).getIntValue();|edit.eventsDepth = -1;|plugin/Source/PluginWaveEdit.cpp|layout
 editor-event-delete-restored-add|edit.events.push_back({ e.startsWithChar('+'),|edit.events.push_back({ true,|plugin/Source/PluginWaveEdit.cpp|layout
 editor-event-cut-kept|        e.events.clear();   // the encode dropped|        ;   // the encode dropped|plugin/Source/PluginWaveCut.cpp|layout
-editor-event-delete-button|    [](WaveEditView& v) { v.deleteEvent(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
-editor-event-add-button|    [](WaveEditView& v) { v.addEvent(); },|    [](WaveEditView&) {},|plugin/Source/UiWavePage.cpp|layout
-editor-event-next-is-prev|    [](WaveEditView& v) { v.toEvent(true); },|    [](WaveEditView& v) { v.toEvent(false); },|plugin/Source/UiWavePage.cpp|layout
+editor-event-delete-button|[](WaveEditView& v) { v.deleteEvent(); } }|[](WaveEditView&) {} }|plugin/Source/UiWavePage.cpp|layout
+editor-event-add-button|[](WaveEditView& v) { v.addEvent(); } }|[](WaveEditView&) {} }|plugin/Source/UiWavePage.cpp|layout
+editor-event-next-is-prev|[](WaveEditView& v) { v.toEvent(true); } }|[](WaveEditView& v) { v.toEvent(false); } }|plugin/Source/UiWavePage.cpp|layout
 editor-event-next-at|std::upper_bound(events_.begin(), events_.end(), current_)|std::lower_bound(events_.begin(), events_.end(), current_)|plugin/Source/UiWaveEditEvents.cpp|layout
 editor-event-prev-at|if (at != events_.begin()) to = *(at - 1);|if (at != events_.begin()) to = *at;|plugin/Source/UiWaveEditEvents.cpp|layout
 editor-event-add-deletes|PluginWaveEdits::editEvent(processor_, osc_, { true, (uint32_t)current_ });|PluginWaveEdits::editEvent(processor_, osc_, { false, (uint32_t)current_ });|plugin/Source/UiWaveEditEvents.cpp|layout
 editor-event-kept-unsaid|    if (!edit.events.empty()) kept.add(|    if (false) kept.add(|plugin/Source/UiWavePage.cpp|layout
 editor-event-unread|        events_ = PluginWaveEdits::events(processor_, osc_);|        ;|plugin/Source/UiWaveEdit.cpp|layout
+# The WAVE page's zoom and key (v484): the buttons' step none or the wrong way, the zoom about the left edge, Fit not
+# back to the start, + past a frame a column, the wheel about the middle, the line's readout never set or set late,
+# the line's buttons unplaced, the key unplaced or its marks undrawn, a handle drawn as another mark, two marks one
+# colour
+editor-zoom-step-none|kZoomStep = 2.0;|kZoomStep = 1.0;|plugin/Source/UiWavePage.cpp|layout
+editor-zoom-in-out|[](WaveEditView& v) { v.zoomBy(1.0 / kZoomStep); }|[](WaveEditView& v) { v.zoomBy(kZoomStep); }|plugin/Source/UiWavePage.cpp|layout
+editor-zoom-left|zoomAbout(wave().getCentreX(), wider);|zoomAbout(wave().getX(), wider);|plugin/Source/UiWaveEdit.cpp|layout
+editor-zoom-fit-first|    first_ = 0;\n    span_ = frames_;|    span_ = frames_;|plugin/Source/UiWaveEdit.cpp|layout
+editor-zoom-least|std::max(1L, (long)w.getWidth())|std::max(1L, (long)w.getWidth() / 4)|plugin/Source/UiWaveEdit.cpp|layout
+editor-zoom-wheel-middle|zoomAbout(e.position.x, std::pow|zoomAbout(wave().getCentreX(), std::pow|plugin/Source/UiWaveEdit.cpp|layout
+editor-zoom-unsaid|    setText(shown_, views_[(size_t)osc_]->shown());|    ;|plugin/Source/UiWavePage.cpp|layout
+editor-zoom-said-late|            refresh();   // the line says|            ;   // the line says|plugin/Source/UiWavePage.cpp|layout
+editor-zoom-unplaced|        onLine_[b]->setBounds(line.removeFromRight(kButtonDefs[b].width));|        ;|plugin/Source/UiWavePage.cpp|layout
+editor-key-unplaced|    key_.setBounds(body.removeFromBottom(kKeyH));|    ;|plugin/Source/UiWavePage.cpp|layout
+editor-key-undrawn|        WaveEditView::paintMark(g, it.mark, it.swatch);|        ;|plugin/Source/UiWavePage.cpp|layout
+editor-key-handle-other|        paintMark(g, markOf(p), handle(p));|        paintMark(g, Mark::edit, handle(p));|plugin/Source/UiWaveEditPaint.cpp|layout
+editor-key-loop-white|        case Mark::loop: return Look::mod;|        case Mark::loop: return Look::text;|plugin/Source/UiWaveEditPaint.cpp|layout
+editor-key-current-start|        case Mark::current: return Look::label;|        case Mark::current: return Look::accent;|plugin/Source/UiWaveEditPaint.cpp|layout

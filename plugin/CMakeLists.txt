@@ -264,7 +264,7 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorWavePageTest.cpp Tests/EditorWaveCutTest.cpp
-             Tests/EditorWaveEventTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
+             Tests/EditorWaveEventTest.cpp Tests/EditorWaveZoomTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
              Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/EditorArpTest.cpp
              Tests/TestMain.cpp Tests/TestWave.cpp Tests/EditorLearnTest.cpp Tests/LayoutControls.cpp   # MIDI learn (v463)
              Tests/EditorLiveTest.cpp)   # the controls following MIDI's edits (v464)

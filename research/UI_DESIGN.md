@@ -167,7 +167,13 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   them: each a ▼ at the wave's top in `text`, Current a thin `label` line the wave's height (a click on the wave puts it
   there); Delete, Add, Next Event and Prev Event on the title line beside Revert and Truncate, Add and Delete at
   Current, Next and Prev moving it; the points' card gains Encode (the type) and Depth, the events' own. A refusal is
-  said on the status line in the XT's words ("Event Interval Too Narrow!").
+  said on the status line in the XT's words ("Event Interval Too Narrow!"). v484 (the user's word, 2026-11-28: the
+  handles' colours weren't plain, nor that the wheel zooms): at the right of the wave's line -, + and Fit (- and + by
+  two about the window's middle, through the wheel's own zoom) and the window shown, as the ruler counts it ("0.00 ms
+  to 2.000 s of 2.000 s"); under the wave a key, each mark as the view draws it, in its colour, then its name: Loop
+  Start, End (`mod`), Backward loop (`mod`, faint), Edit region: Truncate keeps it (`text`), Start Offset (`accent`),
+  Event (`text`, ▼), Current (`label`). The colours come from one table the view and the key both read
+  (`WaveEditView::colourOf`); the line is 22 high for its buttons, the key 16, both out of the wave's 340.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

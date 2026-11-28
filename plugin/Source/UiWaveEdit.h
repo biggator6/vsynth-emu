@@ -38,6 +38,18 @@ public:
     void toEvent(bool after);
     void addEvent();
     void deleteEvent();
+    // v484 (the user's word, 2026-11-28): the window `wider` times as wide about its middle, as the wheel zooms about
+    // the pointer; the whole wave; and the window shown, as the ruler counts it ("0.00 ms to 2.000 s of 4.000 s")
+    void zoomBy(double wider);
+    void fit();
+    juce::String shown() const;
+    // Each kind of mark on the wave, in the page's key's order (UiWaveEditPaint.cpp): its colour, the kind a point is,
+    // a mark drawn as the view draws it about `centre` (a handle, a line, an event's ▼), and the key's name for it
+    enum class Mark { loop, backward, edit, start, event, current, kMarks };
+    static juce::Colour colourOf(Mark m);
+    static Mark markOf(Point p);
+    static void paintMark(juce::Graphics& g, Mark m, juce::Point<float> centre);
+    static const char* nameOf(Mark m);
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -49,6 +61,7 @@ public:
 private:
     enum Watched : size_t { kStart, kLoop, kLoopMode, kLoopStart, kLoopEnd, kNone };
     static constexpr float kStrip = 16.0f, kRulerH = 18.0f;   // the handles' strips over and under the wave, the ruler
+    static constexpr float kMarkW = 8.0f, kMarkH = 7.0f;      // an event's ▼ (v481; moved here by v484 for paintMark)
 
     VSynthEmuProcessor& processor_;
     const int osc_;
@@ -72,6 +85,7 @@ private:
     Point nearest(juce::Point<float> at) const;
     void place(Point p, long frame);
     void setLoopEnd(size_t i, long frame, long frames);
+    void zoomAbout(float x, double wider);
     void makeColumns();
     void paintPoints(juce::Graphics&) const;
     void paintRuler(juce::Graphics&) const;
