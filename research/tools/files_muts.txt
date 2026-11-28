@@ -75,25 +75,36 @@ wavesave-low-word|kLowWordIs = 9;|kLowWordIs = 0;|wavesave
 wavesave-unmapped|    c.mapRam(kLowPage, kLowPageBytes);\n    c.wr32(kLowWord, kLowWordIs);|    ;|wavesave
 wavesave-data-at|kDataAt = 0x40|kDataAt = 0x1c|wavesave
 wavesave-bytes-at|kBytesAt = 0x1c|kBytesAt = 0x20|wavesave
-wavesave-list-rdmd|0x34, 0x40, 0x3c, 0x38 }|0x34, 0x3c, 0x40, 0x38 }|wavesave
-wavesave-vpno-vplp|0x28, 0x2c, 0x30, 0x34|0x28, 0x30, 0x2c, 0x34|wavesave
+wavesave-list-rdmd|{ 0x40, 0x8983142c }, { 0x3c,|{ 0x3c, 0x8983142c }, { 0x40,|wavesave
+wavesave-vpno-vplp|{ 0x2c, 0x89831378 }, { 0x30,|{ 0x30, 0x89831378 }, { 0x2c,|wavesave
 wavesave-list|c.wr32(kWaves + 4 * (kNumber & 0x7f), kEntry + kNode);|c.wr32(kWaves + 4, kEntry + kNode);|wavesave
 wavesave-node|kNode = 0x18|kNode = 0x1c|wavesave
 wavesave-vmdl-never|for (size_t k = XtWaveBlocks::kVmdl;|for (size_t k = XtWaveBlocks::kVpsc;|wavesave
 wavesave-blocks-order|"vpfl", "vmdl", "vpsc", "vpno", "vplp"|"vpfl", "vmdl", "vpsc", "vplp", "vpno"|wavefile
 # A band wave's bands made by rom.2's rebuild first (v483): the data block's samples' address never put or put
-# wrong, no room asked for, the rebuild never run or on the wrong wave (the override word at -1, so the number
-# finds it), its frames or channels read wrong
+# wrong, the rebuild never run or on the wrong wave (the override word at -1, so the number finds it).  v483's room
+# for the bands went in v487: the rebuild grows the data block itself, through the store's heap
 wavesave-samples-never|        if (data) c.wr32(at + kSamplesAt, at + kDataAt);|        ;|wavesave
 wavesave-samples-wrong|c.wr32(at + kSamplesAt, at + kDataAt)|c.wr32(at + kSamplesAt, at + kBytesAt)|wavesave
-wavesave-room-none|putBlocks(c, w, bandRoom(c, *vpsc))|putBlocks(c, w, 0)|wavesave
 wavesave-rebuild-never|    if (xtWaveHasBands((*vpsc)[1]) && !rebuildBands(c, why)) return false;|    ;|wavesave
 wavesave-rebuild-number|{ kRebuild.overrideWord, kNumber }|{ kRebuild.overrideWord, kNumber + 1 }|wavesave
-wavesave-frames-at|kFramesAt = 4|kFramesAt = 8|wavesave
-wavesave-mono|vpsc[kStereoAt] != 0 ? 2u : 1u|1u|wavesave
 # The loops set by rom.2's setter (v486): never set, a forward point set as a backward one, the end as the start, the
 # setter given another wave's number
 wavesave-loops-never|    if (edits.loops && !setLoops(c, *edits.loops, why)) return false;|    ;|wavesave
 wavesave-loops-fwd-as-bwd|{ l.loopStart, 0, 0 }|{ l.loopStart, 0, 1 }|wavesave
 wavesave-loops-end-as-start|{ l.loopEnd, 1, 0 }|{ l.loopEnd, 0, 0 }|wavesave
 wavesave-loops-number|    c.wr32(kLoopSet.numberWord, kNumber);|    c.wr32(kLoopSet.numberWord, kNumber + 1);|wavesave
+# Truncate by rom.2's edit engine (v487): never run, made for another wave, given its range the wrong way, its run
+# skipped; the blocks without their vtables or their entry; the store's heap unanswered, its resize or free; the
+# store's key not rom.2's; a band wave's Truncate let through
+wavesave-cut-never|    if (edits.cut && !truncate(c, *edits.cut, why)) return false;|    ;|wavesave
+wavesave-cut-other-wave|{ kEdit.engine, kWave, kEdit.truncate }|{ kEdit.engine, kWave + 1, kEdit.truncate }|wavesave
+wavesave-cut-swapped|{ kEdit.engine, from, to, from }|{ kEdit.engine, to, from, from }|wavesave
+wavesave-cut-unrun|kEdit { 0x894a8990, 0x894a8b80, 0x894a8c00,|kEdit { 0x894a8990, 0x894a8b80, 0x894a8c70,|wavesave
+wavesave-vtables-none|        c.wr32(at + kVtableAt, kBlockAt[k].vtable);|        ;|wavesave
+wavesave-entry-none|        c.wr32(at + kEntryAt, kEntry);|        ;|wavesave
+wavesave-heap-unanswered|    answerStoreHeap(c);|    ;|wavesave
+wavesave-heap-resize|    c.hook(kStoreHeap.resize,|    if (false) c.hook(kStoreHeap.resize,|wavesave
+wavesave-heap-free|    c.hook(kStoreHeap.free,|    if (false) c.hook(kStoreHeap.free,|wavesave
+wavesave-key-zero|kNumber = kWave + 3000;|kNumber = kWave;|wavesave
+wavesave-band-cut|    if (edits.cut && xtWaveHasBands((*vpsc)[1])) return fail(why, "a band wave's Truncate is open");|    ;|wavesave

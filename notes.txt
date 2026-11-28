@@ -738,6 +738,18 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+A saved wave's Truncate v487 (2026-11-28, on claude/wave-editor after v486; HARDWARE_FIRMWARE.md, "A saved wave's
+  Truncate by rom.2's edit engine"; d-8's second half): XtWaveEdits' cut, made on the store's entry by the XT's edit
+  engine as the edit screen's EXECUTE runs it (0x894a8990 Truncate's object for the wave, 0x894a8b80 the range,
+  0x894a8c00 run, 0x894a8c70 finish), before the loops are set. The store keys the wave 3000 as rom.2 does; each block
+  has its kind's vtable and its entry as rom.2's maker leaves them; the store heap's resize (in place) and free are
+  answered; the band rebuild now grows the data block itself (v483's room gone). xt_files' waves saved: 73 waves (all
+  but the band waves) their second quarter truncated, all as the law ({#wave-truncate-read}); the 5 band waves' refused,
+  [HW] open (rom.2 cuts the bands the load made in place over the samples). The XT's .wav import read too
+  ({#wave-import-read}). Plants: wavesave 28 (11 new), all caught, after the run showed the room, a ask's -4, an
+  in-place choice, the heap's makers and a resize's copy and size unneeded, taken out. fcheck +1 line on purpose; tone
+  --changed none; verify.sh clean.
+
 A saved wave's loops v486 (2026-11-28, on claude/wave-editor after v485; HARDWARE_FIRMWARE.md, "A saved wave's loops
   set by rom.2's setter"; d-8's second half): XtWaveEdits (new) for xtFwWaveFile, its loops set on the store entry by
   rom.2's loop setter (0x894a4e30: the vplp's word, the record marked, the cached loop events built again), as the

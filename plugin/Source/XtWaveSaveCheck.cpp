@@ -66,6 +66,8 @@ struct SaveTally {
     int lite = 0, solo = 0, bands = 0;   // of the XT's
     int stable = 0, most = 0;   // of the XT's band waves not back: saved again as first saved; the most a sample moved
     int looped = 0, loopsBack = 0;   // of those back, with a vplp: its loops set again (v486), and back so
+    int cut = 0, cutAsLaw = 0;       // of those back but band waves: truncated by rom.2 (v487), and as the law says
+    int bandCutRefused = 0;          // and of the band waves back, their Truncate refused (open)
 };
 
 // [FW] the vplp's four loop words, +4 … +0x10 (XtWaveFile.cpp's readLoops); spoiled to all ones, no frame count, so
@@ -82,7 +84,7 @@ bool loopsSetBack(const XtWaveBlocks& w, const std::vector<uint8_t>& file) {
     std::vector<uint8_t>& vplp = *cleared.bytes[XtWaveBlocks::kVplp];
     if (vplp.size() < kLoopWordsEnd) return false;
     std::fill(vplp.begin() + kLoopWordsAt, vplp.begin() + kLoopWordsEnd, kSpoilt);
-    const XtWaveEdits edits { XtWaveLoops { read.loopStart, read.loopEnd, read.bwdEnd, read.bwdStart } };
+    const XtWaveEdits edits { std::nullopt, XtWaveLoops { read.loopStart, read.loopEnd, read.bwdEnd, read.bwdStart } };
     std::vector<uint8_t> again;
     return xtFwWaveFile(cleared, again, nullptr, edits) && again == file;
 }
@@ -94,6 +96,48 @@ bool savesAgain(const std::vector<uint8_t>& written) {
     XtWaveBlocks again;
     std::vector<uint8_t> file;
     return xtWaveBlocksOf(written.data(), written.size(), again) && xtFwWaveFile(again, file) && file == written;
+}
+
+// A wave's second quarter kept by rom.2's Truncate (v487): whether the file written keeps the law read
+// ({#wave-truncate-read}): those frames' bytes, both ends; type LITE (vpsc byte 1, 0) with its frames the kept ones;
+// no vpno, vpdt or rdmd; the loops the whole wave; vmdl and LIST as they were.  Empty `why` when it does
+// A wave's second quarter, from its vpsc's frames (+4)
+XtWaveCut secondQuarter(const XtWaveBlocks& w) {
+    const auto& vpsc = *w.bytes[XtWaveBlocks::kVpsc];
+    const long frames = (long)(vpsc[4] | vpsc[5] << 8 | vpsc[6] << 16 | (uint32_t)vpsc[7] << 24);
+    return { frames / 4, frames / 2 };
+}
+
+std::string cutKeepsLaw(const XtWaveBlocks& w) {
+    XtWaveFile was;
+    std::vector<uint8_t> file;
+    std::string why;
+    const auto& data = w.bytes[XtWaveBlocks::kData];
+    const size_t frameBytes = (*w.bytes[XtWaveBlocks::kVpsc])[2] != 0 ? 4 : 2;
+    const XtWaveCut cut = secondQuarter(w);
+    if (!data || !xtFwWaveFile(w, file, &why, XtWaveEdits { cut, std::nullopt })) return why.empty() ? "no data" : why;
+    XtWaveBlocks cutBlocks;
+    if (!xtWaveBlocksOf(file.data(), file.size(), cutBlocks) || !xtWaveRead(file.data(), file.size(), was))
+        return "unread";
+    const long kept = cut.to - cut.from + 1;
+    const auto& got = *cutBlocks.bytes[XtWaveBlocks::kData];
+    const auto from = data->begin() + (long)frameBytes * cut.from;
+    if (got.size() != (size_t)kept * frameBytes)
+        return "kept " + std::to_string(got.size() / frameBytes) + " frames, not " + std::to_string(kept);
+    if (!std::equal(got.begin(), got.end(), from)) {
+        const std::vector<uint8_t> want(from, from + (long)got.size());
+        const Diff d = diffOf(got, want);
+        return "frames differ from byte " + std::to_string(d.first) + ", " + std::to_string(d.bytes) +
+               " bytes, by up to " + std::to_string(d.most) + ":" + d.words;
+    }
+    if ((*cutBlocks.bytes[XtWaveBlocks::kVpsc])[1] != 0 || was.frames != kept) return "type or length";
+    for (const size_t k : { XtWaveBlocks::kVpno, XtWaveBlocks::kVpdt, XtWaveBlocks::kRdmd })
+        if (cutBlocks.bytes[k]) return "an encode's block kept";
+    if (was.loopStart != 0 || was.loopEnd != kept - 1 || was.bwdEnd != kept - 1 || was.bwdStart != 0) return "loops";
+    if (cutBlocks.bytes[XtWaveBlocks::kVmdl] != w.bytes[XtWaveBlocks::kVmdl] ||
+        cutBlocks.bytes[XtWaveBlocks::kList] != w.bytes[XtWaveBlocks::kList])
+        return "vmdl or LIST";
+    return {};
 }
 
 // One wave written again: its tally, and where it differs printed when `first` and it is the XT's
@@ -118,6 +162,15 @@ void saveOne(const fs::path& path, bool first, SaveTally& t) {
         ++t.looped;
         t.loopsBack += loopsSetBack(w, bytes);
     }
+    if (same && !xtWaveHasBands(type)) {
+        ++t.cut;
+        const std::string cutWhy = cutKeepsLaw(w);
+        t.cutAsLaw += cutWhy.empty();
+        if (first && !cutWhy.empty()) std::printf("%s: Truncate: %s\n", path.filename().c_str(), cutWhy.c_str());
+    }
+    std::vector<uint8_t> cut;
+    const XtWaveEdits bandCut { secondQuarter(w), std::nullopt };
+    t.bandCutRefused += same && xtWaveHasBands(type) && !xtFwWaveFile(w, cut, nullptr, bandCut);
     if (!own || same) return;
     const Diff d = diffOf(file, bytes);
     if (xtWaveHasBands(type)) {
@@ -136,9 +189,10 @@ int xtWaveSaveCheck(const std::string& rom, bool first) {
     for (const fs::path& p : projectWaves(rom)) saveOne(p, first, t);
     std::printf("waves saved: %d of the projects' waves, %d unread; the XT's %d (%d LITE, %d SOLO, %d band) %d back as "
                 "their files, of the band waves not %d saved again the same, a sample moved by up to %d; the others "
-                "%d, %d back; loops set again by the XT's setter on %d, %d back\n",
+                "%d, %d back; loops set again by the XT's setter on %d, %d back; truncated by the XT's on %d, %d as "
+                "its law, the band waves' refused on %d\n",
                 t.waves, t.unread, t.xt, t.lite, t.solo, t.bands, t.xtSame, t.stable, t.most, t.others, t.othersSame,
-                t.looped, t.loopsBack);
-    return t.xt - t.xtSame + t.looped - t.loopsBack;
+                t.looped, t.loopsBack, t.cut, t.cutAsLaw, t.bandCutRefused);
+    return t.xt - t.xtSame + t.looped - t.loopsBack + t.cut - t.cutAsLaw;
 }
 #endif

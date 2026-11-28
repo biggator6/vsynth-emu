@@ -23,9 +23,15 @@ inline bool xtWaveHasBands(int type) {
 struct XtWaveLoops {
     long loopStart = 0, loopEnd = 0, bwdEnd = 0, bwdStart = 0;
 };
+// A Truncate's Edit Start and End, in frames, both kept (v487)
+struct XtWaveCut {
+    long from = 0, to = 0;
+};
 // What the session changes of a wave before it's saved, each set on the store's entry as the XT's own screens set it:
-// the loops by rom.2's loop setter (0x894a4e30, the Loop FWD and BWD screens', v486)
+// Truncate by rom.2's edit engine (the edit screen's, v487), then the loops by its loop setter (0x894a4e30, the Loop
+// FWD and BWD screens', v486), as the XT's screen sets them after a Truncate
 struct XtWaveEdits {
+    std::optional<XtWaveCut> cut;
     std::optional<XtWaveLoops> loops;
 };
 

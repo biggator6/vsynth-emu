@@ -1546,6 +1546,85 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A saved wave's Truncate by rom.2's edit engine (2026-11-28, v487) {#wave-writer-cut}
+
+d-8's second half, its fourth part: the session's Truncate made on the store's entry by the XT's own edit engine, as
+the edit screen's EXECUTE runs it, before the loops are set and the wave written. Read in {#wave-truncate-read}; the
+screen's calls (`0x89380e00`) read again for this.
+
+**How it runs.** As the screen does, with the screen's engine global (`*0x899687c4`) a few words of the harness's:
+`0x894a8990(engine, wave, 1)` makes Truncate's object (the one at `0x89cecf10`, built by `0x894a9d00` from the store's
+entry for key wave + 3000: its audio through the data block's +0x1c, its frames, channels and type), `0x894a8b80(engine,
+Edit Start, Edit End, Current)` gives it the range (1; -2 refused; -4, where the screen asks CANCEL or EXECUTE, which
+none of the waves here answers, is taken as refused), `0x894a8c00` runs it and `0x894a8c70` finishes it. So that rom.2
+can run it on the harness's entry:
+- the store keys the wave 3000 (wave 0), as rom.2 keys wave n (n + 3000): the writer, setter and rebuild take the key,
+  Truncate's object the wave;
+- each block as rom.2's maker leaves it (`0x894a0c50`): its kind's vtable at +0x14 (vmdl `0x89831330`, vpsc
+  `0x89831354`, vpno `0x89831378`, vplp `0x8983139c`, vpdt `0x898313c0`, data `0x898313e4`, rdmd `0x89831408`, LIST
+  `0x8983142c`; each kind's destructor at the vtable's +0x14, which the drop of the encode calls) and its entry at +0x18;
+- the store's own heap's resize and free answered (`0x8949e540(block, header, size)`, `0x8949e460(block)`): Truncate's
+  resize of the data block and drop of the encode, and the band rebuild's grow of the data block, which v483 had sized
+  ahead of it, gone now. A resize is in place, the block given back, as the store's heap grows a chunk into the space
+  after it (`0x8949dc10`): its callers keep the block they had (`0x894a1ce0` drops what the resize returns). The
+  harness puts the data block last, so it has the free memory after it. The plants showed the rest of the heap
+  unneeded: with its block makers (`0x8949e410`, `0x8949e440`) answered or not, a resize made anew with its bytes or
+  without, its size written or not, every file is the same (where Truncate's backup of the audio for Undo goes, if
+  anywhere, wasn't followed).
+
+**The check.** `xt_files`' `waves saved:` line: every wave that comes back, but the band waves, its second quarter kept
+by rom.2's Truncate, then written: the 73 keep the law, those frames' bytes both ends kept, type LITE with the kept
+frames, no vpno, vpdt or rdmd, the loops the whole wave, vmdl and LIST as they were.
+
+**The band waves** [HW] open: on the 5 that come back, rom.2's Truncate keeps the right length but not their samples,
+something like the lowest band (belleville_1: 1 where the file has 682). The load's rebuild makes the bands in place
+over the samples (its load device given the samples' address as both source and target) and puts their pointers over
+the data block's +0x1c, through which Truncate's object takes its audio. Whether the XT does the same, or its SAMPLE
+screens unpack a band wave first, a capture would say (a band wave truncated on the XT and saved). Till then
+`xtFwWaveFile` refuses a cut on a band wave, and the check counts the 5 refused.
+
+### The XT's .wav import, read (2026-11-28, for the import's version) {#wave-import-read}
+
+For d-8's second half, a plain .wav made a wave of the store as the XT's SAMPLE Import makes one. Read statically in
+rom.2 (Ghidra on scratch, never committed; a subagent's read, its notes kept here in our words).
+
+**The calls.** Import Files is a task (`0x8948dff0`): for each chosen file the next free number n (key n + 2999,
+1-based), then `0x894970b0(folder, index, n)`, which builds the path and picks the loader by the extension (wav
+`0x894939d0`, aif `0x89495580`, vpw `0x89494620`, w00 `0x89494e00`), then marks the wave changed (`0x8949fc90(key,
+1)`). A project's load (`0x89496e30`) calls the same loaders. So `0x894939d0(path, key)` is the one .wav loader, a
+plain file's import and an XT file's load alike: 1, or -60 (open, stat), -35 (the store full), -36, -38 (channels not
+1 or 2), -39 (not PCM, no WAVE, bits not 8, 16, 24 or 32), -90 (shorter than its chunks), -95 (a seek that lands
+elsewhere). No UI or kernel wait in it; those are the task's.
+
+**Its OS calls** (rom.2's wrappers, each over a kernel thunk): open `0x89484820(path, 0)`, stat `0x894847d0(fd, buf)`
+(word 0 the size), read `0x894848b0(fd, buf, n)` (the count), seek `0x89484970(fd, offset, whence)` (0 set, 1 current;
+it must return the new position, which the loader compares), close `0x89484860(fd)`; fd 100 and 200 are the Z: and V:
+drives, so any other. Besides: the base name (`0x88008c90`), a display text (`0x88008a90`), the store heap's lock
+(`0x88008000`, `0x88008010`).
+
+**What it makes.** Any wave at the key deleted, an entry made and named (the file's base name less an "NNN " prefix, 12
+characters at most). Each chunk by its tag a block of its kind (vpfl dropped; vmdl 1, vpsc 2, vpno 3, vplp 4, vpdt 5,
+LIST 6, rdmd 7, data 8; others, `smpl` among them, skipped) through the loaders' block maker (`0x894a3490` →
+`0x894a0c50`), fed 256 bytes at a time. A LIST is the file's own, copied, or none: the import never writes "V-Synth
+Ver.". With no vpno or vpdt (a plain file) it makes the defaults (`0x894a27c0`): vpsc of 0x20 bytes, [0] 0x0a, [1] 0
+(LITE), [2] stereo, [3] 1, +4 the frames at 44.1 kHz, +8 0xabe0, [0xa] 0x3c, [0xb] 4, [0xe] 0x21, +0x14 the frames ×
+16, +0x1c 0x124f80, [0xc] and [0xd] not written (the heap's leftovers), the rest 0; vplp of 0x1c bytes, +8 and +0xc the
+last frame, the modes +0x18, +0x19, +0x1a 1, the rest 0. The project's `005` and `006 sine_400hz_r.wav`, imports the
+XT saved, are those byte for byte, [0xc..0xd] "00 80" and "ef ef". The finish (`0x894a3630`) sets type 0 and builds
+LITE's cached loop events; no encode: that is Encode's Execute (`0x894a90b0` → `0x894ab270`). The XT's own encoded
+files have vpsc [0] 0x0b and the LIST "V-Synth Ver.": not the import's, nor the writer's.
+
+**The samples.** frames = ftrc((44100.0f / rate) × frames), in single precision, into vpsc whatever the converter
+gives. 16 bits at 44.1 kHz are copied; else the converter (vtable `0x89831714`, `0x8952df40`): 8 bits (b - 128) << 8,
+24 and 32 bits their top two bytes, another rate through the resampler, then 256 zero samples after (`0x8952e1c0`);
+the data block (44100 / rate) × the 16-bit bytes + 2048. Stereo stays interleaved; a format other than 1 (float,
+EXTENSIBLE) is refused.
+
+**On a fresh machine** the store is made first (`0x894a0840(&override)`: the lists, the override -1, the wave heap,
+48 MB from the pool), and RAM must hold the statics it uses (the builder `0x89ce8a00`, the device `0x89cecf70`, the
+resampler's `0x8a0154f0`). The project's `003 sine_400hz_r.wav` and `004 solo_male_aa.wav`, the XT's SOLO encodes of
+`sine_400hz_raw.wav` and `solo_male_aah_raw.wav` beside them, are the reference for an import then an encode.
+
 ### A saved wave's loops set by rom.2's setter (2026-11-28, v486) {#wave-writer-loops}
 
 d-8's second half, its third part: a wave's loop points set on its store entry as the XT's Loop FWD and BWD screens
@@ -1639,7 +1718,8 @@ it is given when that word is 0 or more.
 
 **How it runs.** `xtFwWaveFile` puts the data block as its constructor leaves it (its +0x1c its samples' address) and,
 for a band wave, with the room rom.2 asks (`0x89527980` run on the vpsc's frames and channels, its +0x1e and +0x20 as
-the rebuild reads them), as the rebuild's grow would leave it, so the XT's heap isn't needed; the override word at -1,
+the rebuild reads them), as the rebuild's grow would leave it, so the XT's heap isn't needed (v487: gone, the
+rebuild growing it itself through the store's heap, which the machine answers now); the override word at -1,
 so the number finds the wave (the machine's RAM starts at 0, which would find wave 0 whatever the number); then the
 rebuild on the entry (1), then the writer as in v482. The load device is given the pool's calloc but calls it for none
 of the waves here, so the machine doesn't answer it: a wave whose load does would fail at the kernel's lock
