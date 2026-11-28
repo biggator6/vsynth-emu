@@ -4430,7 +4430,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
   button's drag finds the mouse over nothing and lets the button up, and JUCE counts no event as a drag unless told:
   a click, then a drag it counts, across as well as up, caught both.
 
-### Session 30 (2026-11-27 to 11-28) — v478 to v491: the WAVE page and the XT's own wave writer
+### Session 30 (2026-11-27 to 11-28) — v478 to v492: the WAVE page and the XT's own wave writer
 
 - The coordinator's brief: research/NEXT_ISSUES.md items 5 and 6, Start Offset in time and a wave display to edit
   start, end, loops and events, so V-Producer isn't needed. The user took all four recommendations (d-7 ms then s;
@@ -4467,5 +4467,9 @@ Round-2 recordings.  First build-out after that: real-time granular port
 - Save Wave (v489, v491) gives the session to that chain: the cut, the loops, and the encode the synth plays with its
   event edits, the saved events the same as the plugin's own encode plays. Plants again shaped the checks: the depth
   given the encode no test wave here shows, and an older XT's file was needed to show a needless re-encode.
+- The user asked whether a wave truncated before it is encoded comes out right. v492 checks it in both places. In
+  xt_files the raw files are cut, encoded BACKING and ENSEMBLE, and come out of the type asked with the kept frames.
+  In the plugin, an older XT's SOLO wave that is cut is saved encoded again, not with its own encode. The band
+  types' "(the wave's own)" status was too long for the header, and the layout check caught it.
 - Open for captures from the user's XT: Synth006's frames a step off, a band wave's Truncate (refused meanwhile), and
   the app's version an encode writes.

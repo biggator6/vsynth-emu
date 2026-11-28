@@ -738,6 +738,15 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+A wave cut, then encoded v492 (2026-11-28, on claude/wave-editor after v491; HARDWARE_FIRMWARE.md, "A wave cut, then
+  encoded"; the user's "Yes, add it"): xt_files' waves imported: each plain file cut to its second quarter by rom.2's
+  Truncate, then encoded BACKING and ENSEMBLE by its Encode EXECUTE: 6 of 6 of the type asked with the kept frames;
+  saved again, the 3 BACKING the same, the ENSEMBLE ones a step off (+-1, Synth006's, [HW] open). EditorWaveSaveTest:
+  a plain wave encoded ENSEMBLE and cut, saved ENSEMBLE with the kept frames, loaded back as its own; an older XT's
+  SOLO wave played SOLO and cut, saved SOLO with the kept frames, not its own encode. The own type's status "(its own)",
+  not "(the wave's own)", which the header cut short for the band types. The editor 5492/5492. Plants: see the
+  version's commit.
+
 Save Wave writes what plays v491 (2026-11-28, on claude/wave-editor after v490; HARDWARE_FIRMWARE.md, "Save Wave writes
   the encode the synth plays"; d-8's file): PluginWaveEdits::save asks the encode the session plays (its type, the
   OSC's Encode Depth, its event edits) of rom.2's Encode EXECUTE on the stored wave (v490), none where the wave plays

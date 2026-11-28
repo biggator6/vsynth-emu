@@ -26,7 +26,11 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
   echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as LITE" && n=$((n+1)); done; done; echo "LITE waves, plugintest: $n/4 bit-identical"; [ $n = 4 ] || rc=1; }
 # A project's SOLO wave with attacks on its own events (Tribal1, 7), with STEP and EVENT
 [ $BUILT = 1 ] && { n=0; for m in 2 3; do o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "analysis/projects/Emu_test.prj/Wave/346 Tribal1.wav" 60 auto 2>&1)
-  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "Encoded as SOLO (the wave's own)" && n=$((n+1)); done; echo "SOLO events, plugintest: $n/2 bit-identical"; [ $n = 2 ] || rc=1; }
+  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" \
+      && echo "$o" | grep -q "Encoded as SOLO (its own)" && n=$((n+1))
+  done
+  echo "SOLO events, plugintest: $n/2 bit-identical"
+  [ $n = 2 ] || rc=1; }
 # Waves on their stored vpdt: BACKING, ENSEMBLE and SOLO (373, whose stored records aren't the XT's encode; VP9SAMnoise1, its events between
 # samples and its stream's own terminator, under EVENT; preset 270, its records short of its last event and a segment off their sum, under
 # EVENT), and preset 270 with a terminator too short to reach its last event, encoded again on its own events, under EVENT
@@ -34,7 +38,9 @@ bash "$D/ab.sh" "${1:-HEAD}" || rc=1
   for wm in "376 Synth014.wav:0:played" "362 Synth006.wav:3:played" "373 SynthFX002.wav:0:played" "002 VP9SAMnoise1.wav:3:played" "$WORK/verify_270.vpw:3:played" "$WORK/verify_270t.vpw:3:encoded"; do
   f=${wm%%:*}; m=${wm#*:}; m=${m%%:*}; [ "${f#/}" = "$f" ] && f="analysis/projects/Emu_test.prj/Wave/$f"
   o=$(cd "$REPO" && TEST_PLAYBACK=$m TEST_NOTE2="64,30000" build/plugin/VSynthEmuTest "$ROM" "$f" 60 auto 2>&1)
-  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "(the wave's own)" && echo "$o" | grep -q "the wave's own vpdt: ${wm##*:}" && n=$((n+1)); done
+  echo "$o" | grep -q "plugin - XtSynth| = 0 (first at frame -1)" && echo "$o" | grep -q "(its own)" \
+      && echo "$o" | grep -q "the wave's own vpdt: ${wm##*:}" && n=$((n+1))
+  done
   echo "stored waves, plugintest: $n/6 bit-identical"; [ $n = 6 ] || rc=1; }
 # A test of this build, run in the checkout: its last line, and the run fails as it does.  VAR=value first goes to its
 # environment.

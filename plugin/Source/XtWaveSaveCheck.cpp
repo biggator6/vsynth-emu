@@ -30,25 +30,9 @@ std::vector<uint8_t> xtFileBytes(const fs::path& path) {
     return { std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>() };
 }
 
-namespace {
-// [FW] the software rom.2 names in a wave's LIST (0x897a8208): a wave whose LIST has it, the XT wrote
-constexpr std::string_view kXtSoftware = "V-Synth Ver.";
-
-bool xtWrote(const XtWaveBlocks& w) {
-    const auto& list = w.bytes[XtWaveBlocks::kList];
-    return list && std::search(list->begin(), list->end(), kXtSoftware.begin(), kXtSoftware.end()) != list->end();
-}
-
-// How two files differ, for XT_FILES_FIRST: the first and last byte that do, how many, and the most two 16-bit words
-// at an even byte differ by (a sample, where the data is)
-struct Diff {
-    size_t first = 0, last = 0, bytes = 0;
-    int most = 0;
-    std::string words;   // the first few that differ: at, a's, b's
-};
-Diff diffOf(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+XtFileDiff xtFileDiff(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
     constexpr int kWordsShown = 6;
-    Diff d;
+    XtFileDiff d;
     d.first = (size_t)(std::mismatch(a.begin(), a.end(), b.begin(), b.end()).first - a.begin());
     const size_t n = std::min(a.size(), b.size());
     int shown = 0;
@@ -64,6 +48,15 @@ Diff diffOf(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
             d.words += " " + std::to_string(w) + ":" + std::to_string(x) + "/" + std::to_string(y);
     }
     return d;
+}
+
+namespace {
+// [FW] the software rom.2 names in a wave's LIST (0x897a8208): a wave whose LIST has it, the XT wrote
+constexpr std::string_view kXtSoftware = "V-Synth Ver.";
+
+bool xtWrote(const XtWaveBlocks& w) {
+    const auto& list = w.bytes[XtWaveBlocks::kList];
+    return list && std::search(list->begin(), list->end(), kXtSoftware.begin(), kXtSoftware.end()) != list->end();
 }
 
 struct SaveTally {
@@ -138,7 +131,7 @@ std::string cutKeepsLaw(const XtWaveBlocks& w, const std::vector<uint8_t>& bytes
         return "kept " + std::to_string(got.size() / frameBytes) + " frames, not " + std::to_string(kept);
     if (!std::equal(got.begin(), got.end(), from)) {
         const std::vector<uint8_t> want(from, from + (long)got.size());
-        const Diff d = diffOf(got, want);
+        const XtFileDiff d = xtFileDiff(got, want);
         return "frames differ from byte " + std::to_string(d.first) + ", " + std::to_string(d.bytes) +
                " bytes, by up to " + std::to_string(d.most) + ":" + d.words;
     }
@@ -183,7 +176,7 @@ void saveOne(const fs::path& path, bool first, SaveTally& t) {
     const XtWaveEdits bandCut { secondQuarter(w), std::nullopt };
     t.bandCutRefused += same && xtWaveHasBands(type) && !xtFwWaveFile(bytes, cut, nullptr, bandCut);
     if (!own || same) return;
-    const Diff d = diffOf(file, bytes);
+    const XtFileDiff d = xtFileDiff(file, bytes);
     if (xtWaveHasBands(type)) {
         t.stable += !file.empty() && savesAgain(file);
         t.most = std::max(t.most, d.most);

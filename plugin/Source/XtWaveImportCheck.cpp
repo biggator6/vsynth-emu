@@ -19,12 +19,42 @@ constexpr std::string_view kSoftware = "V-Synth Ver.";
 constexpr size_t kVersionBytes = 4;
 // [HW] the depth the user's XT encoded 003 and 004 at isn't in their files; any keeping no attack gives their 2 events
 constexpr int kSoloDepth = 64;
-constexpr int kLite = 0, kSolo = 1;
+constexpr int kLite = 0, kSolo = 1, kBacking = 3, kEnsemble = 5;
 
 struct ImportTally {
     int files = 0, imported = 0, encoded = 0, lite = 0, liteSame = 0, solo = 0, soloSame = 0;
     int added = 0, addedBack = 0;   // an event added halfway: one more; added and deleted again: as with none
+    int bands = 0, bandsCut = 0, bandsBack = 0;   // cut then band-encoded (v492): as asked; saved again the same
+    int bandsMost = 0;                            // and of those not, the most a sample moved
 };
+
+// A wave cut to its second quarter by rom.2's Truncate, then encoded BACKING and ENSEMBLE by its Encode EXECUTE, as
+// the XT's screens make them in that order (v492; no file of the XT's to hold them to): each of that type with the
+// kept frames; and saved again from what was written, the same (a band wave's samples come out of its bands, which a
+// load makes again from them: Synth006's a step off, v483)
+void cutsThenBands(const std::vector<uint8_t>& raw, long frames, ImportTally& t, const fs::path& path, bool first) {
+    const XtWaveCut cut { frames / 4, frames / 2 };
+    for (const int type : { kBacking, kEnsemble }) {
+        std::vector<uint8_t> file, again;
+        std::string why;
+        XtWaveFile read;
+        ++t.bands;
+        const XtWaveEdits edits { cut, std::nullopt, XtWaveEncode { type, kSoloDepth, {} } };
+        if (!xtFwWaveFile(raw, file, &why, edits) || !xtWaveRead(file.data(), file.size(), read)) {
+            if (first) std::printf("%s: not cut and encoded %d: %s\n", path.filename().c_str(), type, why.c_str());
+            continue;
+        }
+        t.bandsCut += read.encodeType == type && read.frames == cut.to - cut.from + 1;
+        const bool back = xtFwWaveFile(file, again) && again == file;
+        t.bandsBack += back;
+        if (back || again.empty()) continue;
+        const XtFileDiff d = xtFileDiff(again, file);
+        t.bandsMost = std::max(t.bandsMost, d.most);
+        if (first)
+            std::printf("%s: cut, encoded %d, saved again: %zu bytes differ, words by up to %d\n",
+                        path.filename().c_str(), type, d.bytes, d.most);
+    }
+}
 
 // [FW] the vpno's count of events, at +4 (0x89515b40)
 constexpr size_t kVpnoCountAt = 4;
@@ -91,9 +121,10 @@ void importOne(const fs::path& raw, const std::vector<fs::path>& waves, ImportTa
     const std::vector<uint8_t> bytes = xtFileBytes(raw);
     std::vector<uint8_t> file;
     std::string why;
-    if (xtFwWaveFile(bytes, file, &why)) {
+    if (XtWaveFile imported; xtFwWaveFile(bytes, file, &why) && xtWaveRead(file.data(), file.size(), imported)) {
         ++t.imported;
         holdTo(file, kLite, waves, t.lite, t.liteSame);
+        cutsThenBands(bytes, imported.frames, t, raw, first);
     } else if (first) {
         std::printf("%s: not imported: %s\n", raw.filename().c_str(), why.c_str());
     }
@@ -115,8 +146,11 @@ int xtWaveImportCheck(const std::string& rom, bool first) {
     std::printf("waves imported: %d plain files beside the projects' waves, %d imported by the XT's loader, written as "
                 "the projects' %d LITE imports of them: %d the same but the 2 bytes the import never writes; %d "
                 "encoded SOLO by the XT's Encode, as its %d SOLO encodes of them: %d the same but the app's version; "
-                "an event added halfway on %d, one more and added then deleted as none on %d\n",
-                t.files, t.imported, t.lite, t.liteSame, t.encoded, t.solo, t.soloSame, t.added, t.addedBack);
-    return t.lite - t.liteSame + t.solo - t.soloSame + t.added - t.addedBack;
+                "an event added halfway on %d, one more and added then deleted as none on %d; cut then encoded "
+                "BACKING and ENSEMBLE %d times, %d of the type with the kept frames, %d saved again the same, the "
+                "others' samples moved by up to %d\n",
+                t.files, t.imported, t.lite, t.liteSame, t.encoded, t.solo, t.soloSame, t.added, t.addedBack, t.bands,
+                t.bandsCut, t.bandsBack, t.bandsMost);
+    return t.lite - t.liteSame + t.solo - t.soloSame + t.added - t.addedBack + t.bands - t.bandsCut;
 }
 #endif

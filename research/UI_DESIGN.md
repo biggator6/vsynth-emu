@@ -183,6 +183,8 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   the XT writes one, with the session's Truncate and loops, the status line saying what came of it ("OSC 1: Saved …",
   or why not). v491: what it writes is what the synth plays, the encode the session made (its type, depth and event
   edits) made again by the XT's own Encode on the stored wave where the file's own isn't it.
+  v492: a wave cut is saved encoded again as it plays, its own encode not kept; a wave played as its own says
+  "Encoded as X (its own)", short enough for the header's status line with ENSEMBLE, the longest.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

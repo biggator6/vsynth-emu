@@ -72,6 +72,25 @@ void savesCut(WavePage& page, WaveEditView& v, VSynthEmuProcessor& p, const juce
           "the saved cut loaded back doesn't play its kept frames");
 }
 
+// v492: the older XT's SOLO wave played SOLO (Encode Type) and truncated on the page, which the synth then plays as the
+// cut encoded SOLO (the XT's Truncate makes it LITE, its Encode SOLO again), saved: SOLO with the kept frames, not its
+// own encode's file cut
+void savesOwnCut(VSynthEmuProcessor& p, const juce::File& older, TestChecks& check) {
+    constexpr float kSoloChoice = 1.0f;
+    constexpr int kSolo = 1, kBwdMode = 1;
+    setParam(p, Params::kEncodeType, kSoloChoice);
+    p.loadFile(older, 0);
+    if (!comesToSay(p, "Encoded as SOLO")) return check(false, "the older XT's wave isn't encoded SOLO");
+    check(PluginWaveEdits::truncate(p, 0, kKeepFrom, kKeepTo, kBwdMode), "the older XT's wave's Truncate is refused");
+    waitFor([&] { return !saysNow(p, "Encoding"); });
+    XtWaveFile read;
+    std::vector<uint8_t> bytes;
+    check(savedAs(p, older.getSiblingFile("saved_own_cut.wav"), read, bytes),
+          "the cut older XT's wave isn't saved: " + p.getStatusText().toStdString());
+    check(read.encodeType == kSolo && read.frames == kKeepTo - kKeepFrom + 1,
+          "the older XT's wave, cut and played SOLO, isn't saved SOLO with the kept frames");
+}
+
 // v491: a SOLO wave of an older XT's (the saved one, its LIST's app version "2.01", as the user's project's are) loaded,
 // played as its own (Encode Type Auto) and saved: the same file, its own encode kept (made again, it would say this
 // image's version)
@@ -85,10 +104,11 @@ void keepsOwn(VSynthEmuProcessor& p, std::vector<uint8_t> older, const juce::Fil
     olderFile.replaceWithData(older.data(), older.size());
     setParam(p, Params::kEncodeType, kAuto);
     p.loadFile(olderFile, 0);
-    check(comesToSay(p, "the wave's own"), "the older XT's wave doesn't play as its own SOLO");
+    check(comesToSay(p, "(its own)"), "the older XT's wave doesn't play as its own SOLO");
     XtWaveFile read;
     std::vector<uint8_t> bytes;
     check(savedAs(p, again, read, bytes) && bytes == older, "saved as its own, an older XT's encode isn't kept");
+    savesOwnCut(p, olderFile, check);
 }
 
 // v491: the plain wave encoded SOLO, an event added in its widest gap (where the XT takes one), saved: SOLO, its events
@@ -120,6 +140,34 @@ void savesEncode(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folde
     keepsOwn(p, bytes, folder, check);
 }
 
+// v492: a wave encoded ENSEMBLE (Encode Type) and truncated on the page, which the synth plays as the cut encoded
+// ENSEMBLE, saved: ENSEMBLE with the kept frames (cut, then encoded, as the XT's screens make them); loaded back, its
+// own ENSEMBLE with as many frames.  ENSEMBLE, not BACKING: its status is the longest the header shows
+void savesCutBands(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check) {
+    constexpr float kEnsembleChoice = 3.0f, kAuto = 0.0f;
+    constexpr int kEnsemble = 5, kBwdMode = 1;
+    setParam(p, Params::kEncodeType, kEnsembleChoice);
+    auto* page = pageWithWave(ed, p, folder, kWaveSeconds, check);
+    if (page == nullptr || !comesToSay(p, "Encoded as ENSEMBLE"))
+        return check(false, "the wave isn't encoded ENSEMBLE");
+    check(PluginWaveEdits::truncate(p, 0, kKeepFrom, kKeepTo, kBwdMode), "the page's Truncate is refused");
+    waitFor([&] { return !saysNow(p, "Encoding"); });
+    const long kept = kKeepTo - kKeepFrom + 1;
+    const juce::File to = folder.getChildFile("saved_ensemble.wav");
+    XtWaveFile read;
+    std::vector<uint8_t> bytes;
+    check(savedAs(p, to, read, bytes), "the cut ENSEMBLE wave isn't saved: " + p.getStatusText().toStdString());
+    check(read.encodeType == kEnsemble && read.frames == kept, "the saved cut isn't ENSEMBLE with the kept frames");
+    setParam(p, Params::kEncodeType, kAuto);
+    p.loadFile(to, 0);
+    check(comesToSay(p, "(its own)"), "the saved cut doesn't play as its own ENSEMBLE");
+    check(waitFor([&] {
+              page->refresh();
+              return page->view(0).frames() == kept;
+          }),
+          "the saved cut loaded back doesn't play its kept frames");
+}
+
 } // namespace
 
 void waveSaveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check) {
@@ -132,5 +180,6 @@ void waveSaveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& fo
     savesLoops(page->view(0), p, to, check);
     savesCut(*page, page->view(0), p, to, check);
     savesEncode(ed, p, folder, check);
+    savesCutBands(ed, p, folder, check);
     setParam(p, Params::kEncodeType, kAuto);
 }

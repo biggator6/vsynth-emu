@@ -1546,6 +1546,34 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A wave cut, then encoded (2026-11-28, v492) {#wave-cut-then-encode}
+
+The user's question: does a wave truncated before it is encoded come out right? On the XT the screens go in that
+order: Truncate makes a wave LITE ({#wave-truncate-read}), and its Encode then encodes what was kept. The writer
+(`xtFwWaveFile`) does the same: the cut on the wave as loaded, then the loops, then the encode. Its band-wave guard
+reads the type of the wave as loaded (LITE here), so the cut is allowed.
+
+**xt_files' waves imported line** now also cuts each of the 3 plain files to its second quarter with rom.2's
+Truncate, encodes it BACKING and then ENSEMBLE with its Encode EXECUTE, and writes it:
+- All 6 come out of the type asked with the kept frames.
+- Saved again from what was written, the 3 BACKING files are the same byte for byte.
+- The 3 ENSEMBLE files differ by ±1 in a few samples (26, 26 and 2 bytes). This is the band rebuild's step of
+  Synth006 ({#wave-writer-bands}), still [HW] open.
+The XT has no file to hold these to, so they are held to their own type and length.
+
+**The plugin** (`EditorWaveSaveTest.cpp`):
+- A plain wave encoded ENSEMBLE and truncated on the page is saved as ENSEMBLE with the kept frames. Loaded back, it
+  plays as its own ENSEMBLE with as many frames.
+- An older XT's SOLO wave played SOLO and truncated is saved as SOLO with the kept frames. Its own encode is not kept,
+  because a cut means encoding again, as the XT's Truncate makes it LITE.
+
+The status wording changed. The own type's status was "Encoded as X (the wave's own)", and the header's status line
+cut the band types' version short. It is now "(its own)", as short as "(auto)". ENSEMBLE's is the longest, which is
+why the plugin check uses it.
+
+Still open: Truncate on a wave already encoded with bands (the file's own BACKING or ENSEMBLE, loaded and cut) is
+refused ([HW], {#wave-writer-cut}). Only the order the XT's screens use, cut and then encode, is reproduced.
+
 ### Save Wave writes the encode the synth plays (2026-11-28, v491) {#wave-save-encode}
 
 Save Wave (v489) given v490's encode: a saved wave is what the synth plays. `PluginWaveEdits::save` asks the encode

@@ -576,3 +576,7 @@ editor-save-unwritten|        if (!to.replaceWithData(file.data(), file.size()))
 editor-save-no-encode|    edits.encode = encodeOf(played, own, kept, depth);|    ;|plugin/Source/PluginWaveSave.cpp|layout
 editor-save-own-again|    const bool asItsOwn = played == own && !kept.cut && kept.events.empty();|    const bool asItsOwn = false;|plugin/Source/PluginWaveSave.cpp|layout
 editor-save-no-events|XtWaveEncode { played, depth, kept.events }|XtWaveEncode { played, depth, {} }|plugin/Source/PluginWaveSave.cpp|layout
+# A cut then encoded (v492): the file's own encode kept though it's cut (an older XT's SOLO wave cut and played SOLO),
+# the own encode's status too long for the header (ENSEMBLE's, the longest).
+editor-save-own-cut|    const bool asItsOwn = played == own && !kept.cut && kept.events.empty();|    const bool asItsOwn = played == own && kept.events.empty();|plugin/Source/PluginWaveSave.cpp|layout
+editor-status-own-long|" (its own)"|" (its own) as its file"|plugin/Source/PluginEncodes.cpp|layout

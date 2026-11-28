@@ -113,3 +113,7 @@ wavesave-encode-no-job|    ran = ran && (!queued \|\| c.call(kEncode.job, { c.rd
 wavesave-encode-no-detect|    ran = ran && c.call(kEncode.detect, { kEncode.screen, depth }, xtfw::kStack);\n    for|    for|wavesave
 wavesave-encode-queue|    c.hook(kEncodeJob.queue, [](Sh4& s) { s.ret(0); });|    ;|wavesave
 wavesave-encode-add-delete|edit.add ? kEncode.add : kEncode.remove|edit.add ? kEncode.remove : kEncode.add|wavesave
+# A cut then encoded (v492), by xt_files' waves imported: line's cut then encoded BACKING and ENSEMBLE: the band
+# wave's Truncate refused by the type asked, not the wave's; the encode made before the cut.
+wavesave-band-cut-asked|    if (edits.cut && xtWaveHasBands((int)type)) return|    if (edits.cut && xtWaveHasBands(edits.encode ? edits.encode->type : (int)type)) return|wavesave
+wavesave-encode-before-cut|    if (edits.cut && !truncate(c, *edits.cut, why)) return false;|    if (edits.encode && !encode(c, *edits.encode, why)) return false;\n    if (edits.cut && !truncate(c, *edits.cut, why)) return false;|wavesave

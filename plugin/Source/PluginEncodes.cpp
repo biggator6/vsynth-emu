@@ -122,6 +122,7 @@ void VSynthEmuProcessor::encodeWave(int osc, int choice, int depth) {
         static const char* names[] = { "LITE", "SOLO", "", "BACKING", "", "ENSEMBLE" };
         const juce::String refused = PluginWaveEdits::eventsDone(*this, osc, edit, depth, results);   // the XT's word
         if (refused.isNotEmpty()) return setStatus(who + refused);
-        setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own >= 0 ? " (the wave's own)" : " (auto)"));
+        // v492: "its own", short enough that a band type's fits the header's status line, as "auto" does
+        setStatus(who + "Encoded as " + names[type] + (choice != 0 ? "" : own >= 0 ? " (its own)" : " (auto)"));
     });
 }

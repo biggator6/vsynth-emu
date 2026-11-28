@@ -221,4 +221,12 @@ int xtWaveImportCheck(const std::string& rom, bool first);
 // (<repo>/analysis/projects/*/<folder>, the ROM being <repo>/firmware/unpacked's), sorted; and a file's bytes
 std::vector<std::filesystem::path> xtProjectWaves(const std::string& rom, const std::filesystem::path& folder);
 std::vector<uint8_t> xtFileBytes(const std::filesystem::path& path);
+// How two files differ, for XT_FILES_FIRST: the first and last byte that do, how many, and the most two 16-bit words at
+// an even byte differ by (a sample, where the data is), with the first few that do (at, a's, b's)
+struct XtFileDiff {
+    size_t first = 0, last = 0, bytes = 0;
+    int most = 0;
+    std::string words;
+};
+XtFileDiff xtFileDiff(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b);
 #endif
