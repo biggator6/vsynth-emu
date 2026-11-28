@@ -6,6 +6,7 @@
 // from the other blocks' sizes), vmdl, vpsc, vpno, vplp, vpdt, LIST, rdmd and data, each the wave has.
 // HARDWARE_FIRMWARE.md {#wave-writer-read}, {#wave-writer}, {#wave-writer-bands}, {#wave-loader}.
 #include "XtFiles.h"
+#include "XtFwEvents.h"
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -26,12 +27,20 @@ struct XtWaveLoops {
 struct XtWaveCut {
     long from = 0, to = 0;
 };
+// An Encode EXECUTE on the saved wave (v490): its type (1 SOLO, 3 BACKING, 5 ENSEMBLE), the depth its detection runs at,
+// and the event edits made on it, in order (XtFwEvents.h)
+struct XtWaveEncode {
+    int type = 1, depth = 64;
+    std::vector<XtFwEventEdit> events;
+};
 // What the session changes of a wave before it's saved, each set on the store's entry as the XT's own screens set it:
 // Truncate by rom.2's edit engine (the edit screen's, v487), then the loops by its loop setter (0x894a4e30, the Loop
-// FWD and BWD screens', v486), as the XT's screen sets them after a Truncate
+// FWD and BWD screens', v486), as the XT's screen sets them after a Truncate, then the encode (the Encode screen's,
+// v490), which takes the loops as they are when it opens
 struct XtWaveEdits {
     std::optional<XtWaveCut> cut;
     std::optional<XtWaveLoops> loops;
+    std::optional<XtWaveEncode> encode;
 };
 
 // The .wav `wave` (an XT file, or a plain one the loader imports) loaded as the XT loads it, `edits` set on it, then

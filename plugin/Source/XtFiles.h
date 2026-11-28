@@ -185,6 +185,7 @@ private:
 };
 
 #ifdef XT_FILES_MAIN
+#include <filesystem>
 // xt_files' patches (XtPatchStoreCheck.cpp; its main is XtFiles.cpp's).  The values of the disk image's patches against the
 // firmware's reads, which prints the lines of a type's parameters and of the blocks the firmware points at by its own
 // routines; the counts, which xtPatchCheckPrint prints; and an older, shorter patch, which prints its line and gives how
@@ -212,4 +213,12 @@ int xtPatchSaveCheck(const XtDiskImage& disk, bool first);
 // A wave saved by the firmware's own writer (XtWaveSaveCheck.cpp, v482): each wave of the projects beside the ROM's
 // folders written again, the XT's back as their files; prints its line, gives how many of the XT's came out otherwise
 int xtWaveSaveCheck(const std::string& rom, bool first);
+// A plain .wav imported by the XT's loader, and encoded SOLO by its Encode EXECUTE (XtWaveImportCheck.cpp, v488, v490):
+// each plain file beside the projects' Wave folders written as the projects' XT-made waves with its samples; prints
+// its line, gives how many of those came out otherwise
+int xtWaveImportCheck(const std::string& rom, bool first);
+// The checks' files: every .wav in each project's `folder` (its "Wave" folder, or "." itself) beside the ROM's folders
+// (<repo>/analysis/projects/*/<folder>, the ROM being <repo>/firmware/unpacked's), sorted; and a file's bytes
+std::vector<std::filesystem::path> xtProjectWaves(const std::string& rom, const std::filesystem::path& folder);
+std::vector<uint8_t> xtFileBytes(const std::filesystem::path& path);
 #endif

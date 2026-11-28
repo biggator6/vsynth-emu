@@ -30,6 +30,18 @@ constexpr LoopSet kLoopSet { 0x894a4e30, xtfw::kSamp + 0x80 };
 struct EditEngine { uint32_t make, range, run, finish, engine, truncate; };
 constexpr EditEngine kEdit { 0x894a8990, 0x894a8b80, 0x894a8c00, 0x894a8c70, xtfw::kSamp + 0xc0, 1 };
 constexpr int32_t kEditGiven = 1;   // -4, where the screen would ask, none of the waves here answers: refused, so loudly
+// [FW] the Encode screen's calls on its object (0x89cecf54), as the screen makes them ({#wave-encode-read}): open for a
+// wave (0x894a8fc0(screen, wave): the encode object at *0x89cecf6c), detect (0x894a9020(screen, depth)), an event added
+// or deleted at a frame (0x894a91c0, 0x894a9250), EXECUTE (0x894a90b0(screen, 1|2|3 for SOLO, BACKING, ENSEMBLE): 1,
+// its job queued), the job (0x894ab450(object)) and close (0x894a8ff0)
+struct EncodeScreen { uint32_t screen, object, open, detect, add, remove, execute, job, close; };
+constexpr EncodeScreen kEncode { 0x89cecf54, 0x89cecf6c, 0x894a8fc0, 0x894a9020, 0x894a91c0, 0x894a9250,
+                                 0x894a90b0, 0x894ab450, 0x894a8ff0 };
+// [FW] the job queue EXECUTE links into (0x893004a0), answered as nothing: the harness is the worker task that takes
+// it; and the driver's own result, 1 at 0x89ff0dd0 as the job reaches the vpsc's writer (0x89515cb0), which the job
+// doesn't read and the writers after it overwrite
+struct EncodeJob { uint32_t queue, vpscWriter, result; int32_t done; };
+constexpr EncodeJob kEncodeJob { 0x893004a0, 0x89515cb0, 0x89ff0dd0, 1 };
 // [HW] the XT's word at address 0x10, in its boot flash: the vpfl's builder (0x894a06d0) reads each block's size
 // through the entry's pointer unchecked, so for a block the wave has none of it reads this, 9 in every vpfl the XT
 // wrote for a SOLO wave with no vmdl (the user's project, analysis/projects/Emu_test.prj)
@@ -58,6 +70,31 @@ bool truncate(Sh4& c, const XtWaveCut& cut, std::string* why) {
     if (ran && takes) return true;
     if (why) *why = ran ? "the XT refuses the Truncate: " + std::to_string((int32_t)given)
                         : "the firmware's Truncate failed: " + failedAt(c);
+    return false;
+}
+
+// The wave encoded by rom.2's Encode EXECUTE, as the screen runs it, its job run here; false, and why, if a call
+// fails, EXECUTE refuses or the driver doesn't finish
+bool encode(Sh4& c, const XtWaveEncode& e, std::string* why) {
+    int32_t driver = 0;
+    c.hook(kEncodeJob.queue, [](Sh4& s) { s.ret(0); });
+    c.hook(kEncodeJob.vpscWriter, [&driver](Sh4& s) { driver = (int32_t)s.rd32(kEncodeJob.result); });   // watched
+    const auto depth = (uint32_t)e.depth;
+    bool ran = c.call(kEncode.open, { kEncode.screen, kWave }, xtfw::kStack);
+    ran = ran && c.call(kEncode.detect, { kEncode.screen, depth }, xtfw::kStack);
+    for (const XtFwEventEdit& edit : e.events)   // the screen detects again after each, its list's refresh: nothing written
+        ran = ran && c.call(edit.add ? kEncode.add : kEncode.remove, { kEncode.screen, edit.at }, xtfw::kStack);
+    const uint32_t choice = e.type == 1 ? 1 : e.type == 3 ? 2 : 3;
+    uint32_t executed = 0;
+    ran = ran && c.call(kEncode.execute, { kEncode.screen, choice }, xtfw::kStack, &executed);
+    const bool queued = ran && executed == 1;
+    ran = ran && (!queued || c.call(kEncode.job, { c.rd32(kEncode.object) }, xtfw::kStack));
+    ran = ran && c.call(kEncode.close, { kEncode.screen }, xtfw::kStack);
+    c.unhook(kEncodeJob.vpscWriter);
+    if (ran && queued && driver == kEncodeJob.done) return true;
+    if (why) *why = !ran ? "the firmware's encode failed: " + failedAt(c)
+                         : !queued ? "the XT refuses the encode: " + std::to_string((int32_t)executed)
+                                   : "the XT's encode didn't finish: " + std::to_string(driver);
     return false;
 }
 
@@ -93,5 +130,6 @@ bool xtFwWaveFile(const std::vector<uint8_t>& wave, std::vector<uint8_t>& file, 
     if (edits.cut && xtWaveHasBands((int)type)) return fail(why, "a band wave's Truncate is open");
     if (edits.cut && !truncate(c, *edits.cut, why)) return false;       // v487: on the wave as loaded, as on the XT
     if (edits.loops && !setLoops(c, *edits.loops, why)) return false;   // v486: after it, as its screen sets them
+    if (edits.encode && !encode(c, *edits.encode, why)) return false;   // v490: the loops as its opening finds them
     return xtfw::runWriter(c, { kWriter, kPath, kPathText, kNumber }, file, why);
 }

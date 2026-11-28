@@ -738,6 +738,16 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+A saved wave's encode v490 (2026-11-28, on claude/wave-editor after v489; HARDWARE_FIRMWARE.md, "A saved wave encoded by
+  the XT's own Encode EXECUTE"; d-8's second half): XtWaveEdits' encode (XtWaveEncode: type, depth, event edits) made
+  on the store's wave as the Encode screen makes it (open 0x894a8fc0, detect 0x894a9020, the edits 0x894a91c0 and
+  0x894a9250, EXECUTE 0x894a90b0, its job 0x894ab450 run here, the queue answered, close 0x894a8ff0), the driver's
+  result watched. xt_files' waves imported (its own file now, XtWaveImportCheck.cpp): the project's raw files imported,
+  encoded SOLO and written are the XT's own 003 and 004 byte for byte but the 4 bytes of the app's version in their LIST
+  ("2.01", this image's "0.20"); an event added halfway gives one more, added and deleted as none. Plants: wavesave 55
+  (6 new), all caught; the edit's re-detection unneeded, gone. fcheck the imported line changed on purpose; verify.sh
+  clean.
+
 Save Wave v489 (2026-11-28, on claude/wave-editor after v488; HARDWARE_FIRMWARE.md, "Save Wave on the WAVE page"; d-8's
   file): Save Wave... on the WAVE page's title line, a save dialog beside the loaded file, and PluginWaveEdits::save
   (PluginWaveSave.cpp, new): the OSC's file through xtFwWaveFile with the session's Truncate and loops (the forward

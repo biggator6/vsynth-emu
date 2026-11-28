@@ -12,14 +12,9 @@
 #include <iterator>
 #include <string_view>
 
-namespace {
 namespace fs = std::filesystem;
-// [FW] the software rom.2 names in a wave's LIST (0x897a8208): a wave whose LIST has it, the XT wrote
-constexpr std::string_view kXtSoftware = "V-Synth Ver.";
 
-// Every .wav in each project's `folder` (its Wave folder, or itself): <repo>/analysis/projects/*/<folder>, the ROM
-// being <repo>/firmware/unpacked's
-std::vector<fs::path> projectWaves(const std::string& rom, const fs::path& folder) {
+std::vector<fs::path> xtProjectWaves(const std::string& rom, const fs::path& folder) {
     const fs::path projects = fs::path(rom).parent_path().parent_path().parent_path() / "analysis" / "projects";
     std::vector<fs::path> out;
     std::error_code e;
@@ -30,10 +25,14 @@ std::vector<fs::path> projectWaves(const std::string& rom, const fs::path& folde
     return out;
 }
 
-std::vector<uint8_t> bytesOf(const fs::path& path) {
+std::vector<uint8_t> xtFileBytes(const fs::path& path) {
     std::ifstream f(path, std::ios::binary);
     return { std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>() };
 }
+
+namespace {
+// [FW] the software rom.2 names in a wave's LIST (0x897a8208): a wave whose LIST has it, the XT wrote
+constexpr std::string_view kXtSoftware = "V-Synth Ver.";
 
 bool xtWrote(const XtWaveBlocks& w) {
     const auto& list = w.bytes[XtWaveBlocks::kList];
@@ -155,7 +154,7 @@ std::string cutKeepsLaw(const XtWaveBlocks& w, const std::vector<uint8_t>& bytes
 
 // One wave written again: its tally, and where it differs printed when `first` and it is the XT's
 void saveOne(const fs::path& path, bool first, SaveTally& t) {
-    const std::vector<uint8_t> bytes = bytesOf(path);
+    const std::vector<uint8_t> bytes = xtFileBytes(path);
     ++t.waves;
     XtWaveBlocks w;
     if (!xtWaveBlocksOf(bytes.data(), bytes.size(), w)) {
@@ -194,57 +193,17 @@ void saveOne(const fs::path& path, bool first, SaveTally& t) {
                     why.empty() ? "differs" : why.c_str(), d.first, bytes.size(), d.last, d.bytes, d.most,
                     d.words.c_str());
 }
-// [FW] the vpsc's bytes the import never writes ([0xc], [0xd]: whatever the store's heap held, 0x894a27c0)
-constexpr size_t kUnwrittenAt = 0xc, kUnwrittenEnd = 0xe;
-
-struct ImportTally {
-    int files = 0, imported = 0, references = 0, same = 0;
-};
-
-// A plain .wav beside a project's Wave folder imported by the XT's loader and written (v488): each of the projects' LITE
-// waves with its samples, the XT's own imports of it, is the file written, but the two bytes the import never writes
-void importOne(const fs::path& raw, const std::vector<fs::path>& waves, ImportTally& t, bool first) {
-    ++t.files;
-    std::vector<uint8_t> file;
-    std::string why;
-    if (!xtFwWaveFile(bytesOf(raw), file, &why)) {
-        if (first) std::printf("%s: not imported: %s\n", raw.filename().c_str(), why.c_str());
-        return;
-    }
-    ++t.imported;
-    XtWaveBlocks got;
-    if (!xtWaveBlocksOf(file.data(), file.size(), got)) return;
-    for (const fs::path& p : waves) {
-        const std::vector<uint8_t> bytes = bytesOf(p);
-        XtWaveBlocks w;
-        if (!xtWaveBlocksOf(bytes.data(), bytes.size(), w) || (*w.bytes[XtWaveBlocks::kVpsc])[1] != 0) continue;
-        if (w.bytes[XtWaveBlocks::kData] != got.bytes[XtWaveBlocks::kData]) continue;
-        ++t.references;
-        XtWaveBlocks as = got;   // its two unwritten bytes as the XT's heap had them
-        std::copy_n(w.bytes[XtWaveBlocks::kVpsc]->begin() + kUnwrittenAt, kUnwrittenEnd - kUnwrittenAt,
-                    as.bytes[XtWaveBlocks::kVpsc]->begin() + kUnwrittenAt);
-        const bool same = as.bytes == w.bytes && file.size() == bytes.size();
-        t.same += same;
-        if (first && !same) std::printf("%s: imported, not %s\n", raw.filename().c_str(), p.filename().c_str());
-    }
-}
 } // namespace
 
 int xtWaveSaveCheck(const std::string& rom, bool first) {
-    ImportTally imports;
-    const std::vector<fs::path> waves = projectWaves(rom, "Wave");
-    for (const fs::path& p : projectWaves(rom, ".")) importOne(p, waves, imports, first);
-    std::printf("waves imported: %d plain files beside the projects' waves, %d imported by the XT's loader, written as "
-                "the projects' %d LITE imports of them: %d the same but the 2 bytes the import never writes\n",
-                imports.files, imports.imported, imports.references, imports.same);
     SaveTally t;
-    for (const fs::path& p : waves) saveOne(p, first, t);
+    for (const fs::path& p : xtProjectWaves(rom, "Wave")) saveOne(p, first, t);
     std::printf("waves saved: %d of the projects' waves, %d unread; the XT's %d (%d LITE, %d SOLO, %d band) %d back as "
                 "their files, of the band waves not %d saved again the same, a sample moved by up to %d; the others "
                 "%d, %d back; loops set to marks by the XT's setter on %d, %d so; truncated by the XT's on %d, %d as "
                 "its law, the band waves' refused on %d\n",
                 t.waves, t.unread, t.xt, t.lite, t.solo, t.bands, t.xtSame, t.stable, t.most, t.others, t.othersSame,
                 t.looped, t.loopsBack, t.cut, t.cutAsLaw, t.bandCutRefused);
-    return t.xt - t.xtSame + t.looped - t.loopsBack + t.cut - t.cutAsLaw + imports.references - imports.same;
+    return t.xt - t.xtSame + t.looped - t.loopsBack + t.cut - t.cutAsLaw;
 }
 #endif

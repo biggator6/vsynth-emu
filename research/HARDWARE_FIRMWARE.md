@@ -1546,6 +1546,33 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A saved wave encoded by the XT's own Encode EXECUTE (2026-11-28, v490) {#wave-writer-encode}
+
+d-8's second half, its last firmware part: the encode made on the store's wave as the Encode screen makes it, so a
+saved wave carries an encode (and its event edits) as the XT writes one. Read in {#wave-encode-read}.
+
+**How it runs** (`XtFwWaveFile.cpp`'s `encode`, `XtWaveEdits::encode`, `XtWaveEncode`: the type, the depth, the event
+edits): after the loader, the cut and the loops (the encode takes the loops as its opening finds them), the screen's
+calls on its object `0x89cecf54`: open for wave 0 (`0x894a8fc0`), detect at the depth (`0x894a9020`), each event edit
+(`0x894a91c0` add, `0x894a9250` delete) detected again after, EXECUTE (`0x894a90b0`, 1, 2 or 3 for SOLO, BACKING,
+ENSEMBLE: 1), the job it queued run here (`0x894ab450(*0x89cecf6c)`; the queue, `0x893004a0`, answered as nothing),
+and close (`0x894a8ff0`); then the writer. The driver's own result, which the job doesn't read, is watched: 1 at
+`0x89ff0dd0` as the job reaches the vpsc's writer (`0x89515cb0`), a hook that reads and lets the code run on. Nothing
+else of the machine needed answering: the encoder's chunks go to the store through the callbacks the open sets.
+
+**The check.** `xt_files`' `waves imported:` line (its own file now, `XtWaveImportCheck.cpp`, out of
+`XtWaveSaveCheck.cpp`, near the kit's limit, with the projects' files and a file's bytes shared, `xtProjectWaves`,
+`xtFileBytes`): the 3 plain files imported, then encoded SOLO at depth 64 by the XT's Encode and written, held to every
+SOLO wave of the projects with their samples, the XT's own encodes of them: 3 (`003` for both sine files, `004`), all
+the same byte for byte but the 4 bytes of the app's version in their LIST ("2.01" against this image's "0.20",
+{#wave-encode-read}). So a plain file, imported, encoded and saved by rom.2's own routines, is the file the user's XT
+wrote. The event edits: on each, an event added halfway gives one more event (the vpno's count), and added then
+deleted again gives the file the encode gives with none. The plants: 6 new `wavesave` (the encode never run, SOLO given
+as BACKING, the job or the first detection skipped, the queue unanswered, an add made a delete) with the wave's others,
+55, all caught. The screen detects again after each event edit, its list's refresh: a plant showed it changes nothing
+written, and it went. The driver's watch, a guard for a failure none of the files here makes, no plant can show; nor
+the close.
+
 ### The XT's Encode EXECUTE on a stored wave, read (2026-11-28, for v490) {#wave-encode-read}
 
 For the encode on the store's wave, so a saved wave is encoded as the XT encodes one. Read statically in rom.2 (Ghidra

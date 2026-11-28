@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
     const int linksWrong = xtPresetWavesCheck(diskImage, first);   // XtPresetWavesCheck.cpp, v600
     const int savesWrong = xtPatchSaveCheck(diskImage, first);     // XtPatchSaveCheck.cpp, v602
     const int initWrong = xtPatchInitCheck(diskImage, first);      // XtPatchInitCheck.cpp, v473
-    const int waveSavesWrong = xtWaveSaveCheck(argv[1], first);    // XtWaveSaveCheck.cpp, v482
+    const int waveSavesWrong = xtWaveSaveCheck(argv[1], first) + xtWaveImportCheck(argv[1], first);   // v482, v488
     const bool patchesWrong = patches.different || shortBad || savesWrong || initWrong;
     return (wavesWrong || patchesWrong || linksWrong || waveSavesWrong) ? 1 : 0;
 }

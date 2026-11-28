@@ -151,7 +151,8 @@ elif [[ "$PORT" =~ ^(files|$FILEPORTS)$ ]]; then
              XtPresetWaves.cpp XtPresetWavesCheck.cpp XtFwPatchFile.cpp XtPatchSaveCheck.cpp XtFwPatchInit.cpp \
              XtPatchInitCheck.cpp XtPatchShortCheck.cpp \
              $( [ -f "$S/XtFwWaveFile.cpp" ] && echo XtFwFileOut.cpp XtFwWaveFile.cpp XtWaveSaveCheck.cpp ) \
-             $( [ -f "$S/XtFwWaveLoad.cpp" ] && echo XtFwWaveLoad.cpp ); do
+             $( [ -f "$S/XtFwWaveLoad.cpp" ] && echo XtFwWaveLoad.cpp ) \
+             $( [ -f "$S/XtWaveImportCheck.cpp" ] && echo XtWaveImportCheck.cpp ); do
         [ "$f" = "$F" ] || L+=("$S/$f")
     done
     L+=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
@@ -167,6 +168,7 @@ elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's ro
     # the wave writer, its file calls and its check (v482)
     [ -f "$S/XtFwWaveFile.cpp" ] && L+=("$S/XtFwFileOut.cpp" "$S/XtFwWaveFile.cpp" "$S/XtWaveSaveCheck.cpp")
     [ -f "$S/XtFwWaveLoad.cpp" ] && L+=("$S/XtFwWaveLoad.cpp")   # the XT's loader (v488)
+    [ -f "$S/XtWaveImportCheck.cpp" ] && L+=("$S/XtWaveImportCheck.cpp")   # its check (v490)
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")

@@ -104,3 +104,12 @@ waveload-unlock|    c.hook(kKernel.unlock,|    if (false) c.hook(kKernel.unlock,
 waveload-base-name|    c.hook(kKernel.baseName,|    if (false) c.hook(kKernel.baseName,|waveload
 waveload-display|    c.hook(kKernel.display,|    if (false) c.hook(kKernel.display,|waveload
 wavesave-load-key|xtfw::loadIntoStore(c, in, kNumber, why)|xtfw::loadIntoStore(c, in, kNumber + 1, why)|wavesave
+# The encode by rom.2's Encode EXECUTE (v490), by xt_files' waves imported: line: never run, SOLO given as BACKING, its
+# job skipped, the first detection skipped, the job queue unanswered, an add made a delete.  (The screen's close, and
+# its detection again after each edit, change nothing written, so no plant on them could fail; the second went.)
+wavesave-encode-never|    if (edits.encode && !encode(c, *edits.encode, why)) return false;|    ;|wavesave
+wavesave-encode-type|e.type == 1 ? 1 : e.type == 3 ? 2 : 3|e.type == 1 ? 2 : e.type == 3 ? 2 : 3|wavesave
+wavesave-encode-no-job|    ran = ran && (!queued \|\| c.call(kEncode.job, { c.rd32(kEncode.object) }, xtfw::kStack));|    ;|wavesave
+wavesave-encode-no-detect|    ran = ran && c.call(kEncode.detect, { kEncode.screen, depth }, xtfw::kStack);\n    for|    for|wavesave
+wavesave-encode-queue|    c.hook(kEncodeJob.queue, [](Sh4& s) { s.ret(0); });|    ;|wavesave
+wavesave-encode-add-delete|edit.add ? kEncode.add : kEncode.remove|edit.add ? kEncode.remove : kEncode.add|wavesave
