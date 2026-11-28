@@ -17,6 +17,15 @@ XtWaveLoops loopsOf(float startPercent, float endPercent, long frames, const Plu
     l.bwdEnd = bwd.backward ? bwd.bwdEnd : l.loopEnd;
     return l;
 }
+
+// The encode the saved wave needs to be what the synth plays (v491): the type the session encoded it as (`played`), at
+// the OSC's Encode Depth, with the session's event edits; none where the wave plays LITE, or where the file's own encode
+// (`own`) already is that, nothing cut and no event edits
+std::optional<XtWaveEncode> encodeOf(int played, int own, const PluginWaveEdit& kept, int depth) {
+    const bool asItsOwn = played == own && !kept.cut && kept.events.empty();
+    if (played == 0 || asItsOwn) return std::nullopt;
+    return XtWaveEncode { played, depth, kept.events };
+}
 } // namespace
 
 juce::File PluginWaveEdits::fileOf(const VSynthEmuProcessor& p, int osc) {
@@ -29,12 +38,19 @@ void PluginWaveEdits::save(VSynthEmuProcessor& p, int osc, const juce::File& to)
     const auto view = p.waveView(osc);
     if (!p.hasFileLoaded(osc) || !from.existsAsFile() || !view) return p.setStatus(who + "no file to save from");
     const PluginWaveEdit kept = edit(p, osc);
-    if (!kept.events.empty()) return p.setStatus(who + "its event edits aren't saved yet");
     XtWaveEdits edits;
     if (kept.cut) edits.cut = XtWaveCut { kept.keepFrom, kept.keepTo };
     const float start = p.raw(Params::oscId(osc, Params::kLoopStart));
     const float end = p.raw(Params::oscId(osc, Params::kLoopEnd));
     edits.loops = loopsOf(start, end, view->frames, backward(p, osc));
+    int played = 0, own = -1;
+    {
+        const juce::ScopedLock lock(p.bufferLock_);
+        played = p.wave_[osc].encoded ? p.wave_[osc].encoded->type : 0;
+        own = p.wave_[osc].ownType;
+    }
+    const int depth = juce::roundToInt(p.raw(Params::oscId(osc, Params::kEncodeDepth)));
+    edits.encode = encodeOf(played, own, kept, depth);
     juce::MemoryBlock bytes;
     if (!from.loadFileAsData(bytes)) return p.setStatus(who + "couldn't read " + from.getFileName());
     std::vector<uint8_t> wave((const uint8_t*)bytes.getData(), (const uint8_t*)bytes.getData() + bytes.getSize());

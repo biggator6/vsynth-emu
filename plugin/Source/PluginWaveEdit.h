@@ -81,8 +81,9 @@ struct PluginWaveEdits {
     // v489 (d-8's file): the wave written to `to` as the XT writes one (xtFwWaveFile): its file put in the store by the
     // XT's loader, the session's Truncate and loops set on it by rom.2's own routines (the loops in frames of the wave
     // as it plays: the forward loop the OSC's Loop Start and End, the backward the session's or the wave's own, else the
-    // forward's), on the encode pool; the status says what came of it.  Refused with no file to save from, or with
-    // event edits (not written yet: they need the encode on the stored wave)
+    // forward's), then (v491) the encode the synth plays where the file's own isn't it (the type the session encoded it
+    // as, at the OSC's Encode Depth, with the event edits) by rom.2's Encode EXECUTE; on the encode pool, the status
+    // saying what came of it.  Refused with no file to save from
     static void save(VSynthEmuProcessor& p, int osc, const juce::File& to);
     static juce::File fileOf(const VSynthEmuProcessor& p, int osc);   // the file it saves from, as the session keeps it
     // None kept, as a new wave comes (a file loaded, a patch's waves); and the session's words for them, both ways, by

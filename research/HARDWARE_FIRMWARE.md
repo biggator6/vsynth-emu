@@ -1546,6 +1546,24 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Save Wave writes the encode the synth plays (2026-11-28, v491) {#wave-save-encode}
+
+Save Wave (v489) given v490's encode: a saved wave is what the synth plays. `PluginWaveEdits::save` asks the encode
+of the type the session encoded the wave as (`XtEncoded::type`), at the OSC's Encode Depth, with the session's event
+edits, run on the stored wave by rom.2's Encode EXECUTE; none where the wave plays LITE, or where the file's own
+encode already is what plays (its own type, nothing cut, no event edits: a V-Synth wave saved unedited keeps its own
+vpdt, not one detected again). The event edits' refusal of v489 went.
+
+**The check** (`EditorWaveSaveTest.cpp`): the loops and cut cases on a wave set LITE (Encode Type LITE; Auto had
+encoded the test wave SOLO, and the save rightly wrote SOLO); the plain wave encoded SOLO with an event added in its
+widest gap, saved: SOLO, its events those the synth plays, frame for frame, so rom.2's encode on the stored wave and
+the plugin's encode of the samples (`XtFwEncode`, v481's edits) agree; and that file made an older XT's (its LIST's
+app version "2.01", as the user's project's are), loaded, played as its own SOLO and saved: the same file, its own
+encode kept (made again, it would say this image's version). A plant of the first run showed the check too easy there:
+re-encoding the saved file gave the same file, its LIST already this image's; hence the older XT's file. The depth
+given the encode no check here shows: the test wave's detection finds the same events at depth 0 and at 127. The
+plants: see notes.txt v491.
+
 ### A saved wave encoded by the XT's own Encode EXECUTE (2026-11-28, v490) {#wave-writer-encode}
 
 d-8's second half, its last firmware part: the encode made on the store's wave as the Encode screen makes it, so a

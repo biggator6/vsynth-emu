@@ -181,7 +181,8 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   draws a few columns about its old and new places again, not the wave. v489 (d-8's file): Save Wave... at the title
   line's right, 100 wide: a save dialog beside the loaded file (its name with " edit"), and the wave written there as
   the XT writes one, with the session's Truncate and loops, the status line saying what came of it ("OSC 1: Saved …",
-  or why not). Its event edits it refuses until the encode on the stored wave writes them.
+  or why not). v491: what it writes is what the synth plays, the encode the session made (its type, depth and event
+  edits) made again by the XT's own Encode on the stored wave where the file's own isn't it.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

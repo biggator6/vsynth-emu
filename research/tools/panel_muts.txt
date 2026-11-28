@@ -571,3 +571,8 @@ editor-save-bwd-fwd|    l.bwdStart = bwd.backward ? bwd.bwdStart : l.loopStart;|
 editor-save-ends-swapped|{ waveLoopFrame(startPercent, frames), waveLoopFrame(endPercent, frames), 0, 0 }|{ waveLoopFrame(endPercent, frames), waveLoopFrame(startPercent, frames), 0, 0 }|plugin/Source/PluginWaveSave.cpp|layout
 editor-save-frames|loopsOf(start, end, view->frames,|loopsOf(start, end, view->frames * 2,|plugin/Source/PluginWaveSave.cpp|layout
 editor-save-unwritten|        if (!to.replaceWithData(file.data(), file.size()))|        if (false)|plugin/Source/PluginWaveSave.cpp|layout
+# Save Wave's encode (v491): none asked, the file's own encode made again, the event edits not given.  (The depth
+# given, no: the test wave's detection is the same at every depth tried.)
+editor-save-no-encode|    edits.encode = encodeOf(played, own, kept, depth);|    ;|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-own-again|    const bool asItsOwn = played == own && !kept.cut && kept.events.empty();|    const bool asItsOwn = false;|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-no-events|XtWaveEncode { played, depth, kept.events }|XtWaveEncode { played, depth, {} }|plugin/Source/PluginWaveSave.cpp|layout

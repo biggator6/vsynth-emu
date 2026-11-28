@@ -738,6 +738,14 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+Save Wave writes what plays v491 (2026-11-28, on claude/wave-editor after v490; HARDWARE_FIRMWARE.md, "Save Wave writes
+  the encode the synth plays"; d-8's file): PluginWaveEdits::save asks the encode the session plays (its type, the
+  OSC's Encode Depth, its event edits) of rom.2's Encode EXECUTE on the stored wave (v490), none where the wave plays
+  LITE or the file's own encode already is it; the event refusal gone. EditorWaveSaveTest.cpp: a SOLO encode with an
+  event added saved with the events the synth plays, frame for frame; an older XT's SOLO file kept as its own. The
+  editor 5482/5482. Plants: panel 9 (3 new), all caught, one after the check took an older XT's file; the depth given no
+  check here shows (the test wave's detection the same at 0 and 127). verify.sh clean.
+
 A saved wave's encode v490 (2026-11-28, on claude/wave-editor after v489; HARDWARE_FIRMWARE.md, "A saved wave encoded by
   the XT's own Encode EXECUTE"; d-8's second half): XtWaveEdits' encode (XtWaveEncode: type, depth, event edits) made
   on the store's wave as the Encode screen makes it (open 0x894a8fc0, detect 0x894a9020, the edits 0x894a91c0 and

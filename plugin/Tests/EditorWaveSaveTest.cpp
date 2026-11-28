@@ -38,7 +38,10 @@ void savesLoops(WaveEditView& v, VSynthEmuProcessor& p, const juce::File& to, Te
     XtWaveFile read;
     std::vector<uint8_t> bytes;
     check(savedAs(p, to, read, bytes), "the wave isn't saved: " + p.getStatusText().toStdString());
-    check(read.frames == kWaveFrames && read.encodeType == 0, "the saved wave isn't the file's frames, LITE");
+    check(read.frames == kWaveFrames && read.encodeType == 0, "the saved wave isn't the file's frames, LITE: " +
+                                                                std::to_string(read.frames) + ", type " +
+                                                                std::to_string(read.encodeType) + "; " +
+                                                                p.getStatusText().toStdString());
     check(read.loopStart == kFwdStart && read.loopEnd == kFwdEnd, "the saved forward loop isn't the page's: " +
                                                                     std::to_string(read.loopStart) + " " +
                                                                     std::to_string(read.loopEnd));
@@ -69,12 +72,65 @@ void savesCut(WavePage& page, WaveEditView& v, VSynthEmuProcessor& p, const juce
           "the saved cut loaded back doesn't play its kept frames");
 }
 
+// v491: a SOLO wave of an older XT's (the saved one, its LIST's app version "2.01", as the user's project's are) loaded,
+// played as its own (Encode Type Auto) and saved: the same file, its own encode kept (made again, it would say this
+// image's version)
+void keepsOwn(VSynthEmuProcessor& p, std::vector<uint8_t> older, const juce::File& folder, TestChecks& check) {
+    constexpr float kAuto = 0.0f;
+    const std::string software = "V-Synth Ver.", version = "2.01";
+    const auto at = std::search(older.begin(), older.end(), software.begin(), software.end());
+    if (at == older.end()) return check(false, "the saved SOLO wave's LIST doesn't name the software");
+    std::copy(version.begin(), version.end(), at + (long)software.size());
+    const juce::File olderFile = folder.getChildFile("older_solo.wav"), again = folder.getChildFile("saved_again.wav");
+    olderFile.replaceWithData(older.data(), older.size());
+    setParam(p, Params::kEncodeType, kAuto);
+    p.loadFile(olderFile, 0);
+    check(comesToSay(p, "the wave's own"), "the older XT's wave doesn't play as its own SOLO");
+    XtWaveFile read;
+    std::vector<uint8_t> bytes;
+    check(savedAs(p, again, read, bytes) && bytes == older, "saved as its own, an older XT's encode isn't kept");
+}
+
+// v491: the plain wave encoded SOLO, an event added in its widest gap (where the XT takes one), saved: SOLO, its events
+// those the synth plays.  (Its detection finds the same at every depth tried, 0 to 127: the depth given no check here
+// can show.)
+void savesEncode(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check) {
+    constexpr float kSoloChoice = 1.0f;
+    constexpr int32_t kSixteenths = 16;
+    setParam(p, Params::kEncodeType, kSoloChoice);
+    auto* page = pageWithWave(ed, p, folder, kWaveSeconds, check);
+    if (page == nullptr || !comesToSay(p, "Encoded as SOLO")) return check(false, "the wave isn't encoded SOLO");
+    const std::vector<long> was = PluginWaveEdits::events(p, 0);
+    if (was.size() < 2) return check(false, "the SOLO wave has no events to add between");
+    size_t gap = 0;   // the widest, where the XT takes an event
+    for (size_t i = 1; i + 1 < was.size(); ++i) gap = was[i + 1] - was[i] > was[gap + 1] - was[gap] ? i : gap;
+    PluginWaveEdits::editEvent(p, 0, { true, (uint32_t)((was[gap] + was[gap + 1]) / 2) });
+    waitFor([&] { return !saysNow(p, "Encoding"); });
+    const std::vector<long> plays = PluginWaveEdits::events(p, 0);
+    check(plays.size() == was.size() + 1, "the event isn't added: " + p.getStatusText().toStdString());
+    const juce::File first = folder.getChildFile("saved_solo.wav");
+    XtWaveFile read;
+    std::vector<uint8_t> bytes;
+    check(savedAs(p, first, read, bytes), "the SOLO wave isn't saved: " + p.getStatusText().toStdString());
+    check(read.encodeType == 1, "the saved wave isn't SOLO");
+    bool same = read.events.size() == plays.size();
+    for (size_t i = 0; same && i < plays.size(); ++i) same = read.events[i] / kSixteenths == plays[i];
+    check(same, "the saved wave's events aren't those the synth plays: " + std::to_string(read.events.size()) +
+                    " against " + std::to_string(plays.size()));
+    keepsOwn(p, bytes, folder, check);
+}
+
 } // namespace
 
 void waveSaveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check) {
+    constexpr float kLiteChoice = 4.0f, kAuto = 0.0f;   // Encode Type's: the loops and the cut on a LITE wave
+    setParam(p, Params::kEncodeType, kLiteChoice);
     auto* page = pageWithWave(ed, p, folder, kWaveSeconds, check);
     if (page == nullptr) return;
+    check(comesToSay(p, "Encoded as LITE"), "the wave isn't LITE");
     const juce::File to = folder.getChildFile("saved_wave.wav");
     savesLoops(page->view(0), p, to, check);
     savesCut(*page, page->view(0), p, to, check);
+    savesEncode(ed, p, folder, check);
+    setParam(p, Params::kEncodeType, kAuto);
 }
