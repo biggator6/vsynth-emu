@@ -62,6 +62,7 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
 // A vpdt's events' positions, 1/16 sample, by the layout of its type (1 SOLO, 3 BACKING, 5 ENSEMBLE) and channels; none
 // for a type with no events or a vpdt too short for them (v481, out of xtWaveRead's: the WAVE page shows a wave's events)
 std::vector<int32_t> xtVpdtEvents(const std::vector<uint8_t>& vpdt, int type, int channels);
+std::vector<int32_t> xtVpdtEvents(const uint8_t* vpdt, size_t bytes, int type, int channels);   // a chunk where it is
 // Its encode type alone, vpsc's byte 1, by the same chunks and without its audio (v600: a preset wave against its sample's
 // kind byte, XtPresetWaves); none when there's no vpsc
 std::optional<int> xtWaveEncodeType(const uint8_t* file, size_t size);

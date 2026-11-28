@@ -747,6 +747,9 @@ The events v481 (2026-11-27, on claude/wave-editor after v480; HARDWARE_FIRMWARE
   Truncate. A V-Synth wave's own events give way to the detection's once edited. XtFirmware.cpp's encodes split to
   XtFwEncode.cpp, its addresses to XtFwAddrs.h; XtFwEvents, PluginWaveEvents, UiWaveEditEvents, EditorWaveEventTest
   (new); writeSoloWave to TestWave.cpp. Editor 5298/5298; fcheck as baseline.
+  Continued: the vpdt reader's events read from the chunk again, not its copy (files-vpdt-copy was missed); the
+  plants: 29 editor-event- (-done-positive exact, as the add and delete answer 1, so -done-below; -uncounted exact
+  here and out), 15 editor-cut-, 18 editor-wave-, tone --changed 5, files wavefile and filesfw 29: all caught.
 
 Truncate v480 (2026-11-27, on claude/wave-editor after v479; HARDWARE_FIRMWARE.md, "Truncate on the WAVE page"; the
   user's d-8a): the Edit region's ends in the ruler, Truncate and Revert on the WAVE card. The XT's law: Edit Start …

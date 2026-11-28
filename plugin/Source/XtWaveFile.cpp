@@ -87,24 +87,28 @@ void readEvents(const Chunks& c, XtWaveFile& out) {
     const bool laid = (size_t)out.encodeType < kLayouts.size() && kLayouts[(size_t)out.encodeType];
     if (!vpdt || nDt < 12 || !laid) return;
     out.vpdt.assign(vpdt, vpdt + nDt);
-    out.events = xtVpdtEvents(out.vpdt, out.encodeType, out.channels);
+    out.events = xtVpdtEvents(vpdt, nDt, out.encodeType, out.channels);   // the chunk's own, apart from its copy
 }
 
 } // namespace
 
-std::vector<int32_t> xtVpdtEvents(const std::vector<uint8_t>& vpdt, int type, int channels) {
+std::vector<int32_t> xtVpdtEvents(const uint8_t* vpdt, size_t bytes, int type, int channels) {
     std::vector<int32_t> events;
     const VpdtLayout* layout = type >= 0 && (size_t)type < kLayouts.size() ? kLayouts[(size_t)type] : nullptr;
-    const uint32_t nDt = (uint32_t)vpdt.size();
-    if (nDt < 12 || !layout) return events;
-    const uint32_t nev = le32(vpdt.data() + 8) >> 16;
+    const uint32_t nDt = (uint32_t)bytes;
+    if (!vpdt || nDt < 12 || !layout) return events;
+    const uint32_t nev = le32(vpdt + 8) >> 16;
     const uint32_t stride = channels == 2 ? layout->stereo : layout->mono, first = layout->first;
     for (uint32_t e = 0; e < nev && e < 4096; ++e) {
         const uint32_t at = (stride * e + first) * 2 + 4;
         if (at + 4 > nDt) return {};
-        events.push_back((int32_t)le32(vpdt.data() + at));
+        events.push_back((int32_t)le32(vpdt + at));
     }
     return events;
+}
+
+std::vector<int32_t> xtVpdtEvents(const std::vector<uint8_t>& vpdt, int type, int channels) {
+    return xtVpdtEvents(vpdt.data(), vpdt.size(), type, channels);
 }
 
 namespace {

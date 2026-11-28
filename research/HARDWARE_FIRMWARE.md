@@ -1546,6 +1546,55 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The XT's wave writer and the store it writes, read (2026-11-27, for v482) {#wave-writer-read}
+
+For d-8's second half, the edit written to a file by the firmware's own writer. Read in rom.2 with Ghidra (decompiled
+on scratch, never committed) and the pools.
+
+**The writer** `0x89496590(path, wave)` [FW] calls the OS's open `0x89484850`, write `0x89484930`, close `0x89486d80`
+and, when a write comes up short, remove `0x89484a60`: the .p00 writer's four (`XtFwPatchFile.cpp`, v602). It writes
+`RIFF`, a size of 0x1c plus each block's own size and 8 (the sizes as they are, though each block goes out rounded up
+to even), `WAVE`, `fmt ` of 16 (PCM; 1 or 2 channels by `0x8949e740(wave)`; 44100, 0xac44; 88200 a channel; a block
+align of 2 however many channels; 16 bits), then the nine blocks in order, each that has bytes: its tag (0x897a7de4 …
+0x897a7e24), its size rounded up to even, its bytes in pieces of 256 through the reader, a zero after an odd one. Done,
+it clears the wave's changed flag (`0x8949fc90(wave, 0)`: the entry's +0x50).
+
+**The reader** it makes on the wave (0x60 bytes, `0x894a4090`; set up by `0x894a40a0`; its vtable `0x898315dc`: +0x14
+open `0x894a4540`, +0x20 the data's set-up `0x894a45c0`): block k's bytes at +0xc + 4k, what is left of them at +0x38
++ 4k, filled by `0x894a4110(reader, k)` as the writer reaches each; a buffer of 0x4000 at +8 and the data's device at
++4. A block's size (`0x894a43b0`, `0x894a4110`): vpfl, block 0, 0x2c bytes from the global `0x89ce89fc` when it is set,
+else none; data, block 8, the frames × 2, × 4 in stereo; the others the store's own.
+
+**The store** [FW]: an entry by the wave's number, found through a table of 128 lists (`0x8949fd68`'s; the list's node
+0x18 into the entry). Its blocks: +0x24 vmdl, +0x28 vpsc, +0x2c vpno, +0x30 vplp, +0x34 vpdt, +0x38 data, +0x3c rdmd,
++0x40 LIST (+0x44, +0x48, +0x4c kinds 10 to 12), each a buffer with its size at +0x10 and its bytes from +0x1c (the
+data's from +0x40, its size there 0x20 more than its bytes): `0x8949e850(wave, k)` the bytes, `0x8949ea30(wave, k)`
+the size. The frames are vpsc's word at +4 (`0x8949e790`; none while the entry's +0x52 is set) and stereo vpsc's byte
+at +2 (`0x8949e740`), as `xtWaveRead` reads a file's.
+
+**The data** comes through a device the reader sets up by the wave's type (`0x894a45c0`, the type `0x894a4628`): for
+types 3, 4 and 5 one over the wave's seven bands (`0x894a4750(wave, i)`), so a band wave's file holds the samples its
+bands give back, not those it was encoded from; for the others one over its sample memory (`0x894a4638`), read in
+pieces of 0x4000 (`0x894a4260`).
+
+**The vpfl** of a wave not LITE is the reader's open's own (`0x894a4540` → `0x894a06d0(0x89ce8dd0, wave, 0)`): `0102`,
+the sizes of vpsc, vplp, vmdl, vpno, vpdt, LIST and rdmd, each read as `*(entry + its pointer) + 0x10` with no check
+that the pointer is set, the data's bytes twice (frames × 2, × 4 in stereo; for a band wave the second
+`0x89527980(channels)`), then `LINR` (`RDAC` were its third argument 1). Every vpfl the XT wrote (the user's
+project, its LIST naming `V-Synth Ver.`: 3 SOLO waves by 2.01; 28 SOLO and 6 band waves by 1.50; none of them with a
+vmdl) gives the vmdl 9 bytes, though the file has none and the writer wrote none, since its size getter (`0x8949ea30`,
+case 1 at `0x8949ea98`) tests the pointer: the builder read the word at address 0x10, the XT's boot flash, through the
+null pointer. The one SOLO file with a vmdl, V-Trainer's, is the builder's to the byte. The project's other waves: 6
+LITE with the XT's LIST, 35 LITE with none or another's (an imported file's own), and 9 with no vpsc, plain .wav files.
+
+**So, to run it in the interpreter**: an entry in the machine's memory with the wave's blocks as the XT's store holds
+them, the table's lookup given it, the data's device rom.2's own over the samples or the bands, the OS's file calls
+hooked as the .p00 writer's are. Its reference is the XT's own files, since a project's Wave folder holds its writes:
+their blocks put in an entry and written again must come back byte for byte. And what the blocks hold after the
+plugin's edits must be what the XT's store holds after the same edits on the XT: the loop setters' vplp, Truncate's
+vpsc (LITE, its frames), the encode's vpno and vpdt and, for a band wave, its bands. A plain .wav's blocks are what
+the XT's import makes of it, which is still to be read.
+
 ### The WAVE page's events, the XT's own add and delete (2026-11-27, v481) {#wave-events}
 
 The user's d-9: the points first (v479, v480), then the events, by the XT's own add and delete and its encode. The
@@ -1600,6 +1649,17 @@ keeping the two taken; a detected event's delete kept with them, the page saying
 playing the same events, and restored at depth 99 dropping them, an edit at 99 starting the list again; a V-Synth SOLO
 wave with its own vpdt (`writeSoloWave`, moved into `TestWave.cpp` with a vpdt of given events) playing its own event
 at 22050, an event added at 30000 then playing on SOLO's own encode, and Truncate dropping it. Editor 5298/5298.
+
+**The plants** (v481, continued). The 29 `editor-event-` plants, with the 15 `editor-cut-` and 18 `editor-wave-` again,
+the tone list's changed ones (`mutate_tone.py --changed d140e0f`, 5) and the files list's `wavefile` and `filesfw` (29):
+all caught. Two were put right first: `editor-event-unrun`'s text didn't compile, and `-done-positive` (a raw result
+of 0 read as refused) changed nothing, since the add and the delete answer 1 when done and never 0 (`0x89516c54`,
+`0x89516d6c`), so `-done-below` takes the refusals' edge instead (−13 read as done). `-uncounted` came out as exact
+here: the recount after a taken edit is the screen's refresh, and at the encode's own depth it leaves the detection's
+flags; the count it keeps (`0x8987c93c`) is read only by the screen's own routines, not by Execute's start or the
+commit, so nothing the harness runs sees it. It stays, as the XT's screen runs it. `files-vpdt-copy` was missed at
+first: the reader took the events from the vpdt's copy it keeps, so a plant leaving the copy out emptied both and the
+check passed the wave by; the events are read from the chunk itself again (`xtVpdtEvents` on its pointer).
 
 ### Truncate on the WAVE page, the XT's own (2026-11-27, v480) {#wave-truncate}
 

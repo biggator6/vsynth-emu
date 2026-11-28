@@ -444,14 +444,13 @@ editor-cut-revert-button|    [](WaveEditView& v) { v.revert(); },|    [](WaveEdi
 editor-event-swapped|e.add ? kEventAdd : kEventDelete|e.add ? kEventDelete : kEventAdd|plugin/Source/XtFwEvents.cpp|layout
 editor-event-narrow|{ -13, kEventTooNarrow }|{ -12, kEventTooNarrow }|plugin/Source/XtFwEvents.cpp|layout
 editor-event-not-here|{ -17, kEventNotHere }|{ -16, kEventNotHere }|plugin/Source/XtFwEvents.cpp|layout
-editor-event-done-positive|    if (raw >= 0) return kEventDone;|    if (raw > 0) return kEventDone;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-done-below|    if (raw >= 0) return kEventDone;|    if (raw >= -13) return kEventDone;|plugin/Source/XtFwEvents.cpp|layout
 editor-event-messages|"Event Interval Too Narrow!", "Event Doesn't Exist Here!" };|"Event Doesn't Exist Here!", "Event Interval Too Narrow!" };|plugin/Source/XtFwEvents.cpp|layout
-editor-event-unrun|    s->results.clear();|    return;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-unrun|    s->results.clear();|    return true;|plugin/Source/XtFwEvents.cpp|layout
 editor-event-end-unheld|!e.add && (long)e.at + 1 >= frames ? (uint32_t)frames : e.at;|e.at;|plugin/Source/XtFwEvents.cpp|layout
 editor-event-band-unedited|        if (!xtFwEditEvents(c, frames, depth)) return failed|        if (false) return failed|plugin/Source/XtFwEncode.cpp|layout
 editor-event-solo-unedited|} else if (!xtFwEditEvents(c, frames, depth)) {|} else if (false) {|plugin/Source/XtFwEncode.cpp|layout
-editor-event-uncommitted|    return !taken || (c.call(kEventsCommit, {}, kStack, &events) && (int32_t)events >= 0);|    return true;|plugin/Source/XtFwEvents.cpp|layout
-editor-event-uncounted|        if (result == kEventDone && !c.call(kDetect, { counted }, kStack, &rc)) return false;|        ;|plugin/Source/XtFwEvents.cpp|layout
+editor-event-uncommitted|    return !taken \|\| (c.call(kEventsCommit, {}, kStack, &events) && (int32_t)events >= 0);|    return true;|plugin/Source/XtFwEvents.cpp|layout
 editor-event-scope-none|        if (waveEventsStand(edit, depth)) screen.emplace(edit.events, results);|        ;|plugin/Source/PluginEncodes.cpp|layout
 editor-event-own-kept|isOwn && type == own && !screen;|isOwn && type == own;|plugin/Source/PluginEncodes.cpp|layout
 editor-event-refusal-unsaid|        if (refused.isNotEmpty()) return setStatus(who + refused);|        ;|plugin/Source/PluginEncodes.cpp|layout
