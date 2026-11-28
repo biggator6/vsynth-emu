@@ -178,7 +178,10 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   the wave's height in `ready` (green, nothing else on the wave is), where the newest sounding note plays in the shown
   OSC's wave, as its player has it after each block; none when that OSC is off or plays no wave, or no note sounds.
   One note's, the newest, as the knobs' rings follow it. The key names it Playing. The editor's timer reads it and
-  draws a few columns about its old and new places again, not the wave.
+  draws a few columns about its old and new places again, not the wave. v489 (d-8's file): Save Wave... at the title
+  line's right, 100 wide: a save dialog beside the loaded file (its name with " edit"), and the wave written there as
+  the XT writes one, with the session's Truncate and loops, the status line saying what came of it ("OSC 1: Saved …",
+  or why not). Its event edits it refuses until the encode on the stored wave writes them.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

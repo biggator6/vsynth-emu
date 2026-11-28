@@ -78,6 +78,13 @@ struct PluginWaveEdits {
     // none where the depth moved off theirs; the XT's message for the first refused, empty for none
     static juce::String eventsDone(VSynthEmuProcessor& p, int osc, const PluginWaveEdit& given, int depth,
                                    const std::vector<int>& results);
+    // v489 (d-8's file): the wave written to `to` as the XT writes one (xtFwWaveFile): its file put in the store by the
+    // XT's loader, the session's Truncate and loops set on it by rom.2's own routines (the loops in frames of the wave
+    // as it plays: the forward loop the OSC's Loop Start and End, the backward the session's or the wave's own, else the
+    // forward's), on the encode pool; the status says what came of it.  Refused with no file to save from, or with
+    // event edits (not written yet: they need the encode on the stored wave)
+    static void save(VSynthEmuProcessor& p, int osc, const juce::File& to);
+    static juce::File fileOf(const VSynthEmuProcessor& p, int osc);   // the file it saves from, as the session keeps it
     // None kept, as a new wave comes (a file loaded, a patch's waves); and the session's words for them, both ways, by
     // the state's properties "waveEdit" and "waveEdit2" (a restore puts them back before it loads the waves)
     static void forget(VSynthEmuProcessor& p, int osc);

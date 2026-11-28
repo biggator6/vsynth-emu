@@ -12,6 +12,7 @@ namespace {
 // The wave's line, the wave and the key (v484: the line taller for its buttons, the key's height out of the wave's)
 constexpr int kInfoH = 22, kViewH = 312, kKeyH = 16, kOscsW = 150, kButtonW = 76;
 constexpr int kZoomW = 30, kFitW = 44, kLineGap = 4, kShownW = 250;   // the line's buttons and its readout
+constexpr int kSaveW = 100;   // Save Wave's, the title line's widest (v489)
 constexpr float kSwatchW = 10.0f, kSwatchGap = 6.0f, kItemGap = 18.0f;   // the key's
 constexpr double kZoomStep = 2.0;   // - widens the window twice over, + narrows it to half
 constexpr int kOscsGroup = 1005;   // the OSC buttons' radio group, after the FX page's 1004
@@ -32,6 +33,7 @@ struct ButtonDef {
     void (*act)(WaveEditView&);
 };
 constexpr std::array<ButtonDef, WavePage::kButtons> kButtonDefs { {
+    { "Save Wave...", kSaveW, false, [](WaveEditView& v) { v.saveWave(); } },   // v489, the rightmost
     { "Revert", kButtonW, false, [](WaveEditView& v) { v.revert(); } },
     { "Truncate", kButtonW, false, [](WaveEditView& v) { v.truncate(); } },
     { "Delete", kButtonW, false, [](WaveEditView& v) { v.deleteEvent(); } },

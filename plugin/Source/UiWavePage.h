@@ -37,7 +37,7 @@ public:
     // The page's buttons in kButtons' order, for the checks: the title line's (Revert and Truncate, v480; the events',
     // v481) and the wave's line's zoom (v484)
     enum Button : size_t {
-        kRevert, kTruncate, kDeleteEvent, kAddEvent, kNextEvent, kPrevEvent, kZoomOut, kZoomIn, kFit, kButtons
+        kSave, kRevert, kTruncate, kDeleteEvent, kAddEvent, kNextEvent, kPrevEvent, kZoomOut, kZoomIn, kFit, kButtons
     };
     juce::Button& button(Button b) { return *buttons_[b]; }
     juce::Button& truncateButton() { return button(kTruncate); }

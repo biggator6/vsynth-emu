@@ -79,6 +79,9 @@ void waveZoomChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& fo
 // Its playhead (EditorWavePlayTest.cpp, v485): a held note's place on the wave, moving on at the wave's rate, on each of
 // the four players, none on an OSC that's off or once the note has ended
 void wavePlayChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
+// Its Save Wave (EditorWaveSaveTest.cpp, v489): the session's loops and Truncate written as the XT writes a wave, read
+// back, and the saved file loaded back
+void waveSaveChecks(SynthEditor& ed, VSynthEmuProcessor& p, const juce::File& folder, TestChecks& check);
 // The footer's keyboard (EditorKeysTest.cpp, v201): a key's press, drag and release as their notes, a press sounding
 // through processBlock, and the fold
 void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);

@@ -738,6 +738,14 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+Save Wave v489 (2026-11-28, on claude/wave-editor after v488; HARDWARE_FIRMWARE.md, "Save Wave on the WAVE page"; d-8's
+  file): Save Wave... on the WAVE page's title line, a save dialog beside the loaded file, and PluginWaveEdits::save
+  (PluginWaveSave.cpp, new): the OSC's file through xtFwWaveFile with the session's Truncate and loops (the forward
+  loop the OSC's Loop Start and End as frames, the backward the session's or the wave's own), on the encode pool, the
+  status saying what came of it; event edits refused until the encode on the stored wave. The XT's Encode EXECUTE read
+  ({#wave-encode-read}). EditorWaveSaveTest.cpp (new): VSynthEmuEditorTest 5473/5473. Plants: panel 33 (6 new), all
+  caught; verify.sh clean.
+
 Every wave loaded by the XT's own loader v488 (2026-11-28, on claude/wave-editor after v487; HARDWARE_FIRMWARE.md,
   "Every wave loaded by the XT's own loader"; d-8's second half): XtFwWaveLoad (new), the store's heap made by rom.2
   and the file put in it by its one .wav loader (0x894939d0), its file calls answered from the file's bytes; a plain

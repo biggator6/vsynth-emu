@@ -1546,6 +1546,72 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The XT's Encode EXECUTE on a stored wave, read (2026-11-28, for v490) {#wave-encode-read}
+
+For the encode on the store's wave, so a saved wave is encoded as the XT encodes one. Read statically in rom.2 (Ghidra
+on scratch, never committed; a subagent's read, its notes kept here in our words).
+
+**The calls**, as the Encode screen makes them, its object `0x89cecf54`:
+- opening, `0x894a8fc0(screen, wave)` (the 0-based wave, key + 3000): the encode object at `*0x89cecf6c`
+  (`0x894ab040`, the static `0x89ced170`: a job node, the encode's init `0x89516400`, and the store's chunk
+  callbacks put where the encode's library calls them, `0x8987c8f0` … `0x8987c8f8`: make `0x894abc00`, resize
+  `0x894abc70`, free `0x894abca0`, each the store's own block maker, resize and delete);
+- `0x894a9020(screen, depth)` (0x13ad): the first time, the sample block from the store's vpsc, vplp and vpno
+  (`0x894ab830`), the store's blocks as the library's chunks (`0x894abad0`), and the detection (`0x895164c0`);
+- the event edits, `0x894a91c0(screen, frame)` add and `0x894a9250` delete, each followed by `0x894a9020` again;
+- EXECUTE, `0x894a90b0(screen, 1|2|3)` → `0x894ab270(object, 1|3|5)`: the type LITE for now, the data block's +0x3c
+  0, a room check (`0x894a1dd0`: a block of a tenth of the data made and deleted at once; nothing kept), for the band
+  types the bands' room; then the job queued (`0x893004a0(0x8987cb04, object)`, which calls the kernel and links into
+  a list the worker task's start would have made: a harness answers it as nothing). The job, `0x894ab450(object)`,
+  synchronous, is called directly: the library's commit and driver (`0x89516720`: SOLO `0x89515e20`, BACKING
+  `0x895161d0`, ENSEMBLE `0x89516250`), then the blocks; the driver's own result isn't checked by it (1 at
+  `*0x89ff0dd0` on entering `0x89515cb0`). Closing, `0x894a8ff0`, changes nothing written.
+
+**What it writes**, each block deleted and made again by the store's maker: vpdt (`0x89515a70`), vpno (`0x89515b40`:
++0 8, +4 the count), rdmd (an SMF, `0x89515b90`), vpsc (`0x89511450`, 0x20 bytes from the sample block: [0] the
+version, 0x0b for types 1, 3 and 5 (`0x897ee0b0`), [1] the type, [3] the rate code, +0xc 0, the rest the old vpsc's),
+vplp (`0x89511940`, from the loops taken at the first detection, so loops are set before the object is made; a loop of
+no length the whole wave), LIST (`0x89515c60`: the old one dropped, INFO with ISFT "V-Synth Ver." and the app's
+version string at `0x89534930`, and ICOP "(C) 2003 Roland Corporation.", 66 bytes), and a band wave's 7 band
+pointers at the data's +0x1c. SOLO's samples stay. vmdl is never written (its writer has no caller: V-Trainer's).
+`003` and `004` differ from the import's blocks in vpsc [0], [1] and [0xc..0xd] alone: the encode's.
+
+**The version.** This rom.2 names itself "0.20" at `0x89534930`; `003` and `004` say "V-Synth Ver.2.01", written by
+the XT's app of the time: 4 bytes of their LIST a capture from this image would decide ([HW]).
+
+**The depth** is in neither file (vpsc [3] is the rate code; vmdl's +0x2f only in V-Trainer's files); both have 2
+events, so any depth whose detection keeps no attack gives their vpdt.
+
+**For a harness**, after the loader: the encoder library's own allocator answers of `XtFwEncode` left off (its chunks
+go through the store's callbacks), the job queue answered, the machine's malloc and pool and the loader's lock
+answers kept; then open, detect, edits, EXECUTE, the job, close, and the writer. The store's 12 MB heap and the
+encoder's mallocs share the machine's 16 MB: a long wave may need either smaller.
+
+### Save Wave on the WAVE page (2026-11-28, v489) {#wave-save}
+
+d-8's second half, its file: the page writes the shown OSC's wave as the XT writes one. No firmware of its own: it
+gives the session to v482 to v488's chain.
+
+**What it writes** (`PluginWaveEdits::save`, `PluginWaveSave.cpp`, new): the OSC's file (the session's
+`loadedFilePath`, `PluginWaveEdits::fileOf`) put in the store by the XT's loader (a plain file imported LITE, an XT
+file as it is), then the session's Truncate (`PluginWaveEdit::cut`, its frames of the file as the XT holds it) by
+rom.2's edit engine, then the loops by its setter, in frames of the wave as it plays after the cut: the forward loop
+the OSC's Loop Start and End as XtSynth reads them (`waveLoopFrame`), the backward loop the session's or the wave's
+own (`PluginWaveEdits::backward`), else the forward's; then the writer. It runs on the encode pool, and the status
+line says "OSC n: Saved …" or why not (no file, the loader's or Truncate's refusal, a band wave's Truncate, a file it
+couldn't write). The Encode Type a session gave it isn't written: a plain file saves LITE and an XT file as its own
+until the encode on the stored wave (next). Its event edits it refuses for the same reason.
+
+**On the page**: Save Wave... at the title line's right; a save dialog beside the loaded file, its name with " edit".
+
+**The check.** `EditorWaveSaveTest.cpp` (new, in `VSynthEmuEditorTest`): the 2-second plain wave with its forward loop
+(10000 … 60000) and a backward loop of the session's (20000 … 50000) dragged, saved: LITE, 88200 frames, the vplp's
+loops those (read back by `xtWaveRead`), the status "Saved"; Truncated on the page to 22050 … 66149 and saved: 44100
+frames, the forward loop the page's after it; that file loaded back plays 44100. The plants: 6 new `editor-save-` (the
+cut or loops not given, the backward loop the forward's, the forward ends swapped, the loops in the wrong frames, the
+file never written) and the WAVE page's others its files reach, 33, all caught. The event edits' refusal and the
+button's act (the save dialog) no check reaches.
+
 ### Every wave loaded by the XT's own loader, a plain file imported (2026-11-28, v488) {#wave-loader}
 
 d-8's second half, its fifth part: the wave the writer writes put in the store as the XT puts one, by its one .wav

@@ -182,6 +182,17 @@ void WaveEditView::revert() {
     PluginWaveEdits::revert(processor_, osc_);
 }
 
+void WaveEditView::saveWave() {
+    const juce::File from = PluginWaveEdits::fileOf(processor_, osc_);
+    const juce::File suggested = from.getSiblingFile(from.getFileNameWithoutExtension() + " edit.wav");
+    chooser_ = std::make_unique<juce::FileChooser>("Save the wave as the XT writes one", suggested, "*.wav");
+    const int flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
+                      juce::FileBrowserComponent::warnAboutOverwriting;
+    chooser_->launchAsync(flags, [this](const juce::FileChooser& chosen) {
+        if (chosen.getResult() != juce::File()) PluginWaveEdits::save(processor_, osc_, chosen.getResult());
+    });
+}
+
 void WaveEditView::mouseDown(const juce::MouseEvent& e) {
     dragging_ = nearest(e.position);
     scrolling_ = dragging_ == Point::none && frames_ > 0;

@@ -562,3 +562,12 @@ editor-play-unread|    readPlaying();|    ;|plugin/Source/UiWaveEdit.cpp|layout
 editor-play-read-once|    if (now == playing_) return;|    if (now == playing_ \|\| playing_ >= 0) return;|plugin/Source/UiWaveEdit.cpp|layout
 editor-play-undrawn|        Ui::fill(g, line.toNearestInt(), colourOf(Mark::playing));|        ;|plugin/Source/UiWaveEditPaint.cpp|layout
 editor-play-as-current|        case Mark::playing: return Look::ready;|        case Mark::playing: return Look::label;|plugin/Source/UiWaveEditPaint.cpp|layout
+# Save Wave (v489): the cut or the loops not given, the backward loop always the forward's, the forward loop's ends
+# swapped, the loops in the wrong frames, the file never written.  (The event edits' refusal and the button's act no
+# check here can reach: the first goes with v490's encode, the second opens the save dialog.)
+editor-save-no-cut|    if (kept.cut) edits.cut = XtWaveCut { kept.keepFrom, kept.keepTo };|    ;|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-no-loops|    edits.loops = loopsOf(start, end, view->frames, backward(p, osc));|    ;|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-bwd-fwd|    l.bwdStart = bwd.backward ? bwd.bwdStart : l.loopStart;|    l.bwdStart = l.loopStart;|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-ends-swapped|{ waveLoopFrame(startPercent, frames), waveLoopFrame(endPercent, frames), 0, 0 }|{ waveLoopFrame(endPercent, frames), waveLoopFrame(startPercent, frames), 0, 0 }|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-frames|loopsOf(start, end, view->frames,|loopsOf(start, end, view->frames * 2,|plugin/Source/PluginWaveSave.cpp|layout
+editor-save-unwritten|        if (!to.replaceWithData(file.data(), file.size()))|        if (false)|plugin/Source/PluginWaveSave.cpp|layout

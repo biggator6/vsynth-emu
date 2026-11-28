@@ -30,6 +30,9 @@ public:
     // the OSC's parameters, as a drag sets them), false where the XT refuses; Revert, the wave as its file has it
     bool truncate();
     void revert();
+    // v489 (d-8's file): a file chosen beside the loaded one, the wave written to it as the XT writes one
+    // (PluginWaveEdits::save), which says on the status line what came of it
+    void saveWave();
     // v481 (UiWaveEditEvents.cpp; the XT's Encode screen, d-9): Current, set by a click on the wave; the wave's events as
     // it plays them; Current to the event before or after it (the screen's 0x89516a90, 0x89516a00); an event added or
     // deleted there (PluginWaveEdits::editEvent, the XT's own routines then judging it)
@@ -76,6 +79,7 @@ private:
     long editFrom_ = 0, editTo_ = 0;              // the Edit region, both ends kept (the XT's Edit Start and End)
     long current_ = 0;                            // the XT's Current (v481)
     long playing_ = -1;                           // the playhead (v485)
+    std::unique_ptr<juce::FileChooser> chooser_;  // Save Wave's (v489)
     std::vector<long> events_;                    // the wave's events as it plays them, in frames
     Point dragging_ = Point::none;
     bool scrolling_ = false;
