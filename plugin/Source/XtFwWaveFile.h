@@ -3,7 +3,9 @@
 // rom.2's own table of waves, its blocks as the XT's store holds them (each its own buffer, none where the wave has
 // none), its samples through rom.2's own data device, the OS's file calls hooked (XtFwFileOut.h).  What it writes is
 // the XT's .wav: RIFF, fmt, then vpfl (the reader's own, built from the other blocks' sizes), vmdl, vpsc, vpno, vplp,
-// vpdt, LIST, rdmd and data, each the wave has.  HARDWARE_FIRMWARE.md {#wave-writer-read}, {#wave-writer}.
+// vpdt, LIST, rdmd and data, each the wave has.  A band wave's bands (v483) are made first by rom.2's own rebuild
+// (0x894a1ef0), as the XT's load makes them, and its samples come through their device.  HARDWARE_FIRMWARE.md
+// {#wave-writer-read}, {#wave-writer}, {#wave-writer-bands}.
 #include "XtFiles.h"
 #include <cstdint>
 #include <string>
@@ -16,6 +18,6 @@ inline bool xtWaveHasBands(int type) {
 }
 
 // `blocks` written as the XT writes a wave (a vpfl given is not used: the writer builds its own).  False, and why,
-// with no image, no vpsc, a band wave (types 3 to 5, whose samples come through its bands' device: not yet), one that
-// doesn't fit the machine, or a write the writer gives up.
+// with no image, no vpsc, one that doesn't fit the machine, a band wave whose bands the rebuild refuses, or a write the
+// writer gives up.
 bool xtFwWaveFile(const XtWaveBlocks& blocks, std::vector<uint8_t>& file, std::string* why = nullptr);

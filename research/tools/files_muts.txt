@@ -81,3 +81,13 @@ wavesave-list|c.wr32(kWaves + 4 * (kNumber & 0x7f), kEntry + kNode);|c.wr32(kWav
 wavesave-node|kNode = 0x18|kNode = 0x1c|wavesave
 wavesave-vmdl-never|for (size_t k = XtWaveBlocks::kVmdl;|for (size_t k = XtWaveBlocks::kVpsc;|wavesave
 wavesave-blocks-order|"vpfl", "vmdl", "vpsc", "vpno", "vplp"|"vpfl", "vmdl", "vpsc", "vplp", "vpno"|wavefile
+# A band wave's bands made by rom.2's rebuild first (v483): the data block's samples' address never put or put
+# wrong, no room asked for, the rebuild never run or on the wrong wave (the override word at -1, so the number
+# finds it), its frames or channels read wrong
+wavesave-samples-never|        if (data) c.wr32(at + kSamplesAt, at + kDataAt);|        ;|wavesave
+wavesave-samples-wrong|c.wr32(at + kSamplesAt, at + kDataAt)|c.wr32(at + kSamplesAt, at + kBytesAt)|wavesave
+wavesave-room-none|putBlocks(c, w, bandRoom(c, *vpsc))|putBlocks(c, w, 0)|wavesave
+wavesave-rebuild-never|    if (xtWaveHasBands((*vpsc)[1]) && !rebuildBands(c, why)) return false;|    ;|wavesave
+wavesave-rebuild-number|{ kRebuild.overrideWord, kNumber }|{ kRebuild.overrideWord, kNumber + 1 }|wavesave
+wavesave-frames-at|kFramesAt = 4|kFramesAt = 8|wavesave
+wavesave-mono|vpsc[kStereoAt] != 0 ? 2u : 1u|1u|wavesave

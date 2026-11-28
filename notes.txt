@@ -738,6 +738,15 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+Band waves saved v483 (2026-11-28, on claude/wave-editor after 73dff7f; HARDWARE_FIRMWARE.md, "A band wave saved";
+  d-8's second half): a BACKING or ENSEMBLE wave's bands made first by rom.2's own rebuild (0x894a1ef0) on its entry, as
+  the XT's load makes them, the data block put as its constructor leaves it (+0x1c its samples' address) with the room
+  rom.2 asks (0x89527980), the store's override word at -1; then the writer, whose band device reads the bands. xt_files'
+  waves saved: the XT's 43 (6 LITE, 31 SOLO, 6 band) 42 back byte for byte; 362 Synth006.wav with 8 frames a step off,
+  moving again saved again ([HW] open: the XT's own load and save of it, captured). Plants: wavesave 16 (7 new), all
+  caught; the first run's two blind ones put right (the override word's, the pool calloc's, its hook taken out: never
+  called). fcheck +1 line changed on purpose; tone --changed none; verify.sh clean.
+
 The vc2-mode merge, continued (2026-11-28, on claude/wave-editor after the merge 7b61487): the live check of the six
   MIDI edits (EditorLiveTest.cpp) runs before the wave checks and checks first that nothing plays (no wave loaded, OSC 1
   PCM, OSC 2 off). The WAVE page's checks wait for their encodes, after which the players play, so midi-edits-only-playing

@@ -1546,6 +1546,48 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A band wave saved, its bands made by rom.2's rebuild (2026-11-28, v483) {#wave-writer-bands}
+
+d-8's second half, its second part: band waves (types 3 to 5, BACKING and ENSEMBLE) written by the writer as the XT
+writes them. Read in rom.2 with Ghidra (decompiled on scratch, never committed) and the pools.
+
+**What the XT does** [FW]. A wave's data block is made by its constructor (`0x894a0b90`, `0x894a0f00`, the block from
+`0x8949e440(64, …)`) with its +0x3c cleared, its +0x1c the address of its own samples (+0x40) and +0x20 … +0x34
+cleared. After a load (`0x894a3630`, which checks the blocks a kind needs, `0x8949e850`), and when the data's +0x3c
+asks (`0x8949f380`), the store calls the bands' rebuild `0x894a1ef0(&override, number)`. For a type 3, 4 or 5 it first
+gives the data block the room the bands want (`0x894a1ce0`: `0x89527980(frames, channels)` against its +0x10, grown
+by `0x8949e540` when short), then makes the load device (0x6c bytes from `0x894a92e0`, vtable `0x898317a4`, set up by
+`0x89529e60`), gives it the samples through the data's +0x1c with the pool's alloc, calloc and free (+0x20,
+`0x894a9900`, the info at its +0x50; `0x894a9a3c` …) and runs it (+0x2c, `0x894a9940`: the load `xtFwLoadBands` runs
+for the players), copies its seven band pointers over the data's +0x1c … +0x34 and deletes it. The writer's band
+device (`0x894a45c0`, vtable `0x89831834`) reads those seven (`0x8949ed70`) and gives the samples out of them. Every
+lookup of the store (the rebuild's, the writer's, `0x8949e850`'s) takes the override word `0x89ce87f8` over the number
+it is given when that word is 0 or more.
+
+**How it runs.** `xtFwWaveFile` puts the data block as its constructor leaves it (its +0x1c its samples' address) and,
+for a band wave, with the room rom.2 asks (`0x89527980` run on the vpsc's frames and channels, its +0x1e and +0x20 as
+the rebuild reads them), as the rebuild's grow would leave it, so the XT's heap isn't needed; the override word at -1,
+so the number finds the wave (the machine's RAM starts at 0, which would find wave 0 whatever the number); then the
+rebuild on the entry (1), then the writer as in v482. The load device is given the pool's calloc but calls it for none
+of the waves here, so the machine doesn't answer it: a wave whose load does would fail at the kernel's lock
+(`0x88008110`), loudly, and its hook would come with that wave's check.
+
+**The check.** `xt_files`' `waves saved:` line counts the band waves with the XT's. The user's project has 6
+(`Emu_test.prj`: 4 BACKING, 2 ENSEMBLE, all stereo, all the XT's): 5 come back as their files byte for byte, so 42 of
+the XT's 43 do (and the others' 36). `362 Synth006.wav` (ENSEMBLE, 26014 frames) comes back with 8 frames moved by one
+step, both channels alike and each one up (6937 for 6936, -8574 for -8575), and saved again from that it moves again
+(the line's "0 saved again the same"): bands rebuilt from a file's samples are not always the bands it was written
+from (its encode's, made from the import), and a sample can come out of them a step off. The interpreter runs rom.2's
+own rebuild and device, so the XT would do the same on a load and save; [HW] open until a capture says so: the wave
+loaded on the XT, saved as a copy, against `xtFwWaveFile`'s. fcheck's baseline has the line changed (`--update`, its
+diff read: that line alone).
+
+**The plants.** `files_muts.txt`'s v483 `wavesave` ones: the samples' address never put or put wrong, no room asked
+for, the rebuild never run, run on the wrong number, the frames or channels read wrong; with v482's, 16, all caught.
+Two plants of the first run could not have failed and were put right: the rebuild on the word after the override's
+(any word but one 0 or more finds the number's wave, and with the override at 0 the number didn't matter), and the
+pool's calloc unanswered (never called; its hook taken out).
+
 ### The XT's wave writer, run (2026-11-27, v482) {#wave-writer}
 
 d-8's second half, its first part: a wave written as the XT writes one, by rom.2's own writer in the interpreter. Read
@@ -1566,7 +1608,8 @@ from the XT's own files ({#wave-writer-read}).
 
 **Band waves** (types 3 to 5) are refused for now. The writer takes their samples from their bands' device (`0x894a45c0`
 makes it, vtable `0x89831834`) over the seven band pointers at the data block's +0x1c (`0x8949ed70`), so the bands come
-first, made by the XT's own load (`kLoadInit`, `kLoad`, as `xtFwLoadBands` makes them): the next version.
+first, made by the XT's own load (`kLoadInit`, `kLoad`, as `xtFwLoadBands` makes them): the next version (v483,
+{#wave-writer-bands}).
 
 **The check.** `xt_files`' new line (`waves saved:`, `XtWaveSaveCheck.cpp`, new): every .wav in the projects' Wave
 folders (`analysis/projects/*/Wave`, found from the ROM's place as the disk image is found beside it), its blocks read
