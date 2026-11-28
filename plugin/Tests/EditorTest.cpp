@@ -208,6 +208,7 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     waveCutChecks(ed, p, work, check);
     waveEventChecks(ed, p, work, check);
     waveZoomChecks(ed, p, work, check);
+    wavePlayChecks(ed, p, work, check);
     keyChecks(l, ed, p, check);
     padChecks(l, ed, p, check);
     patternChecks(l, ed, p, check);

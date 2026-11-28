@@ -1546,6 +1546,31 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The WAVE page's playhead (2026-11-28, v485) {#wave-playhead}
+
+The user's word: a cursor following the time while a key is held, to hear the edits. The XT's SAMPLE screens have none
+(their wave is the edit, not the playing note); a reading of the players' state for the editor, no firmware.
+
+**Where it reads.** Each of the block's four PCM players keeps its place in the wave (`XtSynthVoice.h`,
+`xtWaveFrameOf`, in `XtSynthView.cpp`): the linear one (Vari off) its +0xec in frames; LITE's its walk (+0x110, a
+float in frames; its `position()` is the note-on's +0x38, which doesn't move); SOLO's its phrase position (+0x38, in
+sixteenths); the bands' its +0x38 (sixteenths). The block's choice among them is one function now
+(`xtPcmPlayerOf`) the render (`XtSynthBlock.cpp`'s `pcmBlock`) and the playhead both call. `XtSynthView::take`,
+after each block the players play, keeps the newest sounding note's place in OSC 1's wave and OSC 2's (-1 for an OSC
+that's off, analog, EXT IN or with no wave, or no note), beside its Matrix sums (v464).
+
+**On the page** (`research/UI_DESIGN.md`, WAVE, v485): a green line the wave's height (`ready`), named Playing in the
+key; the editor's timer reads it and draws a few columns about its old and new places again. In an alternating loop
+the LITE walk runs past the loop's end before it turns, and the line follows the walk, not the reflected read.
+
+**The check.** `EditorWavePlayTest.cpp` (new): on a SOLO, a LITE and a BACKING wave and a LITE one with Vari off, a
+held note's place on the wave, moving on at the wave's rate (within half and twice the frames played), drawn there in
+the key's colour; OSC 2, off, none; let go and ended, none. LITE's first reading was its note-on place, which this
+check found standing still. The plants: 10 new `editor-play-` (each player's unit, LITE's note-on place, OSC 2
+given OSC 1's, an OSC off given a place, the view never reading it or once, the line undrawn or in Current's colour)
+and the WAVE page's others the change reaches, 26, all caught; the render's choice by the tone list's 69 the change
+reaches, `pcm-lite-linear` and `pcm-solo-bands` new among them, all caught; fcheck as its baseline.
+
 ### The WAVE page's zoom and key (2026-11-28, v484) {#wave-zoom}
 
 The user's word after trying the page: what the blue and white handles are wasn't plain, nor that the wheel zooms. No

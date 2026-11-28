@@ -43,10 +43,10 @@ void zooms(WavePage& page, WaveEditView& v, TestChecks& check) {
           "Fit doesn't bring the wave back");
 }
 
-// The marks told apart by colour: the loop's handles, the Edit region's, Start and Current each their own (an event's
-// ▼ shares the Edit region's white; the backward loop is the loop's, faint)
+// The marks told apart by colour: the loop's handles, the Edit region's, Start, Current and the playhead (v485) each
+// their own (an event's ▼ shares the Edit region's white; the backward loop is the loop's, faint)
 void coloursApart(TestChecks& check) {
-    const std::array<Mark, 4> apart { Mark::loop, Mark::edit, Mark::start, Mark::current };
+    const std::array<Mark, 5> apart { Mark::loop, Mark::edit, Mark::start, Mark::current, Mark::playing };
     for (size_t i = 0; i < apart.size(); ++i)
         for (size_t j = i + 1; j < apart.size(); ++j)
             check(WaveEditView::colourOf(apart[i]) != WaveEditView::colourOf(apart[j]),

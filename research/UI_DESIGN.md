@@ -173,7 +173,12 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   to 2.000 s of 2.000 s"); under the wave a key, each mark as the view draws it, in its colour, then its name: Loop
   Start, End (`mod`), Backward loop (`mod`, faint), Edit region: Truncate keeps it (`text`), Start Offset (`accent`),
   Event (`text`, ▼), Current (`label`). The colours come from one table the view and the key both read
-  (`WaveEditView::colourOf`); the line is 22 high for its buttons, the key 16, both out of the wave's 340.
+  (`WaveEditView::colourOf`); the line is 22 high for its buttons, the key 16, both out of the wave's 340. v485 (the
+  user's word, 2026-11-28: a cursor following the time while a key is held, to hear the edits): the playhead, a line
+  the wave's height in `ready` (green, nothing else on the wave is), where the newest sounding note plays in the shown
+  OSC's wave, as its player has it after each block; none when that OSC is off or plays no wave, or no note sounds.
+  One note's, the newest, as the knobs' rings follow it. The key names it Playing. The editor's timer reads it and
+  draws a few columns about its old and new places again, not the wave.
 
 The footer's keyboard and its zones' ranges are step 1's.
 

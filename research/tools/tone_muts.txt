@@ -40,6 +40,8 @@ lfo-off|        s.lfo.noteOff();\n|
 free-run-tick|            freeLfo[z].tick(1);|            ;|toneblock
 free-follow|else if (other) s.lfo.noteOnFollow(lfoParams(v, s, o), *other);||toneoscstart
 smooth-walk|s.curWalk = xtOscSmooth(s.curWalk, w);|s.curWalk = w;|toneblock
+pcm-lite-linear|                    s.xfg.block(lr);|                    s.lin.block(lr);|toneblock
+pcm-solo-bands|                    s.solo.renderXt(lr, 32);|                    s.mb.block(lr);|toneblock
 smooth-gain|s.curGain = xtOscSmooth(s.curGain, gt);|s.curGain = gt;|toneblock
 legato-env|        v.env.update(envParams(v));\n        if (v.on) oscEnvs(v, v, Z, false);\n|        v.env.update(envParams(v));\n
 legato-source|v.srcKey = shiftKey(keys.prevMono);|v.srcKey = shiftKey(keys.prevPoly);

@@ -23,6 +23,7 @@ juce::Colour WaveEditView::colourOf(Mark m) {
         case Mark::start: return Look::accent;   // as WaveDisplay::paintStartLine draws it, on the rack's display too
         case Mark::event: return Look::text;
         case Mark::current: return Look::label;
+        case Mark::playing: return Look::ready;   // v485: green, nothing else on the wave is
         case Mark::kMarks: break;
     }
     return Look::text;
@@ -45,7 +46,8 @@ WaveEditView::Mark WaveEditView::markOf(Point p) {
 
 const char* WaveEditView::nameOf(Mark m) {
     static constexpr std::array<const char*, (size_t)Mark::kMarks> kNames {
-        "Loop Start, End", "Backward loop", "Edit region: Truncate keeps it", "Start Offset", "Event", "Current"
+        "Loop Start, End", "Backward loop", "Edit region: Truncate keeps it", "Start Offset", "Event", "Current",
+        "Playing"
     };
     return m == Mark::kMarks ? "" : kNames[(size_t)m];
 }
@@ -64,8 +66,9 @@ void WaveEditView::paintMark(juce::Graphics& g, Mark m, juce::Point<float> centr
         Ui::fillPath(g, mark, c);
         return;
     }
-    const float w = m == Mark::start ? kLineW : 1.0f;   // Start centred on its frame, Current from it, as drawn on the wave
-    const float left = m == Mark::start ? centre.x - w / 2.0f : centre.x;
+    const bool centred = m == Mark::start || m == Mark::playing;   // on its frame; Current from it, as on the wave
+    const float w = centred ? kLineW : 1.0f;
+    const float left = centred ? centre.x - w / 2.0f : centre.x;
     const float h = kStrip - 4.0f;
     Ui::fill(g, juce::Rectangle<float>(left, centre.y - h / 2.0f, w, h).toNearestInt(), c);
 }
@@ -91,6 +94,10 @@ void WaveEditView::paint(juce::Graphics& g) {
     const WaveDisplay::Loop loop { watch_.value(kLoop) >= 0.5f, share(at(Point::fwdStart)), share(at(Point::fwdEnd)) };
     WaveDisplay::paintWave(g, w, shown, loop);
     paintEvents(g);   // v481: the events' marks and Current (UiWaveEditEvents.cpp)
+    if (playing_ >= 0 && playing_ < frames_) {   // v485: the playhead, the wave's height
+        const juce::Rectangle<float> line(xOf(playing_) - kLineW / 2.0f, w.getY(), kLineW, w.getHeight());
+        Ui::fill(g, line.toNearestInt(), colourOf(Mark::playing));
+    }
     paintPoints(g);
     paintRuler(g);
 }

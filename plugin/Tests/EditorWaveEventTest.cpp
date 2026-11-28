@@ -27,15 +27,6 @@ constexpr float kBacking = 2.0f;   // Encode Type's choice
 constexpr float kDepth = 100.0f;
 constexpr float kOtherDepth = 99.0f;
 
-bool saysNow(VSynthEmuProcessor& p, const char* message) {
-    return p.getStatusText().contains(message);
-}
-
-// The processor's status come to say `message`, waited for
-bool comesToSay(VSynthEmuProcessor& p, const char* message) {
-    return waitFor([&] { return saysNow(p, message); });
-}
-
 std::string says(VSynthEmuProcessor& p) {
     return ": " + p.getStatusText().toStdString();
 }

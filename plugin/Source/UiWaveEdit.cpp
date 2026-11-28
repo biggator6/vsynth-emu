@@ -10,6 +10,7 @@ namespace {
 constexpr float kReach = 8.0f;
 constexpr float kZoomPerDelta = 4.0f;   // the wheel's delta to the power of two the window narrows by
 constexpr float kPanPerDelta = 0.5f;    // and a sideways delta to the share of the window it moves by
+constexpr int kPlayingReach = 3;        // the columns either side of the playhead drawn again as it moves (v485)
 
 // In Watched's order, the OSC's own (Params::oscId)
 juce::StringArray watched(int osc) {
@@ -57,11 +58,22 @@ void WaveEditView::refresh() {
         madeSpan_ = -1;
         repaint();
     }
+    readPlaying();
     if (dragging_ == Point::bwdStart || dragging_ == Point::bwdEnd) return;
     const PluginWaveEdit bwd = PluginWaveEdits::backward(processor_, osc_);
     if (bwd == bwd_) return;
     bwd_ = bwd;
     repaint();
+}
+
+// The playhead as the synth last left it (v485): a few columns about its old and new places drawn again, not the
+// whole wave, as it moves on every tick a note plays
+void WaveEditView::readPlaying() {
+    const long now = frames_ > 0 ? processor_.modulation().frame(osc_) : -1;
+    if (now == playing_) return;
+    for (const long f : { playing_, now })
+        if (f >= 0) repaint(juce::Rectangle<int>((int)xOf(f) - kPlayingReach, 0, 2 * kPlayingReach + 1, getHeight()));
+    playing_ = now;
 }
 
 long WaveEditView::at(Point p) const {

@@ -21,6 +21,15 @@ inline bool waitFor(const std::function<bool()>& done) {
     return done();
 }
 
+inline bool saysNow(VSynthEmuProcessor& p, const char* message) {
+    return p.getStatusText().contains(message);
+}
+
+// The processor's status come to say `message`, waited for (EditorWaveEventTest.cpp's, v481; shared by v485)
+inline bool comesToSay(VSynthEmuProcessor& p, const char* message) {
+    return waitFor([&] { return saysNow(p, message); });
+}
+
 // XtSynth's own loop end from the controls the processor plays from (XtSynth::waveLoop's reading of the OSC's Loop
 // Start and End: a share of the last frame, rounded)
 inline long played(float share, long frames) {

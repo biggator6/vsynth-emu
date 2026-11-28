@@ -45,7 +45,10 @@ public:
     juce::String shown() const;
     // Each kind of mark on the wave, in the page's key's order (UiWaveEditPaint.cpp): its colour, the kind a point is,
     // a mark drawn as the view draws it about `centre` (a handle, a line, an event's ▼), and the key's name for it
-    enum class Mark { loop, backward, edit, start, event, current, kMarks };
+    enum class Mark { loop, backward, edit, start, event, current, playing, kMarks };   // playing: v485
+    // v485 (the user's word, 2026-11-28): where the newest note plays in this OSC's wave, in frames, as the editor's
+    // timer last read it from the synth (XtSynthView::frame); -1 for none
+    long playing() const { return playing_; }
     static juce::Colour colourOf(Mark m);
     static Mark markOf(Point p);
     static void paintMark(juce::Graphics& g, Mark m, juce::Point<float> centre);
@@ -72,6 +75,7 @@ private:
     PluginWaveEdit bwd_;                          // the backward loop as drawn: the synth's, or the one being dragged
     long editFrom_ = 0, editTo_ = 0;              // the Edit region, both ends kept (the XT's Edit Start and End)
     long current_ = 0;                            // the XT's Current (v481)
+    long playing_ = -1;                           // the playhead (v485)
     std::vector<long> events_;                    // the wave's events as it plays them, in frames
     Point dragging_ = Point::none;
     bool scrolling_ = false;
@@ -90,4 +94,5 @@ private:
     void paintPoints(juce::Graphics&) const;
     void paintRuler(juce::Graphics&) const;
     void paintEvents(juce::Graphics&) const;
+    void readPlaying();                           // the playhead from the synth, its old and new columns drawn again
 };

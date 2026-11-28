@@ -738,6 +738,14 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The WAVE page's playhead v485 (2026-11-28, on claude/wave-editor after v484; HARDWARE_FIRMWARE.md, "The WAVE page's
+  playhead"; the user's word: a cursor following the time while a key is held, to hear the edits): the newest sounding
+  note's place in each OSC's wave, read after each block from its player (XtSynthView::take, xtWaveFrameOf: the linear
+  one's and LITE's walk in frames, SOLO's and the bands' in sixteenths), the block's choice of player one xtPcmPlayerOf
+  the render and the playhead share; a green line the wave's height, Playing in the key, a few columns drawn again as it
+  moves. EditorWavePlayTest.cpp (new): VSynthEmuEditorTest 5461/5461. Plants: panel 26 (10 new), tone 69 (2 new), all
+  caught; fcheck as baseline; verify.sh clean, every render bit-identical.
+
 The WAVE page's zoom and key v484 (2026-11-28, on claude/wave-editor after v483; HARDWARE_FIRMWARE.md, "The WAVE
   page's zoom and key"; the user's word: the handles' colours and the wheel's zoom weren't plain): -, + and Fit at the
   right of the wave's line with the window shown ("0.00 ms to 2.000 s of 2.000 s"), the wheel's zoom made one routine

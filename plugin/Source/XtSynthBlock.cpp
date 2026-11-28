@@ -133,10 +133,20 @@ void XtSynth::toneUpdate(Voice& v) {
 void XtSynth::voiceRender(Voice& v, float* tmp, float* tmp2, const int32_t* in) {
         // A PCM OSC's player, in the XT's units (int16 × 65536); the players' gains are the firmware's
         auto pcmBlock = [](OscVoice& s, float* lr) {
-            if (s.linear) s.lin.block(lr);
-            else if (s.lite) s.xfg.block(lr);
-            else if (s.wave->type == 1) s.solo.renderXt(lr, 32);
-            else s.mb.block(lr);
+            switch (xtPcmPlayerOf(s)) {   // the playhead's choice too (v485)
+                case XtPcmPlayer::linear:
+                    s.lin.block(lr);
+                    break;
+                case XtPcmPlayer::lite:
+                    s.xfg.block(lr);
+                    break;
+                case XtPcmPlayer::solo:
+                    s.solo.renderXt(lr, 32);
+                    break;
+                case XtPcmPlayer::bands:
+                    s.mb.block(lr);
+                    break;
+            }
         };
         // The tone's render by its Structure Type (xtToneOrder), all in the XT's units
         uint32_t mask2 = 0;

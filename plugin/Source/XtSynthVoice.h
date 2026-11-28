@@ -60,6 +60,20 @@ struct XtOscVoice {
     XtAnalogOsc ana;               // kept across notes: its phase runs on
     XtExtInPlayer ext;             // kind 4's player (0x895097d0)
 };
+
+// The player a PCM OSC's note plays through, as the block renders it: the linear one with Vari off, LITE's on a LITE
+// wave, SOLO's, or the bands' (v485: the one choice the render and the editor's playhead both make)
+enum class XtPcmPlayer { linear, lite, solo, bands };
+inline XtPcmPlayer xtPcmPlayerOf(const XtOscVoice& s) {
+    if (s.linear) return XtPcmPlayer::linear;
+    if (s.lite) return XtPcmPlayer::lite;
+    return s.wave->type == 1 ? XtPcmPlayer::solo : XtPcmPlayer::bands;
+}
+// Where in its wave an OSC's note plays, in the wave's frames (its player's place: the linear player's and LITE's walk
+// in frames, SOLO's and the bands' in sixteenths); -1 for an OSC that doesn't sound or plays no wave (XtSynthView.cpp,
+// v485)
+int32_t xtWaveFrameOf(const XtOscVoice& s);
+
 struct XtVoice : XtOscVoice {                  // OSC 1's in the base
     XtOscVoice osc2;
     int zone = 0;                  // the patch's zone the note plays, 0 for zone 1 (the block's +0x6c6; the tone's +0x1c, part and zone)

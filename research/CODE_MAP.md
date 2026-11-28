@@ -57,7 +57,8 @@ Moved here as it stood from CLAUDE.md (2026-11-23, the user's "Yes, all five"), 
   controller and a block of messages into a processor, MidiTest's and the editor's; v465, `levelRoute` (a Matrix route
   from a controller onto OSC 1's Level, what the synth itself takes of it read by its sum) and `holdBlocks`. v464, the knobs' rings:
   `XtSynthView` (the newest note's Matrix sums and MSM terms, copied from XtSynth's voices by a friend after each block
-  into atomics; the processor's `modulation()`), `UiModRings` (`ModRings`, the editor's: which knob a sum lands on
+  into atomics; the processor's `modulation()`; v485 its place in each OSC's wave, `xtWaveFrameOf`, for the WAVE
+  page's playhead, through the block's one choice of player, `xtPcmPlayerOf` in `XtSynthVoice.h`), `UiModRings` (`ModRings`, the editor's: which knob a sum lands on
   straight, by a table, each instance's by index; each shown knob's ring on the timer). Checked by
   `VSynthEmuEditorTest`'s `ringChecks` (EditorLiveTest.cpp) and the `editor-d-ring-` plants.
 - `research/UI_DESIGN.md`: the editor's design, which new UI work follows.

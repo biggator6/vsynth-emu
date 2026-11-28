@@ -549,3 +549,16 @@ editor-key-undrawn|        WaveEditView::paintMark(g, it.mark, it.swatch);|     
 editor-key-handle-other|        paintMark(g, markOf(p), handle(p));|        paintMark(g, Mark::edit, handle(p));|plugin/Source/UiWaveEditPaint.cpp|layout
 editor-key-loop-white|        case Mark::loop: return Look::mod;|        case Mark::loop: return Look::text;|plugin/Source/UiWaveEditPaint.cpp|layout
 editor-key-current-start|        case Mark::current: return Look::label;|        case Mark::current: return Look::accent;|plugin/Source/UiWaveEditPaint.cpp|layout
+# The WAVE page's playhead (v485): a player's place read in the wrong unit or LITE's note-on place for its walk, OSC 2
+# given OSC 1's, an OSC off given a place, the view never reading it or only once, the line undrawn, its colour
+# Current's
+editor-play-lite-start|return (int32_t)s.xfg.walkPosition();|return s.xfg.position() >> 4;|plugin/Source/XtSynthView.cpp|layout
+editor-play-solo-units|return s.solo.position() >> 4;|return s.solo.position();|plugin/Source/XtSynthView.cpp|layout
+editor-play-bands-units|return s.mb.position() >> 4;|return s.mb.position();|plugin/Source/XtSynthView.cpp|layout
+editor-play-linear-units|return s.lin.position();|return s.lin.position() >> 4;|plugin/Source/XtSynthView.cpp|layout
+editor-play-osc2-osc1|xtWaveFrameOf(newest->osc2)|xtWaveFrameOf(*newest)|plugin/Source/XtSynthView.cpp|layout
+editor-play-off-shown|if (!s.on \|\| s.analog \|\| s.extIn \|\| s.wave == nullptr) return -1;|if (s.wave == nullptr) return -1;|plugin/Source/XtSynthView.cpp|layout
+editor-play-unread|    readPlaying();|    ;|plugin/Source/UiWaveEdit.cpp|layout
+editor-play-read-once|    if (now == playing_) return;|    if (now == playing_ \|\| playing_ >= 0) return;|plugin/Source/UiWaveEdit.cpp|layout
+editor-play-undrawn|        Ui::fill(g, line.toNearestInt(), colourOf(Mark::playing));|        ;|plugin/Source/UiWaveEditPaint.cpp|layout
+editor-play-as-current|        case Mark::playing: return Look::ready;|        case Mark::playing: return Look::label;|plugin/Source/UiWaveEditPaint.cpp|layout
