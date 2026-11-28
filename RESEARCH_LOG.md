@@ -4430,7 +4430,7 @@ Round-2 recordings.  First build-out after that: real-time granular port
   button's drag finds the mouse over nothing and lets the button up, and JUCE counts no event as a drag unless told:
   a click, then a drag it counts, across as well as up, caught both.
 
-### Session 30 (2026-11-27 to 11-28) — v478 to v487: the WAVE page and the XT's own wave writer
+### Session 30 (2026-11-27 to 11-28) — v478 to v491: the WAVE page and the XT's own wave writer
 
 - The coordinator's brief: research/NEXT_ISSUES.md items 5 and 6, Start Offset in time and a wave display to edit
   start, end, loops and events, so V-Producer isn't needed. The user took all four recommendations (d-7 ms then s;
@@ -4459,3 +4459,13 @@ Round-2 recordings.  First build-out after that: real-time granular port
   import and its own files' load alike; it makes LITE with default blocks, never encodes, and never writes the
   "V-Synth Ver." LIST. The project's `005` and `006` are its output, `003` and `004` its output encoded: the next
   versions' references.
+- v488 put every wave in the store by that loader, with the store's heap made by rom.2, and the entry the harness had
+  laid out by hand since v482 went: every line stayed the same, and the plain files came out as `005` and `006`. v490
+  ran the Encode EXECUTE on the stored wave from a second subagent's read, and the raw files, imported, encoded SOLO and
+  written, are the XT's own `003` and `004` byte for byte but the app's version in their LIST, which this image says is
+  "0.20" and theirs "2.01". Both ran on the first try; the reads were that good.
+- Save Wave (v489, v491) gives the session to that chain: the cut, the loops, and the encode the synth plays with its
+  event edits, the saved events the same as the plugin's own encode plays. Plants again shaped the checks: the depth
+  given the encode no test wave here shows, and an older XT's file was needed to show a needless re-encode.
+- Open for captures from the user's XT: Synth006's frames a step off, a band wave's Truncate (refused meanwhile), and
+  the app's version an encode writes.
