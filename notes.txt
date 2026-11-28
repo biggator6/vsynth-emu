@@ -738,6 +738,13 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The vc2-mode merge, continued (2026-11-28, on claude/wave-editor after the merge 7b61487): the live check of the six
+  MIDI edits (EditorLiveTest.cpp) runs before the wave checks and checks first that nothing plays (no wave loaded, OSC 1
+  PCM, OSC 2 off). The WAVE page's checks wait for their encodes, after which the players play, so midi-edits-only-playing
+  (the edits made only while the players run) went uncaught after the merge; in vc2-mode its catch hung on the wave
+  check's encode not yet done. The merge's 127 panel plants: 126 caught, then it and the 67 editor ones after the move,
+  all caught; verify.sh clean, the merged build installed.
+
 The wave writer v482 (2026-11-27, on claude/wave-editor after v481; HARDWARE_FIRMWARE.md, "The XT's wave writer, run";
   d-8's second half): rom.2's own writer (0x89496590) in the interpreter, on an entry put in its store's table of waves
   (0x89ce87fc, wave 0) with the wave's blocks in buffers as the store holds them, its vpfl and data device rom.2's;

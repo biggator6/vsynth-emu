@@ -202,6 +202,7 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     rackChecks(l, ed, p, check);
     lowerChecks(l, ed, p, check);
     pagesChecks(l, ed, check);
+    liveChecks(l, ed, p, check);   // before any wave is loaded: the edits as made with nothing playing
     waveChecks(ed, p, work, check);
     wavePageChecks(ed, p, work, check);
     waveCutChecks(ed, p, work, check);
@@ -210,7 +211,6 @@ int editorTest(const juce::File& rom, const juce::File& work, const juce::String
     padChecks(l, ed, p, check);
     patternChecks(l, ed, p, check);
     learnChecks(l, ed, p, check);
-    liveChecks(l, ed, p, check);
     ringChecks(l, ed, p, check);
     vc2Checks(l, ed, p, check, [&] { sizes(l, ed, check); });
     vc2TextChecks(ed, p, check);

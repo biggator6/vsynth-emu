@@ -1,10 +1,14 @@
 // Controls that follow their values live (v464; research/NEXT_ISSUES.md item 2, the user's d-5): a stored value the
 // firmware's MIDI edits (rom.2's OS part: CC 5, 65, 126 and 127, RPN 0, 1 and 2) moves its own control on the PLAY page
 // once the message thread has handed the edit on, as a host's automation does (which LayoutCheck::asItsParameter holds
-// every control to); and its control stays where it was until then, the synth already playing the edit.
+// every control to); and its control stays where it was until then, the synth already playing the edit.  Made with
+// nothing playing, no wave loaded and no OSC needing none, as a fresh instance has it: the edits are made whatever
+// plays, and only this check can show them made while the players don't (the merge of vc2-mode into the wave editor,
+// whose checks leave a wave encoded and playing).
 #include "EditorTest.h"
 #include "TestControls.h"
 #include "TestMidi.h"
+#include "../Source/PluginParamIds.h"
 #include "../Source/UiMidiLearn.h"
 #include <utility>
 
@@ -19,6 +23,10 @@ double shownFor(LayoutCheck& l, const juce::String& id) {
 }  // namespace
 
 void liveChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
+    const bool pcm = juce::roundToInt(p.apvts.getRawParameterValue(Params::kOscType)->load()) == Params::kOscTypePcm;
+    const bool osc2 = p.apvts.getRawParameterValue(Params::oscId(1, Params::kOscSwitch))->load() >= 0.5f;
+    check(!p.hasFileLoaded(0) && !p.hasFileLoaded(1) && pcm && !osc2, "the live check should run with nothing "
+          "playing (EditorTest.cpp: before the wave checks), or it can't show the edits made while nothing plays");
     ed.showPage(Blocks::kPlayPage);
     const double timeWas = shownFor(l, "portaTime");
     playMessages(p, { controller(5, 100), controller(65, 127), controller(126, 0), controller(101, 0),
