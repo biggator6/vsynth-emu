@@ -174,6 +174,8 @@ target_sources(VSynthEmu PRIVATE
     Source/XtDiskImage.cpp
     Source/XtPresetWaves.cpp
     Source/XtFwPatchFile.cpp
+    Source/XtFwFileOut.cpp
+    Source/XtFwWaveFile.cpp
     Source/XtPatchIds.cpp
     Source/XtPatch.cpp
     Source/XtFxChip.cpp

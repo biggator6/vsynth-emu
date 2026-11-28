@@ -2,6 +2,7 @@
 // V-Synth's own files: a wave (.vpw, and the preset waves in the firmware's disk image) and a patch (.p00), read the way
 // the firmware reads them, through its own routines in the interpreter (XtFirmware) and its descriptors from rom.2 at run
 // time.  HARDWARE_FIRMWARE.md, "V-Synth's files".  Needs xtFwOpen.  Not for the audio thread.
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -63,6 +64,14 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
 // for a type with no events or a vpdt too short for them (v481, out of xtWaveRead's: the WAVE page shows a wave's events)
 std::vector<int32_t> xtVpdtEvents(const std::vector<uint8_t>& vpdt, int type, int channels);
 std::vector<int32_t> xtVpdtEvents(const uint8_t* vpdt, size_t bytes, int type, int channels);   // a chunk where it is
+// A wave's blocks as the XT's store holds them and its writer writes them (v482, XtFwWaveFile.h), in the writer's
+// order (0x89496590): each chunk's bytes, none where the file has none
+struct XtWaveBlocks {
+    enum Block : size_t { kVpfl, kVmdl, kVpsc, kVpno, kVplp, kVpdt, kList, kRdmd, kData, kCount };
+    std::array<std::optional<std::vector<uint8_t>>, kCount> bytes;
+};
+// A .vpw's or a project's .wav's blocks; false, and why, with no vpsc or a chunk that runs past the end
+bool xtWaveBlocksOf(const uint8_t* file, size_t size, XtWaveBlocks& out, std::string* why = nullptr);
 // Its encode type alone, vpsc's byte 1, by the same chunks and without its audio (v600: a preset wave against its sample's
 // kind byte, XtPresetWaves); none when there's no vpsc
 std::optional<int> xtWaveEncodeType(const uint8_t* file, size_t size);
@@ -185,4 +194,7 @@ int xtWaveCheckOwn(const std::vector<uint8_t>& disk, size_t at);
 // A patch saved by the firmware's own routines (XtPatchSaveCheck.cpp, v602): the image's patches back as their files,
 // and values set by the firmware's setters read back by the port's reads; prints its line, gives how many came out wrong
 int xtPatchSaveCheck(const XtDiskImage& disk, bool first);
+// A wave saved by the firmware's own writer (XtWaveSaveCheck.cpp, v482): each wave of the projects beside the ROM's
+// folders written again, the XT's back as their files; prints its line, gives how many of the XT's came out otherwise
+int xtWaveSaveCheck(const std::string& rom, bool first);
 #endif

@@ -1,21 +1,20 @@
 // A patch saved as the firmware saves one: see XtFwPatchFile.h (v602).
 #include "XtFwPatchFile.h"
 #include "XtFirmware.h"
+#include "XtFwFileOut.h"
 #include "XtFwMachine.h"
 #include <memory>
 
 using xtfile::fail;
 
 namespace {
-// [FW] rom.2's own: the setters of the two banks, the store's file layout, the .p00 writer (path, file layout) and what
-// it calls of the OS (open, write, close, and the remove it calls when a write comes up short)
+// [FW] rom.2's own: the setters of the two banks, the store's file layout, and the .p00 writer (path, file layout),
+// its file calls answered by XtFwFileOut's hooks
 constexpr uint32_t kSet = 0x894818b0, kSetTyped = 0x89481e20, kToFile = 0x8947de90, kWriter = 0x8948fc30;
-constexpr uint32_t kOpen = 0x89484850, kWrite = 0x89484930, kClose = 0x89486d80, kRemove = 0x89484a60;
 // [FW] the descriptor banks: 12 bytes an ID from 0x897a167c, 8 from 0x897a56d8 for the IDs past them
 constexpr uint32_t kDescs = 0x897a167c, kDescBytes = 12, kTypedDescs = 0x897a56d8, kTypedBytes = 8;
 // Where the harness puts them (XtFwMachine.h's memory, as xtFwPatchStore uses it)
 constexpr uint32_t kStore = xtfw::kSamp, kFile = xtfw::kSamp + 0x2000, kPath = xtfw::kSamp + 0x4000;
-constexpr uint32_t kHandle = 3, kWritten = 1;   // the handle the open hook gives; the writer's answer when it wrote all
 constexpr char kPathText[] = "A:\\SAVE.P00";
 
 bool failed(std::string* why, const char* what, const Sh4& c) {
@@ -68,23 +67,5 @@ bool xtFwPatchFile(const std::vector<uint8_t>& store, std::vector<uint8_t>& file
     if (!m) return false;
     Sh4& c = m->cpu;
     if (!c.call(kToFile, { kFile, kStore }, xtfw::kStack)) return failed(why, "the firmware's file layout failed", c);
-    std::vector<uint8_t> written;
-    bool removed = false;
-    c.hook(kOpen, [](Sh4& s) { s.ret(kHandle); });
-    c.hook(kWrite, [&written](Sh4& s) {
-        std::vector<uint8_t> bytes(s.r[6]);
-        s.read(s.r[5], bytes.data(), bytes.size());
-        written.insert(written.end(), bytes.begin(), bytes.end());
-        s.ret(s.r[6]);
-    });
-    c.hook(kClose, [](Sh4& s) { s.ret(0); });
-    c.hook(kRemove, [&removed](Sh4& s) {
-        removed = true;
-        s.ret(0);
-    });
-    c.write(kPath, kPathText, sizeof kPathText);
-    if (!c.call(kWriter, { kPath, kFile }, xtfw::kStack)) return failed(why, "the firmware's writer failed", c);
-    if (removed || c.r[0] != kWritten) return fail(why, "the firmware's writer gave the file up");
-    file = std::move(written);
-    return true;
+    return xtfw::runWriter(c, { kWriter, kPath, kPathText, kFile }, file, why);   // its file calls hooked (v482)
 }

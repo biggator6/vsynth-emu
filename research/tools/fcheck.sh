@@ -87,7 +87,9 @@ h='echo "== bandcmp"; '
 for spec in "3 drum.bin 2 1.0 1.0 30000" "3 drum.bin 2 1.3 -1.0 30000" "5 chord.bin 1 0.8 1.5 30000" "5 chord.bin 1 1.0 0.0 20000 3000:1.0 8000:-0.5" \
             "5 vocal.bin 1 0.03 -0.2 3000 0:0.015" "3 drum.bin 2 0.5 -0.5 8000 0:0.3"; do
   part xt_fw "${h}echo \"band $spec: \$(\"\$X/xt_fw\" \"\$ROM\" bandcmp $spec 2>&1 | tail -1)\""; h=""; done
-# V-Synth's files: the disk image's preset waves and patches against the firmware's own routines
+# V-Synth's files: the disk image's preset waves and patches against the firmware's own routines, and the projects'
+# waves written again by its writer (v482: they are read, from the ROM's place)
+FILES=("$REPO"/analysis/projects/*/Wave/*.wav)
 [ -x "$X/xt_files" ] && part xt_files 'echo "== xt_files"; "$X/xt_files" "$ROM"'
 # The arpeggiator against the firmware's own object: the disk image's patches with it on, and random cases (v188)
 [ -x "$X/xt_arp" ] && part xt_arp 'echo "== xt_arp"; "$X/xt_arp" "$ROM" 1000 2024'

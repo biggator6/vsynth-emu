@@ -10,6 +10,9 @@ namespace {
 // rom.2's OS calls the machine answers (see research/HARDWARE_FIRMWARE.md)
 constexpr uint32_t kMalloc = 0x89527910, kCalloc = 0x89527930, kFree = 0x89527950;
 constexpr uint32_t kOsInit = 0x895278f0, kUi = 0x89511360;
+// The pool allocator and its free (0x89300770, 0x89300840), which lock the dispatch through the kernel (0x89301880):
+// the wave writer's 16 KB staging buffer (0x894a4110), v482
+constexpr uint32_t kPoolAlloc = 0x89300770, kPoolFree = 0x89300840;
 std::atomic<bool> nearestAll { false };   // roundNearest's, set before a harness's machines are made
 } // namespace
 
@@ -28,8 +31,10 @@ Machine::Machine(const std::string& rom, std::size_t samples) {
         return p;
     };
     cpu.hook(kMalloc, [alloc](Sh4& c) { c.ret(alloc(c.r[4])); });
+    cpu.hook(kPoolAlloc, [alloc](Sh4& c) { c.ret(alloc(c.r[4])); });
     cpu.hook(kCalloc, [alloc](Sh4& c) { c.ret(alloc(c.r[4] * std::max(1u, c.r[5]))); });
     cpu.hook(kFree, [](Sh4& c) { c.ret(0); });
+    cpu.hook(kPoolFree, [](Sh4& c) { c.ret(0); });
     cpu.hook(kOsInit, [](Sh4& c) { c.ret(0); });
     cpu.hook(kUi, [](Sh4& c) { c.ret(0); });
     ok = true;

@@ -60,7 +60,20 @@ preset-bytes|const size_t bytes = (next == streams.end() ? d.size() : *next) - a
 link-number|kLinkNumberAt = 8,|kLinkNumberAt = 12,|presetwaves
 link-trim|s.erase(s.find_last_not_of(' ') + 1);|;|presetwaves
 save-layout-order|c.call(kToFile, { kFile, kStore }, xtfw::kStack)|c.call(kToFile, { kStore, kFile }, xtfw::kStack)|patchsave
-save-writer-args|c.call(kWriter, { kPath, kFile }, xtfw::kStack)|c.call(kWriter, { kPath, kStore }, xtfw::kStack)|patchsave
-save-short-write|        s.ret(s.r[6]);\n    });|        s.ret(s.r[6] - 1);\n    });|patchsave
+save-writer-args|{ kWriter, kPath, kPathText, kFile }|{ kWriter, kPath, kPathText, kStore }|patchsave
+save-short-write|        s.ret(s.r[6]);\n    });|        s.ret(s.r[6] - 1);\n    });|fileout
 save-typed-desc|static_cast<uint32_t>(typed ? v.base : v.id)|static_cast<uint32_t>(v.id)|patchsave
 save-typed-section|xtPatchSection(typed && t ? v.base + t->slot : v.id, v.zone, v.cosm)|xtPatchSection(v.id, v.zone, v.cosm)|patchsave
+# A wave saved by rom.2's own writer (v482, XtFwWaveFile.cpp), by xt_files' waves saved: line: the XT's word at 0x10
+# (left 0, or its page unmapped), a block's bytes or the data's at the wrong place, two blocks' pointers swapped, the
+# entry's node or its list wrong, the vmdl never put; the blocks read in the wrong order (XtWaveFile.cpp)
+wavesave-low-word|kLowWordIs = 9;|kLowWordIs = 0;|wavesave
+wavesave-unmapped|    c.mapRam(kLowPage, kLowPageBytes);\n    c.wr32(kLowWord, kLowWordIs);|    ;|wavesave
+wavesave-data-at|kDataAt = 0x40|kDataAt = 0x1c|wavesave
+wavesave-bytes-at|kBytesAt = 0x1c|kBytesAt = 0x20|wavesave
+wavesave-list-rdmd|0x34, 0x40, 0x3c, 0x38 }|0x34, 0x3c, 0x40, 0x38 }|wavesave
+wavesave-vpno-vplp|0x28, 0x2c, 0x30, 0x34|0x28, 0x30, 0x2c, 0x34|wavesave
+wavesave-list|c.wr32(kWaves + 4 * (kNumber & 0x7f), kEntry + kNode);|c.wr32(kWaves + 4, kEntry + kNode);|wavesave
+wavesave-node|kNode = 0x18|kNode = 0x1c|wavesave
+wavesave-vmdl-never|for (size_t k = XtWaveBlocks::kVmdl;|for (size_t k = XtWaveBlocks::kVpsc;|wavesave
+wavesave-blocks-order|"vpfl", "vmdl", "vpsc", "vpno", "vplp"|"vpfl", "vmdl", "vpsc", "vplp", "vpno"|wavefile

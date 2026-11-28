@@ -1546,6 +1546,43 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### The XT's wave writer, run (2026-11-27, v482) {#wave-writer}
+
+d-8's second half, its first part: a wave written as the XT writes one, by rom.2's own writer in the interpreter. Read
+in {#wave-writer-read}.
+
+**How it runs.** `xtFwWaveFile` (`XtFwWaveFile.cpp`, new), on a machine of its own: the wave's blocks
+(`xtWaveBlocksOf`, `XtWaveFile.cpp`: the nine the writer writes, in its order, found by the one chunk finder the reader
+uses, now over a list of tags) each in a buffer as the store holds it (its size at +0x10, its bytes from +0x1c, the
+data's from +0x40 with its size 0x20 more), an entry pointing at them (vmdl at +0x24 … LIST at +0x40; none where the
+wave has no such block), its node (the entry's +0x18) alone in list 0 of rom.2's table of waves (`0x89ce87fc`) as wave
+0, and the writer called, `0x89496590("A:\WAVE.WAV", 0)`. Its reader, the vpfl its open builds and the data's device
+(types 0 to 2: a copy out of the data block, `0x894a9340`) are rom.2's. The OS's file calls are answered as the .p00
+writer's were, the hooks now one function both call (`xtfw::runWriter`, `XtFwFileOut.cpp`, out of `XtFwPatchFile.cpp`);
+the machine answers rom.2's pool allocator as well (`0x89300770`, `0x89300840`: the writer's 16 KB staging buffer; it
+locks through the kernel at `0x89301880`, which no harness had reached), as it answers malloc. Address 0x10 is mapped
+and holds 9, the XT's word there, which the vpfl's builder reads for a vmdl the wave has none of: a [HW] fact taken
+from the XT's own files ({#wave-writer-read}).
+
+**Band waves** (types 3 to 5) are refused for now. The writer takes their samples from their bands' device (`0x894a45c0`
+makes it, vtable `0x89831834`) over the seven band pointers at the data block's +0x1c (`0x8949ed70`), so the bands come
+first, made by the XT's own load (`kLoadInit`, `kLoad`, as `xtFwLoadBands` makes them): the next version.
+
+**The check.** `xt_files`' new line (`waves saved:`, `XtWaveSaveCheck.cpp`, new): every .wav in the projects' Wave
+folders (`analysis/projects/*/Wave`, found from the ROM's place as the disk image is found beside it), its blocks read
+and written again, against its file. 88 waves: 9 unread (plain .wav files, no vpsc), 6 band waves not written; the
+XT's 37 (its LIST naming `V-Synth Ver.`: 6 LITE, 31 SOLO) all back as their files byte for byte, and the 36 others (35
+LITE, V-Trainer's SOLO with its vmdl) too. The image's 512 patches still come back through the shared hooks. fcheck's
+baseline has the line added (`--update`, its diff read), its section's key the projects' waves.
+
+**The plants.** `files_muts.txt`'s new `wavesave` ones (the XT's word at 0x10 left 0 or its page unmapped, a block's
+bytes or the data's at the wrong place, LIST and rdmd or vpno and vplp swapped, the entry's node or its list wrong, the
+vmdl never put) and `wavesave-blocks-order` (the blocks read out of the writer's order, `XtWaveFile.cpp`), with
+`save-short-write` moved onto `XtFwFileOut.cpp` (port `fileout`) and `save-writer-args` onto `runWriter`'s call: with
+the `wavefile`, `presetwaves`, `patchsave` and `files` ones the changed files reach, 48, all caught; `mutate_tone.py
+--changed 7e29636`: 1, caught. The plugin's 14 test targets and patch apply as before (editor 5298/5298), `ab.sh`
+4/4 identical, built and run without the plugin's install (vc2-mode's was being tested).
+
 ### The XT's wave writer and the store it writes, read (2026-11-27, for v482) {#wave-writer-read}
 
 For d-8's second half, the edit written to a file by the firmware's own writer. Read in rom.2 with Ghidra (decompiled

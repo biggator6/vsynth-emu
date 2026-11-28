@@ -13,13 +13,18 @@ using xtfile::le32;
 
 namespace {
 
-// The chunks the reader takes, each by its place here
+// The chunks a list of tags finds, each by its place in it: the reader's, and the writer's blocks (v482), each list
+// ending at the data
+template <size_t N> struct ChunksOf {
+    std::array<const uint8_t*, N> at {};
+    std::array<uint32_t, N> bytes {};
+};
 constexpr std::array<const char*, 6> kIds = { "vpfl", "vpsc", "vplp", "vpno", "vpdt", "data" };
 enum ChunkAt : size_t { Fl, Sc, Lp, No, Dt, Data };
-struct Chunks {
-    std::array<const uint8_t*, kIds.size()> at {};
-    std::array<uint32_t, kIds.size()> bytes {};
-};
+using Chunks = ChunksOf<kIds.size()>;
+// [FW] the writer's blocks by their tags, in its order (0x89496590's, from 0x897a7de4): XtWaveBlocks::Block's
+constexpr std::array<const char*, XtWaveBlocks::kCount> kBlockIds = { "vpfl", "vmdl", "vpsc", "vpno", "vplp",
+                                                                      "vpdt", "LIST", "rdmd", "data" };
 
 // Where a type's events sit in its vpdt, in halfwords: a SOLO wave's every 10 (16 stereo) from 8, a band wave's every
 // 0x2e (0x58 stereo) from 14.  A LITE wave (0) has none.
@@ -27,17 +32,20 @@ struct VpdtLayout { uint32_t mono, stereo, first; };
 constexpr VpdtLayout kSolo { 10, 16, 8 }, kBand { 0x2e, 0x58, 14 };
 constexpr std::array<const VpdtLayout*, 6> kLayouts = { nullptr, &kSolo, nullptr, &kBand, nullptr, &kBand };
 
-// The chunks up to the data, each where it last came, and the stream's end; false, and why, if one runs past the end.
-bool findChunks(const uint8_t* file, size_t size, Chunks& c, size_t& end, std::string* why) {
+// The chunks of `ids` up to the data (the list's last), each where it last came, and the stream's end; false, and why,
+// if one runs past the end.
+template <size_t N>
+bool findChunks(const uint8_t* file, size_t size, const std::array<const char*, N>& ids, ChunksOf<N>& c, size_t& end,
+                std::string* why) {
     // A project's .wav is a RIFF round the same chunks
     size_t i = size >= 12 && !std::memcmp(file, "RIFF", 4) && !std::memcmp(file + 8, "WAVE", 4) ? 12 : 0;
-    while (i + 8 <= size && !c.at[Data]) {
+    while (i + 8 <= size && !c.at[N - 1]) {
         const uint32_t n = le32(file + i + 4);
         if (n > size - i - 8) return fail(why, "a chunk runs past the end");
-        const auto id = std::ranges::find_if(kIds, [&](const char* k) { return !std::memcmp(file + i, k, 4); });
-        if (id != kIds.end()) {
-            c.at[(size_t)(id - kIds.begin())] = file + i + 8;
-            c.bytes[(size_t)(id - kIds.begin())] = n;
+        const auto id = std::ranges::find_if(ids, [&](const char* k) { return !std::memcmp(file + i, k, 4); });
+        if (id != ids.end()) {
+            c.at[(size_t)(id - ids.begin())] = file + i + 8;
+            c.bytes[(size_t)(id - ids.begin())] = n;
         }
         i += 8 + (size_t)n + (n & 1);
     }
@@ -137,7 +145,7 @@ bool readSamples(const Chunks& c, bool linear, XtWaveFile& out, std::string* why
 bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* why) {
     out = {};
     Chunks c;
-    if (!findChunks(file, size, c, out.size, why)) return false;
+    if (!findChunks(file, size, kIds, c, out.size, why)) return false;
     const uint8_t* vpfl = c.at[Fl];
     const uint32_t nFl = c.bytes[Fl];
     const uint8_t* vpsc = c.at[Sc];
@@ -160,6 +168,17 @@ bool xtWaveRead(const uint8_t* file, size_t size, XtWaveFile& out, std::string* 
 std::optional<int> xtWaveEncodeType(const uint8_t* file, size_t size) {
     Chunks c;
     size_t end = 0;
-    if (!findChunks(file, size, c, end, nullptr) || !c.at[Sc] || c.bytes[Sc] < 2) return std::nullopt;
+    if (!findChunks(file, size, kIds, c, end, nullptr) || !c.at[Sc] || c.bytes[Sc] < 2) return std::nullopt;
     return c.at[Sc][1];
+}
+
+bool xtWaveBlocksOf(const uint8_t* file, size_t size, XtWaveBlocks& out, std::string* why) {
+    out = {};
+    ChunksOf<XtWaveBlocks::kCount> c;
+    size_t end = 0;
+    if (!findChunks(file, size, kBlockIds, c, end, why)) return false;
+    if (!c.at[XtWaveBlocks::kVpsc] || c.bytes[XtWaveBlocks::kVpsc] < 8) return fail(why, "no vpsc");
+    for (size_t k = 0; k < XtWaveBlocks::kCount; ++k)
+        if (c.at[k]) out.bytes[k].emplace(c.at[k], c.at[k] + c.bytes[k]);
+    return true;
 }

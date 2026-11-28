@@ -738,6 +738,16 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+The wave writer v482 (2026-11-27, on claude/wave-editor after v481; HARDWARE_FIRMWARE.md, "The XT's wave writer, run";
+  d-8's second half): rom.2's own writer (0x89496590) in the interpreter, on an entry put in its store's table of waves
+  (0x89ce87fc, wave 0) with the wave's blocks in buffers as the store holds them, its vpfl and data device rom.2's;
+  address 0x10 mapped holding the XT's 9 (the vpfl's builder reads a missing vmdl's size through a null pointer).
+  XtFwWaveFile, XtFwFileOut (both writers' file calls, out of XtFwPatchFile), XtWaveSaveCheck (new); xtWaveBlocksOf and
+  findChunks over a list of tags (XtWaveFile.cpp); the machine answers rom.2's pool allocator. xt_files' waves saved:
+  the XT's 37 (6 LITE, 31 SOLO) and the 36 others back byte for byte; band waves next. fcheck +1 line on purpose.
+  Plants: files 48 (wavesave 10, fileout 1 and the changed files' wavefile, presetwaves, patchsave, files), tone 1: all
+  caught. The 14 test targets, patch apply and ab.sh clean, run without installing; verify.sh after the vc2-mode merge.
+
 The events v481 (2026-11-27, on claude/wave-editor after v480; HARDWARE_FIRMWARE.md, "The WAVE page's events"; the
   user's d-9): Add, Delete, Next and Prev at Current on the WAVE page, run by rom.2 in the wave's encode after its
   detection: the screen's add and delete (0x89516b20, 0x89516c80), the list counted again after each taken one as the
