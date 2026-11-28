@@ -1546,6 +1546,35 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### Every wave loaded by the XT's own loader, a plain file imported (2026-11-28, v488) {#wave-loader}
+
+d-8's second half, its fifth part: the wave the writer writes put in the store as the XT puts one, by its one .wav
+loader, so a plain file is imported as the XT's SAMPLE Import makes it. Read in {#wave-import-read}.
+
+**How it runs** (`XtFwWaveLoad.cpp`, new; `xtfw::loadIntoStore`): the store's heap made by rom.2's own heap init
+(`0x8949d990(0x89ce87e8, bytes)`, as the store's init calls it, but 12 MB, not the XT's 48 MB, which the machine's RAM
+can't hold), the override word -1 as the init leaves it, then the loader, `0x894939d0(path, 3000)`: 1. Its file calls
+are rom.2's wrappers, answered from the file's bytes (open, stat with the size, read with the count, seek from the start
+or from here with the new place, close), and the kernel's it reaches (the heap's lock and unlock, a path's base name, a
+display text) answered as nothing. The loader makes the entry and each block by rom.2's own makers, with their vtables;
+its finish runs the band rebuild. So `xtFwWaveFile` takes the file's bytes now, and what v482 to v487 put by hand goes:
+the entry, its node and list, each block's place, vtable and entry, the band rebuild's call, the answers to the store's
+heap; Truncate's resize and the rebuild's grow are the store heap's own. Nothing else of the machine needed answering.
+
+**The checks.** `xt_files`' `waves saved:` line as before through the loader: the XT's 42 of 43 back byte for byte
+(Synth006 as it was), the others' 36, 73 Truncates as the law, the 5 band waves' refused; the loops now set to four
+marks of their own by rom.2's setter on 78 waves, each written with its file's blocks but the vplp's four words the
+marks (a check that needs no place in the file and sees two points swapped). And a new line, `waves imported:`: the 3
+plain .wav files beside the projects' Wave folders (`Emu_test.prj`'s `sine_400hz_raw.wav`, `sine_400hz_raw_orig.wav`,
+`solo_male_aah_raw.wav`) imported by the loader and written, then held to every LITE wave of the projects with their
+samples, the XT's own imports of them: 4 (`005` and `006` for each sine file), all the same byte for byte but vpsc's
+[0xc] and [0xd], which the import never writes. The plants: 10 new `waveload` (each file call's answer, the heap's
+size, the override, each kernel call) and `wavesave` ones (the loader's key, the type read for another wave), with the
+writer's, the loops', Truncate's and the reader's that stay, 49, all caught; 17 of v482 to v487's went with the entry
+they planted in. A seek from the start the loader makes on none of the files here: answered as the wrapper's contract
+says, unchecked. fcheck's baseline: the saved line's loops wording and the new imported line (`--update`, its diff
+read: those).
+
 ### A saved wave's Truncate by rom.2's edit engine (2026-11-28, v487) {#wave-writer-cut}
 
 d-8's second half, its fourth part: the session's Truncate made on the store's entry by the XT's own edit engine, as

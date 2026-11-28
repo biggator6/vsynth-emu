@@ -69,25 +69,12 @@ patchinit-named|kInit = 0x89482540, kNoName = 0;|kInit = 0x89482540, kNoName = 0
 patchinit-short|    out.store.resize(static_cast<size_t>(kXtPatchBytes));|    out.store.resize(static_cast<size_t>(kXtPatchBytes) - 8);|patchinit
 patchinit-read-off|    m.cpu.read(kStore, out.store.data(), out.store.size());|    m.cpu.read(kStore + 1, out.store.data(), out.store.size());|patchinit
 # A wave saved by rom.2's own writer (v482, XtFwWaveFile.cpp), by xt_files' waves saved: line: the XT's word at 0x10
-# (left 0, or its page unmapped), a block's bytes or the data's at the wrong place, two blocks' pointers swapped, the
-# entry's node or its list wrong, the vmdl never put; the blocks read in the wrong order (XtWaveFile.cpp)
+# (left 0, or its page unmapped); the blocks read in the wrong order (XtWaveFile.cpp, as the check reads them).  The
+# plants of v482 to v487 on the entry the harness put (its blocks, their places and vtables, its list and node, the
+# band rebuild's call, the store heap's answers) went with it in v488: the XT's own loader puts the wave now
 wavesave-low-word|kLowWordIs = 9;|kLowWordIs = 0;|wavesave
 wavesave-unmapped|    c.mapRam(kLowPage, kLowPageBytes);\n    c.wr32(kLowWord, kLowWordIs);|    ;|wavesave
-wavesave-data-at|kDataAt = 0x40|kDataAt = 0x1c|wavesave
-wavesave-bytes-at|kBytesAt = 0x1c|kBytesAt = 0x20|wavesave
-wavesave-list-rdmd|{ 0x40, 0x8983142c }, { 0x3c,|{ 0x3c, 0x8983142c }, { 0x40,|wavesave
-wavesave-vpno-vplp|{ 0x2c, 0x89831378 }, { 0x30,|{ 0x30, 0x89831378 }, { 0x2c,|wavesave
-wavesave-list|c.wr32(kWaves + 4 * (kNumber & 0x7f), kEntry + kNode);|c.wr32(kWaves + 4, kEntry + kNode);|wavesave
-wavesave-node|kNode = 0x18|kNode = 0x1c|wavesave
-wavesave-vmdl-never|for (size_t k = XtWaveBlocks::kVmdl;|for (size_t k = XtWaveBlocks::kVpsc;|wavesave
 wavesave-blocks-order|"vpfl", "vmdl", "vpsc", "vpno", "vplp"|"vpfl", "vmdl", "vpsc", "vplp", "vpno"|wavefile
-# A band wave's bands made by rom.2's rebuild first (v483): the data block's samples' address never put or put
-# wrong, the rebuild never run or on the wrong wave (the override word at -1, so the number finds it).  v483's room
-# for the bands went in v487: the rebuild grows the data block itself, through the store's heap
-wavesave-samples-never|        if (data) c.wr32(at + kSamplesAt, at + kDataAt);|        ;|wavesave
-wavesave-samples-wrong|c.wr32(at + kSamplesAt, at + kDataAt)|c.wr32(at + kSamplesAt, at + kBytesAt)|wavesave
-wavesave-rebuild-never|    if (xtWaveHasBands((*vpsc)[1]) && !rebuildBands(c, why)) return false;|    ;|wavesave
-wavesave-rebuild-number|{ kRebuild.overrideWord, kNumber }|{ kRebuild.overrideWord, kNumber + 1 }|wavesave
 # The loops set by rom.2's setter (v486): never set, a forward point set as a backward one, the end as the start, the
 # setter given another wave's number
 wavesave-loops-never|    if (edits.loops && !setLoops(c, *edits.loops, why)) return false;|    ;|wavesave
@@ -95,16 +82,25 @@ wavesave-loops-fwd-as-bwd|{ l.loopStart, 0, 0 }|{ l.loopStart, 0, 1 }|wavesave
 wavesave-loops-end-as-start|{ l.loopEnd, 1, 0 }|{ l.loopEnd, 0, 0 }|wavesave
 wavesave-loops-number|    c.wr32(kLoopSet.numberWord, kNumber);|    c.wr32(kLoopSet.numberWord, kNumber + 1);|wavesave
 # Truncate by rom.2's edit engine (v487): never run, made for another wave, given its range the wrong way, its run
-# skipped; the blocks without their vtables or their entry; the store's heap unanswered, its resize or free; the
-# store's key not rom.2's; a band wave's Truncate let through
+# skipped; the store's key not rom.2's; a band wave's Truncate let through, or its type read for another wave (v488)
 wavesave-cut-never|    if (edits.cut && !truncate(c, *edits.cut, why)) return false;|    ;|wavesave
 wavesave-cut-other-wave|{ kEdit.engine, kWave, kEdit.truncate }|{ kEdit.engine, kWave + 1, kEdit.truncate }|wavesave
 wavesave-cut-swapped|{ kEdit.engine, from, to, from }|{ kEdit.engine, to, from, from }|wavesave
 wavesave-cut-unrun|kEdit { 0x894a8990, 0x894a8b80, 0x894a8c00,|kEdit { 0x894a8990, 0x894a8b80, 0x894a8c70,|wavesave
-wavesave-vtables-none|        c.wr32(at + kVtableAt, kBlockAt[k].vtable);|        ;|wavesave
-wavesave-entry-none|        c.wr32(at + kEntryAt, kEntry);|        ;|wavesave
-wavesave-heap-unanswered|    answerStoreHeap(c);|    ;|wavesave
-wavesave-heap-resize|    c.hook(kStoreHeap.resize,|    if (false) c.hook(kStoreHeap.resize,|wavesave
-wavesave-heap-free|    c.hook(kStoreHeap.free,|    if (false) c.hook(kStoreHeap.free,|wavesave
 wavesave-key-zero|kNumber = kWave + 3000;|kNumber = kWave;|wavesave
-wavesave-band-cut|    if (edits.cut && xtWaveHasBands((*vpsc)[1])) return fail(why, "a band wave's Truncate is open");|    ;|wavesave
+wavesave-band-cut|    if (edits.cut && xtWaveHasBands((int)type)) return fail(why, "a band wave's Truncate is open");|    ;|wavesave
+wavesave-type-other|c.call(kTypeOf, { kNumber }|c.call(kTypeOf, { kNumber + 1 }|wavesave
+# The wave loaded by the XT's own loader (v488, XtFwWaveLoad.cpp), by xt_files' waves saved: and waves imported:
+# lines: the file's reads given nothing or counted wrong, its size short, the store's heap too small, the override
+# word left 0, each kernel call unanswered; the loader given another key.  (A seek from the start the loader makes on
+# none of the files here, so no plant can show it.)
+waveload-read-none|        if (n > 0) s.write(s.r[5], in.bytes.data() + in.at, n);|        ;|waveload
+waveload-read-count|        in.at += n;|        in.at += n / 2;|waveload
+waveload-stat-short|        s.wr32(s.r[5], size);|        s.wr32(s.r[5], size / 2);|waveload
+waveload-heap-small|kStoreHeapBytes = 0xc00000|kStoreHeapBytes = 0x8000|waveload
+waveload-override-left|    c.wr32(kOverride, kNoOverride);|    ;|waveload
+waveload-lock|    c.hook(kKernel.lock,|    if (false) c.hook(kKernel.lock,|waveload
+waveload-unlock|    c.hook(kKernel.unlock,|    if (false) c.hook(kKernel.unlock,|waveload
+waveload-base-name|    c.hook(kKernel.baseName,|    if (false) c.hook(kKernel.baseName,|waveload
+waveload-display|    c.hook(kKernel.display,|    if (false) c.hook(kKernel.display,|waveload
+wavesave-load-key|xtfw::loadIntoStore(c, in, kNumber, why)|xtfw::loadIntoStore(c, in, kNumber + 1, why)|wavesave

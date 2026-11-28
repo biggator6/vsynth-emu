@@ -27,7 +27,8 @@ VF=(XtFiles.cpp XtWaveFile.cpp $( [ -f XtDiskImage.cpp ] && echo XtDiskImage.cpp
     $( [ -f XtPresetWaves.cpp ] && echo XtPresetWaves.cpp XtPresetWavesCheck.cpp )
     $( [ -f XtFwPatchFile.cpp ] && echo XtFwPatchFile.cpp XtPatchSaveCheck.cpp )
     $( [ -f XtFwPatchInit.cpp ] && echo XtFwPatchInit.cpp XtPatchInitCheck.cpp XtPatchShortCheck.cpp )
-    $( [ -f XtFwWaveFile.cpp ] && echo XtFwFileOut.cpp XtFwWaveFile.cpp XtWaveSaveCheck.cpp ))
+    $( [ -f XtFwWaveFile.cpp ] && echo XtFwFileOut.cpp XtFwWaveFile.cpp XtWaveSaveCheck.cpp )
+    $( [ -f XtFwWaveLoad.cpp ] && echo XtFwWaveLoad.cpp ))
 # The arpeggiator in XtSynth (v189): the router and what it sends, the engine (v188), the tempo ticks and a patch's reads
 SARP=($( [ -f XtSynthArp.cpp ] && echo XtSynthArp.cpp XtArpeggio.cpp XtArpeggioStep.cpp XtArpeggioMotifs.cpp \
       XtTempoTicks.cpp ))

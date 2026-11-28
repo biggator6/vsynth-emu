@@ -17,16 +17,22 @@ namespace fs = std::filesystem;
 // [FW] the software rom.2 names in a wave's LIST (0x897a8208): a wave whose LIST has it, the XT wrote
 constexpr std::string_view kXtSoftware = "V-Synth Ver.";
 
-// Every .wav in each project's Wave folder: <repo>/analysis/projects/*/Wave, the ROM being <repo>/firmware/unpacked's
-std::vector<fs::path> projectWaves(const std::string& rom) {
+// Every .wav in each project's `folder` (its Wave folder, or itself): <repo>/analysis/projects/*/<folder>, the ROM
+// being <repo>/firmware/unpacked's
+std::vector<fs::path> projectWaves(const std::string& rom, const fs::path& folder) {
     const fs::path projects = fs::path(rom).parent_path().parent_path().parent_path() / "analysis" / "projects";
     std::vector<fs::path> out;
     std::error_code e;
     for (const auto& project : fs::directory_iterator(projects, e))
-        for (const auto& f : fs::directory_iterator(project.path() / "Wave", e))
+        for (const auto& f : fs::directory_iterator(project.path() / folder, e))
             if (f.path().extension() == ".wav") out.push_back(f.path());
     std::sort(out.begin(), out.end());
     return out;
+}
+
+std::vector<uint8_t> bytesOf(const fs::path& path) {
+    std::ifstream f(path, std::ios::binary);
+    return { std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>() };
 }
 
 bool xtWrote(const XtWaveBlocks& w) {
@@ -65,57 +71,64 @@ struct SaveTally {
     int waves = 0, unread = 0, xt = 0, xtSame = 0, others = 0, othersSame = 0;
     int lite = 0, solo = 0, bands = 0;   // of the XT's
     int stable = 0, most = 0;   // of the XT's band waves not back: saved again as first saved; the most a sample moved
-    int looped = 0, loopsBack = 0;   // of those back, with a vplp: its loops set again (v486), and back so
+    int looped = 0, loopsBack = 0;   // of those back, with a vplp: its loops set to marks (v486), and written so
     int cut = 0, cutAsLaw = 0;       // of those back but band waves: truncated by rom.2 (v487), and as the law says
     int bandCutRefused = 0;          // and of the band waves back, their Truncate refused (open)
 };
 
-// [FW] the vplp's four loop words, +4 … +0x10 (XtWaveFile.cpp's readLoops); spoiled to all ones, no frame count, so
-// each must be set to come back (a forward loop's start is 0 in every wave here, as a cleared word would be)
+// [FW] the vplp's four loop words, +4 … +0x10 (XtWaveFile.cpp's readLoops), in XtWaveLoops' order
 constexpr size_t kLoopWordsAt = 4, kLoopWordsEnd = 0x14;
-constexpr uint8_t kSpoilt = 0xff;
 
-// A wave's loop words spoiled and set again by rom.2's own setter to what its file has: whether it then comes back as
-// its file (v486)
-bool loopsSetBack(const XtWaveBlocks& w, const std::vector<uint8_t>& file) {
-    XtWaveFile read;
-    if (!xtWaveRead(file.data(), file.size(), read)) return false;
-    XtWaveBlocks cleared = w;
-    std::vector<uint8_t>& vplp = *cleared.bytes[XtWaveBlocks::kVplp];
+// A wave's frames, from its vpsc (+4)
+long framesOf(const XtWaveBlocks& w) {
+    const auto& vpsc = *w.bytes[XtWaveBlocks::kVpsc];
+    return (long)(vpsc[4] | vpsc[5] << 8 | vpsc[6] << 16 | (uint32_t)vpsc[7] << 24);
+}
+
+// A wave's four loop points set by rom.2's own setter to marks, each its own (v486): whether the file then written is
+// its file's blocks, the vplp's four words the marks
+bool loopsSetAsMarks(const XtWaveBlocks& w, const std::vector<uint8_t>& bytes) {
+    const long f = framesOf(w);
+    const XtWaveLoops marks { f / 8, f / 2, 3 * f / 4, f / 4 };
+    std::vector<uint8_t> file;
+    XtWaveBlocks got;
+    if (!xtFwWaveFile(bytes, file, nullptr, XtWaveEdits { std::nullopt, marks })) return false;
+    if (!xtWaveBlocksOf(file.data(), file.size(), got)) return false;
+    XtWaveBlocks want = w;
+    std::vector<uint8_t>& vplp = *want.bytes[XtWaveBlocks::kVplp];
     if (vplp.size() < kLoopWordsEnd) return false;
-    std::fill(vplp.begin() + kLoopWordsAt, vplp.begin() + kLoopWordsEnd, kSpoilt);
-    const XtWaveEdits edits { std::nullopt, XtWaveLoops { read.loopStart, read.loopEnd, read.bwdEnd, read.bwdStart } };
-    std::vector<uint8_t> again;
-    return xtFwWaveFile(cleared, again, nullptr, edits) && again == file;
+    const std::array<long, 4> words { marks.loopStart, marks.loopEnd, marks.bwdEnd, marks.bwdStart };
+    for (size_t i = 0; i < words.size(); ++i)
+        for (size_t b = 0; b < 4; ++b) vplp[kLoopWordsAt + 4 * i + b] = (uint8_t)(words[i] >> (8 * b));
+    want.bytes[XtWaveBlocks::kVpfl] = got.bytes[XtWaveBlocks::kVpfl];   // the writer's own
+    return got.bytes == want.bytes;
 }
 
 // A wave saved again from what its first save wrote: whether it comes back as that.  A band wave's bands are made
 // from its samples (0x894a1ef0), which come out of them again (0x894a45c0) a step off where the bands its file was
 // written from (its encode's) differ from those; then saved again, they stay (v483)
 bool savesAgain(const std::vector<uint8_t>& written) {
-    XtWaveBlocks again;
     std::vector<uint8_t> file;
-    return xtWaveBlocksOf(written.data(), written.size(), again) && xtFwWaveFile(again, file) && file == written;
+    return xtFwWaveFile(written, file) && file == written;
+}
+
+// A wave's second quarter
+XtWaveCut secondQuarter(const XtWaveBlocks& w) {
+    return { framesOf(w) / 4, framesOf(w) / 2 };
 }
 
 // A wave's second quarter kept by rom.2's Truncate (v487): whether the file written keeps the law read
 // ({#wave-truncate-read}): those frames' bytes, both ends; type LITE (vpsc byte 1, 0) with its frames the kept ones;
-// no vpno, vpdt or rdmd; the loops the whole wave; vmdl and LIST as they were.  Empty `why` when it does
-// A wave's second quarter, from its vpsc's frames (+4)
-XtWaveCut secondQuarter(const XtWaveBlocks& w) {
-    const auto& vpsc = *w.bytes[XtWaveBlocks::kVpsc];
-    const long frames = (long)(vpsc[4] | vpsc[5] << 8 | vpsc[6] << 16 | (uint32_t)vpsc[7] << 24);
-    return { frames / 4, frames / 2 };
-}
-
-std::string cutKeepsLaw(const XtWaveBlocks& w) {
+// no vpno, vpdt or rdmd; the loops the whole wave; vmdl and LIST as they were.  Empty when it does, else what not
+std::string cutKeepsLaw(const XtWaveBlocks& w, const std::vector<uint8_t>& bytes) {
     XtWaveFile was;
     std::vector<uint8_t> file;
     std::string why;
     const auto& data = w.bytes[XtWaveBlocks::kData];
     const size_t frameBytes = (*w.bytes[XtWaveBlocks::kVpsc])[2] != 0 ? 4 : 2;
     const XtWaveCut cut = secondQuarter(w);
-    if (!data || !xtFwWaveFile(w, file, &why, XtWaveEdits { cut, std::nullopt })) return why.empty() ? "no data" : why;
+    if (!data || !xtFwWaveFile(bytes, file, &why, XtWaveEdits { cut, std::nullopt }))
+        return why.empty() ? "no data" : why;
     XtWaveBlocks cutBlocks;
     if (!xtWaveBlocksOf(file.data(), file.size(), cutBlocks) || !xtWaveRead(file.data(), file.size(), was))
         return "unread";
@@ -142,8 +155,7 @@ std::string cutKeepsLaw(const XtWaveBlocks& w) {
 
 // One wave written again: its tally, and where it differs printed when `first` and it is the XT's
 void saveOne(const fs::path& path, bool first, SaveTally& t) {
-    std::ifstream f(path, std::ios::binary);
-    const std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    const std::vector<uint8_t> bytes = bytesOf(path);
     ++t.waves;
     XtWaveBlocks w;
     if (!xtWaveBlocksOf(bytes.data(), bytes.size(), w)) {
@@ -153,24 +165,24 @@ void saveOne(const fs::path& path, bool first, SaveTally& t) {
     const int type = (*w.bytes[XtWaveBlocks::kVpsc])[1];
     std::vector<uint8_t> file;
     std::string why;
-    const bool same = xtFwWaveFile(w, file, &why) && file == bytes;
+    const bool same = xtFwWaveFile(bytes, file, &why) && file == bytes;
     const bool own = xtWrote(w);
     ++(own ? t.xt : t.others);
     (own ? t.xtSame : t.othersSame) += same;
     if (own) ++(xtWaveHasBands(type) ? t.bands : type == 0 ? t.lite : t.solo);
     if (same && w.bytes[XtWaveBlocks::kVplp]) {
         ++t.looped;
-        t.loopsBack += loopsSetBack(w, bytes);
+        t.loopsBack += loopsSetAsMarks(w, bytes);
     }
     if (same && !xtWaveHasBands(type)) {
         ++t.cut;
-        const std::string cutWhy = cutKeepsLaw(w);
+        const std::string cutWhy = cutKeepsLaw(w, bytes);
         t.cutAsLaw += cutWhy.empty();
         if (first && !cutWhy.empty()) std::printf("%s: Truncate: %s\n", path.filename().c_str(), cutWhy.c_str());
     }
     std::vector<uint8_t> cut;
     const XtWaveEdits bandCut { secondQuarter(w), std::nullopt };
-    t.bandCutRefused += same && xtWaveHasBands(type) && !xtFwWaveFile(w, cut, nullptr, bandCut);
+    t.bandCutRefused += same && xtWaveHasBands(type) && !xtFwWaveFile(bytes, cut, nullptr, bandCut);
     if (!own || same) return;
     const Diff d = diffOf(file, bytes);
     if (xtWaveHasBands(type)) {
@@ -182,17 +194,57 @@ void saveOne(const fs::path& path, bool first, SaveTally& t) {
                     why.empty() ? "differs" : why.c_str(), d.first, bytes.size(), d.last, d.bytes, d.most,
                     d.words.c_str());
 }
+// [FW] the vpsc's bytes the import never writes ([0xc], [0xd]: whatever the store's heap held, 0x894a27c0)
+constexpr size_t kUnwrittenAt = 0xc, kUnwrittenEnd = 0xe;
+
+struct ImportTally {
+    int files = 0, imported = 0, references = 0, same = 0;
+};
+
+// A plain .wav beside a project's Wave folder imported by the XT's loader and written (v488): each of the projects' LITE
+// waves with its samples, the XT's own imports of it, is the file written, but the two bytes the import never writes
+void importOne(const fs::path& raw, const std::vector<fs::path>& waves, ImportTally& t, bool first) {
+    ++t.files;
+    std::vector<uint8_t> file;
+    std::string why;
+    if (!xtFwWaveFile(bytesOf(raw), file, &why)) {
+        if (first) std::printf("%s: not imported: %s\n", raw.filename().c_str(), why.c_str());
+        return;
+    }
+    ++t.imported;
+    XtWaveBlocks got;
+    if (!xtWaveBlocksOf(file.data(), file.size(), got)) return;
+    for (const fs::path& p : waves) {
+        const std::vector<uint8_t> bytes = bytesOf(p);
+        XtWaveBlocks w;
+        if (!xtWaveBlocksOf(bytes.data(), bytes.size(), w) || (*w.bytes[XtWaveBlocks::kVpsc])[1] != 0) continue;
+        if (w.bytes[XtWaveBlocks::kData] != got.bytes[XtWaveBlocks::kData]) continue;
+        ++t.references;
+        XtWaveBlocks as = got;   // its two unwritten bytes as the XT's heap had them
+        std::copy_n(w.bytes[XtWaveBlocks::kVpsc]->begin() + kUnwrittenAt, kUnwrittenEnd - kUnwrittenAt,
+                    as.bytes[XtWaveBlocks::kVpsc]->begin() + kUnwrittenAt);
+        const bool same = as.bytes == w.bytes && file.size() == bytes.size();
+        t.same += same;
+        if (first && !same) std::printf("%s: imported, not %s\n", raw.filename().c_str(), p.filename().c_str());
+    }
+}
 } // namespace
 
 int xtWaveSaveCheck(const std::string& rom, bool first) {
+    ImportTally imports;
+    const std::vector<fs::path> waves = projectWaves(rom, "Wave");
+    for (const fs::path& p : projectWaves(rom, ".")) importOne(p, waves, imports, first);
+    std::printf("waves imported: %d plain files beside the projects' waves, %d imported by the XT's loader, written as "
+                "the projects' %d LITE imports of them: %d the same but the 2 bytes the import never writes\n",
+                imports.files, imports.imported, imports.references, imports.same);
     SaveTally t;
-    for (const fs::path& p : projectWaves(rom)) saveOne(p, first, t);
+    for (const fs::path& p : waves) saveOne(p, first, t);
     std::printf("waves saved: %d of the projects' waves, %d unread; the XT's %d (%d LITE, %d SOLO, %d band) %d back as "
                 "their files, of the band waves not %d saved again the same, a sample moved by up to %d; the others "
-                "%d, %d back; loops set again by the XT's setter on %d, %d back; truncated by the XT's on %d, %d as "
+                "%d, %d back; loops set to marks by the XT's setter on %d, %d so; truncated by the XT's on %d, %d as "
                 "its law, the band waves' refused on %d\n",
                 t.waves, t.unread, t.xt, t.lite, t.solo, t.bands, t.xtSame, t.stable, t.most, t.others, t.othersSame,
                 t.looped, t.loopsBack, t.cut, t.cutAsLaw, t.bandCutRefused);
-    return t.xt - t.xtSame + t.looped - t.loopsBack + t.cut - t.cutAsLaw;
+    return t.xt - t.xtSame + t.looped - t.loopsBack + t.cut - t.cutAsLaw + imports.references - imports.same;
 }
 #endif

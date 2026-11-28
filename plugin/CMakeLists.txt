@@ -179,6 +179,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFwPatchFile.cpp
     Source/XtFwFileOut.cpp
     Source/XtFwWaveFile.cpp
+    Source/XtFwWaveLoad.cpp
     Source/XtFwPatchInit.cpp
     Source/XtPatchIds.cpp
     Source/XtPatch.cpp

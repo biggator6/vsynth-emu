@@ -731,7 +731,8 @@ short: a patch using the Multi Step Modulator in 77 fields, cut before it 98 val
 links: 224 preset waves, 77 SOLO, 134 BACKING, 13 ENSEMBLE, 9556574 frames, the last PRC-UduPot at 0x218b200; 224 link files in Internal.prj/Wave naming 224 of them, 0 wrong; 0 unread; hash 3f103b01fd1f2034
 saved: 512 of the image's 512 patches back as their files; 1481 values set by the firmware's setter, 0 read otherwise; 1131 typed, 0 read otherwise
 init: EXECUTE (0x893c5a10) on part 0 over an image patch against xtFwPatchInit, 0 bytes different, the other 15 parts' 0 moved, the change asked for part 0; CANCEL 0 bytes moved, closed; named "INIT PATCH"; the default under a file against the init named "", 0 bytes different, which is apart from this one in 401 values; 12385 values against the firmware's reads, 0 out of range, 0 different; 0 wrong
-waves saved: 88 of the projects' waves, 9 unread; the XT's 43 (6 LITE, 31 SOLO, 6 band) 42 back as their files, of the band waves not 0 saved again the same, a sample moved by up to 1; the others 36, 36 back; loops set again by the XT's setter on 78, 78 back; truncated by the XT's on 73, 73 as its law, the band waves' refused on 5
+waves imported: 3 plain files beside the projects' waves, 3 imported by the XT's loader, written as the projects' 4 LITE imports of them: 4 the same but the 2 bytes the import never writes
+waves saved: 88 of the projects' waves, 9 unread; the XT's 43 (6 LITE, 31 SOLO, 6 band) 42 back as their files, of the band waves not 0 saved again the same, a sample moved by up to 1; the others 36, 36 back; loops set to marks by the XT's setter on 78, 78 so; truncated by the XT's on 73, 73 as its law, the band waves' refused on 5
 == xt_arp
 presets: 117 cases, 646719 operations, 10790 messages, 10717 states, 0 different
 random: 1000 cases, 4537707 operations, 224687 messages, 110830 states, 0 different

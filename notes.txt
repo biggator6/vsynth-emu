@@ -738,6 +738,16 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+Every wave loaded by the XT's own loader v488 (2026-11-28, on claude/wave-editor after v487; HARDWARE_FIRMWARE.md,
+  "Every wave loaded by the XT's own loader"; d-8's second half): XtFwWaveLoad (new), the store's heap made by rom.2
+  and the file put in it by its one .wav loader (0x894939d0), its file calls answered from the file's bytes; a plain
+  file imported LITE as the XT imports it. xtFwWaveFile takes the file now; the entry the harness put (v482 to v487)
+  gone. xt_files: waves saved as before (the loops now set to marks of their own, held to the file's blocks); waves
+  imported (new): the 3 plain files beside the projects' Wave folders imported and written as the projects' 4 LITE
+  imports of them, byte for byte but the 2 vpsc bytes the import never writes. Plants: 49 (11 new), all caught; 17
+  went with the entry; a seek from the start never made (unchecked). fcheck +1 line and 1 changed on purpose;
+  verify.sh clean.
+
 A saved wave's Truncate v487 (2026-11-28, on claude/wave-editor after v486; HARDWARE_FIRMWARE.md, "A saved wave's
   Truncate by rom.2's edit engine"; d-8's second half): XtWaveEdits' cut, made on the store's entry by the XT's edit
   engine as the edit screen's EXECUTE runs it (0x894a8990 Truncate's object for the wave, 0x894a8b80 the range,

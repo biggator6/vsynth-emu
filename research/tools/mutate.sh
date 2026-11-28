@@ -15,7 +15,8 @@
 # XtPresetWaves.cpp (a project's links and the preset waves they reach, v600), the same; PORT=patchsave:
 # XtFwPatchFile.cpp (a patch's save by the firmware's routines, v602), the same; PORT=patchinit: XtFwPatchInit.cpp (the
 # PATCH Init by the firmware's, v473), the same; PORT=wavesave: XtFwWaveFile.cpp (a wave's save by the firmware's
-# writer, v482), and PORT=fileout: XtFwFileOut.cpp (both writers' file calls), the same.
+# writer, v482), PORT=fileout: XtFwFileOut.cpp (both writers' file calls), and PORT=waveload: XtFwWaveLoad.cpp (a
+# wave loaded by the XT's own loader, v488), the same.
 # PORT=patchstore: XtPatchStore.cpp (the patch store's layout and the descriptors' reads, v187) under xt_files, as
 # PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone; PORT=tonearp: XtSynthArp.cpp under xt_tone (v189).
 # PORT=arp: XtArpeggio.cpp (the arpeggiator's keys and settings, v188), PORT=arpstep: XtArpeggioStep.cpp (its timer and
@@ -40,7 +41,7 @@ N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 IMAGE="$ROM"   # what the planted binary runs on: rom.2, but rom.4 for PORT=vc2params (v199) and vc2in (v208)
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
 # The ports that plant in one of xt_files' own files, besides PORT=files (and filesfw, XtFirmware's routines for them)
-FILEPORTS="wavefile|diskimage|patchstore|presetwaves|patchsave|patchinit|wavesave|fileout"
+FILEPORTS="wavefile|diskimage|patchstore|presetwaves|patchsave|patchinit|wavesave|fileout|waveload"
 source "$(dirname "$0")/objects.sh"   # keptObject: the fx ports' objects, by their source and every header
 source "$(dirname "$0")/mutate_tonefile.sh"   # tonefile: a tone port's file (moved as it stood, so mutate_tone.py reads it too)
 source "$(dirname "$0")/mutate_parts.sh"   # harnessParts, fxParts: a harness's kept objects (moved as they stood, v208)
@@ -141,6 +142,7 @@ elif [[ "$PORT" =~ ^(files|$FILEPORTS)$ ]]; then
         patchinit) F=XtFwPatchInit.cpp ;;
         wavesave) F=XtFwWaveFile.cpp ;;
         fileout) F=XtFwFileOut.cpp ;;
+        waveload) F=XtFwWaveLoad.cpp ;;
         *) F=XtFiles.cpp ;;
     esac
     D=XT_FILES_MAIN
@@ -148,7 +150,8 @@ elif [[ "$PORT" =~ ^(files|$FILEPORTS)$ ]]; then
     for f in XtFiles.cpp XtWaveFile.cpp XtDiskImage.cpp XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp \
              XtPresetWaves.cpp XtPresetWavesCheck.cpp XtFwPatchFile.cpp XtPatchSaveCheck.cpp XtFwPatchInit.cpp \
              XtPatchInitCheck.cpp XtPatchShortCheck.cpp \
-             $( [ -f "$S/XtFwWaveFile.cpp" ] && echo XtFwFileOut.cpp XtFwWaveFile.cpp XtWaveSaveCheck.cpp ); do
+             $( [ -f "$S/XtFwWaveFile.cpp" ] && echo XtFwFileOut.cpp XtFwWaveFile.cpp XtWaveSaveCheck.cpp ) \
+             $( [ -f "$S/XtFwWaveLoad.cpp" ] && echo XtFwWaveLoad.cpp ); do
         [ "$f" = "$F" ] || L+=("$S/$f")
     done
     L+=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
@@ -163,6 +166,7 @@ elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's ro
        "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
     # the wave writer, its file calls and its check (v482)
     [ -f "$S/XtFwWaveFile.cpp" ] && L+=("$S/XtFwFileOut.cpp" "$S/XtFwWaveFile.cpp" "$S/XtWaveSaveCheck.cpp")
+    [ -f "$S/XtFwWaveLoad.cpp" ] && L+=("$S/XtFwWaveLoad.cpp")   # the XT's loader (v488)
 elif [ "${PORT:-cosm}" = analog ]; then
     F=XtAnalog.cpp; D=XT_ANALOG_MAIN
     L=("$S/XtOsc.cpp" "$S/XtCosm.cpp" "$S/XtEnvelope.cpp" "$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp")
