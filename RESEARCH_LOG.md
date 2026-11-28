@@ -4429,3 +4429,33 @@ Round-2 recordings.  First build-out after that: real-time granular port
   route from it on a held note reads the synth's own. The test's right-click was a press and a drag, and in a test a
   button's drag finds the mouse over nothing and lets the button up, and JUCE counts no event as a drag unless told:
   a click, then a drag it counts, across as well as up, caught both.
+
+### Session 30 (2026-11-27 to 11-28) — v478 to v487: the WAVE page and the XT's own wave writer
+
+- The coordinator's brief: research/NEXT_ISSUES.md items 5 and 6, Start Offset in time and a wave display to edit
+  start, end, loops and events, so V-Producer isn't needed. The user took all four recommendations (d-7 ms then s;
+  d-8a Start Offset with Truncate; d-8 the session first, then a file; d-9 points, then events) and a page of its own.
+- v478 to v481 built the page on rom.2's own laws: the time text, the points dragged as XtSynth reads them, the XT's
+  Truncate, and its event add and delete run in the encode. The VC-2 mode needs none of it (the user, through the
+  coordinator: it handles live input).
+- v482 to v487 write a wave as the XT writes one: rom.2's writer on an entry put in its store, then its band rebuild,
+  its loop setter and its Truncate on that entry. Each check is the user's project: 42 of the XT's 43 waves come back
+  byte for byte, every wave's loops set again by the setter come back, and Truncate keeps its law on all 73 that aren't
+  band waves. Two are open for a capture: `362 Synth006.wav`, 8 frames a step off and moving again on each save, and
+  Truncate on a band wave, which in the harness cuts the bands the load made in place over the samples, so refused.
+- The plants did much of the design. The store heap's answers began as a heap with rooms and copies; run after run
+  showed the makers, the copies, the sizes and the in-place choice changed no file, and what is left is a resize that
+  gives the block back, as the XT's own heap grows a chunk into the space after it, and a free. Two plants that could
+  never fail showed the store's override word sitting at 0 in a fresh machine, which found wave 0 whatever number was
+  given, and a pool calloc no load called.
+- vc2-mode was merged in on the user's word. Its MIDI live check had passed only because the wave check's encode
+  hadn't finished yet; behind this branch's WAVE checks, which wait for their encodes, the players played and its plant
+  went uncaught. The check now runs first and says it needs nothing playing.
+- The user tried the page and asked what the blue and white handles were, whether it zooms, and for a cursor
+  following a held note. v484 put -, + and Fit and a key under the wave, the key's colours and the view's one table;
+  v485 a playhead from each player's place. LITE's `position()` turned out to be its note-on's, which the check found
+  standing still; its walk is the place.
+- The import, read by a subagent while Truncate was built: `0x894939d0` is the XT's one .wav loader, a plain file's
+  import and its own files' load alike; it makes LITE with default blocks, never encodes, and never writes the
+  "V-Synth Ver." LIST. The project's `005` and `006` are its output, `003` and `004` its output encoded: the next
+  versions' references.
