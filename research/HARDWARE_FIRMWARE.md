@@ -1546,6 +1546,28 @@ stage time (+0x6c) and the onset level (+0x58).
 - the TVA's level, pan and LFO terms (the plugin uses level 1, centre pan,
   no LFO; velocity stays a linear gain). (Done in v114.)
 
+### A saved wave's loops set by rom.2's setter (2026-11-28, v486) {#wave-writer-loops}
+
+d-8's second half, its third part: a wave's loop points set on its store entry as the XT's Loop FWD and BWD screens
+set them, so a saved wave carries the session's loops. Read in rom.2 (Ghidra on scratch, never committed).
+
+**The setter** [FW] `0x894a4e30(&number, frame, end, backward)`, which the screens' four sets call (`0x894a48e0` …
+`0x894a4940`, after their clamps, {#wave-truncate-read}): it finds the wave (the override word first, as every lookup),
+writes the vplp's word (backward 0: +4 the start with end 0, +8 the end; backward 1: +0xc with end 0, which
+`XtWaveFile` reads as the backward loop's end, +0x10 its start), marks the record changed (+0x50) and builds the cached
+loop events again (`0x894a1960(&override, number)`: from the vpdt, or LITE's). It clamps nothing: the screens do.
+
+**How it runs.** `xtFwWaveFile` takes `XtWaveEdits` (new): its `loops` (`XtWaveLoops`, the four in `XtWaveFile`'s
+names) set by the setter on the entry after the wave is as loaded (its bands rebuilt), the number read through a word of
+the harness's, then the writer. The loop events' rebuild needs nothing more of the machine.
+
+**The check.** `xt_files`' `waves saved:` line: every wave that comes back with a vplp (78) saved again with its loop
+words spoiled (all ones, no frame count) and set by the setter to its file's own (as `xtWaveRead` reads them): 78 back
+byte for byte. fcheck's baseline has the line changed (`--update`, its diff read: that line alone). The plants: 4 new
+(the loops never set, a forward point set as a backward one, the end as the start, the setter on another number) with
+v483's 16 `wavesave`, all caught; one was missed first while the words were cleared to 0, the forward loop's start
+being 0 in every wave here.
+
 ### The WAVE page's playhead (2026-11-28, v485) {#wave-playhead}
 
 The user's word: a cursor following the time while a key is held, to hear the edits. The XT's SAMPLE screens have none

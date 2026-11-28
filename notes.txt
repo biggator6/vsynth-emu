@@ -738,6 +738,13 @@ A project's wave links v600 (2026-11-24, on claude/vsynth-files from vc2-mode dc
   VSynthEmuProjectTest (new, in verify.sh): slot 117 linked to preset 224 loads preset 224's settings (seen red with the
   slot taken for the preset), 11/11. The worktree needed analysis/projects linked for make_inputs.py's w358.bin.
 
+A saved wave's loops v486 (2026-11-28, on claude/wave-editor after v485; HARDWARE_FIRMWARE.md, "A saved wave's loops
+  set by rom.2's setter"; d-8's second half): XtWaveEdits (new) for xtFwWaveFile, its loops set on the store entry by
+  rom.2's loop setter (0x894a4e30: the vplp's word, the record marked, the cached loop events built again), as the
+  Loop FWD and BWD screens set them, before the writer. xt_files' waves saved: 78 waves' loop words spoiled and set
+  again to their own, all back byte for byte. Plants: wavesave 20 (4 new), all caught, one after its check spoiled the
+  words to all ones (every forward start here is 0). fcheck +1 line changed on purpose; verify.sh clean.
+
 The WAVE page's playhead v485 (2026-11-28, on claude/wave-editor after v484; HARDWARE_FIRMWARE.md, "The WAVE page's
   playhead"; the user's word: a cursor following the time while a key is held, to hear the edits): the newest sounding
   note's place in each OSC's wave, read after each block from its player (XtSynthView::take, xtWaveFrameOf: the linear

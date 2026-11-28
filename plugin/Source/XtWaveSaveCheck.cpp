@@ -65,7 +65,27 @@ struct SaveTally {
     int waves = 0, unread = 0, xt = 0, xtSame = 0, others = 0, othersSame = 0;
     int lite = 0, solo = 0, bands = 0;   // of the XT's
     int stable = 0, most = 0;   // of the XT's band waves not back: saved again as first saved; the most a sample moved
+    int looped = 0, loopsBack = 0;   // of those back, with a vplp: its loops set again (v486), and back so
 };
+
+// [FW] the vplp's four loop words, +4 … +0x10 (XtWaveFile.cpp's readLoops); spoiled to all ones, no frame count, so
+// each must be set to come back (a forward loop's start is 0 in every wave here, as a cleared word would be)
+constexpr size_t kLoopWordsAt = 4, kLoopWordsEnd = 0x14;
+constexpr uint8_t kSpoilt = 0xff;
+
+// A wave's loop words spoiled and set again by rom.2's own setter to what its file has: whether it then comes back as
+// its file (v486)
+bool loopsSetBack(const XtWaveBlocks& w, const std::vector<uint8_t>& file) {
+    XtWaveFile read;
+    if (!xtWaveRead(file.data(), file.size(), read)) return false;
+    XtWaveBlocks cleared = w;
+    std::vector<uint8_t>& vplp = *cleared.bytes[XtWaveBlocks::kVplp];
+    if (vplp.size() < kLoopWordsEnd) return false;
+    std::fill(vplp.begin() + kLoopWordsAt, vplp.begin() + kLoopWordsEnd, kSpoilt);
+    const XtWaveEdits edits { XtWaveLoops { read.loopStart, read.loopEnd, read.bwdEnd, read.bwdStart } };
+    std::vector<uint8_t> again;
+    return xtFwWaveFile(cleared, again, nullptr, edits) && again == file;
+}
 
 // A wave saved again from what its first save wrote: whether it comes back as that.  A band wave's bands are made
 // from its samples (0x894a1ef0), which come out of them again (0x894a45c0) a step off where the bands its file was
@@ -94,6 +114,10 @@ void saveOne(const fs::path& path, bool first, SaveTally& t) {
     ++(own ? t.xt : t.others);
     (own ? t.xtSame : t.othersSame) += same;
     if (own) ++(xtWaveHasBands(type) ? t.bands : type == 0 ? t.lite : t.solo);
+    if (same && w.bytes[XtWaveBlocks::kVplp]) {
+        ++t.looped;
+        t.loopsBack += loopsSetBack(w, bytes);
+    }
     if (!own || same) return;
     const Diff d = diffOf(file, bytes);
     if (xtWaveHasBands(type)) {
@@ -112,8 +136,9 @@ int xtWaveSaveCheck(const std::string& rom, bool first) {
     for (const fs::path& p : projectWaves(rom)) saveOne(p, first, t);
     std::printf("waves saved: %d of the projects' waves, %d unread; the XT's %d (%d LITE, %d SOLO, %d band) %d back as "
                 "their files, of the band waves not %d saved again the same, a sample moved by up to %d; the others "
-                "%d, %d back\n",
-                t.waves, t.unread, t.xt, t.lite, t.solo, t.bands, t.xtSame, t.stable, t.most, t.others, t.othersSame);
-    return t.xt - t.xtSame;
+                "%d, %d back; loops set again by the XT's setter on %d, %d back\n",
+                t.waves, t.unread, t.xt, t.lite, t.solo, t.bands, t.xtSame, t.stable, t.most, t.others, t.othersSame,
+                t.looped, t.loopsBack);
+    return t.xt - t.xtSame + t.looped - t.loopsBack;
 }
 #endif

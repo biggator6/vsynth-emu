@@ -91,3 +91,9 @@ wavesave-rebuild-never|    if (xtWaveHasBands((*vpsc)[1]) && !rebuildBands(c, wh
 wavesave-rebuild-number|{ kRebuild.overrideWord, kNumber }|{ kRebuild.overrideWord, kNumber + 1 }|wavesave
 wavesave-frames-at|kFramesAt = 4|kFramesAt = 8|wavesave
 wavesave-mono|vpsc[kStereoAt] != 0 ? 2u : 1u|1u|wavesave
+# The loops set by rom.2's setter (v486): never set, a forward point set as a backward one, the end as the start, the
+# setter given another wave's number
+wavesave-loops-never|    if (edits.loops && !setLoops(c, *edits.loops, why)) return false;|    ;|wavesave
+wavesave-loops-fwd-as-bwd|{ l.loopStart, 0, 0 }|{ l.loopStart, 0, 1 }|wavesave
+wavesave-loops-end-as-start|{ l.loopEnd, 1, 0 }|{ l.loopEnd, 0, 0 }|wavesave
+wavesave-loops-number|    c.wr32(kLoopSet.numberWord, kNumber);|    c.wr32(kLoopSet.numberWord, kNumber + 1);|wavesave

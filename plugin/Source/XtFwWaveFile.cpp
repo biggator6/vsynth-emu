@@ -30,6 +30,12 @@ struct Rebuild { uint32_t at, overrideWord, none, room, done; };
 constexpr Rebuild kRebuild { 0x894a1ef0, 0x89ce87f8, 0xffffffff, 0x89527980, 1 };
 // [FW] the vpsc's stereo flag and frames, where the rebuild reads them (its +0x1e, +0x20)
 constexpr size_t kStereoAt = 2, kFramesAt = 4;
+// [FW] the loop setter, (&number, frame, which end, the backward loop's), as the Loop FWD and BWD screens' sets call it
+// (0x894a48e0 … 0x894a4940): the vplp's word (+4 and +8 the forward loop's start and end, +0xc and +0x10 the backward's
+// end and start) written, the record marked changed (+0x50), the cached loop events built again (0x894a1960).  It
+// reads the number through a word of the harness's
+struct LoopSet { uint32_t at, numberWord; };
+constexpr LoopSet kLoopSet { 0x894a4e30, xtfw::kSamp + 0x80 };
 // [HW] the XT's word at address 0x10, in its boot flash: the vpfl's builder (0x894a06d0) reads each block's size
 // through the entry's pointer unchecked, so for a block the wave has none of it reads this, 9 in every vpfl the XT
 // wrote for a SOLO wave with no vmdl (the user's project, analysis/projects/Emu_test.prj)
@@ -78,9 +84,23 @@ bool rebuildBands(Sh4& c, std::string* why) {
     if (why) *why = "the firmware's band rebuild refused the wave: " + std::to_string((int32_t)rc);
     return false;
 }
+
+// The wave's four loop points set by rom.2's setter, each as its screen sets it; false, and why, if a call fails
+bool setLoops(Sh4& c, const XtWaveLoops& l, std::string* why) {
+    struct Set { long frame; uint32_t end, backward; };
+    const std::array<Set, 4> sets { { { l.loopStart, 0, 0 }, { l.loopEnd, 1, 0 }, { l.bwdEnd, 0, 1 },
+                                      { l.bwdStart, 1, 1 } } };
+    c.wr32(kLoopSet.numberWord, kNumber);
+    for (const Set& s : sets) {
+        if (c.call(kLoopSet.at, { kLoopSet.numberWord, (uint32_t)s.frame, s.end, s.backward }, xtfw::kStack)) continue;
+        if (why) *why = "the firmware's loop setter failed: " + c.error();
+        return false;
+    }
+    return true;
+}
 } // namespace
 
-bool xtFwWaveFile(const XtWaveBlocks& w, std::vector<uint8_t>& file, std::string* why) {
+bool xtFwWaveFile(const XtWaveBlocks& w, std::vector<uint8_t>& file, std::string* why, const XtWaveEdits& edits) {
     file.clear();
     const auto& vpsc = w.bytes[XtWaveBlocks::kVpsc];
     if (!vpsc || vpsc->size() < 8) return fail(why, "no vpsc");
@@ -95,5 +115,6 @@ bool xtFwWaveFile(const XtWaveBlocks& w, std::vector<uint8_t>& file, std::string
     c.wr32(kWaves + 4 * (kNumber & 0x7f), kEntry + kNode);
     c.wr32(kRebuild.overrideWord, kRebuild.none);
     if (xtWaveHasBands((*vpsc)[1]) && !rebuildBands(c, why)) return false;
+    if (edits.loops && !setLoops(c, *edits.loops, why)) return false;   // v486: on the wave as loaded, as on the XT
     return xtfw::runWriter(c, { kWriter, kPath, kPathText, kNumber }, file, why);
 }
