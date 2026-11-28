@@ -21,20 +21,38 @@ Windows part applies to a VST3 built on Windows from this project.
 
 ## macOS
 
-**Built on this Mac:** nothing to do. The build signs the plugins ad hoc and nothing is quarantined.
+**Built on this Mac:** nothing to do. The build signs the plugins ad hoc and nothing is quarantined. Checked with
+`codesign --verify --strict`, a locally built AU says "code has no resources but signature indicates they must be
+present". That's the linker's signature, and the AU still loads and passes `auval`. Re-sign it as below only if a
+host won't load it.
 
-**From anywhere else:** run these in Terminal for each bundle you installed (the instrument's AU shown):
+**From anywhere else:** every bundle needs it, the VST3s as well as the AUs. This does all four in Terminal, skipping
+any you didn't install:
 
 ```bash
-xattr -cr ~/Library/Audio/Plug-Ins/Components/"V-Synth Emu.component"
+cd ~/Library/Audio/Plug-Ins
+for b in "Components/V-Synth Emu.component" "Components/V-Synth Emu FX.component" \
+         "VST3/V-Synth Emu.vst3" "VST3/V-Synth Emu FX.vst3"; do
+  [ -e "$b" ] || continue
+  xattr -cr "$b"
+  codesign --force --deep --sign - "$b"
+  codesign --verify --deep --strict --verbose=2 "$b"
+done
+```
+
+For a copy installed for every user, start with `cd /Library/Audio/Plug-Ins` instead, and put `sudo` before each of
+the first two commands in the loop. For one bundle alone, the same three commands, for example the instrument's VST3:
+
+```bash
+xattr -cr ~/Library/Audio/Plug-Ins/VST3/"V-Synth Emu.vst3"
 ```
 
 ```bash
-codesign --force --deep --sign - ~/Library/Audio/Plug-Ins/Components/"V-Synth Emu.component"
+codesign --force --deep --sign - ~/Library/Audio/Plug-Ins/VST3/"V-Synth Emu.vst3"
 ```
 
 ```bash
-codesign --verify --deep --strict --verbose=2 ~/Library/Audio/Plug-Ins/Components/"V-Synth Emu.component"
+codesign --verify --deep --strict --verbose=2 ~/Library/Audio/Plug-Ins/VST3/"V-Synth Emu.vst3"
 ```
 
 - `xattr -cr` removes the quarantine mark and the other file attributes a download or copy adds. It must come
@@ -42,7 +60,7 @@ codesign --verify --deep --strict --verbose=2 ~/Library/Audio/Plug-Ins/Component
   allowed".
 - `codesign --force --deep --sign -` signs the bundle ad hoc for this Mac. Apple silicon Macs won't load code with
   no valid signature, and a copy from another Mac may have lost or broken its signature on the way.
-- The last command should end with "valid on disk" and "satisfies its Designated Requirement".
+- The last command should say "valid on disk" and "satisfies its Designated Requirement" for each bundle.
 
 **Without Terminal:** load the plugin once in your host. When macOS says it couldn't verify it, go to System
 Settings, Privacy & Security, scroll to Security, and click Open Anyway for the plugin. Then load it again. On
