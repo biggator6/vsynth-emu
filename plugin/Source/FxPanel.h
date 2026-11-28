@@ -5,6 +5,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
 #include <vector>
+#include "UiControls.h"   // Controls::attached and LearnSlider: MIDI learn on every control (v463)
 #include "UiParts.h"
 
 class VSynthEmuProcessor;
@@ -28,7 +29,7 @@ private:
     using ButtonAtt = juce::AudioProcessorValueTreeState::ButtonAttachment;
     using ComboAtt  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
-    struct Level { juce::Label label; juce::Slider slider; std::unique_ptr<SliderAtt> att; };
+    struct Level { juce::Label label; LearnSlider slider; std::unique_ptr<SliderAtt> att; };   // v463: MIDI learn's
     struct Choice { juce::Label label; juce::ComboBox box; std::unique_ptr<ComboAtt> att; };   // a box on its choices
     struct Block { juce::ToggleButton on; juce::Label typeLabel; juce::ComboBox type; std::unique_ptr<ButtonAtt> onAtt; std::unique_ptr<ComboAtt> typeAtt; std::vector<std::unique_ptr<Level>> levels; };
     struct ParamRow { juce::Label name; juce::Slider value; int id = -1, def = 0; };

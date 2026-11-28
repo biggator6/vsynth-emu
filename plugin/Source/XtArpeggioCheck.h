@@ -65,10 +65,15 @@ private:
     void differs(const char* what, long fwValue, long portValue);
 };
 
-// The tempo ticks the arpeggio steps on: XtTempoTicks against the clock object's routines (XtTempoTicksCheck.cpp)
-struct XtTicksTally {
-    long cases = 0, ms = 0, values = 0, different = 0;
+// What a section of xt_arp after the object's compared: its cases, their steps (the ticks' ms, the edits made), the values
+// and how many of them differ
+struct XtArpTally {
+    long cases = 0, steps = 0, values = 0, different = 0;
     bool failed = false;                           // a routine faulted or ran out of steps
 };
-XtTicksTally xtTempoTicksCheck(const std::string& rom, long cases, unsigned seed, bool first);
+// The tempo ticks the arpeggio steps on: XtTempoTicks against the clock object's routines (XtTempoTicksCheck.cpp)
+XtArpTally xtTempoTicksCheck(const std::string& rom, long cases, unsigned seed, bool first);
+// The Pattern Edit (v468): XtArpPatternEdit against the firmware's own screen, setter and clears on a patch's store, and
+// its pattern before any patch against the firmware's default patch (XtArpPatternEditCheck.cpp)
+XtArpTally xtArpPatternEditCheck(const std::string& rom, long cases, unsigned seed, bool first);
 #endif

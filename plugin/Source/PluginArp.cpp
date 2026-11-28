@@ -4,6 +4,7 @@
 #include "PluginArp.h"
 #include "PluginProcessor.h"
 #include "PluginSetting.h"
+#include "XtArpPatternEdit.h"
 #include "XtArpeggioPatch.h"
 #include <algorithm>
 #include <cstring>
@@ -66,10 +67,9 @@ Spec specOf(const ArpParam& r) {
 
 } // namespace
 
+// v469, the user's d-6: an initialized patch's (0x89482540), which the firmware's default patch has too
 XtArpPattern xtArpDefaultPattern() {
-    XtArpPattern p;
-    std::fill(std::begin(p.line), std::end(p.line), uint8_t { 60 });   // NOTE, C4 [FW 0x897a167c: ID 0x44b's default]
-    return p;
+    return xtArpInitPattern();
 }
 
 bool xtArpPatternSilent(const XtArpPattern& p) {

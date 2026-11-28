@@ -9,6 +9,7 @@ constexpr int kBigDial = 40;   // from this size a knob's name and value are 11,
 
 Knob::Knob(juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name, int dialSize)
     : attachment_(state, id, dial_), size_(dialSize) {
+    MidiLearn::attach(dial_, id);   // v463
     Controls::showEditorText(dial_, state, id);   // a VC-2 value on its string's scale (v453)
     const float text = dialSize >= kBigDial ? 11.0f : 10.0f;
     dial_.setRotaryParameters(Look::sweepStart, Look::sweepEnd, true);

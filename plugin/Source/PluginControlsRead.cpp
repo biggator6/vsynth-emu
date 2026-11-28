@@ -5,12 +5,17 @@
 #include "PluginParamIds.h"
 #include <array>
 
+// A parameter's value as the synth takes it: a MIDI edit's while the message thread hasn't handed it on (v462)
+float VSynthEmuProcessor::raw(const juce::String& id) const {
+    return midi_.edits.read(apvts.getRawParameterValue(id));
+}
+
 int VSynthEmuProcessor::knob(const juce::String& id) const {
-    return (int)std::lround(apvts.getRawParameterValue(id)->load());
+    return (int)std::lround(raw(id));
 }
 
 int VSynthEmuProcessor::kf(const juce::String& id) const {
-    return 10 * (int)std::lround(apvts.getRawParameterValue(id)->load() / 10.0f);
+    return 10 * (int)std::lround(raw(id) / 10.0f);
 }
 
 void VSynthEmuProcessor::readOscControls(XtSynth::Controls& c) const {
@@ -18,7 +23,7 @@ void VSynthEmuProcessor::readOscControls(XtSynth::Controls& c) const {
     // the defaults at e.g. 0.99999994, and the firmware's fixed-point steps
     // would play that, not 1 (a centred XT knob is exact).
     auto snap = [](float v, float stepSize) { return std::round(v / stepSize) * stepSize; };
-    c.pitchSemis   = snap(apvts.getRawParameterValue(Params::kPitchShift)->load(), 0.01f);
+    c.pitchSemis   = snap(raw(Params::kPitchShift), 0.01f);
     c.oscTime      = knob(Params::kOscTime);
     c.oscTimeOffset = knob(Params::kOscTimeOffset);
     c.oscTimeKF    = kf(Params::kOscTimeKF);
@@ -47,29 +52,29 @@ void VSynthEmuProcessor::readOscControls(XtSynth::Controls& c) const {
     c.patchFine    = knob(Params::kPatchFine);
     c.bendUp       = knob(Params::kBendUp);
     c.bendDown     = knob(Params::kBendDown);
-    c.scaleTune    = apvts.getRawParameterValue(Params::kScaleTune)->load() >= 0.5f;
+    c.scaleTune    = raw(Params::kScaleTune) >= 0.5f;
     for (int i = 0; i < 12; ++i) c.scale[i] = knob(Params::kScaleTunes[i]);
-    c.patchTempo   = (int)std::lround(snap(apvts.getRawParameterValue(Params::kPatchTempo)->load(), 0.1f) * 10.0f);
+    c.patchTempo   = (int)std::lround(snap(raw(Params::kPatchTempo), 0.1f) * 10.0f);
     c.clockSource  = knob(Params::kClockSource);
-    c.tempoSync    = apvts.getRawParameterValue(Params::kTempoSync)->load() >= 0.5f;
-    c.origTempo    = (int)std::lround(apvts.getRawParameterValue(Params::kOrigTempo)->load() * 10000.0f);
-    c.timeTrip     = apvts.getRawParameterValue(Params::kTripSw)->load() >= 0.5f;
-    c.beatKeep     = apvts.getRawParameterValue(Params::kBeatKeep)->load() >= 0.5f;
-    c.loop         = apvts.getRawParameterValue(Params::kLoop)->load() >= 0.5f;
+    c.tempoSync    = raw(Params::kTempoSync) >= 0.5f;
+    c.origTempo    = (int)std::lround(raw(Params::kOrigTempo) * 10000.0f);
+    c.timeTrip     = raw(Params::kTripSw) >= 0.5f;
+    c.beatKeep     = raw(Params::kBeatKeep) >= 0.5f;
+    c.loop         = raw(Params::kLoop) >= 0.5f;
     c.loopMode     = knob(Params::kLoopMode);
-    c.loopStart    = apvts.getRawParameterValue(Params::kLoopStart)->load() / 100.0f;   // not to a step: a wave's own loop is to the sample
-    c.loopEnd      = apvts.getRawParameterValue(Params::kLoopEnd)->load() / 100.0f;
+    c.loopStart    = raw(Params::kLoopStart) / 100.0f;   // not to a step: a wave's own loop is to the sample
+    c.loopEnd      = raw(Params::kLoopEnd) / 100.0f;
     c.startOffset  = knob(Params::kStartOffset);
     c.playbackMode = knob(Params::kPlaybackMode);
-    c.portamento   = apvts.getRawParameterValue(Params::kPorta)->load() >= 0.5f;
+    c.portamento   = raw(Params::kPorta) >= 0.5f;
     c.portaMode    = knob(Params::kPortaMode);
     c.portaType    = knob(Params::kPortaType);
     c.portaTime    = knob(Params::kPortaTime);
     c.portaVeloSens = knob(Params::kPortaVeloSens);
     c.mono         = knob(Params::kMonoPoly) == 0;
-    c.legato       = apvts.getRawParameterValue(Params::kLegato)->load() >= 0.5f;
+    c.legato       = raw(Params::kLegato) >= 0.5f;
     c.octave       = knob(Params::kOctave);
-    c.mod.on       = apvts.getRawParameterValue(Params::kModSwitch)->load() >= 0.5f;
+    c.mod.on       = raw(Params::kModSwitch) >= 0.5f;
     c.mod.type     = knob(Params::kModType);
     c.mod.level    = knob(Params::kModLevel);
     c.mod.attack   = knob(Params::kModAttack);
@@ -79,8 +84,8 @@ void VSynthEmuProcessor::readOscControls(XtSynth::Controls& c) const {
 
 void VSynthEmuProcessor::readToneControls(XtSynth::Controls& c) const {
     c.energy       = knob(Params::kEnergy);
-    c.rootKey      = (int)apvts.getRawParameterValue(Params::kRootKey)->load();
-    c.tvaOn        = apvts.getRawParameterValue(Params::kTvaSwitch)->load() >= 0.5f;
+    c.rootKey      = (int)raw(Params::kRootKey);
+    c.tvaOn        = raw(Params::kTvaSwitch) >= 0.5f;
     c.chorusSend   = knob(Params::kTvaChoSend);
     c.reverbSend   = knob(Params::kTvaRevSend);
     c.outputAssign = knob(Params::kOutputAssign);
@@ -98,7 +103,7 @@ void VSynthEmuProcessor::readToneControls(XtSynth::Controls& c) const {
     c.tvaLfoDelay  = knob(Params::kTvaLfoDelay);
     c.tvaLfoFadeMode = knob(Params::kTvaLfoMode);
     c.tvaLfoFade   = knob(Params::kTvaLfoFade);
-    c.tvaLfoKeySync = apvts.getRawParameterValue(Params::kTvaLfoSync)->load() >= 0.5f;
+    c.tvaLfoKeySync = raw(Params::kTvaLfoSync) >= 0.5f;
     {
         static const std::array<std::array<juce::String, 5>, 8> mxIds = [] {
             std::array<std::array<juce::String, 5>, 8> a;
@@ -114,19 +119,19 @@ void VSynthEmuProcessor::readToneControls(XtSynth::Controls& c) const {
         }
         for (int i = 0; i < kAssigns; ++i) c.assign[i] = knob(assignParamId(i));
     }
-    c.attack       = (int)apvts.getRawParameterValue(Params::kAttack)->load();
-    c.decay        = (int)apvts.getRawParameterValue(Params::kDecay)->load();
-    c.sustain      = (int)apvts.getRawParameterValue(Params::kSustain)->load();
-    c.release      = (int)apvts.getRawParameterValue(Params::kRelease)->load();
-    c.aSens        = (int)apvts.getRawParameterValue(Params::kAttackSens)->load();
-    c.dSens        = (int)apvts.getRawParameterValue(Params::kDecaySens)->load();
-    c.rSens        = (int)apvts.getRawParameterValue(Params::kReleaseSens)->load();
-    c.timeKF       = 10 * (int)std::lround(apvts.getRawParameterValue(Params::kTimeKF)->load() / 10.0f);
-    c.pAttack      = (int)apvts.getRawParameterValue(Params::kPAttack)->load();
-    c.pDecay       = (int)apvts.getRawParameterValue(Params::kPDecay)->load();
-    c.pSustain     = (int)apvts.getRawParameterValue(Params::kPSustain)->load();
-    c.pRelease     = (int)apvts.getRawParameterValue(Params::kPRelease)->load();
-    c.pDepth       = (int)apvts.getRawParameterValue(Params::kPDepth)->load();
+    c.attack       = (int)raw(Params::kAttack);
+    c.decay        = (int)raw(Params::kDecay);
+    c.sustain      = (int)raw(Params::kSustain);
+    c.release      = (int)raw(Params::kRelease);
+    c.aSens        = (int)raw(Params::kAttackSens);
+    c.dSens        = (int)raw(Params::kDecaySens);
+    c.rSens        = (int)raw(Params::kReleaseSens);
+    c.timeKF       = 10 * (int)std::lround(raw(Params::kTimeKF) / 10.0f);
+    c.pAttack      = (int)raw(Params::kPAttack);
+    c.pDecay       = (int)raw(Params::kPDecay);
+    c.pSustain     = (int)raw(Params::kPSustain);
+    c.pRelease     = (int)raw(Params::kPRelease);
+    c.pDepth       = (int)raw(Params::kPDepth);
     c.tAttack      = knob(Params::kTAttack);
     c.tDecay       = knob(Params::kTDecay);
     c.tSustain     = knob(Params::kTSustain);
@@ -155,17 +160,17 @@ void VSynthEmuProcessor::readToneControls(XtSynth::Controls& c) const {
     c.oscVelCurve  = knob(Params::kOscVelCurve);
     c.ampVelSens   = knob(Params::kAmpVelSens);
     c.ampVelCurve  = knob(Params::kAmpVelCurve);
-    c.robot        = apvts.getRawParameterValue(Params::kRobot)->load() > 0.5f;   // Robot Voice (SOLO)
-    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;
-    c.lfoWave      = (int)apvts.getRawParameterValue(Params::kLfoWave)->load();
-    c.lfoRate      = (int)apvts.getRawParameterValue(Params::kLfoRate)->load();
-    c.lfoPitchDepth = (int)apvts.getRawParameterValue(Params::kLfoDepth)->load();
-    c.lfoDelay     = (int)apvts.getRawParameterValue(Params::kLfoDelay)->load();
-    c.lfoFadeMode  = (int)apvts.getRawParameterValue(Params::kLfoFadeMode)->load();
-    c.lfoFade      = (int)apvts.getRawParameterValue(Params::kLfoFade)->load();
-    c.lfoOffset    = (int)apvts.getRawParameterValue(Params::kLfoOffset)->load();
-    c.lfoKeySync   = apvts.getRawParameterValue(Params::kLfoKeySync)->load() > 0.5f;
-    c.on           = apvts.getRawParameterValue(Params::kOscSwitch)->load() >= 0.5f;
+    c.robot        = raw(Params::kRobot) > 0.5f;   // Robot Voice (SOLO)
+    c.vari         = raw(Params::kVari) > 0.5f;
+    c.lfoWave      = (int)raw(Params::kLfoWave);
+    c.lfoRate      = (int)raw(Params::kLfoRate);
+    c.lfoPitchDepth = (int)raw(Params::kLfoDepth);
+    c.lfoDelay     = (int)raw(Params::kLfoDelay);
+    c.lfoFadeMode  = (int)raw(Params::kLfoFadeMode);
+    c.lfoFade      = (int)raw(Params::kLfoFade);
+    c.lfoOffset    = (int)raw(Params::kLfoOffset);
+    c.lfoKeySync   = raw(Params::kLfoKeySync) > 0.5f;
+    c.on           = raw(Params::kOscSwitch) >= 0.5f;
 }
 
 void VSynthEmuProcessor::readEnvVelocity(XtSynth::Controls& c) const {

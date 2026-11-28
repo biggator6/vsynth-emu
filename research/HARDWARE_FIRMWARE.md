@@ -1928,6 +1928,464 @@ value as now; d-8a start is the OSC's Start Offset on the display and end the XT
 loops drawn and dragged; d-8 the edit kept in the session's copy first, then written by the XT's own writer (above); d-9
 the points first, then the events by the XT's own add and delete and its encode.
 
+### The VC-2 mode without a PATCH Init (2026-11-27, v474) {#vc2-no-init}
+
+The user's answer to v473's question of how the VC-2's INIT should offer its Patch Category: "vc-2 mode doesn't need
+an init". So the patch box shows INIT in V-Synth mode alone (its VC-2 row has no init, so no button), and what v473
+added for rom.4's init is out: `vc2PatchInit` and `vc2PatchCategoryNames` (Vc2PatchInit.cpp), `initVc2Patch`
+(PluginVc2PatchInit.cpp), xt_vc2patch's `inits:` part (Vc2PatchInitCheck.cpp) and the 12 inits among its reads, their
+plants and tests. The V-Synth's PATCH Init is unchanged. Kept, each with callers of its own: `applyVc2Patch`
+(loadVc2Patch's apply), `xtfw::forCalls`, `vc2PatchStoreName`, and `XtInitAsked` (XtPatchInitWindow.h, now xt_files'
+alone); `vc2PatchTake` went back into `vc2PatchRead`.
+
+What rom.4's init is stays as v473 found it (below): `0x893291c0(store, name, category)`, its window, the Category
+names' table and how rom.4 draws them, and that a .p02's base is Category 0's init itself. Its port and check are in
+d696a0f (claude/patch-init), should the VC-2 mode want one later.
+
+**Checks.** VSynthEmuEditorTest: no INIT on the VC-2's header (`editor-vc2-box-init-shown` and
+`editor-vc2-box-init-given` plant one); the V-Synth's INIT as v473 left it. xt_vc2patch's reads back to the image's
+patches and the random stores, fcheck's baseline as before v473 there.
+
+### PATCH Init: the V-Synth's, and the VC-2's by Patch Category (2026-11-27, v473) {#patch-init}
+
+For research/NEXT_ISSUES.md item 4, the user's "need a patch init" (2026-11-27). Each image's own initialize, run in
+the interpreter as a patch's read is (load-time code, CLAUDE.md), applied as its mode's patch is: rom.2's for the
+V-Synth, rom.4's for the VC-2, which takes a Patch Category. Kept apart in the code (XtFwPatchInit and PluginPatchInit;
+Vc2PatchInit and PluginVc2PatchInit), as step 6 gives each plugin its own.
+
+#### The V-Synth's
+
+**Names first.** The XT's manual, "Initializing Patch Settings (PATCH Init)": ▼MENU on the PATCH PLAY or edit screen,
+PATCH Init, EXECUTE; it "returns the settings of the currently selected patch to a standard set of values", the patch
+in the temporary area alone; its message is "INITIALIZE PATCH, Are You Sure?". All three are rom.2's strings:
+- the pulldown item "PATCH Init", in both patch menus' tables (.data 0x89877738, 0x89877850);
+- the message, entry 41 of the message table at 0x89858e94 (40 bytes an entry: WARNING, INITIALIZE PATCH, Are You
+  Sure ?); 42 is INITIALIZE RHYTHM KIT;
+- the name "INIT PATCH" (0x897a13d0).
+
+**Two sources for the routine.**
+- The dialogs that show message 41, `0x893c59c0` and `0x893c3ae0` (each asks `0x894612d0` first, which gives a rhythm
+  kit message 42), both CANCEL and EXECUTE with the callback `0x893c5a10`. EXECUTE (its button word 1) runs
+  `0x8947fdb0(&part 0, no name)`, then the patch's change `0x8947e270(&part, 1)`, the screen's refresh `0x893716b0`
+  and the edit screen `0x89372450(6)`; CANCEL closes the window (`0x893724a0`).
+- `0x8947fdb0` takes the part's object from the part table `0x897a0fc8` (+0 1 when it holds a patch, +4 its store) and
+  runs `0x89482540(store, name)`, the routine that writes "INIT PATCH": it clears the store's 0x14fa bytes
+  (`0x8952fedc`), writes every ID by the setters `0x89484360` and `0x89484330`, and with no name writes "INIT PATCH",
+  then the MFX Switch, the three effects' types and parameters, Matrix Control 5 and in each zone the MOD and TVA
+  Switches, the two sends, OSC 1's Switch and both COSMs (its branch `0x894828a0`…`0x894829c2`). A name given skips
+  that branch.
+
+**The default a file is read over is the same routine.** `0x8947e230` runs `0x89482540` with an empty name
+(0x897a1344), then the store's file layout (`0x8947de90`), which `0x8947dad0` copies under a .p00's data ("V-Synth's
+files"). So that default is the init named "" byte for byte, and apart from PATCH Init in 401 values, all the branch's:
+a file's base has its effects and zones off where PATCH Init has a patch that sounds.
+
+**The port.** None: `xtFwPatchInit` (XtFwPatchInit.cpp) runs `0x89482540(store, 0)` on a fresh machine and gives the
+store and its name. `initPatch` (PluginPatchInit.cpp) applies it as a loaded patch is (`applyPatch`): zone 1 onto the
+parameters, its effects, arpeggio and zones, no wave (its PCM OSCs name none), its name. As on the XT, only the patch
+played changes: the system's settings, the Effects switch and the patch browsed stay. The patch box's INIT
+(UI_DESIGN.md, "The patch box"): a menu under the XT's words, INITIALIZE PATCH, Execute.
+
+**Checks.**
+- `xt_files`' init line (XtPatchInitCheck.cpp): the window's EXECUTE run in the interpreter, on the 16 parts' patches
+  as the start-up makes them (`0x89478510`) with part 0 holding an image patch, the callback's other calls hooked: part
+  0's store is xtFwPatchInit's, 0 bytes different; the other 15 parts' 0 moved; the change asked once, for part 0; the
+  edit screen. CANCEL: 0 bytes moved, the window closed. Named "INIT PATCH". The default under a file against the
+  routine run with an empty name, 0 bytes different. The init's store against the firmware's reads as the image's
+  patches are checked (`xtPatchCheckStore`: every value in every zone and COSM, every type's parameters, the blocks
+  with no zone by the firmware's pointing routines): 12,385 values, 0 out of range, 0 different.
+- `VSynthEmuProjectTest`'s init part (ProjectInitTest.cpp): INIT on a fresh processor, and on one holding an image
+  patch of several zones with a project's patch browsed: its name, its zones, zone 1's controls and the arpeggio as
+  the store gives them (`xtPatchControls`, `xtWithPatchArp`), the store kept for the session, and saved unchanged the
+  init's store byte for byte, so no parameter reads otherwise; no wave and no note; the patch browsed as it was. 22
+  checks. `VSynthEmuEditorTest`: INIT on the header, and its Execute through the box gives the init and keeps the
+  project's place.
+- Planted errors: `mutate_files.py`'s four `patchinit-` (the routine, a name given, the store short, read a byte
+  off); `mutate_panel.py`'s `init-` (not applied, unnamed, refused with an image) and `editor-d-box-init-` (hidden,
+  not run, not placed).
+
+**A split on the way** (CLAUDE.md, files over the limit): the shorter patch's check moved from XtPatchStoreCheck.cpp to
+XtPatchShortCheck.cpp as it stood, and the store check gained `xtPatchCheckStore`, its comparisons for one store.
+`xtfile::storeBytesApart` is the checks' one measure of a store moved (ProjectSaveTest's `storeBytesMoved` was it);
+`xtPatchStoreName` the name's read (xtPatchRead's).
+
+#### The VC-2's, by Patch Category
+
+**Names first.** No VC-2 manual here, so rom.4's strings and code are both sources, held to each other. rom.4 has the
+pulldown item "PATCH Init" (.data 0x8992037c), the message INITIALIZE PATCH, Are You Sure? (its table's entry 41
+again, at 0x8994137c) and the name "INIT PATCH" (0x8950dd40, loaded by the init at 0x89329356).
+
+**The window.** Its handler `0x89493d80` takes buttons 10…21, each putting a Patch Category 0…11 at `0x89abb75c`, and
+button 9 shows message 41 with the callback `0x89493f40`, as does `0x89493ff0`. EXECUTE runs `0x89326c60(&part 0, no
+name, [0x89abb75c])`, then the patch's change `0x89325360(&part, 1)`, the refresh `0x8940b5b0` and the edit screen
+`0x8940c230(7)`. `0x89326c60` takes part 0's object from rom.4's part table (`0x8950d8e0`, +0 1 when it holds a patch,
++4 the store) and runs **`0x893291c0(store, name, category)`**: the store's 0x13a4 bytes cleared, every ID by rom.4's
+setters, Patch Category (0x12c) set to the one given and a 12-way switch writing each Category's own settings; with no
+name, "INIT PATCH". A second dialog, `0x8943da40` (callback `0x8943da70`), inits with Category 0.
+
+**The Categories' names.** rom.4's text for Patch Category is only "range 0..11". Its names are a table of 12
+pointers at .data 0x8994a638, each a label of two lines, one string with a newline between (`strings` shows the two as
+strings of their own, and the first reader here took the padding after the label for an empty second line: the check's
+two-lines rule found it), which `0x894958c0` draws
+for a patch by its Patch Category (`0x8940f1c0(0x12c)`, then `table[value]` to `0x894f4370`): Modelng Choir, Modelng
+Vocal, Modelng Analog, Vocoder Choir, Vocoder Solo, Vocoder Vintage, Poly PShift, Kbd Choir, Kbd Vocal, Kbd Analog,
+Process Type 1, Process Type 2. The SysEx's Category law ("rom.4's SysEx") fits them: OSC 1 Pulse Width writes under
+2, 5 and 9 (Modelng Analog, Vocoder Vintage, Kbd Analog), Formant Shift under 3…5 and 11.
+
+**The default a .p02 is read over** (`0x89325300`, "rom.4's patch store and a .p02") is `0x893291c0` with an empty
+name (0x8950dcb4) at Category 0. Unlike rom.2's, rom.4's init takes an empty name as none (`0x89329312`…`0x8932931a`:
+a null pointer or a NUL first), so that default is Category 0's PATCH Init itself, named INIT PATCH, byte for byte. A
+planted name given as "" rather than none was so caught by nothing, rightly; the plant now gives a name.
+
+**The port.** None: `vc2PatchInit(category)` (Vc2PatchInit.cpp) runs `0x893291c0(store, 0, category)` on the rom.4
+image the .p02 reads run on; `vc2PatchCategoryNames()` reads the table. `initVc2Patch` (PluginVc2PatchInit.cpp)
+applies it as a .p02 is (`applyVc2Patch`, loadVc2Patch's apply made its own): the VC-2's parameters, the store and
+name kept for the session and the part. The patch box's INIT in VC-2 mode: the menu INITIALIZE PATCH, the 12
+Categories by rom.4's names, as rom.4's window offers them (the recommendation asked of the user, taken while the
+answer is pending).
+
+**Checks.**
+- `xt_vc2patch`'s `inits:` line (Vc2PatchInitCheck.cpp): the window's EXECUTE at each Category, on a machine of its
+  own with part 0 holding an image patch, against vc2PatchInit: 0 bytes different at all 12, each its Patch Category
+  and named INIT PATCH, the change asked once for part 0; the 12 stores distinct; the other window's EXECUTE gives
+  Category 0's; CANCEL moves nothing; the 12 names equal the labels `0x894958c0` draws, run with its value read
+  answered by each Category, each two lines; the default under a .p02 against Category 0's init, 0 bytes. And the 12
+  inits' every value and typed value against rom.4's reads, with the image's patches: 0 different. (The names' first
+  check read the drawn label by the same routine as the names, so a plant there was missed: each name must now be two
+  lines as well, said on one, which then showed the first reader wrong, as above.)
+- `VSynthEmuArpPluginTest`'s VC-2 patch part: each Category's INIT on one processor, every VC-2 parameter but the
+  system's as its init's store reads, the store and name kept, no V-Synth or VC-2 system parameter moved; Category 12
+  refused, nothing moved. `VSynthEmuEditorTest`: INIT on the VC-2's header, its menu 12 distinct names, Category 3's
+  choice giving its init.
+- Planted errors: `mutate_vc2.py --patch`'s eight `init-`/`take-` (a name given, Category 0, Category + 1, the store
+  read off, the names' table, their newline kept and a label cut short, the read's name), `mutate_panel.py`'s
+  `vc2-init-` and `editor-vc2-box-init-`.
+
+**Made one on the way:** `xtfw::forCalls` (XtFwMachine.h), the memory and step limit every rom.4 machine had by hand
+(the .p02 read, its save, the system's defaults, the init); `vc2PatchTake` and `vc2PatchStoreName` (Vc2PatchFile.cpp,
+the read's and the init's; vc2card.cpp's copy gone); `XtInitAsked` (XtPatchInitWindow.h), the window's callback's
+hooked calls for both checks; xt_vc2patch's `vc2PointAtStores`.
+
+### The pattern before any patch: an initialized patch's (2026-11-27, v469) {#arp-default-init}
+
+The user's d-6 (research/NEXT_ISSUES.md), on v468's finding below: the plugin's pattern before any patch, and a session's
+from before v190, is an initialized patch's (`xtArpDefaultPattern` → `xtArpInitPattern`: every line NOTE C4, line 1 at
+velocity 100 on every step), where it was the descriptors' all-rest pattern. So the Arpeggio switched on in a fresh plugin
+plays the keys held by its Motif, Octave Range and Grid (UP, a 16th each, at the defaults), as an initialized XT does;
+INIT on the card puts it back; ALL CLEAR leaves a pattern of rests, which plays nothing, the keys included, as on the XT.
+No starter pattern the XT doesn't have. A patch, a session and the card bring their own pattern as before.
+- **Checks.** `VSynthEmuArpPluginTest`: a new processor's pattern is the firmware's own default patch's (`0x8947e230`,
+  then `0x8947dae0` on no file's bytes, as the plugin's save makes it), not silent; the chord through processBlock with
+  the arpeggio on now plays on that pattern, with no patch and none set: a note each quarter at 120 BPM on QUARTER, XtSynth's
+  render sample for sample; xt_arp's edits section holds `xtArpInitPattern` to the same patch. The v190 plant on the
+  default's line became `arp-default-empty` (the old all-rest default), caught. The whole `arp_muts.txt` list (v468's
+  and the earlier) 110/110; the editor's and arpeggio's panel plants 120 of 121, the one left, `arp-said-missing`,
+  plants into text that v206 took out of `XtPatch.cpp`, so it plants nothing: stale before this branch.
+
+### The arpeggio's Pattern Edit, and the pattern an initialized patch has (2026-11-27, v468) {#arp-pattern-edit}
+
+The user's report (research/NEXT_ISSUES.md, item 3): "arpeggiator only reads from patches - no ability to program
+patterns. with no pattern, it should still handle live input for repeat/up/down/etc". Names first: the manual's Pattern
+Edit (pp. 65–67) and Arpeggio (pp. 82–83), then rom.2's strings for that screen, then its code.
+
+**The manual.** A pattern is up to 32 steps × 16 lines. Each line has a State (NOTE, CTRL) and a Note/CC (a note C-1–G9,
+or a controller 0–127). The input area shows a note as ●, a tie as =, a controller as ○; Value shows the cell under the
+cursor. Six buttons, 0, 32, 64, 96, 127 and Tie/Clr, put that velocity (or a controller's value) at the cursor, or a tie,
+or clear a controller, and change the one there when editing; the VALUE dial and INC/DEC set it too. Grid, End Point (the
+pattern's length, 1–32), Clear (LINE CLEAR, ALL CLEAR, CANCEL), Real Rec and Step Rec (at most 16 pitches and controllers
+in a pattern, a new one each taking a line). The motifs: UP, DOWN, UP&DOWN, RANDOM, NOTE ORDER sound the keys held;
+RHYTHM "the notes that you specified when inputting the pattern", whatever is played; PHRASE the phrase moved to the last
+key; AUTO the keys given to the lines from the lowest.
+
+**rom.2's screen.** Its strings sit at `0x897786d8`…`0x89778795`: the buttons' "0", "32", "64", "96", "127", "Tie", "Clr",
+"Value :", "State", "Note/CC", "Grid", "End Point", "Pattern Edit", the Value texts "***", "  0", "---", "Real", "Rec",
+"Step", "Stop", and the clear dialog's "CANCEL", "LINE CLEAR", "ALL CLEAR" (with "PATTERN CLEAR" and "This Will Clear One
+or All Lines." at `0x8975cd74`…`0x8975cd94`). The code that loads them is `0x893f8200`…`0x893fb9xx`. It keeps its cursor in
+three work IDs of the system store (`0x89968728`, getter `0x8937ce90`, setter `0x8937ced0`, which clamps to the ID's
+range): 0x1403 the cursor's line (0…15), 0x1402 its cell, line × 32 + step (0…511), and 0x1401 the cell's value
+(0…128; the ranges at `0x8937a320`…`0x8937a34a`, in `0x89379c70`). Setting 0x1401 writes the patch: `0x893787f0`'s case
+points a write object at line [0x1403] and writes ID 0x44d + 2 × ([0x1402] & 31), Step 1…32's Velocity (`0x89379a44`).
+Nothing else is touched: no other cell, no line's State or Note/CC.
+- **The buttons** (`0x893f9400`, buttons 10…15 by the table at `0x893f9494`; each writes only with the cursor in the input
+  area, focus 0x20 by `0x89374e00`), by the cursor line's State (ID 0x44a):
+
+  | button | NOTE line | CTRL line |
+  |---|---|---|
+  | 0 | 0, REST (`0x893f99f0`) | 1, the value 0 (`0x893f94b8`) |
+  | 32, 64, 96 | 33, 65, 97 (`0x893f9930`, `0x893f9960`, `0x893f998c`) | the same |
+  | 127 | 128 (`0x893f99bc`) | the same |
+  | Tie / Clr | 1, TIE (`0x893f9a1c`) | 0, REST (`0x893f99f0`) |
+
+  So a NOTE line's 0 is a rest, never a velocity of 0, and a CTRL line's 0 is a controller sent at 0.
+- **INC/DEC** in the input area move the cell by 1, by 10 with SHIFT (`0x893f8b10`, keys 0x13 and 0x15), and the dial sets it
+  (`0x893fa400`), all through 0x1401's 0…128. On a NOTE line's Note/CC SHIFT moves it by 12; otherwise by 1, by 10 with SHIFT.
+  The line's State and Note/CC are patch IDs 0x44a (0…1) and 0x44b (0…127, the descriptors'), set as any other ID, cells
+  left as they are: a NOTE line's TIE becomes a CTRL line's value 0 and back.
+- **What it draws** (`0x893f9fe0`, and the same loop in `0x893f9400`): a cell 0 blank; on a NOTE line 1 a tie and 2…128 a
+  note; on a CTRL line any cell past 0 a controller. Value at the cursor: on a NOTE line "  0" for a rest, "Tie" for 1,
+  else the cell less 1; on a CTRL line "***" for a rest, else the cell less 1; "---" off the input area. The steps past End
+  Point are drawn in another colour (the box from 0x127 − 6 × (31 − End Point)).
+- **Clear** (the dialog `0x893f9a50`, its answer `0x893fb940`): ALL CLEAR is `0x89304000` → `0x893052f0` on the Pattern
+  Edit object `0x8987f7b8`, which writes 0 (`0x89479e50` → `0x89484330`) to Step 1…32 of each of the 16 lines; LINE CLEAR is
+  `0x89304010` → `0x89305360`, the same for the cursor's line. Neither touches a State or a Note/CC. Each then reads the
+  lines into the object again (`0x89305250`), and ALL CLEAR sets its tables to −1 (`0x893057f0`): Rec's, not read further.
+- Real Rec and Step Rec are that object's (`0x8987f7b8`, the players of v188's "Pattern Edit's players", constructor
+  `0x89304bb0`; their pattern writes `0x89304e2e`…`0x89305fc8`), not read here.
+
+**What an empty pattern plays.** Nothing. A step plays a cell other than 0, and on a NOTE line other than 1 (`0x89302700`,
+v188), and with the Switch on the keys go to the arpeggio and not the part (`0x89307c80`, v189): keys held over a pattern
+of rests sound nothing at all. The plugin before any patch has the descriptors' pattern (v190), every cell 0, so the
+Arpeggio switched on in a fresh plugin silences the keys: what the user met.
+
+**What an initialized patch has.** The XT's PATCH initialize, `0x89482540` (it names the patch "INIT PATCH" when given no
+name; `0x89482bc0` beside it is a variant with a third argument, one caller, `0x8947fdf0`), sets every block to its
+descriptors' defaults, the pattern's 16 lines too (`0x89482834` on 0x44a…, 0x43 IDs a line, from store + 0x128c), and then
+writes 101, velocity 100, to Step 1…32 of line 1 (`0x89482b1c`…`0x89482b3c`: ID 0x44d + 2k, `mov #101`, 32 times). So an
+initialized patch has every line NOTE C4, line 1 at velocity 100 on every step and the rest at REST, with the settings'
+defaults (Motif UP, Grid 16TH, End Point 32): switched on, it plays the keys held one a 16th, up. The presets show the same
+pattern: of the disk image's 512, 291 have line 1 at velocity 100 on every step and nothing else (189 and 9 with every line
+at C4, Switch off and on; 89 and 4 with line 1's note 80, G#5, and not every line at C4), and one, Solid Bass (Switch
+off), has a pattern of rests.
+
+**How the lines and the motif share the keys** (v188's engine, as it stands): a NOTE line with a velocity at a step asks the
+motif for a key. UP, DOWN, UP&DOWN, RANDOM and NOTE-ORDER give each such line the walk's next key, so two lines at one step
+play two keys at once, and the line's own note is not read; AUTO gives line i the (i mod count)-th key held from the lowest;
+RHYTHM plays the line's own note, the keys only starting and stopping it; PHRASE plays the line's note moved by the last
+key less line 1's note. The cell scales the key's velocity (or Keyboard Velocity's), and the ties after it lengthen the
+note. A CTRL line sends its controller at the cell less 1 whatever the motif, at most CC 95 as the engine lays the line out
+(`0x8930ca30`), though the screen and the store take 0…127.
+
+**So for the plugin** (d-6, the user's): what the XT does without a patch's pattern is an initialized patch's, line 1 on
+every step, which with Motif and Grid is the live "repeat/up/down"; an all-rest pattern stays silent.
+
+**The port (v468).** `XtArpPatternEdit` (no JUCE): each button's cell by the line's State, 0x1401's write at the cursor
+clamped to 0…128, a line's State and Note/CC clamped to their descriptors' 0…1 and 0…127, LINE CLEAR and ALL CLEAR, the
+initialized pattern (`xtArpInitPattern`), and what the screen draws of a cell (`xtArpMarkOf`, `xtArpValueText`), each a
+table by State and the cell's kind (rest, 1, a value). The PLAY page's pattern card edits through it (`UiArpPattern` the
+grid, `UiArpPatternEdit` Value, the six buttons, the clears and INIT): a click on a cell is the touch that moves the
+cursor, a drag or the wheel the dial (INC/DEC: 1, 10 with SHIFT; a NOTE line's Note/CC 12 with SHIFT, a CTRL line's 10,
+the screen's generic step there not read). Each edit goes to the session as a patch's pattern does (`setArpPattern`:
+the audio thread's words and the state's `arpPattern`). The VC-2's pattern stays drawn only.
+- **A CTRL line's controller.** The patch and the Pattern Edit hold it as 0…127; the object plays it at 95 at most, which
+  0x8930ca30 does as it lays a patch's pattern out (`0x8930cac0`). The reads (`xtArpPatternRead`) clamped it at 95 since
+  v188, so an edit to 120 would have shown 95 and a patch saved by the plugin lost it; now the session and a saved patch
+  keep the patch's value, and `XtArpeggio::setPattern` lays it out (`xtArpLaidOut`). No preset has a CTRL line past CC 81,
+  so no preset's sound moves.
+
+**The check** (xt_arp's edits section, `XtArpPatternEditCheck.cpp`). A machine whose part 0 has its three stores (+4, +8
+and the write object's +0x10, which `0x8947b5b0` reads) at a patch's store, the firmware's default patch's: the OS's
+semaphores, the screen's lock and drawing calls and Rec's tables (`0x893057f0`) answered with nothing, the focus
+(`0x89374e00`) answering the input area, the text and glyph draws (`0x89325310`, `0x89324660`) recorded. Each case 60
+edits drawn: the cursor (0x1403, 0x1402 through the setter), a value at it (0x1401, −20…150), a button through the
+handler itself (`0x893f9400`, 10…15), a line's State (−2…3) or Note/CC (−20…150) through the setter, LINE CLEAR, ALL
+CLEAR; the port given the same. After each the store's pattern against the port's; after one in four the arpeggio's own
+read of the store (`0x8930ca30`) against `xtArpLaidOut`, and the redraw (`0x893f9fe0`): Value's text and every cell's
+glyph against `xtArpValueText` and `xtArpMarkOf`. And `xtArpInitPattern` against the default patch's pattern. Its draws
+are its own generator's (seed + 468), so no other section's cases move.
+- **The result.** At fcheck's 1000 cases, 200 of 60 edits: 12,000 edits, 9,411,642 values, 0 different; the first run
+  with nothing planted was 0 different too, so 18 plants were made to show it can fail (`arp_muts.txt`, `PORT=arpedit`
+  and two on the layout): each button's cell, the clamps of 0x1401, State and Note/CC, a clear touching a line's State
+  or missing the last line, the initialized pattern's cell and note, a mark and two Value texts, the layout's limit and
+  its State: 18 caught. The card's own check is VSynthEmuEditorTest's (`EditorArpTest.cpp`): each edit through it into
+  the session against the port, the pattern in the synth's controls and back from a saved session.
+
+**Not yet:** Real Rec and Step Rec (d-10: later, their own item); the VC-2's pattern, rom.4's, drawn only; the screen's
+generic INC/DEC on a CTRL line's Note/CC and on a State with SHIFT (the plugin takes 10 and a click).
+
+### The checks the v464 gates' four missed plants showed blind (2026-11-27, v465) {#midi-learn-checks}
+
+v464's gates (verify.sh clean; 184 of the plants v462–v464 reach) missed four. Each was a check that couldn't fail;
+v465 changes only the checks, no code of the plugin's.
+- `midi-learn-host-whole`, `midi-learn-reaches-firmware` (a learnt controller handed to the firmware as well): MidiTest's
+  "no longer reaching the firmware" read `currentControls().portaTime`, the parameter's path through `raw()`, which a CC
+  reaching `XtSynth::controller` doesn't move (the firmware's channel keeps it in `cc[]`, the Matrix's sources). Now the
+  learn check holds a note with a Matrix route from CC 5 onto OSC 1's Level (TestMidi.h's `levelRoute`, v464's ring
+  check's route made one) and reads the sum by `XtSynthView::matrix`: 0 with CC 5 learnt, above 0 once it's forgotten.
+- `editor-d-learn-switch-toggles` (no `setState(buttonNormal)` on a switch's right-click): `LayoutCheck::rightClick` sent
+  a press, a drag and the release. A juce::Button's drag asks whether the mouse is over it (`isMouseSourceOver`), which,
+  with no real mouse in a test, says no and lets the button up, so its release never clicked, kept up or not.
+- `editor-d-learn-bar-drags` (UiFields' bar a plain juce::Slider): `LayoutCheck::mouseAt` made every event as a click
+  (`mouseWasDragged` false). JUCE doesn't move a LinearBar with an editable text box on a click (a click edits its text),
+  and the drag went straight up, along no bar.
+- Now `rightClick` is a click (press, the editor's listener, release at the same point), then a drag 20 across and 30
+  up that JUCE counts as one (`mouseAt`'s `dragged`). With the four plants in, the MIDI check and the editor's say so; the
+  plugin as it is passes both (VSynthEmuMidiTest 39/39, VSynthEmuEditorTest 5255/5255).
+
+### A modulator as the knob's ring (2026-11-27, v464) {#mod-rings}
+
+research/NEXT_ISSUES.md item 2's second half, the user's d-5: the knob says what's stored, a modulator shows as a ring
+beside it (research/UI_DESIGN.md, "The look": `mod`, 3.2 outside the track, over the modulation's reach; the ring's
+drawing was D's from v196, `Knob::setModulation`, and nothing had called it).
+
+**What the ring shows.** XtSynth's converters add, to some knobs, the Matrix's sum by slot (`XtVoice::mx`) and the
+Multi Step Modulator's term by destination (`XtVoice::msm`) straight, in the knob's own units, as the voice's last
+conversion pass left them (XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp): each OSC's Level (`o.oscLevel + term + mx`), its
+LFO's Rate (`withSum`) and its four depths, the analog's PW and Fat LFO (on time's and formant's terms); each COSM's LFO
+Rate; the TVA's Level, Pan, Level and Pan LFO, its LFO's Rate and the three sends; Portamento Time (the MSM's term
+alone, `portaSettings`). Those knobs are rung from the stored value to it plus the newest note's sum and term, clamped
+to the range: a Matrix route from a controller, the bender, the pad or the velocity, and the MSM's steps, as they move.
+The newest note is the one held last, else the one let go last that still sounds; none sounding, no ring. Not rung
+(follow-ups): the knobs whose sums the converter takes in another unit or by type (each OSC's Pitch, Time and Formant,
+whose sums go into the pitch, time and formant laws; each COSM's PRM1, PRM2 and LFO-PRMs, whose knobs depend on its
+Type), the envelopes' times (bars, not knobs), and the LFOs' and envelopes' own output, which moves within a note.
+
+**How.** `XtSynthView` (a friend of XtSynth's, reading its voices, changing nothing) copies the newest note's 79 sums
+and 72 terms into atomics after each block the XT's players play (`modView_.take`, processBlock), none sounding in the
+VC-2 mode and with no image. `ModRings` (the editor's) holds a table of each ringed parameter's slot and destination,
+each OSC's and COSM's rows made by its index, and on the editor's timer sets each shown knob's ring when it has moved
+(`Knob::setModulation`; a hidden page's knobs are passed by).
+
+**The check.** `VSynthEmuEditorTest` (`EditorLiveTest.cpp`, `ringChecks`): Matrix Control 1 with CC01 onto OSC1-LVL at
++63 and OSC 1 Level at 64, a note held and CC 1 at 127: Level's knob rung from 64 up, the knob itself still 64; CC 1 at
+0, no ring; the note let go and ended, no ring. Plants: the `editor-d-ring-` names.
+
+### MIDI learn; controls that follow a host and MIDI's edits (2026-11-27, v463) {#midi-learn}
+
+research/NEXT_ISSUES.md item 1, the user's d-3 (a learnt controller is the plugin's alone) and d-4 (the map is the
+session's). The XT has no MIDI learn: this is the plugin's own layer, ahead of the firmware's MIDI.
+
+**The map** (`PluginMidiLearn`): a controller number to a parameter (PluginMidiEdits' index), one controller a
+parameter, learning a second letting the first go. A control arms it; the audio thread takes the next controller the
+host sends as that parameter's. A learnt controller's value moves its parameter over its whole range (value / 127,
+through the parameter's own range, so a choice or a switch steps) through `PluginMidiEdits::edit`, as the six edits
+do: the synth plays it from the next block, the message thread hands it to the parameter, the control and the host.
+All of it is atomics: the audio thread neither locks nor allocates.
+
+**Ahead of the firmware.** `PluginMidiIn::ahead` takes the host's block first in processBlock, before every way it is
+played (the V-Synth's players, the VC-2 mode's part, the file with no image). A controller the map takes (the one being
+learnt, or one learnt) is taken out: the block the firmware gets is a copy without it, in a buffer given its room at
+the start. A block with none goes on as it came. The editor's own messages (the footer's keys, the pad's controllers)
+don't pass the map: they are the editor's. In VC-2 mode the part reads its parameters through the patch store the
+keeper writes, so a learnt VC-2 parameter sounds once the message thread has handed it on (30 Hz), not at the next block.
+
+**v462's six edits moved here, a fault the live check found.** v462 made them in `toSynth`, which runs only while the
+XT's players play (a wave loaded, or an OSC that needs none): with OSC 1 on PCM and no wave, a CC 5 edited nothing. The
+XT's OS makes them apart from its tone generator, whatever it plays. In the same pass now, in the block's order, every
+controller the map doesn't take makes its edits in the V-Synth mode (rom.2's; the VC-2 mode's own are a follow-up),
+before the block is played any way. `VSynthEmuEditorTest`'s live check (below) failed on all six with v462's place.
+
+**The session** keeps the map as `midiMap` ("cc=parameter ID" by commas); a session from before has none, and one
+coming back replaces the map. `PluginMidiEdits::flush` and `drop` take a lock now (v463), as a host may save or load a
+session on its own thread while the timer flushes; the audio thread takes none.
+
+**The editor** (research/UI_DESIGN.md, "MIDI learn"). Every control made from a parameter's ID is marked by its maker
+(`MidiLearn::attach`; `Controls::attached`, which makes an attachment and marks its control, for `Controls::box`,
+`Controls::toggle`, the bars, the path's Structure and the FX page; `Knob`, `Bar` and the header's Effects by hand).
+`MidiLearn::Menus`, the editor's, listens to every press under it; a right-click on a marked control opens its menu:
+Learn MIDI CC or Cancel learning, Forget CC n, MIDI map... (`MidiMapView` in a call-out). A `LearnSlider` (the knob's
+dial, the bars) takes no drag from a right-click, and a switch's own press is put back up so it doesn't toggle. The
+page bar says on every page which parameter is learning.
+
+**The checks.**
+- `VSynthEmuMidiTest`: the editor's own controller (the pad's) not learnt; the next one learnt for LFO 1's Rate, its
+  127 the top at once and its 0 the bottom on the parameter; CC 5 learnt no longer Portamento Time (d-3); the map
+  back in another processor from a saved session by ID, and played there; a session with none leaving none; a second
+  controller letting the first go; Forget, after which CC 5 is the firmware's again. 37 checks.
+- `VSynthEmuEditorTest`: on every page, block, face and VC-2 page, each control that moves a parameter learns for that
+  parameter, and a right-click on it (its own press, the editor's listener, a drag of 30 up, the release) moves no
+  parameter (`LayoutCheck::asItsParameter`, LayoutControls.cpp); and (`EditorLearnTest.cpp`) the editor listening, OSC 1 Level's menu, Learn
+  arming it and the line saying so, its menu then offering Cancel, a controller through processBlock learnt and the
+  knob following, Forget, the map's rows by controller, a row's Forget and Forget all.
+- `VSynthEmuEditorTest`, item 2's first half (v463): every control moved, its parameter set back as a host sets one
+  (`changedBy`'s restore) brings the control back to what it showed (`LayoutCheck::asItsParameter`): host automation
+  moves every kind of control, on every page and block, through JUCE's attachments; and (`EditorLiveTest.cpp`) the
+  six edits by CC 5, 65, 126, 127, RPN 0 and 2 through processBlock, the PLAY page's controls unmoved until the
+  message thread hands them on, then each at its value, and back with CC 127.
+- `mutate_panel.py`: the 10 `midi-learn-` (one the place of the six edits) and 10 `editor-d-learn-` plants.
+
+### rom.2's MIDI paths: which edit a stored value, which only modulate; the six edits in the plugin (2026-11-27, v462) {#midi-stored-or-modulated}
+
+For research/NEXT_ISSUES.md items 1 and 2 (MIDI learn; controls that follow their values). The question: which MIDI
+messages change what the XT stores, its temporary patch (the values its display shows and a Write saves), and which
+only move a value at run time. Names first: the XT manual's MIDI Implementation Chart (p. 201) recognises Bank Select
+(CC 0, 32), CC 1–31 and 33–95, RPN (CC 100, 101), Program Change 1–128, System Exclusive and the mode messages 123–127;
+its Controller pages name CC 5 Portamento Time. Read in rom.2 by `sh4dis.py`, the address and offsets below.
+
+**Two listeners per message.** rom.2 has the OS library rom.4 has (v313, "rom.4's MIDI channel states"), at
+`0x89474a10` (rom.4's `0x893172e0`): a control change is stored on the channel below 96 (`0x89475370`) and then told
+to the port's listeners, vtable slot +0x18; Data Entry (CC 6, 38) tells slot +0x24 with the RPN's number and +0x30
+with the NRPN's; CC 98…101 select them, each marking the other unselected (bit 15); CC 121 at 0 resets them; a
+program change tells slot +0x0c. Beside that, the tone generator's own dispatcher (`0x894d43e0` → `0x894d6f10`, v117,
+v132) reads the channel's values. The listeners are the OS's 16 part objects (eight bytes: +0 the part, +1…+3 its own
+bytes, +4 the class), built by `0x89475dc0` on the base `0x894756c0`, class `0x8982ffa4` (rom.4's `0x898c872c`):
+
+| Slot | Routine | What it writes |
+|---|---|---|
+| +0x18 control change | `0x89475ee0` | first the base (`0x894754e0`: CC 0 to +2, CC 32 to +3, the bank kept for a program change); then CC 5 → Portamento Time (ID 0x118) = value; CC 65 → Portamento Switch (0x115) = value ≥ 64; CC 126 → Mono/Poly (0x113) = 0, MONO; CC 127 → Mono/Poly = 1, POLY |
+| +0x24 RPN data | `0x89475f80`, by a table at `0x89475fdc` | RPN 0 → Pitch Bend Range Up and Down (0x11e, 0x11f) = Data Entry's MSB, when ≤ 24; RPN 1 → Patch Fine Tune (0x111) = data × 100 / 8192 − 100, when −50…+50; RPN 2 → Patch Coarse Tune (0x110) = MSB − 64, when −48…+48; any other number, or none selected, nothing. Each Data Entry, MSB or LSB, tells it again |
+| +0x30 NRPN data | the base's `rts` | nothing |
+| +0x0c program change | `0x89475e30` | with +1 set: the part's bank (+2, +3) and program into the system's patch selection (`0x8947a090`, `0x8947a170`, `0x8947a0b0`): a patch change, every stored value |
+| +0x3c | `0x894760a0`, from the universal SysEx handler `0x89473b60` (device 127 or the XT's, a channel mask) | the MIDI Tuning Standard's scale/octave tuning: twelve bytes, each ≤ 127 less 64, into Patch Scale Tune C…B (0x136, step 2) |
+
+Each writes through one edit object: `0x8947a550(edit, part)` takes the part's store (table `0x897a0fc8`), the IDs
+changed start empty; `0x89479e50(edit, value, id)`, the setter the panel's pages and the SysEx receive use too, writes
+the value and widens the span; `0x8947a590(edit, 0)` then, if anything changed, posts message 7 for the part to
+`0x89c1d518`, which brings the tone generator the new values. So these are edits of the patch, as a knob's on the
+panel is. The tone generator's handlers for the same numbers do nothing else of their own: CC 5, 65 and 71…74 are its
+plain update (v117), CC 126 and 127 let the keys go.
+
+**What only modulates.** Everything else a channel message does. A controller below 96 is kept on the channel
+(C + 0x84 + number) and read where it is used: the Matrix's Control Sources 1–8 (CC01…CC95, the bender, the
+aftertouch), the patch TVA's CC 7, 11 and 10 (v114), Hold and Sostenuto (v117), the pad's Time Trip and X-Y assigns
+(v132, v134). The bender and both pressures are channel values too. LFOs, envelopes and the Multi Step Modulator run
+in the voices. None of these writes the store, so the XT's display doesn't show them; nor does a CC 71…74 (Resonance,
+Release, Attack, Cutoff), which only a Matrix route makes do anything.
+
+**System Exclusive.** A DT1 to the temporary patch writes stored values by address (with Rx Sys-Ex on). Its receive
+in rom.2 reaches the same setter through `0x89472c70`, not traced further here. The plugin takes no SysEx.
+
+**In the plugin today.** `VSynthEmuProcessor::toSynth` hands XtSynth notes, bends, pressures and controllers, and
+XtSynth::controller does the tone generator's part. None of the OS part's edits is made: CC 5, 65, 126 and 127 and
+RPN 0…2 leave the parameters as they are, and a program change, SysEx and the tuning message are dropped.
+
+`0x8947a590`'s other two calls (`0x89473f90` when its flag is set and `0x8987a507` is on, which sends the edit out as
+the XT's own transmit does; `0x89480010`) were not followed.
+
+**The decisions** (the user, 2026-11-27, research/NEXT_ISSUES.md): a stored value changed by MIDI moves the control and
+the host's parameter, a modulator shows as the knob's ring (d-5); a learned controller is the plugin's alone (d-3), the
+map the session's (d-4); a program change, the tuning message and SysEx not in this group ("Not now").
+
+**The port** (`XtMidiPort`, XtMidiEdits.cpp): the port object's words +4, +6 and +8 as the handler moves them (CC 6
+Data Entry's MSB, `data = value << 7`, its LSB 38 `(data & 0x3f80) | value`; CC 98 and 99 the NRPN's LSB, `& 0x7f80`,
+and MSB, `& 0x00ff`, each marking the RPN unselected, bit 15; CC 100 and 101 the RPN's the same way; CC 121 at 0 both
+back to 0x7f7f), then for Data Entry the RPN slot, then for every number the control change slot. It gives the IDs
+and values in the order the setter is called, two at most. The Rx Bank flag only drops CC 0 and 32, which edit
+nothing here, so the port doesn't keep it, nor the bank bytes.
+
+**In the plugin** (`PluginMidiIn`, `PluginMidiEdits`). `toSynth` hands each controller to `PluginMidiIn::controller`
+before XtSynth's, as the OS's task takes a message before the part does. Each edit goes onto its parameter
+(Patch Coarse and Fine Tune, Mono/Poly, Portamento, Portamento Time, Bend Range Up and Down, each the patch's value as
+it is: MONO 0, POLY 1 as the choice's order). The audio thread never calls JUCE's parameters: `PluginMidiEdits::edit`
+keeps the value for the parameter, lock-free, and every read the synth's controls make (`VSynthEmuProcessor::raw`,
+which `knob`, `kf` and the reads of PluginControlsRead.cpp, PluginOsc2Controls.cpp and PluginCosmControls.cpp now
+go through) takes it ahead of the parameter, so the next block plays it. The message thread, on a 30 Hz timer, hands
+it to the parameter as a gesture, which moves the control and tells the host. If the parameter moved meanwhile (a host,
+a control, a patch), the later setter wins and the edit is dropped. A patch's controls and a session coming back drop
+a pending edit, and a saved session takes it first. The XT's tone generator gets its edit by a message after the OS
+has made it, so taking it from the next block on is the plugin's choice of when, as host automation is.
+
+The editor's queue (v201) moved as it stood from PluginProcessor.h into `PluginMidiIn`, so the header has room.
+
+**The check.** `xt_midi <rom> [cases] [seed]` (XtMidiEditsCheck.cpp, XT_MIDI_MAIN) runs rom.2's handler `0x89474a10`
+on a port object whose one listener is an OS part object built by the firmware's own constructor `0x89475dc0`. The
+edit object's three routines are hooked to log the part, each (ID, value) and each commit. The channel's store
+`0x89475370` and reset `0x89475200` belong to the tone generator, not these edits, and answer at once. Each case draws
+the part (0…15), the Rx Bank flag and the port's words (none, an RPN 0…2, one unselected, or noise), then 400 control
+changes aimed at the handler's ways: the four numbers mostly at 0…3, Data Entry's MSB at the limits (24/25, 32/96,
+16/112), CC 65 about 64, CC 121 at 0 and 1. One message in 50 is preceded by noise in the port's words on both sides.
+After each message the three words, the edits and the commits are compared.
+- 0 different at 2024 (200 cases, 80,000 messages, 17,132 edits), 7 and 31337 (400 cases each, 160,000 messages).
+- `mutate_midi.py`: 26 plants (`midi_muts.txt`, `PORT=midi`), none missed.
+
+`VSynthEmuMidiTest` (Tests/MidiTest.cpp) runs them through the processor: CC 5's edit the synth's at once and the
+parameter's only when handed on, its listeners told once within a gesture; CC 1, 74 and 7 edit nothing; each of the
+six onto its parameter, RPN 0 past 24 and an NRPN chosen last editing nothing; a parameter moved before the hand-on
+keeping its own value; a saved session carrying a pending edit and a session coming back dropping one.
+
+**Not covered.** A real XT, as before. The VC-2's own (rom.4's part objects, class `0x898c872c`, the same slots at
+`0x893187a0` and `0x89318840`), which VC-2 mode doesn't make yet: a follow-up. The program change, the tuning message
+and SysEx DT1, by the user's choice.
+
 ### The VC-2 heard dry in REAPER: REAPER adds an instrument's input to its output; an effect build (2026-11-26, v461) {#vc2-plugin-reaper-dry}
 
 The user's report: in REAPER (AU and VST3 alike), VC-2 mode, 001 LargeChoir 1, a vocal into the plugin and notes

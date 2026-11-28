@@ -11,7 +11,8 @@ VSynthEmuProcessor::BlockReads::BlockReads(juce::AudioProcessorValueTreeState& s
 // An analog or EXT IN OSC needs the firmware image but no sample: OSC 1's Type anything but PCM, or OSC 2 on
 bool VSynthEmuProcessor::playsWaveless() const {
     if (!xtSynthRomReady()) return false;
-    return std::lround(reads_.oscType->load()) != Params::kOscTypePcm || reads_.osc2Switch->load() >= 0.5f;
+    const auto& edits = midi_.edits;   // a MIDI edit's value first (v462)
+    return std::lround(edits.read(reads_.oscType)) != Params::kOscTypePcm || edits.read(reads_.osc2Switch) >= 0.5f;
 }
 
 void VSynthEmuProcessor::playMidi(const juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int inputs,

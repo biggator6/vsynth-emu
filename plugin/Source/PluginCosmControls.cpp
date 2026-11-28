@@ -6,7 +6,7 @@ void VSynthEmuProcessor::readCosmControls(XtSynth::Controls& c) const {
     for (int k = 0; k < 2; ++k) {
         using Params::cosmId;
         XtSynth::Controls::Cosm& m = c.cosm[k];
-        m.on        = apvts.getRawParameterValue(cosmId(k, "Switch"))->load() >= 0.5f;
+        m.on        = raw(cosmId(k, "Switch")) >= 0.5f;
         m.type      = knob(cosmId(k, "Type"));
         m.resoOwn   = knob(cosmId(k, "ResoOwn"));
         m.cutoffOwn = knob(cosmId(k, "CutoffOwn"));
@@ -76,7 +76,7 @@ void VSynthEmuProcessor::readCosmControls(XtSynth::Controls& c) const {
         m.lfoDelay    = knob(cosmId(k, "LfoDelay"));
         m.lfoFadeMode = knob(cosmId(k, "LfoFadeMode"));
         m.lfoFade     = knob(cosmId(k, "LfoFade"));
-        m.lfoKeySync  = apvts.getRawParameterValue(cosmId(k, "LfoKeySync"))->load() >= 0.5f;
+        m.lfoKeySync  = raw(cosmId(k, "LfoKeySync")) >= 0.5f;
     }
 }
 

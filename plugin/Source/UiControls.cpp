@@ -1,5 +1,6 @@
 // D's controls made from a parameter's ID (UiControls.h; UI step 2; the VC-2's kinds and text, v453)
 #include "UiControls.h"
+#include "PluginGesture.h"
 #include "PluginProcessor.h"
 #include "PluginVc2Params.h"
 #include "UiVc2Text.h"
@@ -59,11 +60,7 @@ int paramValue(State& state, const juce::String& id) {
 }
 
 void setValue(State& state, const juce::String& id, int value) {
-    auto* p = state.getParameter(id);
-    if (p == nullptr) return;
-    p->beginChangeGesture();
-    p->setValueNotifyingHost(p->convertTo0to1((float)value));
-    p->endChangeGesture();
+    if (auto* p = state.getParameter(id)) setAsGesture(*p, (float)value);
 }
 
 juce::String currentText(State& state, const juce::String& id) {
@@ -89,13 +86,13 @@ bool box(juce::ComboBox& b, State& state, const juce::String& id, Attached& into
     b.clear(juce::dontSendNotification);
     b.addItemList(items, 1);
     b.setTitle(state.getParameter(id)->getName(64));
-    into.boxes.push_back(std::make_unique<State::ComboBoxAttachment>(state, id, b));
+    into.boxes.push_back(attached<State::ComboBoxAttachment>(b, state, id));
     return true;
 }
 
 bool toggle(juce::Button& b, State& state, const juce::String& id, Attached& into) {
     if (state.getParameter(id) == nullptr) return false;
-    into.switches.push_back(std::make_unique<State::ButtonAttachment>(state, id, b));
+    into.switches.push_back(attached<State::ButtonAttachment>(b, state, id));
     return true;
 }
 

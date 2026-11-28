@@ -120,6 +120,7 @@ void VSynthEmuProcessor::writeMsmControls(const XtSynth::Controls& c) {
 // stops and reads them at its next setControls, as the firmware's patch message does (0x894d9950), where an edit, a
 // host's automation, only reads them (0x894d9b20)
 void VSynthEmuProcessor::setPatchControls(const XtSynth::Controls& c) {
+    midi_.edits.drop();   // a MIDI edit not yet handed on is older than the patch (v462)
     setControls(c);
     synth_.msmPatch();
 }

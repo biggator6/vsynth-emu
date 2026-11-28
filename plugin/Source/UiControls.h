@@ -3,6 +3,7 @@
 // them; a switch; a knob (UiKnob.h); and which face a Type parameter shows (UI step 3).  A panel keeps what these give it
 // for as long as it shows the controls.
 #include "UiKnob.h"
+#include "UiMidiLearn.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <memory>
 #include <vector>
@@ -17,6 +18,13 @@ struct KnobRow {
     const char* id;
     const char* name;
 };
+
+// A control attached to a parameter, and marked to learn MIDI for it (v463, UiMidiLearn.h): every maker's way to attach
+template <class Attachment, class Control>
+std::unique_ptr<Attachment> attached(Control& control, State& state, const juce::String& id) {
+    MidiLearn::attach(control, id);
+    return std::make_unique<Attachment>(state, id, control);
+}
 
 // What a panel's controls are attached by; each made with its control, dropped with it
 struct Attached {

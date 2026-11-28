@@ -787,6 +787,113 @@ Start Offset in time v478 (2026-11-27, on claude/wave-editor from vc2-mode f1c07
   mutate_panel.py's 12 startoffset- plants and the 19 vc2-param- ones caught (vc2-param-default moved onto its line,
   stale since v457); verify.sh clean.
 
+The VC-2 mode without a PATCH Init v474 (2026-11-27, on claude/patch-init; HARDWARE_FIRMWARE.md, "The VC-2 mode
+  without a PATCH Init"): the user's "vc-2 mode doesn't need an init", their answer to v473's question. INIT is the
+  V-Synth's alone: the patch box's VC-2 row has no init, so no button, and its menu is Execute without a choice taken.
+  Out: Vc2PatchInit (vc2PatchInit, vc2PatchCategoryNames), PluginVc2PatchInit (initVc2Patch), xt_vc2patch's inits: part
+  (Vc2PatchInitCheck.cpp) and the 12 inits among its reads (fcheck's baseline there as before v473), the vc2patchinit
+  port and its plants, the VC-2 tests' init checks; vc2PatchTake back into vc2PatchRead. Kept, each with callers:
+  applyVc2Patch, xtfw::forCalls, vc2PatchStoreName, XtInitAsked. The V-Synth's PATCH Init unchanged.
+  Checks: xt_vc2patch 0 different; fcheck as baseline; VSynthEmuEditorTest 5229/5229 (no INIT on the VC-2's header),
+  the VC-2 patch part 16/16, VSynthEmuProjectTest 53/53. Plants: mutate_vc2.py --patch --changed d696a0f 13, 0 missed;
+  mutate_files.py's 4 patchinit, 0 missed; mutate_panel.py 49 (the box's, editor-vc2-box-init-shown and -given new,
+  init-, vc2-patch-, editor-vc2-), 0 missed; mutate_tone.py --changed: no plants reach the files changed. verify.sh
+  d696a0f: every line passed (ab 4/4 identical, auval on both AUs; installed into ~/Library as this build). The work
+  in progress was committed first as 62e2a53 (the coordinator's ask), this on top.
+
+PATCH Init v473 (2026-11-27, on claude/patch-init from vc2-mode f1c0797; HARDWARE_FIRMWARE.md, "PATCH Init: the
+  V-Synth's, and the VC-2's by Patch Category"; NEXT_ISSUES.md item 4), the V-Synth's and the VC-2's in one version
+  (the patch box, CMakeLists and the editor's tests hold both), each found by the manual's PATCH Init and INITIALIZE
+  PATCH (both images' strings) and its window's EXECUTE, run in the interpreter, applied as its mode's patch is:
+  - the V-Synth's: rom.2's 0x89482540(store, no name) (0x893c5a10 → 0x8947fdb0 on part 0), xtFwPatchInit, initPatch
+    (applyPatch with no wave folder), "INIT PATCH". A finding: a .p00's default base is the same routine with an empty
+    name, which skips the effects' and zones' settings PATCH Init writes (401 values apart). xt_files' init: line (the
+    EXECUTE run on part 0, 0 bytes different; CANCEL; the default; the store against the firmware's reads, 12,385
+    values 0 different; fcheck baseline +1 line, the only difference); VSynthEmuProjectTest's init part (saved
+    unchanged, the init's store byte for byte).
+  - the VC-2's: rom.4's 0x893291c0(store, no name, category) (0x89493f40 → 0x89326c60 on part 0, the Category its
+    window's buttons chose), vc2PatchInit, initVc2Patch (applyVc2Patch, loadVc2Patch's apply made its own); the 12
+    Categories' names from rom.4's table (0x8994a638), as its patch display draws them. xt_vc2patch's inits: line (each
+    Category's EXECUTE 0 bytes different, 12 distinct, the other window's Category 0, the names as rom.4 draws them,
+    each two lines, CANCEL, the .p02's default Category 0's init itself, as rom.4 takes an empty name as none, unlike
+    rom.2; the 12 read by rom.4's reads, 0 different).
+  Plants: mutate_files.py whole 70, 0 missed (4 patchinit new); mutate_panel.py 32 (the box's, init-, save-, project-)
+  and 46 (vc2-patch-, vc2-init-, editor-vc2-, the box's again, rom4-no-patchfiles, step-), 0 missed; mutate_vc2.py
+  --patch --changed 38, 2 missed and both answered (an empty name is none in rom.4, so that plant now names the patch;
+  the names' read was checked by itself, so each name must now be two lines, which showed the first reader wrong: a
+  label is one string with a newline between its lines; then init-named, init-label-lines and init-label-cut caught),
+  --synth --changed 7, 0 missed; verify.sh: every line passed (fcheck as baseline, the editor 5232/5232, the project
+  test 53/53, the VC-2 patch part 19/19, auval on both AUs);
+  mutate_tone.py --changed: no plants reach the files changed.
+  The patch box's INIT: a menu under INITIALIZE PATCH, the V-Synth's Execute, the VC-2's 12 Categories (the
+  recommendation asked of the user, taken while the answer is pending). Made one: xtfw::forCalls (rom.4's machines),
+  vc2PatchTake/vc2PatchStoreName, xtPatchStoreName, xtfile::storeBytesApart, XtInitAsked (XtPatchInitWindow.h);
+  XtPatchStoreCheck.cpp split (the shorter patch's check to XtPatchShortCheck.cpp).
+
+The pattern before any patch an initialized patch's v469 (2026-11-27, after v468; HARDWARE_FIRMWARE.md, "The pattern
+  before any patch"): the user's d-6. xtArpDefaultPattern is xtArpInitPattern (line 1 at velocity 100 on every step),
+  for a new processor and a session from before v190, so the Arpeggio on with no patch plays the keys held by its
+  Motif and Grid as an initialized XT does; ALL CLEAR still leaves it silent, as the XT. VSynthEmuArpPluginTest: the
+  default against the firmware's own default patch, not silent, and the chord through processBlock on it with no
+  pattern set, a note each quarter against XtSynth; panel_muts' arp-default-line became arp-default-empty. Gates:
+  VSynthEmuArpPluginTest 430/430; the whole arp_muts.txt list 110/110 caught; mutate_panel.py --editor and the 17 arp-
+  plants 121 planted, 120 caught, arp-said-missing not planted (its text left XtPatch.cpp in v206, before this branch);
+  verify.sh every line (fcheck as baseline, ab 4/4, editor 5284/5284, arp 24/24, patch apply 0 failed, auval both).
+
+The arpeggio's pattern programmed v468 (2026-11-27, on claude/arp-pattern from vc2-mode f1c0797; HARDWARE_FIRMWARE.md,
+  "The arpeggio's Pattern Edit"; research/NEXT_ISSUES.md item 3): the PLAY page's pattern card edits the pattern by the
+  XT's Pattern Edit, read in rom.2 (the screen at 0x893f8200, its work IDs 0x1401-0x1403, the setter 0x8937ced0, the
+  clears 0x893052f0 and 0x89305360): XtArpPatternEdit (the six buttons' cells by State, the cell at the cursor clamped
+  to 0-128, State and Note/CC by their descriptors, LINE and ALL CLEAR, the initialized pattern, Value's text and each
+  cell's mark), UiArpPattern (the grid: a click the cursor, a drag or the wheel the value, a click on a State, a drag or
+  the wheel on a Note/CC) and UiArpPatternEdit (Value, the buttons, the clears, INIT), each edit into the session by
+  setArpPattern. A CTRL line's controller is kept 0-127 as the patch holds it; the 95 limit moved from the reader to
+  where the object lays a pattern out (xtArpLaidOut, 0x8930ca30). xt_arp's edits section runs the firmware's own
+  setter, button handler, clears, redraw and 0x8930ca30 on a patch's store in the interpreter against the port: at
+  fcheck's 1000, 200 cases, 12,000 edits, 9,411,642 values, 0 different (fcheck's baseline +1 line, its only
+  difference; the presets', random and ticks' lines and every other section as before). Plants: 18 new in
+  arp_muts.txt (16 arpedit, 2 on the layout), 18 caught. The editor 5284/5284 (EditorArpTest.cpp, 59 new checks: the
+  card's edits against the port, the pattern in the synth's controls and back from a saved session, a CTRL line at CC
+  100 kept); 12 editor-d-arp- plants in panel_muts.txt.
+
+The MIDI learn checks made able to fail v465 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "The checks the
+  v464 gates' four missed plants showed blind"): v464's gates missed 4 of 184 plants. MidiTest's learn check reads what
+  the synth itself takes of CC 5 by a Matrix route from it on a held note (TestMidi.h: levelRoute, holdBlocks,
+  toDefaults; the ring check uses them too); LayoutCheck::rightClick is a click, then a drag JUCE counts as one, across
+  and up. Checks only. VSynthEmuMidiTest 39/39, VSynthEmuEditorTest 5255/5255; the four plants caught.
+
+A modulator as the knob's ring v464 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "A modulator as the knob's
+  ring"): research/NEXT_ISSUES.md item 2's second half, d-5. XtSynthView (a friend of XtSynth's: the newest note's
+  Matrix sums and MSM terms into atomics after each block the players play; none otherwise), ModRings (UiModRings.cpp,
+  the editor's: the knobs a sum lands on straight in their own units, by a table, each OSC's and COSM's rows by index;
+  each shown knob's ring on the timer, only when it moved, through Knob::setModulation, D's ring from v196 that nothing
+  had called). VSynthEmuEditorTest's ringChecks (EditorLiveTest.cpp); plants: 5 editor-d-ring-.
+
+MIDI learn v463 (2026-11-27, claude/midi-learn; HARDWARE_FIRMWARE.md, "MIDI learn"; research/UI_DESIGN.md, "MIDI
+  learn"): research/NEXT_ISSUES.md item 1, d-3 and d-4. PluginMidiLearn (a controller to a parameter, armed from a
+  control, learnt on the audio thread, the session's midiMap by ID); PluginMidiIn::ahead (the host's block without
+  the controllers the map takes, before every way it is played; the editor's own messages pass by it). UiMidiLearn:
+  LearnSlider (no drag from a right-click), MidiLearn::attach from every maker (Controls::attached makes an attachment
+  and marks its control), MidiLearn::Menus (the editor's listener: Learn or Cancel, Forget CC n, MIDI map...), the page
+  bar's learning line; UiMidiMap's MidiMapView in a call-out. PluginMidiEdits' flush and drop under a lock (a host's
+  session thread). Tests/TestMidi.h (MidiTest's helpers, made one with the editor's). And item 2's first half: the six
+  edits moved from toSynth into ahead's pass (they were made only while the players played; the live check found it),
+  every control held to follow a host's automation. VSynthEmuMidiTest 37/37; VSynthEmuEditorTest: every control on
+  every page following its parameter set back, learning for it, a right-click moving nothing
+  (LayoutCheck::asItsParameter, LayoutControls.cpp), EditorLearnTest.cpp, EditorLiveTest.cpp (the six edits moving the
+  PLAY page's controls). Plants: 10 midi-learn- (midi-edits-only-playing among them), 10 editor-d-learn-.
+
+The six edits of the patch from MIDI v462 (2026-11-27, claude/midi-learn from vc2-mode f1c0797; HARDWARE_FIRMWARE.md,
+  "rom.2's MIDI paths"): research/NEXT_ISSUES.md items 1 and 2's research, the user's d-3, d-4, d-5 (all as
+  recommended) and "Not now" for a program change, the tuning message and SysEx. rom.2's OS part objects (class
+  0x8982ffa4) make CC 5, 65, 126, 127 and RPN 0, 1, 2 edits of the patch; all else only modulates. XtMidiPort
+  (XtMidiEdits.cpp) is the port's numbers and the part object's two slots; xt_midi (XtMidiEditsCheck.cpp,
+  research/tools/build_midi.sh, in fcheck at 200 cases) 0 different at 2024, 7, 31337; mutate_midi.py 26 plants, 0
+  missed (mutlist.main, mutate_msm.py's arguments too). PluginMidiIn (the editor's queue moved out of
+  PluginProcessor.h, the edits onto the parameters) and PluginMidiEdits (lock-free on the audio thread, read ahead
+  of the parameter by VSynthEmuProcessor::raw, handed on as a gesture by a 30 Hz timer; the later setter wins);
+  PluginGesture.h's setAsGesture (Controls::setValue's, made one). VSynthEmuMidiTest (new, in verify.sh).
+
 The VC-2 heard dry in REAPER v461 (2026-11-26; HARDWARE_FIRMWARE.md, "The VC-2 heard dry in REAPER"): not the
   plugin's. VSynthEmuVc2PlayTest's render mode (Vc2PlayRender.cpp: a .p02 or a session's state, a rate, Effects, a
   saw or a file on the input, a held chord, `seconds=`) vocodes the user's own project state and vocal offline; the

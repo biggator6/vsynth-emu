@@ -25,6 +25,9 @@ ahead of the firmware's MIDI, and shown as a list (the map).
 - **d-3. A learned CC and the firmware.** Recommended: a learned CC is the plugin's alone and doesn't also reach the
   firmware, so one CC never does two things; an unlearned CC reaches the firmware as now.
 - **d-4. Where the map lives.** Recommended: in the session first; a default map for new sessions later if wanted.
+- **Decided (2026-11-27):** the user took both recommendations: a learned CC is the plugin's alone, an unlearned one
+  reaches the firmware as now (d-3); the map is the session's (d-4).
+- **Done in v463** (claude/midi-learn): HARDWARE_FIRMWARE.md "MIDI learn"; research/UI_DESIGN.md "MIDI learn".
 
 ### 2. Controls that follow the values live
 "controls should real-time reflect values. Move as control information or modulators are sent." Today: a parameter's
@@ -36,8 +39,22 @@ Step Modulator), which move a value at run time without changing what's stored.
 - **d-5. What a control shows.** Recommended: a stored value changed by MIDI moves the control itself (and the host's
   parameter with it); a modulator shows as a ring or bar beside the control, so the control always says what's stored.
   UI_DESIGN.md takes the ring's design.
+- **Found (2026-11-27; HARDWARE_FIRMWARE.md, "rom.2's MIDI paths"):** the OS's part objects make six edits of the patch:
+  CC 5 Portamento Time, CC 65 Portamento Switch, CC 126 and 127 Mono/Poly, RPN 0 both Bend Ranges, RPN 1 Patch Fine
+  Tune, RPN 2 Patch Coarse Tune; a program change, the MIDI Tuning scale message and SysEx DT1 write stored values too.
+  Everything else only modulates.
+- **Decided (2026-11-27):** the user took d-5's recommendation: the six edits (and a learned CC) move the control and
+  the host's parameter, a modulator shows as the knob's ring. And of the other three paths, none in this group ("Not
+  now"): a program change, the tuning message and SysEx DT1 are follow-ups.
+- **Done:** the six edits onto the parameters, v462; made in processBlock's first pass whatever plays, and every control
+  held to follow a host's automation and the six edits, v463; a modulator as the knob's ring, the Matrix's and the
+  MSM's straight sums on their knobs, v464. Left for later: rings on the knobs whose sums go in by another unit or by
+  COSM Type, and the LFOs' and envelopes' own movement.
 
 ### 3. The arpeggiator's pattern
+**Done** (2026-11-27, claude/arp-pattern): v468, the pattern edited on its card by the XT's Pattern Edit; v469, d-6's
+initialized pattern before any patch. HARDWARE_FIRMWARE.md, "The arpeggio's Pattern Edit" and "The pattern before any
+patch".
 "arpeggiator only reads from patches - no ability to program patterns. with no pattern, it should still handle live input
 for repeat/up/down/etc". Today: the ten settings are host parameters (PluginArp.cpp, v190), among them the motif, the
 eight of the firmware's table (UP, DOWN, NOTE-ORDER, PHRASE, RHYTHM and the rest; XtArpeggioMotifs.cpp), which choose the
@@ -50,12 +67,25 @@ editable.
 - **d-6. Live input with no pattern.** Recommended: the engine stays the firmware's; "repeat/up/down" come from the motif
   with starter patterns given as data (e.g. a step on every beat, a line a key), which the user picks and then edits. If
   the XT plays nothing with an empty pattern, an empty pattern does the same here.
+  **Decided (the user, 2026-11-27: "XT's init pattern"), on the research** (HARDWARE_FIRMWARE.md, "The arpeggio's Pattern
+  Edit"): the XT's PATCH initialize (`0x89482540`) gives line 1 velocity 100 on every step, which with the Motif and Grid
+  is the live repeat/up/down, and 291 of the 512 presets have it; a pattern of rests plays nothing, the keys included. So
+  the plugin's pattern before any patch is the initialized one, an INIT on the card puts it back beside LINE CLEAR and ALL
+  CLEAR, a pattern of rests stays silent, and no starter pattern the XT doesn't have.
+- **d-10. Real Rec and Step Rec.** The user had no preference (2026-11-27), so the recommendation stands: later, its own
+  item, each held to the Pattern Edit object's own (`0x8987f7b8`, the 16-pitch limit) in a harness; this group does the
+  grid's edits.
 
 ### 4. A patch init
 "need a patch init". Today: none. The XT has its own PATCH initialize (and rom.4 its own, by Patch Category, for the
 VC-2), load-time code, so it runs in the interpreter as the loaders do (CLAUDE.md) and is applied as a patch is
 (`loadPatch`). The work: find the routine (names first: the manual's Initialize), run it, a button in the patch box; with
 step 6, each plugin its own init.
+- v473 (claude/patch-init): both, each by its window's EXECUTE: rom.2's `0x89482540` and rom.4's `0x893291c0` by
+  Patch Category, the patch box's INIT a menu (Execute; the 12 Categories by rom.4's names) (HARDWARE_FIRMWARE.md,
+  "PATCH Init: the V-Synth's, and the VC-2's by Patch Category").
+- v474: the user's answer, "vc-2 mode doesn't need an init": the VC-2's taken out (its init, check, menu and plants);
+  INIT is the V-Synth's alone (HARDWARE_FIRMWARE.md, "The VC-2 mode without a PATCH Init").
 
 ### 5. Start Offset in time, and a line on the wave
 "start offset - change to ms/sec rather than samples - display a vertical line when editing". Today: Start Offset is

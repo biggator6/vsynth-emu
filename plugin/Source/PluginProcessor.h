@@ -10,6 +10,8 @@
 #include "XtFxControl.h"
 #include "PluginArp.h"
 #include "PluginLoadedWave.h"
+#include "PluginMidiIn.h"
+#include "XtSynthView.h"
 #include "PluginVc2Play.h"
 #include "PluginWaveView.h"
 #include <climits>
@@ -86,6 +88,7 @@ public:
     // Message thread.  A VC-2 patch (.p02, v452; PluginVc2Patch.h): rom.4's reader's values onto the VC-2's parameters, its
     // store kept for the session; false, the status saying why, for a file that isn't one.  The store and name kept last.
     bool loadVc2Patch(const juce::File& file);
+    void applyVc2Patch(const std::string& name, const std::vector<uint8_t>& store);   // its apply (v473)
     std::vector<uint8_t> vc2PatchStore() const;
     juce::String vc2PatchName() const;
     void applyPatch(const std::string& name, const std::vector<uint8_t>& store, int zone, const juce::File& waveFolder);
@@ -111,19 +114,13 @@ public:
     std::shared_ptr<const WaveView> waveView(int osc) const;
     int waveViewGen(int osc) const { return waveViewGen_[osc].load(); }   // moves with each view made
 
-    // ── The editor's notes and controllers (PluginProcess.cpp, v201) ─────────
-    // The footer's keys, and the Time Trip pad's controllers, for the synth as if from the host's MIDI: queued here (any
-    // thread but the audio thread), taken at the next block's start, before the host's.  False if the queue is full.
-    bool sendFromEditor(const juce::MidiMessage& m);
-    // Each message the editor has queued, in order and taken: the audio thread's, at a block's start, and a test's
+    // ── The plugin's MIDI ahead of the firmware's (PluginMidiIn.h, v462): the editor's notes and controllers (v201), a
+    // control change's edits of the patch onto the parameters ─────────
+    bool sendFromEditor(const juce::MidiMessage& m) { return midi_.send(m); }
     template <class Take>
-    void takeFromEditor(Take&& take) {
-        const auto scope = editorFifo_.read(editorFifo_.getNumReady());
-        scope.forEach([&](int i) {
-            const EditorEvent& e = editorEvents_[(size_t)i];
-            take(juce::MidiMessage(e.bytes[0], e.bytes[1], e.bytes[2]));
-        });
-    }
+    void takeFromEditor(Take&& take) { midi_.take(take); }
+    PluginMidiIn& midiIn() { return midi_; }
+    const XtSynthView& modulation() const { return modView_; }   // v464: the newest note's, for the knobs' rings
 
     // ── The XT's firmware (rom.2) ────────────────────────────────────────────
     // Message thread.  The image the user chose: used now and kept for every project and plugin format, so a new
@@ -208,11 +205,8 @@ private:
     mutable juce::CriticalSection viewLock_;
     std::shared_ptr<const WaveView> waveView_[2];
     std::atomic<int> waveViewGen_[2] {};
-    // The editor's queue (v201): a lock-free ring the message thread writes and the audio thread reads
-    struct EditorEvent { uint8_t bytes[3]; };
-    static constexpr int kEditorEvents = 256;
-    juce::AbstractFifo editorFifo_ { kEditorEvents };
-    std::array<EditorEvent, kEditorEvents> editorEvents_ {};
+    PluginMidiIn midi_ { apvts };   // v462: the editor's queue and the MIDI edits (PluginMidiIn.h)
+    XtSynthView modView_;           // v464: taken after each block the XT's players play, none sounding otherwise
     void toSynth(const juce::MidiMessage& msg);   // one message to the synth, the host's or the editor's
     void toFile(const juce::MidiMessage& msg);    // or to the file played without the firmware
     void playFile(juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int numOut);   // that file's block
@@ -258,6 +252,7 @@ private:
     static void addModParams(ParamList& params);
     // xtControls and setControls by part (PluginControlsRead.cpp, PluginControlsWrite.cpp, PluginCosmControls.cpp,
     // PluginOsc2Controls.cpp, v190)
+    float raw(const juce::String& id) const;         // a parameter's value as the synth reads it (v462: a MIDI edit's)
     int knob(const juce::String& id) const;          // a parameter's value, rounded
     int kf(const juce::String& id) const;            // a keyfollow's, to its step of 10
     void readOscControls(XtSynth::Controls& c) const;

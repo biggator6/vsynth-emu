@@ -32,12 +32,20 @@ void PageBar::resized() {
     keyboard_.setBounds(r.removeFromRight(kKeyboardW).withSizeKeepingCentre(kKeyboardW, kSwitchH));
 }
 
+void PageBar::showLine(const juce::String& line) {
+    if (line == line_) return;
+    line_ = line;
+    repaint();
+}
+
 void PageBar::paint(juce::Graphics& g) {
     g.fillAll(Look::ground);
     Ui::fill(g, getLocalBounds().removeFromBottom(1), Look::divider);
     Tabs::paint(g);
     const auto r = tabs();
-    if (chosen() != Blocks::kSynthPage || r.empty()) return;
+    if (r.empty() || (line_.isEmpty() && chosen() != Blocks::kSynthPage)) return;
     const auto hint = getLocalBounds().withLeft(r.back().getRight() + 24).withRight(keyboard_.getX() - kRightGap);
-    Ui::drawText(g, kHint, hint, { Look::sans(11.0f), Look::muted, juce::Justification::centredRight });
+    const bool said = line_.isNotEmpty();
+    Ui::drawText(g, said ? line_ : juce::String(kHint), hint,
+                 { Look::sans(11.0f), said ? Look::accent : Look::muted, juce::Justification::centredRight });
 }

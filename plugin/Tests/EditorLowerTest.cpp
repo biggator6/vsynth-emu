@@ -67,6 +67,10 @@ void curveDrag(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check) {
     for (const juce::String& i : ids) was.push_back(valueOf(p, i));
     for (const juce::String& i : ids) setParam(p, i, 64.0f);   // each point apart from the others, each free to move
     using Point = EnvCurve::Point;
+    const float attackAt = curve.pointAt(Point::attack).x;   // v464: a drawing follows a host's setting, as a control
+    setParam(p, ids[0], 100.0f);
+    check(curve.pointAt(Point::attack).x > attackAt, "a curve's point doesn't follow its parameter as a host sets it");
+    setParam(p, ids[0], 64.0f);
     for (Point at : { Point::attack, Point::release }) {
         const juce::String moved = ids[at == Point::attack ? 0 : 3];
         const float before = valueOf(p, moved);

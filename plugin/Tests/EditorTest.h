@@ -79,6 +79,9 @@ void keyChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
 // The Time Trip pad (EditorPadTest.cpp, v202): a press's, a drag's and a release's controllers by the assigns as they
 // stand, Hold, an assign OFF
 void padChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// The arpeggio pattern's card (EditorArpTest.cpp, v468): each edit of the XT's Pattern Edit through it into the session,
+// Value and the buttons following the cursor, the clears and INIT, the pattern played and back from a saved session
+void patternChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 // The VC-2 mode (EditorVc2Test.cpp, v453; research/UI_DESIGN_VC2.md): the header's switch and the session's mode, each
 // page and block at three sizes (`sizes`), each zone's, OSC's and COSM's controls on every face moving their own
 // parameters alone, after a change of zone too, each Matrix Control's and zone's; and (EditorVc2TextTest.cpp) the
@@ -86,7 +89,17 @@ void padChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestCheck
 void vc2Checks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check,
                const std::function<void()>& sizes);
 void vc2TextChecks(SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// Whether c is drawn: a size, and it and every parent up to root shown (the editor is on no desktop, so not isShowing;
+// EditorTest.cpp's, from v474 the VC-2's check that it has no INIT too)
+bool seen(juce::Component* c, juce::Component& root);
 // The patch box's project (EditorPatchBoxTest.cpp, v601): its arrows grey with no patch browsed and at a project's ends,
 // ▶ and ◀ loading the next and the one before, the project's line saying where; a project's patches by slot
+// MIDI learn (EditorLearnTest.cpp, v463): a knob's menu, Learn arming it, a controller through processBlock learnt and
+// the knob following, Forget, the map's rows
+void learnChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// Live values (EditorLiveTest.cpp, v464): the firmware's MIDI edits of the patch moving their controls on the PLAY page
+void liveChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
+// and (v464) a modulator as the knob's ring: a Matrix route on a held note, none with nothing added or no note
+void ringChecks(LayoutCheck& l, SynthEditor& ed, VSynthEmuProcessor& p, TestChecks& check);
 void patchBoxChecks(LayoutCheck& l, VSynthEmuProcessor& p, const juce::File& rom, const juce::File& work,
                     TestChecks& check);

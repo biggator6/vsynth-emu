@@ -52,6 +52,7 @@ SynthEditor::SynthEditor(VSynthEmuProcessor& p)
     showKeyboard(p.apvts.state.getProperty(kKeyboardShown, true));
     select(Blocks::kFirstSelected);
     showMode(pluginMode(p.apvts.state));
+    learnMenus_.listenTo(*this);   // v463: a right-click on any control under it, MIDI learn's menu
     startTimerHz(kRefreshHz);
 }
 
@@ -148,12 +149,14 @@ void SynthEditor::paint(juce::Graphics& g) {
 void SynthEditor::timerCallback() {
     header_.refresh();
     footer_.refresh();
+    pageBar_.showLine(MidiLearn::learning(processor_));   // v463: which parameter is learning a controller
     if (!vc2()) {
         path_.refresh();
         rack_.refresh();
         lower_.refresh();
         if (auto* wave = dynamic_cast<WavePage*>(pages_[(size_t)Blocks::kWavePage].get()))   // v479, while it shows
             if (wave->isVisible()) wave->refresh();
+        showRings();   // v464
         return;
     }
     vc2Synth_->refresh();

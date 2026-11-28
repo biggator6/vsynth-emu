@@ -8,7 +8,7 @@ void VSynthEmuProcessor::readOsc2Controls(XtSynth::Controls& c) const {
         using Params::oscId;
         auto knob2 = [&](const juce::String& id) { return knob(oscId(1, id)); };
         auto kf2 = [&](const juce::String& id) { return kf(oscId(1, id)); };
-        o.on = apvts.getRawParameterValue(oscId(1, Params::kOscSwitch))->load() >= 0.5f;
+        o.on = raw(oscId(1, Params::kOscSwitch)) >= 0.5f;
         o.oscType = knob2(Params::kOscType);
         o.ana.wave = knob2(Params::kAnaWave);
         o.ana.impact = knob2(Params::kAnaImpact);
@@ -52,7 +52,7 @@ void VSynthEmuProcessor::readOsc2Controls(XtSynth::Controls& c) const {
         o.lfoFadeMode = knob2(Params::kLfoFadeMode);
         o.lfoFade = knob2(Params::kLfoFade);
         o.lfoOffset = knob2(Params::kLfoOffset);
-        o.lfoKeySync = apvts.getRawParameterValue(oscId(1, Params::kLfoKeySync))->load() > 0.5f;
+        o.lfoKeySync = raw(oscId(1, Params::kLfoKeySync)) > 0.5f;
         o.oscLevel = knob2(Params::kOscLevel);
         o.oscLevelKF = kf2(Params::kOscLevelKF);
         o.oscLevelLfoDepth = knob2(Params::kOscLevelLfo);
@@ -69,21 +69,21 @@ void VSynthEmuProcessor::readOsc2Controls(XtSynth::Controls& c) const {
         o.oscVelCurve = knob2(Params::kOscVelCurve);
         o.energy = knob2(Params::kEnergy);
         o.rootKey = knob2(Params::kRootKey);
-        o.robot = apvts.getRawParameterValue(oscId(1, Params::kRobot))->load() > 0.5f;
-        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;
+        o.robot = raw(oscId(1, Params::kRobot)) > 0.5f;
+        o.vari = raw(oscId(1, Params::kVari)) > 0.5f;
         o.oscTime = knob2(Params::kOscTime);
         o.oscTimeOffset = knob2(Params::kOscTimeOffset);
         o.oscTimeKF = kf2(Params::kOscTimeKF);
         o.oscFormant = knob2(Params::kOscFormant);
         o.oscFormantKF = kf2(Params::kOscFormantKF);
-        o.tempoSync = apvts.getRawParameterValue(oscId(1, Params::kTempoSync))->load() >= 0.5f;
-        o.origTempo = (int)std::lround(apvts.getRawParameterValue(oscId(1, Params::kOrigTempo))->load() * 10000.0f);
-        o.timeTrip = apvts.getRawParameterValue(oscId(1, Params::kTripSw))->load() >= 0.5f;
-        o.beatKeep = apvts.getRawParameterValue(oscId(1, Params::kBeatKeep))->load() >= 0.5f;
-        o.loop = apvts.getRawParameterValue(oscId(1, Params::kLoop))->load() >= 0.5f;
+        o.tempoSync = raw(oscId(1, Params::kTempoSync)) >= 0.5f;
+        o.origTempo = (int)std::lround(raw(oscId(1, Params::kOrigTempo)) * 10000.0f);
+        o.timeTrip = raw(oscId(1, Params::kTripSw)) >= 0.5f;
+        o.beatKeep = raw(oscId(1, Params::kBeatKeep)) >= 0.5f;
+        o.loop = raw(oscId(1, Params::kLoop)) >= 0.5f;
         o.loopMode = knob2(Params::kLoopMode);
-        o.loopStart = apvts.getRawParameterValue(oscId(1, Params::kLoopStart))->load() / 100.0f;
-        o.loopEnd = apvts.getRawParameterValue(oscId(1, Params::kLoopEnd))->load() / 100.0f;
+        o.loopStart = raw(oscId(1, Params::kLoopStart)) / 100.0f;
+        o.loopEnd = raw(oscId(1, Params::kLoopEnd)) / 100.0f;
         o.startOffset = knob2(Params::kStartOffset);
         o.playbackMode = knob2(Params::kPlaybackMode);
     }

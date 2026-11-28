@@ -40,10 +40,14 @@ and (v602, the user's choice: Save and Save As) Save…, a menu of Save over the
 As…, a file to choose with the project's next free slot offered and the patch named after it (`UiPatchSave`); the
 file saved becomes the patch browsed; and (v603) Save Project As…, a new project's folder to name, the project
 copied with the patch in its slot and its outside waves added, what it wrote said after, with the plain WAVs the XT
-must import. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save….
+must import. A mode with no save (the VC-2's, whose patches rom.4 writes) shows no Save…. And (v473, the user's
+"need a patch init") INIT, left of Browse…, 44 wide: a menu under the XT's own words, INITIALIZE PATCH, whose one
+item, Execute, runs the V-Synth's PATCH Init (rom.2's init, "INIT PATCH"); the patch played changes, the patch
+browsed and its project stay, as on the XT. The VC-2 mode has none (v474, the user's "vc-2 mode doesn't need an
+init"). The name squeezes to half its width before it is cut, as the lines under it do.
 A project is the XT's folder (`NAME.prj`, a VC-2's `NAME.vc2`) and its `Patch` folder's patches by slot
 (`PluginProject`); a patch outside a Patch folder is browsed with its own folder's. A mode's patches are a row of one
-table (`kPatchKinds`: the V-Synth's `.p00`, the VC-2's `.p02`, each load, name and note), so the VC-2's projects browse
+table (`kPatchKinds`: the V-Synth's `.p00`, the VC-2's `.p02`, each load, name, note, save and init), so the VC-2's projects browse
 the same way. The session keeps the patch browsed (`patchFile`, `vc2PatchFile`), so a reopened session browses on.
 `VSynthEmuEditorTest`'s `patchBoxChecks` (`EditorPatchBoxTest.cpp`) and the `editor-d-box-` plants.
 
@@ -130,9 +134,14 @@ a knob a cell (64) and a box or a switch two, a row as high as its tallest (`Con
   made for each Control by index; and the controller assigns' card, the twelve boxes by the processor's names.
 - **PLAY:** the arpeggio's card and its pattern's down the left; portamento, keys (Voices, Legato, Octave), tune (Coarse,
   Fine, Bend Up and Down) and tempo (Clock, Tempo) down the right, each a grid from a table. The pattern is a patch's
-  data, no parameter, so it is drawn and not edited: its 16 lines down, each a note or a controller named at the left,
-  its 32 steps across, a played step's cell in the accent by its velocity, a tie a thin bar carrying the line on, the
-  steps past the End Point faint; a line says so when no step plays.
+  data, no parameter: its 16 lines down, each its State (NOTE, CTRL in `mod`) and Note/CC at the left, its 32 steps
+  across in beats of four, each cell as the XT's screen marks it (a note in the accent by its velocity, a tie a thin bar
+  carrying the line on, a controller a ring in `mod`), the steps past the End Point faint; a line says so when no step
+  plays. From v468 it is edited by the XT's Pattern Edit (`UiArpPatternEdit`; HARDWARE_FIRMWARE.md, "The arpeggio's
+  Pattern Edit"): a click on a cell is the cursor (ringed in `text`), a drag up or down on it or the wheel its value; a
+  click on a State turns it, a drag or the wheel moves a Note/CC; under the pattern Value and the six buttons (0, 32,
+  64, 96, 127, Tie or Clr by the cursor's line), then LINE CLEAR, ALL CLEAR and INIT (the initialized patch's pattern,
+  the user's d-6), each into the session. The VC-2's is drawn only.
 - **ZONES:** the keys' card: the 128 keys with each zone's range in its colour (the footer's), as a note picks its zone,
   its number on it, the C keys named every other octave (`UiZoneStrip`); and the
   zones' card, a cell for each of the sixteen made by index: its colour and name, its Range Upper as a bar in its colour,
@@ -194,6 +203,39 @@ A knob sweeps 270°, from 135° (lower left) to 405° (lower right). Its track i
 round ends; its value arc is `accent` from the bottom of the sweep, or from the top for a bipolar knob; a modulated knob
 has a `mod` ring 3.2 outside the track over the modulation's reach; a big knob has a cap (`2A2D33`); a pointer in `text`
 runs from the centre to 6 inside the track. Its name is under it, its value under that.
+
+The ring (v464; research/NEXT_ISSUES.md item 2, d-5) is live: from the knob's stored value to that plus what the
+newest note's Matrix routes and Multi Step Modulator add to it, on the editor's timer, so a controller moving a Matrix
+source sweeps it while the knob stays on what's stored. Only the knobs whose converter adds those straight in their own
+units are rung (`ModRings`' table: each OSC's Level, LFO Rate and depths, PW and Fat LFO; each COSM's LFO Rate; the
+TVA's Level, Pan, their LFO depths, LFO Rate and sends; Portamento Time). No note sounding, or nothing added, no ring.
+HARDWARE_FIRMWARE.md, "A modulator as the knob's ring".
+
+### MIDI learn {#midi-learn}
+
+v463 (research/NEXT_ISSUES.md item 1; the user's d-3 and d-4, 2026-11-27). Every control made from a parameter's ID can
+learn a MIDI controller, from the shared makers, not one by one: the knob's dial and a bar are `LearnSlider`s, and the
+knob, the bars, `Controls::box` and `Controls::toggle`, the path's Structure, the header's Effects and the FX page's
+controls mark theirs (`MidiLearn::attach`). A right-click on any of them (or a control-click) opens its menu, in D's
+look as every popup is:
+
+- **Learn MIDI CC**: the next controller the plugin is sent is the parameter's. While it waits the item reads **Cancel
+  learning**, and the page bar's line, on every page, reads "MIDI learn: move a controller for <name>" in the accent.
+- **Forget CC n**, when the parameter has one.
+- **MIDI map...**: the map (`MidiMapView`) in a call-out at the control, 340 wide: MIDI MAP, then a row for each
+  controller learnt by number (its CC in the accent's mono, its parameter's name, Forget), past twelve rows a scrolling
+  list; under them the learning line or how to learn, and Forget all.
+
+A right-click doesn't move the control: a slider takes no drag from it and a switch doesn't toggle. A learnt
+controller moves its parameter over its whole range (0…127 across), the control and the host following as for any
+MIDI edit (`PluginMidiEdits`), and it no longer reaches the firmware (d-3). One controller a parameter: learning a
+second lets the first go. The map is the session's (d-4), by parameter ID. `VSynthEmuEditorTest` holds every control
+it moves to its own parameter's learning, and a right-click to moving nothing.
+
+Every control follows its parameter as it moves, whoever moves it: a host's automation, a learnt controller, or the
+XT's own MIDI edits of the patch (CC 5, 65, 126, 127, RPN 0…2; HARDWARE_FIRMWARE.md, "rom.2's MIDI paths"), through
+its attachment (research/NEXT_ISSUES.md item 2, d-5: what's stored moves the control). `VSynthEmuEditorTest` holds every
+control to it on every page and block (v463).
 
 ### Where the tabbed editor's controls went
 

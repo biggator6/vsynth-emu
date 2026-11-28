@@ -114,6 +114,7 @@ private:
     Controls zoneControls(int z) const;              // zone z's own blocks on ctl's
     void zonesFollow();                              // each zone's controls again, after ctl or the zones moved
     Voice voice[kVoices];
+    friend class XtSynthView;         // the editor's rings read the newest note's sums (XtSynthView.h, v464)
     long clock = 0;
     int tickCount = 0;                // frames since the last update (kTickFrames, XtSynthConstants.h)
     // The free-running phase a key-unsynced voice starts from, by zone (the pool's objects are by the tone's +0x1c, part and zone,

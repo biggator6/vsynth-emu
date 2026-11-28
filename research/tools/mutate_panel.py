@@ -26,8 +26,8 @@ RANGE='row.value.setRange(p.low, p.high, 1.0);'
 MUTS=[
  # The editor's layout by VSynthEmuEditorTest, and TEST_FX_PANEL (v196: the plants on today's editor went with its
  # files; D's are panel_muts.txt's editor- lines)
- ('patch-vari-read',CR,'    c.vari         = apvts.getRawParameterValue(Params::kVari)->load() > 0.5f;','    c.vari         = true;','patch'),
- ('patch-vari2-read',O2,'        o.vari = apvts.getRawParameterValue(oscId(1, Params::kVari))->load() > 0.5f;','        o.vari = true;','patch'),
+ ('patch-vari-read',CR,'    c.vari         = raw(Params::kVari) > 0.5f;','    c.vari         = true;','patch'),   # raw: v462
+ ('patch-vari2-read',O2,'        o.vari = raw(oscId(1, Params::kVari)) > 0.5f;','        o.vari = true;','patch'),
  ('patch-vari-write',CW,'    set(Params::kVari, c.vari ? 1 : 0);','    ;','patch'),
  ('lite-own',EN,'own = w.ownType == 0 || w.ownType == 1','own = w.ownType == 1','lite'),
  ('lite-choice',EN,'kTypeOfChoice[] = { 1, 3, 5, 0 };','kTypeOfChoice[] = { 1, 3, 5, 5 };','lite-pick'),
@@ -190,6 +190,7 @@ ENV={
  'arpplugin':{'_bin':'VSynthEmuArpPluginTest'},   # its parameters, a patch's, a session's, through the processor (v190)
  'extin':{'_bin':'VSynthEmuExtInTest'},   # the outside input to the EXT IN OSC, the feed and the processor (v207)
  'project':{'_bin':'VSynthEmuProjectTest'},   # a project's own files: its wave links (v600), a patch saved (v602)
+ 'midi':{'_bin':'VSynthEmuMidiTest'},   # the plugin's MIDI ahead of the firmware's: its edits of the patch (v462)
  'vc2play':{'_bin':'VSynthEmuVc2PlayTest'},   # the VC-2 mode's audio against the part driven directly (v455)
  'patch':{'TEST_PATCH_APPLY':'1'},
  'solo-own':{'TEST_PLAYBACK':'3','TEST_NOTE2':'64,30000','_preset':'270','_term':'8','_mode':'auto'},   # encoded again on its own events: a terminator too short to reach its last event

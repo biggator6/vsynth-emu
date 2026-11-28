@@ -108,3 +108,12 @@ def run_plants(h, names, cases):
     print('planted', len(res), 'missed', sum(r[1] == 'MISSED ' for r in res), 'errors',
           sum(r[1] == 'ERROR  ' for r in res))
     return 1 if any(r[1] != 'caught ' for r in res) else 0
+
+
+def main(h, cases, argv):
+    """A runner of a harness of its own: [cases] [name ...] from argv, `cases` when the first isn't a number, then
+    run_plants's exit status (mutate_msm.py's and mutate_midi.py's, v462)"""
+    args = list(argv)
+    if args and args[0].isdigit():
+        cases = args.pop(0)
+    return run_plants(h, args, cases)

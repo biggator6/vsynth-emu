@@ -3,7 +3,7 @@
 // portamento, keys, tune and tempo down the right, each a card of controls from a table (UiPlayPage.cpp).  A mode's
 // (v453): the V-Synth's, or the VC-2's (UiVc2Pages.cpp), whose right column ends in a card of its own, Scale Tune's.
 #include "PluginProcessor.h"
-#include "UiArpPattern.h"
+#include "UiArpPatternEdit.h"
 #include "UiCard.h"
 #include "UiPages.h"
 #include <functional>
@@ -23,9 +23,11 @@ public:
     explicit PlayPage(VSynthEmuProcessor& p);   // the V-Synth's
     PlayPage(VSynthEmuProcessor& p, Mode mode);
     void resized() override;
+    ArpPatternEditor* patternEditor() const { return editor_; }   // the pattern card's body when it edits (v468)
 
 private:
     std::vector<int> columns_;                   // each card's column, the table's
     std::vector<std::unique_ptr<Card>> cards_;   // the table's, in its order
     std::unique_ptr<Card> pattern_, last_;
+    ArpPatternEditor* editor_ = nullptr;
 };

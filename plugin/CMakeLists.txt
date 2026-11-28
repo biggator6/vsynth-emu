@@ -71,6 +71,7 @@ target_sources(VSynthEmu PRIVATE
     Source/PluginPresetWaves.cpp
     Source/PluginProject.cpp
     Source/PluginPatchSave.cpp
+    Source/PluginPatchInit.cpp
     Source/PluginProjectSave.cpp
     Source/PluginEncodes.cpp
     Source/PluginEffects.cpp
@@ -111,6 +112,7 @@ target_sources(VSynthEmu PRIVATE
     Source/UiMatrix.cpp
     Source/UiModPage.cpp
     Source/UiArpPattern.cpp
+    Source/UiArpPatternEdit.cpp
     Source/UiPlayPage.cpp
     Source/UiZoneStrip.cpp
     Source/UiZonesPage.cpp
@@ -158,6 +160,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtArpeggioStep.cpp
     Source/XtArpeggioMotifs.cpp
     Source/XtArpeggioPatch.cpp
+    Source/XtArpPatternEdit.cpp
     Source/XtSynthRom.cpp
     Source/XtMultiBandPlayer.cpp
     Source/Sh4Interp.cpp
@@ -176,6 +179,7 @@ target_sources(VSynthEmu PRIVATE
     Source/XtFwPatchFile.cpp
     Source/XtFwFileOut.cpp
     Source/XtFwWaveFile.cpp
+    Source/XtFwPatchInit.cpp
     Source/XtPatchIds.cpp
     Source/XtPatch.cpp
     Source/XtFxChip.cpp
@@ -195,6 +199,7 @@ target_sources(VSynthEmu PRIVATE
 )
 include(Vc2Sources.cmake)   # the VC-2 mode's ports, rom.4's (v251: moved out of this list as they stood)
 include(Vc2UiSources.cmake)   # the VC-2 mode's pages in the editor (v453)
+include(MidiSources.cmake)    # the plugin's MIDI ahead of the firmware's (v462)
 
 # ─── Which build this is ─────────────────────────────────────────────────────
 # Worked out at every build, not at configure, so it can't go stale.  It rewrites the file only when the id changes.
@@ -259,10 +264,10 @@ vse_add_test(VSynthEmuArpPluginTest Tests/ArpPluginTest.cpp Tests/MsmPluginTest.
 # The editor, D (research/UI_DESIGN.md; v196): its layout, every control on its parameter, every press's route
 vse_add_test(VSynthEmuEditorTest Tests/EditorTest.cpp Tests/EditorRackTest.cpp Tests/EditorLowerTest.cpp
              Tests/EditorPagesTest.cpp Tests/EditorWaveTest.cpp Tests/EditorWavePageTest.cpp Tests/EditorWaveCutTest.cpp
-             Tests/EditorWaveEventTest.cpp Tests/EditorKeysTest.cpp
-             Tests/EditorPadTest.cpp
-             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/TestMain.cpp
-             Tests/TestWave.cpp)
+             Tests/EditorWaveEventTest.cpp Tests/EditorKeysTest.cpp Tests/EditorPadTest.cpp
+             Tests/EditorVc2Test.cpp Tests/EditorVc2TextTest.cpp Tests/EditorPatchBoxTest.cpp Tests/EditorArpTest.cpp
+             Tests/TestMain.cpp Tests/TestWave.cpp Tests/EditorLearnTest.cpp Tests/LayoutControls.cpp   # MIDI learn (v463)
+             Tests/EditorLiveTest.cpp)   # the controls following MIDI's edits (v464)
 # The outside input from the plugin's input bus to the EXT IN OSC (v207): the feed alone at each rate, the processor
 # against XtSynth given the input by the law, the Effects off and on
 vse_add_test(VSynthEmuExtInTest Tests/ExtInTest.cpp Tests/ExtInPluginTest.cpp Tests/TestMain.cpp)
@@ -272,12 +277,14 @@ vse_add_test(VSynthEmuOutputTest Tests/OutputTest.cpp Tests/TestMain.cpp Tests/T
 # part's view (v456) and the system's parameters (v457)
 vse_add_test(VSynthEmuVc2PlayTest Tests/Vc2PlayTest.cpp Tests/Vc2PlayRun.cpp Tests/Vc2PlayTime.cpp Tests/Vc2PlayView.cpp
              Tests/Vc2PlaySystem.cpp Tests/Vc2PlayFx.cpp Tests/Vc2PlayRender.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
-# A project's own files (v600 on): a link to a preset wave followed to the wave it names
+# A project's own files (v600 on): a link to a preset wave followed to the wave it names; the PATCH Init (v473)
 vse_add_test(VSynthEmuProjectTest Tests/ProjectTest.cpp Tests/ProjectSaveTest.cpp Tests/ProjectSaveAsTest.cpp
-             Tests/TestMain.cpp Tests/TestWave.cpp)
+             Tests/ProjectInitTest.cpp Tests/TestMain.cpp Tests/TestWave.cpp)
+# The plugin's MIDI ahead of the firmware's (v462): rom.2's edits of the patch from MIDI onto the parameters
+vse_add_test(VSynthEmuMidiTest Tests/MidiTest.cpp Tests/TestMain.cpp)
 # What verify.sh builds, in one make: the plugin's links and the tests' run side by side
 add_custom_target(VSynthEmuVerify)
 add_dependencies(VSynthEmuVerify VSynthEmu_All VSynthEmuFx_All VSynthEmuTest VSynthEmuTeardownTest VSynthEmuWaveFileTest
                  VSynthEmuRestoreTest VSynthEmuRomTest VSynthEmuSwitchTest VSynthEmuStepTest
                  VSynthEmuDiskImageTest VSynthEmuArpTest VSynthEmuArpPluginTest VSynthEmuEditorTest
-                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest VSynthEmuVc2PlayTest)
+                 VSynthEmuExtInTest VSynthEmuOutputTest VSynthEmuProjectTest VSynthEmuVc2PlayTest VSynthEmuMidiTest)

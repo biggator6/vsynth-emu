@@ -14,7 +14,7 @@ bool waveEventsStand(const PluginWaveEdit& edit, int depth) {
 }
 
 void PluginWaveEdits::editEvent(VSynthEmuProcessor& p, int osc, const XtFwEventEdit& edit) {
-    const int depth = juce::roundToInt(p.apvts.getRawParameterValue(Params::oscId(osc, Params::kEncodeDepth))->load());
+    const int depth = juce::roundToInt(p.raw(Params::oscId(osc, Params::kEncodeDepth)));   // as the synth reads it (v462)
     {
         const juce::ScopedLock lock(p.bufferLock_);
         PluginWaveEdit& e = p.wave_[osc].edit;

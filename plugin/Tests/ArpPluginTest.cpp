@@ -2,12 +2,13 @@
 // - its ten parameters against the firmware: each name [FW 0x89790338], range and default (its descriptor, through
 //   xtParamDesc) and each value's text (the firmware's routine, XtFxValueText), End Point shown as its step (1…32, the
 //   manual's);
-// - the parameters into the controls the processor plays from, each moved from its default;
+// - the parameters into the controls the processor plays from, each moved from its default; a new processor's pattern
+//   the firmware's default patch's, an initialized patch's (v469, the user's d-6), which plays;
 // - a patch of the disk image's with the arpeggio on, through loadPatch: its settings on the parameters and its pattern,
 //   as the firmware's reads have them (xtArpSettingsOf, xtArpPatternOf), and no longer said to be missing;
 // - a session: settings and pattern back in another processor; one saved before v190 brings the XT's default pattern;
-// - a chord through processBlock with the arpeggio on: XtSynth's render on the processor's own controls, sample for
-//   sample, a note each quarter; the Switch off, the chord once.
+// - a chord through processBlock with the arpeggio on and no patch, on the new processor's pattern: XtSynth's render on
+//   the processor's own controls, sample for sample, a note each quarter; the Switch off, the chord once.
 // Then the Multi Step Modulator's plugin side (MsmPluginTest.cpp, v193), the zones' (v195) and the VC-2's parameters
 // (Vc2ParamPluginTest.cpp, v451), whose checks this program runs too; `vc2ids`, the VC-2 part's child run.
 // `params` lists every parameter instead: its place, ID, name, range, default and its text at five points, what a host
@@ -28,12 +29,12 @@
 #include "../Source/PluginProcessor.h"
 #include "../Source/Sh4Interp.h"
 #include "../Source/XtFiles.h"
+#include "../Source/XtFirmware.h"
 #include "../Source/XtPatch.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <optional>
-#include <span>
 
 namespace {
 
@@ -63,17 +64,12 @@ void againstFirmware(TestChecks& check, VSynthEmuProcessor& p, const juce::File&
     }
 }
 
-// The default pattern against the descriptors: each line's State (ID 0x44a) and Note (0x44b), each step's cell (0x44d)
-bool descriptorsPattern(const XtArpPattern& p) {
-    const auto def = [](int id) {
-        const XtParamDesc* d = xtParamDesc(id);
-        return d ? d->def - d->centre : -1;
-    };
-    const int line = (def(0x44a) << 7) | def(0x44b), cell = def(0x44d);
-    const auto lines = std::span(p.line);
-    const auto cells = std::span(&p.cell[0][0], sizeof p.cell);
-    return std::ranges::all_of(lines, [&](int l) { return l == line; })
-        && std::ranges::all_of(cells, [&](int c) { return c == cell; });
+// The pattern before any patch (v469, the user's d-6) as the firmware has it: its default patch's, which its PATCH
+// initialize writes (line 1 at velocity 100 on every step), from the firmware's own patch routines on no file's bytes
+XtArpPattern firmwareDefaultPattern() {
+    std::vector<uint8_t> store;
+    const uint8_t none = 0;
+    return xtFwPatchStore(&none, 0, store) ? xtArpPatternOf(store) : XtArpPattern {};
 }
 
 // Each parameter moved from its default reaches the controls; a new processor's are the arpeggio object's own
@@ -81,8 +77,8 @@ void intoControls(TestChecks& check, const juce::File& rom) {
     VSynthEmuProcessor p;
     p.setRomFile(rom);
     check(p.currentControls().arp == XtArpSettings {}, "a new processor's arpeggio should be the object's defaults");
-    check(descriptorsPattern(p.arpPattern()), "and its pattern the descriptors' defaults");
-    check(xtArpPatternSilent(p.arpPattern()), "which plays nothing");
+    check(p.arpPattern() == firmwareDefaultPattern(), "and its pattern the firmware's default patch's, initialized");
+    check(!xtArpPatternSilent(p.arpPattern()), "which plays");
     againstFirmware(check, p, rom);
     const Setting moved[] = { { "arpSwitch", 1 },       { "arpHold", 1 },       { "arpMotif", 6 },
                               { "arpDuration", 37 },    { "arpShuffleRate", 71 }, { "arpShuffleRes", 1 },
@@ -163,16 +159,14 @@ Heard play(VSynthEmuProcessor& p, double seconds) {
     return h;
 }
 
-// The analog saw, UP on quarters at 120 BPM, a line of velocity 100: a note each quarter, as XtSynth plays it
+// The analog saw, UP on quarters at 120 BPM, on a new processor's pattern, no patch's (v469: an initialized patch's, line
+// 1 at velocity 100 on every step): live keys, a note each quarter, as XtSynth plays it
 void throughProcessor(TestChecks& check, const juce::File& rom, bool on) {
     VSynthEmuProcessor p;
     p.setRomFile(rom);
     const Setting set[] = { { "oscType", 0 }, { "ampAttack", 0 }, { "ampRelease", 0 },
                             { "arpSwitch", on ? 1.0f : 0.0f }, { "arpGrid", 0 }, { "arpDuration", 25 } };
     for (const auto& [id, v] : set) setParam(p, id, v);
-    XtArpPattern pattern = xtArpDefaultPattern();
-    for (auto& step : pattern.cell) step[0] = 101;
-    p.setArpPattern(pattern);
     const Heard h = play(p, 2.1);
     const std::vector<double> at = onsetsMs(h.rms, 1000.0 * kBlock / kRate);
     const std::string which = on ? "the Switch on: " : "the Switch off: ";

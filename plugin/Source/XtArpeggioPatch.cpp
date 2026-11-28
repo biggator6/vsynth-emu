@@ -19,13 +19,14 @@ XtArpSettings xtArpSettingsOf(const std::vector<uint8_t>& store) {
     return s;
 }
 
-// The pattern as 0x8930ca30 lays it out: a line's State and Note/CC, then its 32 steps
+// The pattern as the patch holds it: a line's State and Note/CC, then its 32 steps (v468: a CTRL line's controller as
+// stored, 0…127; XtArpeggio::setPattern lays it out as 0x8930ca30 does, where this did)
 XtArpPattern xtArpPatternRead(const std::function<int(int id, int line)>& value, int state, int note, int step1) {
     XtArpPattern p;
     for (int l = 0; l < XtArpPattern::kLines; ++l) {
         const bool ctrl = (value(state, l) & 1) != 0;
         const int n = value(note, l) & kNoteBits;
-        p.line[l] = (uint8_t)(ctrl ? kCtrl | std::min(n, kXtArpCtrlMost) : n);
+        p.line[l] = (uint8_t)(ctrl ? kCtrl | n : n);
         for (int s = 0; s < XtArpPattern::kSteps; ++s)
             p.cell[s][l] = (uint8_t)value(step1 + kStepIds * s, l);
     }

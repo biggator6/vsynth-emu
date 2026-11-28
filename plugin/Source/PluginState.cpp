@@ -5,6 +5,7 @@
 #include "PluginParamIds.h"
 
 void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    midi_.edits.flush();   // v462: a MIDI edit not yet on its parameter goes with it
     auto state = apvts.copyState();
     juce::String edits;
     for (int id = 0; id < kFxIds; ++id) {
@@ -12,6 +13,7 @@ void VSynthEmuProcessor::getStateInformation(juce::MemoryBlock& destData) {
         if (v != kFxNoEdit) edits << id << "=" << v << ",";
     }
     state.setProperty("fxEdits", edits, nullptr);
+    state.setProperty("midiMap", midi_.learn.toText(), nullptr);   // v463: MIDI learn's, by parameter ID (d-4)
     vc2PatchToState(vc2Patch_, state);   // PluginVc2Patch.cpp, v452: the VC-2 patch's store and name
     PluginWaveEdits::toState(*this, state);   // v479: the WAVE page's edits of each OSC's wave
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
@@ -25,6 +27,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
 
     const juce::ValueTree saved = juce::ValueTree::fromXml(*xml);
     const bool hadSplits = saved.getChildWithProperty("id", Params::zoneUpperId(0)).isValid();   // v195 on
+    midi_.edits.drop();   // v462: the session's values, not a MIDI edit made before it came
     apvts.replaceState(saved);
     restoreArpPattern();   // v190: a session before it has none
     for (auto& e : fxEdits_) e.store(kFxNoEdit, std::memory_order_relaxed);
@@ -32,6 +35,7 @@ void VSynthEmuProcessor::setStateInformation(const void* data, int sizeInBytes) 
         if (pair.contains("=")) setFxParam(pair.upToFirstOccurrenceOf("=", false, false).getIntValue(),
                                            pair.fromFirstOccurrenceOf("=", false, false).getIntValue());
     fxPatchPending_ = true;
+    midi_.learn.fromText(apvts.state.getProperty("midiMap").toString());   // v463: none from a session before it
 
     // The firmware image and the file, if their paths were persisted
     const juce::String rom = apvts.state.getProperty("romPath").toString();

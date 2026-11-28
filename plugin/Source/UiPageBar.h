@@ -11,7 +11,11 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     juce::Button& keyboardSwitch() { return keyboard_; }
+    // A line in the accent on every page in the hint's place, MIDI learn's while it waits (v463); none, the hint again
+    void showLine(const juce::String& line);
+    const juce::String& line() const { return line_; }
 
 private:
     juce::ToggleButton keyboard_ { "Keyboard" };
+    juce::String line_;
 };

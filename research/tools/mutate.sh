@@ -13,15 +13,18 @@
 # PORT=wavefile: XtWaveFile.cpp (a wave's chunks) under xt_files, as PORT=files; PORT=tonewave: XtWaveFile.cpp under xt_tone.
 # PORT=diskimage: XtDiskImage.cpp (the firmware's disk image, v177) under xt_files, as PORT=files; PORT=presetwaves:
 # XtPresetWaves.cpp (a project's links and the preset waves they reach, v600), the same; PORT=patchsave:
-# XtFwPatchFile.cpp (a patch's save by the firmware's routines, v602), the same; PORT=wavesave: XtFwWaveFile.cpp (a
-# wave's save by the firmware's writer, v482), and PORT=fileout: XtFwFileOut.cpp (both writers' file calls), the same.
+# XtFwPatchFile.cpp (a patch's save by the firmware's routines, v602), the same; PORT=patchinit: XtFwPatchInit.cpp (the
+# PATCH Init by the firmware's, v473), the same; PORT=wavesave: XtFwWaveFile.cpp (a wave's save by the firmware's
+# writer, v482), and PORT=fileout: XtFwFileOut.cpp (both writers' file calls), the same.
 # PORT=patchstore: XtPatchStore.cpp (the patch store's layout and the descriptors' reads, v187) under xt_files, as
 # PORT=files; PORT=tonestore: XtPatchStore.cpp under xt_tone; PORT=tonearp: XtSynthArp.cpp under xt_tone (v189).
 # PORT=arp: XtArpeggio.cpp (the arpeggiator's keys and settings, v188), PORT=arpstep: XtArpeggioStep.cpp (its timer and
 # step), PORT=arpmotif: XtArpeggioMotifs.cpp (its motifs), PORT=ticks: XtTempoTicks.cpp (the tempo ticks it steps on,
-# v189), under xt_arp; [cases] its random cases, after the presets.
+# v189), PORT=arpedit: XtArpPatternEdit.cpp (the Pattern Edit's edits, v468), under xt_arp; [cases] its random cases,
+# after the presets.
 # PORT=msm: XtMsm.cpp (the Multi Step Modulator, v192) under xt_msm, [cases] its random cases and SEED its seed;
 # PORT=msmtrack: XtMsmTrack.cpp, PORT=msmpatch: XtMsmPatch.cpp, the same.
+# PORT=midi: XtMidiEdits.cpp (rom.2's edits of the patch from MIDI, v462) under xt_midi, [cases] its cases, SEED its seed.
 # PORT=vc2…: rom.4's ports under their checks, on rom.4 ($ROM4): mutate_vc2ports.sh's list (v220).
 # PORT=toneknobs, toneenvknobs, toneupdate, tonezones, tonenotes: XtSynthKnobs.cpp, XtSynthEnvKnobs.cpp, XtSynthUpdate.cpp,
 # XtSynthZones.cpp, XtSynthNotes.cpp under xt_tone (v193: XtSynth's parts by job); tonefwcpp, tonefwh, tonecases,
@@ -36,6 +39,8 @@ source "$(dirname "$0")/env.sh"
 N=$1; O=$2; W=$3; C=${4:-100}; P=${5:-.}
 IMAGE="$ROM"   # what the planted binary runs on: rom.2, but rom.4 for PORT=vc2params (v199) and vc2in (v208)
 S="$REPO/plugin/Source"; M="$WORK/mut"; mkdir -p "$M"
+# The ports that plant in one of xt_files' own files, besides PORT=files (and filesfw, XtFirmware's routines for them)
+FILEPORTS="wavefile|diskimage|patchstore|presetwaves|patchsave|patchinit|wavesave|fileout"
 source "$(dirname "$0")/objects.sh"   # keptObject: the fx ports' objects, by their source and every header
 source "$(dirname "$0")/mutate_tonefile.sh"   # tonefile: a tone port's file (moved as it stood, so mutate_tone.py reads it too)
 source "$(dirname "$0")/mutate_parts.sh"   # harnessParts, fxParts: a harness's kept objects (moved as they stood, v208)
@@ -90,19 +95,21 @@ elif [[ "$PORT" =~ ^(fxc|fxv|fxi|fxe|fxim|fxu|fx4c|fx4i|fx4u|fx4in)$ ]]; then
     esac
     [[ "$PORT" == fx4* ]] && IMAGE="$ROM4"
     fxParts XtFxChip "${KEEP[@]}"
-elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks|arpring)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
+elif [[ "$PORT" =~ ^(arp|arpstep|arpmotif|ticks|arpring|arpedit)$ ]]; then   # XtArpeggio against the firmware's object; XT_ARP_STOP stops it
     case "$PORT" in
         ticks) F=XtTempoTicks.cpp ;;
         arpstep) F=XtArpeggioStep.cpp ;;
         arpmotif) F=XtArpeggioMotifs.cpp ;;
         arpring) F=XtRing.h ;;   # v354: the keys' ring, a header: every part built from a copy (below)
+        arpedit) F=XtArpPatternEdit.cpp ;;   # v468: the Pattern Edit's edits, under xt_arp's edits section
         *) F=XtArpeggio.cpp ;;
     esac
     harnessParts XT_ARP_MAIN arp_obj XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases \
-                 XtTempoTicks XtTempoTicksCheck XtArpeggioPatch
+                 XtTempoTicks XtTempoTicksCheck XtArpeggioPatch XtArpPatternEdit XtArpPatternEditCheck
     PARTS=(XtArpeggio XtArpeggioStep XtArpeggioMotifs XtArpeggioCheck XtArpeggioCases XtTempoTicks XtTempoTicksCheck
-           XtArpeggioPatch XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware XtFwMachine XtMultiBandPlayer
-           XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup $( [ -f "$S/XtFwEncode.cpp" ] && echo XtFwEncode XtFwEvents ))
+           XtArpeggioPatch XtArpPatternEdit XtArpPatternEditCheck XtFiles XtWaveFile XtDiskImage XtPatchStore XtFirmware
+           XtFwMachine XtMultiBandPlayer XtSoloVoice XtSoloEncoder Sh4Interp Sh4Setup
+           $( [ -f "$S/XtFwEncode.cpp" ] && echo XtFwEncode XtFwEvents ))
     TONE=(-DXT_ARP_MAIN -DXT_HARNESS_SWITCHES)   # the header's plant's flags, as the tone's own
 elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     # The Multi Step Modulator against xt_msm: XtMsm.cpp, with PORT=msmtrack XtMsmTrack.cpp, with PORT=msmpatch
@@ -114,11 +121,14 @@ elif [[ "$PORT" =~ ^msm(track|patch)?$ ]]; then
     esac
     ARGS=("${SEED:-2024}")
     harnessParts XT_MSM_MAIN msm_obj XtMsm XtMsmTrack XtMsmPatch XtMsmCheck XtMsmCases
+elif [ "$PORT" = midi ]; then      # rom.2's edits of the patch from MIDI against xt_midi (v462); XT_MIDI_STOP stops it
+    F=XtMidiEdits.cpp; ARGS=("${SEED:-2024}")
+    harnessParts XT_MIDI_MAIN midi_obj XtMidiEdits XtMidiEditsCheck
 elif [[ "$PORT" =~ ^vc2 ]]; then   # rom.4's ports, on rom.4 (mutate_vc2ports.sh, v220)
     vc2Port "$PORT"
 elif [ "$PORT" = enc ]; then       # XtSoloEncoder, on the xt_enc waves of fcheck's baseline; [cases] is not used
     F=XtSoloEncoder.cpp; D=XT_ENCODER_MAIN; L=("$S/XtFirmware.cpp" "$S/XtMultiBandPlayer.cpp" "$S/XtSoloVoice.cpp" "$S/Sh4Interp.cpp"); EXTRA=(-ffp-contract=off)
-elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore|presetwaves|patchsave|wavesave|fileout)$ ]]; then
+elif [[ "$PORT" =~ ^(files|$FILEPORTS)$ ]]; then
     # XtFiles, or with PORT=wavefile XtWaveFile (a wave's chunks), with PORT=diskimage XtDiskImage (the firmware's disk
     # image), with PORT=patchstore XtPatchStore (the store's layout), against fcheck's baseline of xt_files; [cases] is
     # not used.  The others, xt_files' checks among them, are built as they are.
@@ -128,6 +138,7 @@ elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore|presetwaves|patchsave|w
         patchstore) F=XtPatchStore.cpp ;;
         presetwaves) F=XtPresetWaves.cpp ;;
         patchsave) F=XtFwPatchFile.cpp ;;
+        patchinit) F=XtFwPatchInit.cpp ;;
         wavesave) F=XtFwWaveFile.cpp ;;
         fileout) F=XtFwFileOut.cpp ;;
         *) F=XtFiles.cpp ;;
@@ -135,7 +146,8 @@ elif [[ "$PORT" =~ ^(files|wavefile|diskimage|patchstore|presetwaves|patchsave|w
     D=XT_FILES_MAIN
     L=()
     for f in XtFiles.cpp XtWaveFile.cpp XtDiskImage.cpp XtPatchStore.cpp XtPatchStoreCheck.cpp XtWaveFileCheck.cpp \
-             XtPresetWaves.cpp XtPresetWavesCheck.cpp XtFwPatchFile.cpp XtPatchSaveCheck.cpp \
+             XtPresetWaves.cpp XtPresetWavesCheck.cpp XtFwPatchFile.cpp XtPatchSaveCheck.cpp XtFwPatchInit.cpp \
+             XtPatchInitCheck.cpp XtPatchShortCheck.cpp \
              $( [ -f "$S/XtFwWaveFile.cpp" ] && echo XtFwFileOut.cpp XtFwWaveFile.cpp XtWaveSaveCheck.cpp ); do
         [ "$f" = "$F" ] || L+=("$S/$f")
     done
@@ -146,7 +158,8 @@ elif [ "$PORT" = filesfw ]; then   # the same, with the error in XtFirmware's ro
     [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.cpp" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFiles.h" ] && [ "$OBJ/XtFiles_main.o" -nt "$S/XtFirmware.h" ] || { "$TC/clang++" -isysroot "$SDK" -std=c++20 -O2 -DXT_FILES_MAIN -I"$S" -c "$S/XtFiles.cpp" -o "$OBJ/XtFiles_main.$$.o" && mv "$OBJ/XtFiles_main.$$.o" "$OBJ/XtFiles_main.o"; }
     L=("$OBJ/XtFiles_main.o" "$S/XtWaveFile.cpp" "$S/XtDiskImage.cpp" "$S/XtPatchStore.cpp" "$S/XtPatchStoreCheck.cpp"
        "$S/XtWaveFileCheck.cpp" "$S/XtPresetWaves.cpp" "$S/XtPresetWavesCheck.cpp" "$S/XtFwPatchFile.cpp"
-       "$S/XtPatchSaveCheck.cpp" "$S/XtMultiBandPlayer.cpp"
+       "$S/XtPatchSaveCheck.cpp" "$S/XtFwPatchInit.cpp" "$S/XtPatchInitCheck.cpp" "$S/XtPatchShortCheck.cpp"
+       "$S/XtMultiBandPlayer.cpp"
        "$S/XtSoloVoice.cpp" "$S/XtSoloEncoder.cpp" "$S/Sh4Interp.cpp")
     # the wave writer, its file calls and its check (v482)
     [ -f "$S/XtFwWaveFile.cpp" ] && L+=("$S/XtFwFileOut.cpp" "$S/XtFwWaveFile.cpp" "$S/XtWaveSaveCheck.cpp")
@@ -210,7 +223,7 @@ if [ "$PORT" = solo ]; then
     cat "$T"/* | grep -E "$P"
     exit
 fi
-if [[ "$PORT" =~ ^(files|filesfw|wavefile|diskimage|patchstore|presetwaves|patchsave|wavesave|fileout)$ ]]; then
+if [[ "$PORT" =~ ^(files|filesfw|$FILEPORTS)$ ]]; then
     # the baseline's whole xt_files section, as xt_files gains lines (v148, v155): a line the run prints that isn't in it differs, and one of it the run doesn't print
     B="$REPO/research/tools/fcheck_baseline.txt"; T="$M/$N.base"; awk '/^== /{s = ($0 == "== xt_files"); next} s' "$B" > "$T"
     "$M/$N" "$ROM" 2>/dev/null > "$M/$N.all"; st=$?
